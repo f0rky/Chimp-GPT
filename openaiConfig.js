@@ -58,9 +58,9 @@ async function processMessage(userMessage, conversationLog) {
             function_call: "auto"
         });
 
-        console.log('GPT completion:', completion);
-        console.log('GPT completion choices:', completion.data.choices);
-        console.log('GPT function call object:', JSON.stringify(completion.data.choices[0].message.function_call, null, 2));
+        //console.log('GPT completion:', completion);
+        //console.log('GPT completion choices:', completion.data.choices);
+        //console.log('GPT function call object:', JSON.stringify(completion.data.choices[0].message.function_call, null, 2));
 
 
 

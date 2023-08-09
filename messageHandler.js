@@ -32,9 +32,22 @@ client.on('messageCreate', async (message) => {
     // Add the user's message
     conversationLog.push({ role: 'user', content: message.content });
 
+    console.log("Current conversationLog:", JSON.stringify(conversationLog, null, 2));
     // Process the message with GPT
     let gptResponse = await processMessage(message.content, conversationLog);
-      console.log("GPT response type:", gptResponse.type);
+    console.log("GPT response type:", gptResponse.type);
+    // Append user message to conversationLog
+    conversationLog.push({
+        role: 'user',
+        content: message.content
+    });
+
+    // Append assistant's response to conversationLog
+    conversationLog.push({
+        role: 'assistant',
+        content: gptResponse.content
+    });
+
 
     if (gptResponse.type === "functionCall") {
       console.log("Inside functionCall condition");
@@ -44,7 +57,12 @@ client.on('messageCreate', async (message) => {
             // Generate a natural response with GPT if needed
             const naturalResponse = await generateResponse(time, conversationLog);
             message.reply(naturalResponse);
+        } else if (gptResponse.functionName === "lookupWeather") {
+            const weather = await lookupWeather(gptResponse.parameters.location);
+            const naturalResponse = await generateResponse(weather, conversationLog);
+            message.reply(naturalResponse);
         }
+
         // Handle other function calls similarly
     } else if (gptResponse.type === "message") {
         // Check if the message is empty or whitespace only
