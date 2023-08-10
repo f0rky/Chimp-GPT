@@ -91,22 +91,25 @@ async function processMessage(userMessage, conversationLog) {
 }
 
 async function generateResponse(functionResult, conversationLog) {
-  console.log("Generating response with function result:", functionResult);
-  // Add the function result to the conversation log
-  conversationLog.push({
-    role: 'system',
-    content: `The result of the function call is: ${functionResult}`,
-  });
+    console.log("Generating response with function result:", functionResult);
+    
+    // Add the function result to the conversation log
+    conversationLog.push({
+        role: 'system',
+        content: `The result of the function call is: ${functionResult}`,
+    });
 
-  // Create a completion with OpenAI, including the updated conversation log
-  const completion = await openai.createChatCompletion({
-    model: 'gpt-3.5-turbo-0613',
-    messages: conversationLog,
-    max_tokens: 256,
-  });
+    console.log("Conversation log before generating response:", JSON.stringify(conversationLog, null, 2));  // Add this line
+    
+    // Create a completion with OpenAI, including the updated conversation log
+    const completion = await openai.createChatCompletion({
+        model: 'gpt-3.5-turbo-0613',
+        messages: conversationLog,
+        max_tokens: 256,
+    });
 
-  // Get the GPT response
-  return completion.data.choices[0].message.content;
+    // Get the GPT response
+    return completion.data.choices[0].message.content;
 }
 
 // openaiConfig.js

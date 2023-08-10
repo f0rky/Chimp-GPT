@@ -3,14 +3,26 @@ const client = require('./discordClient');
 const { processMessage, generateResponse } = require('./openaiConfig');
 const lookupWeather = require('./weatherLookup');
 const lookupTime = require('./timeLookup');
+const userConversations = {};
+const MAX_CONVERSATION_LENGTH = 8;
+
 
 client.on('messageCreate', async (message) => {
     // Your existing logic for handling messages
 
     if (message.author.bot) return;
     if (message.content.startsWith(process.env.IGNORE_MESSAGE_PREFIX)) return;
+    const userId = message.author.id;
+
 
     console.log('Received message:', message.content);
+    if (message.content && message.content.trim() !== '') {
+        conversationLog.push({
+            role: 'user',
+            content: message.content
+        });
+    }
+
 
     if (message.content.startsWith('!weather')) {
         const location = message.content.split(' ')[1];
@@ -23,14 +35,19 @@ client.on('messageCreate', async (message) => {
         return message.reply(time);
     }
 
-    // Maintain conversation log
-    // Start the conversation log with the bot's personality
-    let conversationLog = [
-        { role: 'system', content: process.env.BOT_PERSONALITY }
-    ];
+    if (!userConversations[message.author.id]) {
+        userConversations[message.author.id] = [
+            { role: 'system', content: process.env.BOT_PERSONALITY }
+        ];
+    }
 
-    // Add the user's message
+    const conversationLog = userConversations[message.author.id];
     conversationLog.push({ role: 'user', content: message.content });
+
+    // Ensure conversation doesn't exceed max length
+    while (conversationLog.length > MAX_CONVERSATION_LENGTH) {
+        conversationLog.shift();
+    }
 
     console.log("Current conversationLog:", JSON.stringify(conversationLog, null, 2));
     // Process the message with GPT
@@ -56,10 +73,22 @@ client.on('messageCreate', async (message) => {
             const time = await lookupTime(gptResponse.parameters.location);
             // Generate a natural response with GPT if needed
             const naturalResponse = await generateResponse(time, conversationLog);
+            if (naturalResponse && naturalResponse.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: naturalResponse
+                });
+            }
             message.reply(naturalResponse);
         } else if (gptResponse.functionName === "lookupWeather") {
             const weather = await lookupWeather(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
+            if (naturalResponse && naturalResponse.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: naturalResponse
+                });
+            }
             message.reply(naturalResponse);
         }
 
@@ -69,6 +98,12 @@ client.on('messageCreate', async (message) => {
         if (!gptResponse.content || gptResponse.content.trim() === '') {
             message.reply("Sorry, I couldn't understand your request. Please try again.");
         } else {
+            if (gptResponse.content && gptResponse.content.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: gptResponse.content
+                });
+            }
             message.reply(gptResponse.content);
         }
     } else if (gptResponse.type === "error") {
