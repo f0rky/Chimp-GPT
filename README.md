@@ -20,7 +20,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
 
 1. **Clone the Repository**:
     ```bash
-    git clone [<repository-url>](https://github.com/f0rky/Chimp-GPT)
+    git clone https://github.com/f0rky/Chimp-GPT
     cd Chimp-GPT
     ```
 
@@ -30,7 +30,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
     ```
 
 3. **Set Up Environment Variables**:
-   Create a `.env` file in the root directory and set up the following environment variables:
+   Create a `.env` file in the root directory and set up the following environment variables (.env_example):
     ```
     OPENAI_API_KEY=your_openai_api_key
     TOKEN=your_discord_bot_token
