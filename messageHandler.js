@@ -23,6 +23,9 @@ client.on('messageCreate', async (message) => {
     const conversationLog = userConversations[userId];
 
     console.log('Received message:', message.content);
+    // Send initial feedback to user
+    let feedbackMessage = await message.reply("<a:loading:1139032461712556062> Thinking...");
+
     if (message.content && message.content.trim() !== '') {
         conversationLog.push({
             role: 'user',
@@ -45,6 +48,12 @@ client.on('messageCreate', async (message) => {
     
     if (gptResponse.type === "functionCall") {
       console.log("Inside functionCall condition");
+    if (gptResponse.functionName === "lookupTime") {
+        feedbackMessage.edit("<a:loading:1139032461712556062> Checking watch...");
+    } else if (gptResponse.functionName === "lookupWeather") {
+        feedbackMessage.edit("<a:loading:1139032461712556062> Looking outside...");
+    }
+
         if (gptResponse.functionName === "lookupTime") {
             console.log("Function Name:", gptResponse.functionName);
             const time = await lookupTime(gptResponse.parameters.location);
@@ -56,7 +65,7 @@ client.on('messageCreate', async (message) => {
                     content: naturalResponse
                 });
             }
-            message.reply(naturalResponse);
+            feedbackMessage.edit(naturalResponse);
         } else if (gptResponse.functionName === "lookupWeather") {
             const weather = await lookupWeather(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
@@ -66,14 +75,14 @@ client.on('messageCreate', async (message) => {
                     content: naturalResponse
                 });
             }
-            message.reply(naturalResponse);
+            feedbackMessage.edit(naturalResponse);
         }
 
         // Handle other function calls similarly
     } else if (gptResponse.type === "message") {
         // Check if the message is empty or whitespace only
         if (!gptResponse.content || gptResponse.content.trim() === '') {
-            message.reply("Sorry, I couldn't understand your request. Please try again.");
+            feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
         } else {
             if (gptResponse.content && gptResponse.content.trim() !== '') {
                 conversationLog.push({
@@ -81,10 +90,10 @@ client.on('messageCreate', async (message) => {
                     content: gptResponse.content
                 });
             }
-            message.reply(gptResponse.content);
+            feedbackMessage.edit(gptResponse.content);
         }
     } else if (gptResponse.type === "error") {
-        message.reply(gptResponse.content);
+        feedbackMessage.edit(gptResponse.content);
     }
 });
 
