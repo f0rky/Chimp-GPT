@@ -4,6 +4,8 @@ const client = require('./discordClient');
 const { processMessage, generateResponse } = require('./openaiConfig');
 const lookupWeather = require('./weatherLookup');
 const lookupTime = require('./timeLookup');
+const lookupQuakeServer = require('./quakeLookup');
+
 const userConversations = {};
 const MAX_CONVERSATION_LENGTH = 8;
 
@@ -45,19 +47,13 @@ client.on('messageCreate', async (message) => {
     // Process the message with GPT
     let gptResponse = await processMessage(message.content, conversationLog);
     console.log("GPT response type:", gptResponse.type);
-    
     if (gptResponse.type === "functionCall") {
-      console.log("Inside functionCall condition");
-    if (gptResponse.functionName === "lookupTime") {
-        feedbackMessage.edit("<a:loading:1139032461712556062> Checking watch...");
-    } else if (gptResponse.functionName === "lookupWeather") {
-        feedbackMessage.edit("<a:loading:1139032461712556062> Looking outside...");
-    }
+        console.log("Inside functionCall condition");
+        console.log("Function Name:", gptResponse.functionName);
 
         if (gptResponse.functionName === "lookupTime") {
-            console.log("Function Name:", gptResponse.functionName);
+            feedbackMessage.edit("<a:loading:1139032461712556062> Checking watch...");
             const time = await lookupTime(gptResponse.parameters.location);
-            // Generate a natural response with GPT if needed
             const naturalResponse = await generateResponse(time, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
                 conversationLog.push({
@@ -66,7 +62,9 @@ client.on('messageCreate', async (message) => {
                 });
             }
             feedbackMessage.edit(naturalResponse);
+
         } else if (gptResponse.functionName === "lookupWeather") {
+            feedbackMessage.edit("<a:loading:1139032461712556062> Looking outside...");
             const weather = await lookupWeather(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
@@ -76,9 +74,31 @@ client.on('messageCreate', async (message) => {
                 });
             }
             feedbackMessage.edit(naturalResponse);
+
+        } else if (gptResponse.functionName === "quakeLookup" || message.content.startsWith("!serverstats")) {
+            feedbackMessage.edit("<a:loading:1139032461712556062> Checking server stats...");
+            const serverStats = await lookupQuakeServer();
+
+            // Convert serverStats object to a readable string
+            const serverStatsString = `
+                Server Name: ${serverStats.serverName}
+                Current Map: ${serverStats.currentMap}
+                Player Count: ${serverStats.playerCount}
+                Top Player: ${serverStats.currentTopPlayer}
+                Uptime: ${serverStats.uptime}
+            `;
+
+            //const naturalResponse = await generateResponse(serverStatsString, conversationLog);
+            const naturalResponse = serverStatsString;
+            if (naturalResponse && naturalResponse.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: naturalResponse
+                });
+            }
+            feedbackMessage.edit(naturalResponse);
         }
 
-        // Handle other function calls similarly
     } else if (gptResponse.type === "message") {
         // Check if the message is empty or whitespace only
         if (!gptResponse.content || gptResponse.content.trim() === '') {

@@ -41,6 +41,15 @@ async function processMessage(userMessage, conversationLog) {
                     }
                 },
                 {
+                    name: "quakeLookup",
+                    description: "get the current quake server stats",
+                    parameters: {
+                        type: "object",
+                        properties: {},
+                        required: []
+                    }
+                },
+                {
                     name: "lookupWeather",
                     description: "get the weather forecast in a given location",
                     parameters: {
