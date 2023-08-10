@@ -20,7 +20,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
 
 1. **Clone the Repository**:
     ```bash
-    git clone <repository-url>
+    git clone [<repository-url>](https://github.com/f0rky/Chimp-GPT)
     cd Chimp-GPT
     ```
 
