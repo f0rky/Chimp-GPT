@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const client = require('./discordClient');
 const { processMessage, generateResponse } = require('./openaiConfig');
@@ -6,7 +7,6 @@ const lookupTime = require('./timeLookup');
 const userConversations = {};
 const MAX_CONVERSATION_LENGTH = 8;
 
-
 client.on('messageCreate', async (message) => {
     // Your existing logic for handling messages
 
@@ -14,6 +14,13 @@ client.on('messageCreate', async (message) => {
     if (message.content.startsWith(process.env.IGNORE_MESSAGE_PREFIX)) return;
     const userId = message.author.id;
 
+    // Ensure the user's conversation log is initialized
+    if (!userConversations[userId]) {
+        userConversations[userId] = [
+            { role: 'system', content: process.env.BOT_PERSONALITY }
+        ];
+    }
+    const conversationLog = userConversations[userId];
 
     console.log('Received message:', message.content);
     if (message.content && message.content.trim() !== '') {
@@ -23,26 +30,8 @@ client.on('messageCreate', async (message) => {
         });
     }
 
+    
 
-    if (message.content.startsWith('!weather')) {
-        const location = message.content.split(' ')[1];
-        const weather = await lookupWeather(location);
-        return message.reply(weather);
-    }
-    if (message.content.startsWith('!time')) {
-        const location = message.content.split(' ')[1];
-        const time = await lookupTime(location);
-        return message.reply(time);
-    }
-
-    if (!userConversations[message.author.id]) {
-        userConversations[message.author.id] = [
-            { role: 'system', content: process.env.BOT_PERSONALITY }
-        ];
-    }
-
-    const conversationLog = userConversations[message.author.id];
-    conversationLog.push({ role: 'user', content: message.content });
 
     // Ensure conversation doesn't exceed max length
     while (conversationLog.length > MAX_CONVERSATION_LENGTH) {
@@ -53,19 +42,7 @@ client.on('messageCreate', async (message) => {
     // Process the message with GPT
     let gptResponse = await processMessage(message.content, conversationLog);
     console.log("GPT response type:", gptResponse.type);
-    // Append user message to conversationLog
-    conversationLog.push({
-        role: 'user',
-        content: message.content
-    });
-
-    // Append assistant's response to conversationLog
-    conversationLog.push({
-        role: 'assistant',
-        content: gptResponse.content
-    });
-
-
+    
     if (gptResponse.type === "functionCall") {
       console.log("Inside functionCall condition");
         if (gptResponse.functionName === "lookupTime") {
