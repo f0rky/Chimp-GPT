@@ -16,8 +16,8 @@ async function lookupWeather(location) {
   };
 
   try {
-	  const response = await axios.request(options);
-	  //console.log(response.data);
+    const response = await axios.request(options);
+    //console.log(response.data);
     let weather = response.data;
     //const currentTemp = weather.current.temp_f;
     //console.log(currentTemp);
@@ -28,7 +28,7 @@ async function lookupWeather(location) {
     High Today: ${weather.forecast.forecastday[0].day.maxtemp_c}`;
     return weatherForecast;
   } catch (error) {
-	  console.error(error);
+    console.error(error);
     return "No forecast found";
   }
 }

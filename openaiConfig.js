@@ -3,23 +3,6 @@ const { Configuration, OpenAIApi } = require('openai');
 const configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });
 const openai = new OpenAIApi(configuration);
 
-const FUNCTION_CALLS = {
-  'lookupTime': {
-    patterns: [
-      /what's the time in (.+?)\?/i,
-      /what is the time in (.+?)\?/i,
-      /can you tell me the time in (.+?)\?/i,
-      /could you tell me the time in (.+?)\?/i,
-      /tell me the time in (.+?)/i,
-      /time in (.+?)\?/i,
-      /current time in (.+?)\?/i,
-      /show me the time in (.+?)/i,
-      /what time is it in (.+?)\?/i
-    ]
-  },
-  // Add more function calls as needed
-};
-
 async function processMessage(userMessage, conversationLog) {
     try {
         const completion = await openai.createChatCompletion({
