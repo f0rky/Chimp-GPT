@@ -8,6 +8,7 @@ async function processMessage(userMessage, conversationLog) {
         const completion = await openai.createChatCompletion({
             model: "gpt-3.5-turbo-0613",
             messages: conversationLog,
+            max_tokens: 512, // Limit token usage (optional)
             functions: [
                 {
                     name: "lookupTime",
