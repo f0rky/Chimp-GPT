@@ -77,26 +77,39 @@ client.on('messageCreate', async (message) => {
 
         } else if (gptResponse.functionName === "quakeLookup" || message.content.startsWith("!serverstats")) {
             feedbackMessage.edit("<a:loading:1139032461712556062> Checking server stats...");
-            const serverStats = await lookupQuakeServer();
 
-            // Convert serverStats object to a readable string
-            const serverStatsString = `
-                Server Name: ${serverStats.serverName}
-                Current Map: ${serverStats.currentMap}
-                Player Count: ${serverStats.playerCount}
-                Top Player: ${serverStats.currentTopPlayer}
-                Uptime: ${serverStats.uptime}
-            `;
+            const serverStatsArray = await lookupQuakeServer();
+            if (!serverStatsArray || serverStatsArray.length === 0) {
+                feedbackMessage.edit("No active servers found.");
+                return; // Exit early
+           }
 
-            //const naturalResponse = await generateResponse(serverStatsString, conversationLog);
-            const naturalResponse = serverStatsString;
-            if (naturalResponse && naturalResponse.trim() !== '') {
-                conversationLog.push({
-                    role: 'assistant',
-                    content: naturalResponse
-                });
+           let responseMessage = "";
+
+           for (let i = 0; i < serverStatsArray.length; i++) {
+                const serverStats = serverStatsArray[i];
+
+                if (serverStats.error) {
+                    responseMessage += serverStats.error + "\n\n";
+                } else if (serverStats.message) {
+                    responseMessage += serverStats.message + "\n\n";
+                } else {
+                    const serverStatsString = `
+                        Server Name: ${serverStats.serverName}
+                        Current Map: ${serverStats.currentMap}
+                        Player Count: ${serverStats.playerCount}
+                        Top Player: ${serverStats.currentTopPlayer}
+                        Uptime: ${serverStats.uptime}
+                    `;
+                    responseMessage += `Server ${i + 1}:\n` + serverStatsString + "\n\n";
+                }
             }
-            feedbackMessage.edit(naturalResponse);
+
+            // Truncate the message if it's too long (Discord has a 2000 character limit)
+            if (responseMessage.length > 2000) {
+                responseMessage = responseMessage.substring(0, 1997) + "...";
+            }
+            feedbackMessage.edit(responseMessage);
         }
 
     } else if (gptResponse.type === "message") {

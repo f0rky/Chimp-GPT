@@ -1,40 +1,58 @@
 const axios = require('axios');
 
+const API_URL = 'https://ql.syncore.org/api/servers?regions=Oceania&hasPlayers=true&hasBots=false';
+
+function getTopPlayer(players) {
+    if (players.length === 0) {
+        throw new Error("No players found.");
+    }
+
+    return players.reduce((prev, current) => {
+        return (prev.score > current.score) ? prev : current;
+    });
+}
+function calculateUptime(levelStartTime) {
+    const currentTime = Math.floor(Date.now() / 1000);  // Current time in seconds
+    const uptimeSeconds = currentTime - parseInt(levelStartTime);
+    return new Date(uptimeSeconds * 1000).toISOString().substr(11, 8);  // Convert seconds to HH:mm:ss format
+}
+
+function extractServerStats(server) {
+    const { info, players, rules } = server;
+    const topPlayer = getTopPlayer(players);
+    const uptime = calculateUptime(rules.g_levelStartTime);
+
+    return {
+        serverName: info.serverName.trim(),
+        currentMap: info.map,
+        playerCount: `${info.players}/${info.maxPlayers}`,
+        currentTopPlayer: `${topPlayer.name} with ${topPlayer.score} points`,
+        uptime
+    };
+}
+
 async function getServerStats() {
     console.log("getServerStats: Function started");
-    const apiUrl = 'https://ql.syncore.org/api/servers?regions=Oceania&hasPlayers=true&hasBots=false';
 
     try {
-        const response = await axios.get(apiUrl);
+        const { data } = await axios.get(API_URL);
 
-        if (response.data && response.data.servers && response.data.servers.length > 0) {
-            const server = response.data.servers[0];
-            const info = server.info;
-            const players = server.players;
+        if (data && data.servers && data.servers.length > 0) {
+            // Sort the servers by player count in descending order
+            const sortedServers = data.servers.sort((a, b) => b.info.players - a.info.players);
 
-            // Getting the top player based on score
-            const topPlayer = players.reduce((prev, current) => {
-                return (prev.score > current.score) ? prev : current;
-            });
+            // Extract stats for top 3 servers or less
+            const topServers = sortedServers.slice(0, 3).map(extractServerStats);
 
-            // Calculate uptime based on the level start time
-            const currentTime = Math.floor(Date.now() / 1000);  // Current time in seconds
-            const uptimeSeconds = currentTime - parseInt(server.rules.g_levelStartTime);
-            const uptime = new Date(uptimeSeconds * 1000).toISOString().substr(11, 8);  // Convert seconds to HH:mm:ss format
             console.log("getServerStats: Function completed");
-            return {
-                serverName: info.serverName.trim(),
-                currentMap: info.map,
-                playerCount: `${info.players}/${info.maxPlayers}`,
-                currentTopPlayer: `${topPlayer.name} with ${topPlayer.score} points`,
-                uptime: uptime
-            };
+
+            return topServers;
         } else {
-            return "No active servers found.";
+            return [{ message: "No active servers found." }];
         }
     } catch (error) {
         console.error(error);
-        return "Error fetching server stats.";
+        return [{ error: "Error fetching server stats." }];
     }
 }
 
@@ -42,7 +60,14 @@ module.exports = getServerStats;
 
 if (require.main === module) {  // Check if the script is being run directly
     (async () => {
-        const result = await getServerStats();
-        console.log(result);
+        const results = await getServerStats();
+        
+        results.forEach((result, index) => {
+            if (result.error || result.message) {
+                console.log(result.error || result.message);
+            } else {
+                console.log(`Server ${index + 1}:\n`, result, '\n');
+            }
+        });
     })();
 }
