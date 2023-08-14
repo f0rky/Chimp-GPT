@@ -123,7 +123,13 @@ client.on('messageCreate', async (message) => {
                     content: gptResponse.content
                 });
             }
-            feedbackMessage.edit(gptResponse.content);
+
+            // Truncate the message if it's too long (Discord has a 2000 character limit)
+            let finalResponse = gptResponse.content;
+            if (finalResponse.length > 2000) {
+                finalResponse = finalResponse.substring(0, 1997) + "...";
+            }
+            feedbackMessage.edit(finalResponse);
         }
     } else if (gptResponse.type === "error") {
         feedbackMessage.edit(gptResponse.content);
