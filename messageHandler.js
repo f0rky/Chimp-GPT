@@ -2,7 +2,7 @@
 require('dotenv').config();
 const client = require('./discordClient');
 const { processMessage, generateResponse } = require('./openaiConfig');
-const lookupWeather = require('./weatherLookup');
+const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
 const lookupTime = require('./timeLookup');
 const lookupQuakeServer = require('./quakeLookup');
 
@@ -66,6 +66,18 @@ client.on('messageCreate', async (message) => {
         } else if (gptResponse.functionName === "lookupWeather") {
             feedbackMessage.edit("<a:loading:1139032461712556062> Looking outside...");
             const weather = await lookupWeather(gptResponse.parameters.location);
+            const naturalResponse = await generateResponse(weather, conversationLog);
+            if (naturalResponse && naturalResponse.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: naturalResponse
+                });
+            }
+            feedbackMessage.edit(naturalResponse);
+
+        } else if (gptResponse.functionName === "lookupExtendedForecast") {
+            feedbackMessage.edit("<a:loading:1139032461712556062> Let me ping the cloud, and I don't mean the fluffy ones...");
+            const weather = await lookupExtendedForecast(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
                 conversationLog.push({

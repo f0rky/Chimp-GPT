@@ -46,6 +46,20 @@ async function processMessage(userMessage, conversationLog) {
                         },
                         required: ["location"]
                     }
+                },
+                {
+                    name: "lookupExtendedForecast",
+                    description: "get the weather forecast for the next 5 days in a given location",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            location: {
+                                type: "string",
+                                description: "The location, e.g., Beijing, China. But it should be written in a city, state, country"
+                            }
+                        },
+                        required: ["location"]
+                    }
                 }
             ],
             function_call: "auto"
