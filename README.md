@@ -1,13 +1,13 @@
 
 # Chimp-GPT Discord Bot
 
-Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to interact with users, provide weather information, and tell the current time, among other functionalities.
+Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to interact with users, provide weather information, tell the current time, and more.
 
 ## Features
 
-- **Interactive Conversations**: Engage in dynamic conversations with the bot.
-- **Weather Lookup**: Ask the bot about current weather conditions.
-- **Time Inquiry**: Find out the current time by asking the bot.
+- **Interactive Conversations**: Engage in dynamic conversations with the bot using natural language. For example, ask "Tell me a joke," and the bot will respond with a joke.
+- **Weather Lookup**: Ask the bot about current weather conditions. Example: "What's the weather like in New York?"
+- **Time Inquiry**: Find out the current time by asking the bot, like: "What time is it in London?"
 
 ## Prerequisites
 
@@ -30,18 +30,21 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
     ```
 
 3. **Set Up Environment Variables**:
-   Create a `.env` file in the root directory and set up the following environment variables (.env_example):
-    ```
-    OPENAI_API_KEY=your_openai_api_key
-    TOKEN=your_discord_bot_token
-    X_RAPIDAPI_KEY=your_rapidapi_key
-    ```
-   
+   Create a `.env` file in the root directory and set up the following environment variables (refer to `.env_example`):
+   ```env
+   TOKEN=your_discord_bot_token
+   OPENAI_API_KEY=your_openai_api_key
+   CHANNEL_ID=your_channel_id(s) # Single or comma-separated
+   X_RAPIDAPI_KEY=your_rapidapi_key
+   BOT_PERSONALITY="Your bot's personality description"
+   IGNORE_MESSAGE_PREFIX="." # Prefix to ignore messages
+   ```
+
 4. **Set Up Bot Personality**:
-   Modify the `BOT_PERSONALITY` variable in the code to define the personality and behavior of the bot as you see fit.
+   Modify the `BOT_PERSONALITY` variable in the code to define the personality and behavior of the bot as you see fit. (protip ChatGPT to create a persona!)
 
 5. **Set Discord Channel ID**:
-   Modify the `CHANNEL_ID` variable in the code to specify the Discord channel where the bot will operate.
+   Modify the `CHANNEL_ID` variable in the code to specify the Discord channel where the bot will operate in, this can be multiple (comma seperated)
 
 6. **Run the Bot**:
     ```bash
@@ -57,9 +60,11 @@ The bot should now be running and ready to interact in your Discord server.
 
 2. **Weather Inquiry**:
     Ask the bot about the weather, for example: "What's the weather like in New York?"
+    And it will use OpenAI's GPT-3.5 to provide a natural response using the RapidAPI accurate weather information.
 
 3. **Time Inquiry**:
-    Ask the bot for the current time, like: "What time is it?"
+    Ask the bot for the current time, like: "Whats the time in New York?"
+    And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
 
 ## Contributing
 
