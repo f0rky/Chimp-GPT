@@ -9,23 +9,19 @@ const lookupQuakeServer = require('./quakeLookup');
 const userConversations = {};
 const MAX_CONVERSATION_LENGTH = 8;
 
+// Read the CHANNEL_ID from .env; it can be a single ID or a comma-separated list
+const allowedChannelIDs = (process.env.CHANNEL_ID || "").split(',');
+
 client.on('messageCreate', async (message) => {
     // Your existing logic for handling messages
     console.log('Processing message:', message.content, 'from:', message.author.username, 'Replying to:', message.reference ? message.reference.messageID : 'None');
 
     if (message.author.bot) return;
     if (message.content.startsWith(process.env.IGNORE_MESSAGE_PREFIX)) return;
-    if (message.reference) {
-        try {
-            const referencedMessage = await message.channel.messages.fetch(message.reference.messageID);
-            if (referencedMessage && referencedMessage.author.id !== client.user.id) {
-                console.log("Ignoring reply to another user");
-                return; // Ignore the message if it's a reply to someone other than the bot
-            }
-        } catch (error) {
-            console.log("Error fetching referenced message:", error);
-            return; // Ignore the message if there's an error fetching the referenced message
-        }
+
+    if (!allowedChannelIDs.includes(message.channel.id)) {
+      console.log(`Ignoring message from unauthorized channel: ${message.channel.id}`);
+      return;
     }
 
     const userId = message.author.id;
