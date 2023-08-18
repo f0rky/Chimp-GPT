@@ -11,9 +11,23 @@ const MAX_CONVERSATION_LENGTH = 8;
 
 client.on('messageCreate', async (message) => {
     // Your existing logic for handling messages
+    console.log('Processing message:', message.content, 'from:', message.author.username, 'Replying to:', message.reference ? message.reference.messageID : 'None');
 
     if (message.author.bot) return;
     if (message.content.startsWith(process.env.IGNORE_MESSAGE_PREFIX)) return;
+    if (message.reference) {
+        try {
+            const referencedMessage = await message.channel.messages.fetch(message.reference.messageID);
+            if (referencedMessage && referencedMessage.author.id !== client.user.id) {
+                console.log("Ignoring reply to another user");
+                return; // Ignore the message if it's a reply to someone other than the bot
+            }
+        } catch (error) {
+            console.log("Error fetching referenced message:", error);
+            return; // Ignore the message if there's an error fetching the referenced message
+        }
+    }
+
     const userId = message.author.id;
 
     // Ensure the user's conversation log is initialized
