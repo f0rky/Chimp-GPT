@@ -5,9 +5,12 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
 
 ## Features
 
-- **Interactive Conversations**: Engage in dynamic conversations with the bot using natural language. For example, ask "Tell me a joke," and the bot will respond with a joke.
-- **Weather Lookup**: Ask the bot about current weather conditions. Example: "What's the weather like in New York?"
-- **Time Inquiry**: Find out the current time by asking the bot, like: "What time is it in London?"
+- **Interactive Conversations**: Engage in dynamic conversations with the bot using natural language.
+  Example: ask "Tell me a joke," and the bot will respond with a joke using GPT3.5.
+- **Weather Lookup**: Ask the bot about current weather conditions for a location.
+  Example: "What's the weather like in New York?"
+- **Time Inquiry**: Find out the current time of a location by asking the bot
+  Example: "What time is it in London?"
 
 ## Prerequisites
 
