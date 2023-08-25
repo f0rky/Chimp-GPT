@@ -8,6 +8,7 @@ const lookupQuakeServer = require('./quakeLookup');
 
 const userConversations = {};
 const MAX_CONVERSATION_LENGTH = 8;
+const loadingEmoji = process.env.LOADING_EMOJI;
 
 // Read the CHANNEL_ID from .env; it can be a single ID or a comma-separated list
 const allowedChannelIDs = (process.env.CHANNEL_ID || "").split(',');
@@ -41,7 +42,7 @@ client.on('messageCreate', async (message) => {
 
     console.log('Received message:', message.content);
     // Send initial feedback to user
-    let feedbackMessage = await message.reply("<a:loading:1139032461712556062> Thinking...");
+    let feedbackMessage = await message.reply(`${loadingEmoji} Thinking...`);
 
     if (message.content && message.content.trim() !== '') {
         conversationLog.push({
@@ -67,7 +68,7 @@ client.on('messageCreate', async (message) => {
         console.log("Function Name:", gptResponse.functionName);
 
         if (gptResponse.functionName === "lookupTime") {
-            feedbackMessage.edit("<a:loading:1139032461712556062> Checking watch...");
+            feedbackMessage.edit(`${loadingEmoji} Checking watch...`);
             const time = await lookupTime(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(time, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
@@ -79,7 +80,7 @@ client.on('messageCreate', async (message) => {
             feedbackMessage.edit(naturalResponse);
 
         } else if (gptResponse.functionName === "lookupWeather") {
-            feedbackMessage.edit("<a:loading:1139032461712556062> Looking outside...");
+            feedbackMessage.edit(`${loadingEmoji} Looking outside...`);
             const weather = await lookupWeather(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
@@ -91,7 +92,7 @@ client.on('messageCreate', async (message) => {
             feedbackMessage.edit(naturalResponse);
 
         } else if (gptResponse.functionName === "lookupExtendedForecast") {
-            feedbackMessage.edit("<a:loading:1139032461712556062> Let me ping the cloud, and I don't mean the fluffy ones...");
+            feedbackMessage.edit(`${loadingEmoji} Let me ping the cloud, and I don't mean the fluffy ones...`);
             const weather = await lookupExtendedForecast(gptResponse.parameters.location);
             const naturalResponse = await generateResponse(weather, conversationLog);
             if (naturalResponse && naturalResponse.trim() !== '') {
@@ -103,7 +104,7 @@ client.on('messageCreate', async (message) => {
             feedbackMessage.edit(naturalResponse);
 
         } else if (gptResponse.functionName === "quakeLookup" || message.content.startsWith("!serverstats")) {
-            feedbackMessage.edit("<a:loading:1139032461712556062> Checking server stats...");
+            feedbackMessage.edit(`${loadingEmoji} Checking server stats...`);
 
             const serverStatsArray = await lookupQuakeServer();
             if (!serverStatsArray || serverStatsArray.length === 0) {
@@ -164,4 +165,4 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);

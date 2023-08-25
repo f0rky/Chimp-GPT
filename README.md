@@ -35,12 +35,14 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
 3. **Set Up Environment Variables**:
    Create a `.env` file in the root directory and set up the following environment variables (refer to `.env_example`):
    ```env
-   TOKEN=your_discord_bot_token
-   OPENAI_API_KEY=your_openai_api_key
-   CHANNEL_ID=your_channel_id(s) # Single or comma-separated
-   X_RAPIDAPI_KEY=your_rapidapi_key
-   BOT_PERSONALITY="Your bot's personality description"
-   IGNORE_MESSAGE_PREFIX="." # Prefix to ignore messages
+   DISCORD_TOKEN = your_discord_bot_token
+   OPENAI_API_KEY = your_openai_api_key
+   CHANNEL_ID = your_channel_id(s) # Single or comma-separated
+   X_RAPIDAPI_KEY = your_rapidapi_key
+   BOT_PERSONALITY = "Your bot's personality"
+   IGNORE_MESSAGE_PREFIX = "." # Prefix to ignore messages
+   LOADING_EMOJI = <a:loading:1139032461712556062> # say \:emoji: on discord to get this ID
+
    ```
 
 4. **Set Up Bot Personality**:
