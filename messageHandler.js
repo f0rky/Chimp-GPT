@@ -12,6 +12,11 @@ const MAX_CONVERSATION_LENGTH = 8;
 // Read the CHANNEL_ID from .env; it can be a single ID or a comma-separated list
 const allowedChannelIDs = (process.env.CHANNEL_ID || "").split(',');
 
+// Function to remove color codes from the string
+function removeColorCodes(str) {
+    return str.replace(/\^\d+/g, '');
+}
+
 client.on('messageCreate', async (message) => {
     // Your existing logic for handling messages
     console.log('Processing message:', message.content, 'from:', message.author.username, 'Replying to:', message.reference ? message.reference.messageID : 'None');
@@ -116,14 +121,15 @@ client.on('messageCreate', async (message) => {
                 } else if (serverStats.message) {
                     responseMessage += serverStats.message + "\n\n";
                 } else {
+                    const cleanedTopPlayer = removeColorCodes(serverStats.currentTopPlayer);
                     const serverStatsString = `
                         Server Name: ${serverStats.serverName}
                         Current Map: ${serverStats.currentMap}
                         Player Count: ${serverStats.playerCount}
-                        Top Player: ${serverStats.currentTopPlayer}
+                        Top Player: ${cleanedTopPlayer}
                         Uptime: ${serverStats.uptime}
                     `;
-                    responseMessage += `Server ${i + 1}:\n` + serverStatsString + "\n\n";
+                    responseMessage += `Server ${i + 1}:` + serverStatsString + "\n\n";
                 }
             }
 
