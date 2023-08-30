@@ -5,6 +5,7 @@ const { processMessage, generateResponse } = require('./openaiConfig');
 const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
 const lookupTime = require('./timeLookup');
 const lookupQuakeServer = require('./quakeLookup');
+const lookupWolfram = require('./wolframLookup');
 
 const userConversations = {};
 const MAX_CONVERSATION_LENGTH = 8;
@@ -50,9 +51,6 @@ client.on('messageCreate', async (message) => {
             content: message.content
         });
     }
-
-    
-
 
     // Ensure conversation doesn't exceed max length
     while (conversationLog.length > MAX_CONVERSATION_LENGTH) {
@@ -102,6 +100,18 @@ client.on('messageCreate', async (message) => {
                 });
             }
             feedbackMessage.edit(naturalResponse);
+
+        } else if (gptResponse.functionName === "getWolframShortAnswer") {
+            feedbackMessage.edit(`${loadingEmoji} Consulting Wolfram Alpha...`);
+            const wolframAnswer = await lookupWolfram.getWolframShortAnswer(gptResponse.parameters.query);
+            const naturalResponse = await generateResponse(wolframAnswer, conversationLog);
+            if (naturalResponse && naturalResponse.trim() !== '') {
+                conversationLog.push({
+                    role: 'assistant',
+                    content: naturalResponse
+                });
+           }
+           feedbackMessage.edit(naturalResponse);
 
         } else if (gptResponse.functionName === "quakeLookup" || message.content.startsWith("!serverstats")) {
             feedbackMessage.edit(`${loadingEmoji} Checking server stats...`);

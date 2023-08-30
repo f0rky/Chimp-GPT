@@ -60,6 +60,20 @@ async function processMessage(userMessage, conversationLog) {
                         },
                         required: ["location"]
                     }
+                },
+                {
+                    name: "getWolframShortAnswer",
+                    description: "Get a short answer to a query using Wolfram Alpha",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            query: {
+                                type: "string",
+                                description: "The query you want to ask Wolfram Alpha, e.g., 'What is the square root of 16?'"
+                            }
+                        },
+                        required: ["query"]
+                    }
                 }
             ],
             function_call: "auto"
