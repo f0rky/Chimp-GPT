@@ -1,12 +1,18 @@
-const { Configuration, OpenAIApi } = require('openai');
+/**
+ * OpenAI Configuration for ChimpGPT
+ * Updated to use the latest models and API format
+ */
+const OpenAI = require('openai');
 
-const configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });
-const openai = new OpenAIApi(configuration);
+// Initialize the OpenAI client with the API key
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
 
 async function processMessage(userMessage, conversationLog) {
     try {
-        const completion = await openai.createChatCompletion({
-            model: "gpt-3.5-turbo-0613",
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo-0125",
             messages: conversationLog,
             max_tokens: 512, // Limit token usage (optional)
             functions: [
@@ -123,14 +129,14 @@ async function generateResponse(functionResult, conversationLog) {
     console.log("Conversation log before generating response:", JSON.stringify(conversationLog, null, 2));  // Add this line
     
     // Create a completion with OpenAI, including the updated conversation log
-    const completion = await openai.createChatCompletion({
-        model: 'gpt-3.5-turbo-0613',
+    const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo-0125',
         messages: conversationLog,
         max_tokens: 256,
     });
 
     // Get the GPT response
-    return completion.data.choices[0].message.content;
+    return completion.choices[0].message.content;
 }
 
 // openaiConfig.js

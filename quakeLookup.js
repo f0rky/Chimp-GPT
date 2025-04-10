@@ -1,7 +1,29 @@
+/**
+ * Quake Live Server Lookup Module
+ * 
+ * This module provides functionality to query Quake Live servers,
+ * retrieve player statistics, and format the data for display in Discord.
+ * It supports configurable ELO display modes and uses AI to summarize
+ * data when it exceeds Discord's character limits.
+ * 
+ * @module QuakeLookup
+ * @author Brett
+ * @version 1.0.0
+ */
+
 const axios = require('axios');
 const OpenAI = require('openai');
+const { quake: quakeLogger } = require('./logger');
+const { validateServerInput, validateEloMode, sanitizeOutput } = require('./utils/inputValidator');
 
-// Constants
+/**
+ * API endpoints and configuration constants
+ * @constant {string} SERVERS_API_URL - URL for the Quake Live servers API
+ * @constant {string} QLSTATS_API_URL - URL for the QLStats rankings API
+ * @constant {Object} DEFAULT_PARAMS - Default parameters for server queries
+ * @constant {number} DISCORD_CHAR_LIMIT - Maximum character limit for Discord messages
+ * @constant {number} BUFFER_SPACE - Buffer space to account for message formatting
+ */
 const SERVERS_API_URL = 'https://ql.syncore.org/api/servers';
 const QLSTATS_API_URL = 'https://ql.syncore.org/api/qlstats/rankings';
 const DEFAULT_PARAMS = {
@@ -11,6 +33,13 @@ const DEFAULT_PARAMS = {
 };
 const DISCORD_CHAR_LIMIT = 2000;
 const BUFFER_SPACE = 100;
+
+/**
+ * Module configuration
+ * @typedef {Object} QuakeConfig
+ * @property {number} eloMode - ELO display mode: 0=Off, 1=Categorized, 2=Actual value
+ * @property {number} maxServers - Maximum number of servers to display
+ */
 const CONFIG = {
     // ELO display mode:
     // 0 = Off (don't show ELO)
@@ -20,11 +49,23 @@ const CONFIG = {
     maxServers: 3
 };
 
-// Initialize OpenAI
+/**
+ * OpenAI client instance for AI-powered summaries
+ * @type {OpenAI}
+ */
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+/**
+ * Calculate server uptime from level start time
+ * 
+ * Converts the level start time (Unix timestamp) to a formatted
+ * uptime string in the format HH:MM:SS.
+ * 
+ * @param {string|number} levelStartTime - Unix timestamp when the level started
+ * @returns {string} Formatted uptime string (HH:MM:SS)
+ */
 function calculateUptime(levelStartTime) {
     try {
         const startTime = parseInt(levelStartTime, 10);
@@ -41,11 +82,20 @@ function calculateUptime(levelStartTime) {
 
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     } catch (error) {
-        console.error('Uptime calculation error:', error);
+        quakeLogger.error({ error }, 'Uptime calculation error');
         return '00:00:00';
     }
 }
 
+/**
+ * Remove Quake color codes from text
+ * 
+ * Quake uses color codes in the format ^n where n is a digit.
+ * This function removes these codes to display clean text.
+ * 
+ * @param {string} text - Text potentially containing color codes
+ * @returns {string} Text with color codes removed
+ */
 function stripColorCodes(text) {
     return text ? text.replace(/\^\d+/g, '') : '';
 }
@@ -71,12 +121,18 @@ function formatGameStatus(serverStats) {
 
 async function getQLStatsData(serverAddress) {
     try {
-        console.log('Requesting QLStats for:', serverAddress);
-        const response = await axios.get(`${QLSTATS_API_URL}?servers=${serverAddress}`);
+        // Validate server address before making API call
+        const validatedAddress = validateServerInput(serverAddress);
+        if (!validatedAddress.isValid) {
+            quakeLogger.warn({ address: serverAddress }, 'Invalid server address in getQLStatsData');
+            return null;
+        }
+        
+        const response = await axios.get(`${QLSTATS_API_URL}?server=${encodeURIComponent(validatedAddress.value)}`, { timeout: 3000 });
         return response.data;
     } catch (error) {
-        console.error('Error fetching QLStats data:', error);
-        return { rankedPlayers: [] };
+        quakeLogger.error({ error, serverAddress }, 'Error fetching QLStats data');
+        return null;
     }
 }
 
@@ -108,8 +164,14 @@ function mergePlayerData(basicPlayers, qlstatsPlayers) {
 
 /**
  * Get ELO category (Scrub/Mid/Pro) based on rating
+ * 
+ * Categorizes players into skill levels based on their ELO rating:
+ * - Scrub: 0-799
+ * - Mid: 800-1300
+ * - Pro: 1301+
+ * 
  * @param {number} rating - Player's ELO rating
- * @returns {string} - ELO category
+ * @returns {string} ELO category label
  */
 function getEloCategory(rating) {
     if (rating < 800) return 'Scrub';
@@ -119,9 +181,18 @@ function getEloCategory(rating) {
 
 /**
  * Format player line with configurable ELO display
+ * 
+ * Creates a formatted string for a player entry in the server stats display.
+ * The format changes based on whether the player is active or spectating and
+ * includes ELO information according to the configured display mode.
+ * 
  * @param {Object} player - Player data
- * @param {boolean} isSpectator - Whether player is a spectator
- * @returns {string} - Formatted player line
+ * @param {string} player.name - Player's name
+ * @param {number} [player.score] - Player's score (for active players)
+ * @param {number} [player.ping] - Player's ping in milliseconds
+ * @param {number} [player.elo] - Player's ELO rating if available
+ * @param {boolean} [isSpectator=false] - Whether player is a spectator
+ * @returns {string} Formatted player line for display
  */
 function formatPlayerLine(player, isSpectator = false) {
     const cleanName = stripColorCodes(player.name).padEnd(20);
@@ -147,6 +218,17 @@ function formatPlayerLine(player, isSpectator = false) {
     return `${cleanName} ${score} ${eloDisplay}`;
 }
 
+/**
+ * Format player list for display
+ * 
+ * Creates a formatted string for the player list, including team scores,
+ * player names, and ELO information based on the configured display mode.
+ * 
+ * @param {Array<Object>} players - Player data array
+ * @param {Array<Object>} basicPlayers - Basic player data from server stats
+ * @param {Object} serverStats - Server stats object
+ * @returns {string} Formatted player list string
+ */
 function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     if (!players?.length) {
         return basicPlayers.map(player => {
@@ -224,6 +306,14 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     return lines.join('\n');
 }
 
+/**
+ * Extract server stats from server data
+ * 
+ * Creates a server stats object with relevant information for display.
+ * 
+ * @param {Object} server - Server data object
+ * @returns {Object} Server stats object
+ */
 function extractServerStats(server) {
     const { info, rules, players } = server;
     const uptime = calculateUptime(rules.g_levelStartTime);
@@ -244,9 +334,20 @@ function extractServerStats(server) {
     };
 }
 
+/**
+ * Format server response for display
+ * 
+ * Creates a formatted string for a server response, including server information,
+ * player list, and team scores.
+ * 
+ * @param {Object} serverStats - Server stats object
+ * @param {Object} qlstatsData - QLStats data object
+ * @returns {Object} Formatted server response object
+ */
 function formatServerResponse(serverStats, qlstatsData) {
     const steamLink = `steam://connect/${serverStats.address}`;
-    const avgRating = CONFIG.eloMode > 0 && qlstatsData.rankedPlayers?.length > 0 
+    // Check if qlstatsData exists and has rankedPlayers before accessing properties
+    const avgRating = CONFIG.eloMode > 0 && qlstatsData && qlstatsData.rankedPlayers && qlstatsData.rankedPlayers.length > 0 
         ? `Avg Rating: ${Math.round(qlstatsData.avg)}` : '';
 
     return {
@@ -261,7 +362,7 @@ function formatServerResponse(serverStats, qlstatsData) {
             `⏱️ Uptime: ${serverStats.uptime}`,
             avgRating ? `📊 ${avgRating}` : '',
             '',
-            formatPlayerList(qlstatsData.rankedPlayers, serverStats.players, serverStats),
+            formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
             '',
             '═════════════════════════════════',
             '```'
@@ -270,10 +371,15 @@ function formatServerResponse(serverStats, qlstatsData) {
 }
 
 /**
- * Process server stats with AI to create a concise summary when the response exceeds Discord's character limit
- * @param {Array} serverResponses - Array of formatted server responses
- * @param {Array} allServerStats - Array of all server stats objects
- * @returns {Promise<string>} - AI-processed summary
+ * Process server stats with AI to create a concise summary
+ * 
+ * When the full server stats would exceed Discord's character limit,
+ * this function uses OpenAI to generate a condensed summary of the
+ * most important information from all servers.
+ * 
+ * @param {Array<string>} serverResponses - Array of formatted server responses
+ * @param {Array<Object>} allServerStats - Array of all server stats objects
+ * @returns {Promise<Object>} AI-processed summary object with formatted property
  */
 async function processServerStatsWithAI(serverResponses, allServerStats) {
     try {
@@ -352,146 +458,126 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
     }
 }
 
-async function lookupQuakeServer() {
-    console.log("lookupQuakeServer: Function started");
+/**
+ * Look up Quake Live server statistics
+ * 
+ * Main function that retrieves server information, player stats, and formats
+ * the data for display in Discord. If the formatted output would exceed
+ * Discord's character limit, it uses AI to create a condensed summary.
+ * 
+ * The function implements the compact display format preferred by the user,
+ * with team scores next to team names, condensed spectator lists, and
+ * configurable ELO display modes.
+ * 
+ * @param {string} [serverFilter=null] - Optional server name or IP to filter by
+ * @param {number} [eloMode=null] - Optional ELO display mode override (0=Off, 1=Categorized, 2=Actual value)
+ * @returns {Promise<string>} Formatted server statistics for display in Discord
+ */
+async function lookupQuakeServer(serverFilter = null, eloMode = null) {
+    // Validate inputs (these should already be validated by the command module,
+    // but we validate again here for safety and to handle direct calls)
+    const validatedServer = validateServerInput(serverFilter);
+    const validatedEloMode = validateEloMode(eloMode);
+    
+    quakeLogger.info({
+        serverFilter: validatedServer.value,
+        eloMode: validatedEloMode.value,
+        originalServerFilter: serverFilter,
+        originalEloMode: eloMode
+    }, 'lookupQuakeServer: Function started');
 
     try {
-        const { data } = await axios.get(SERVERS_API_URL, {
+        // Apply ELO mode override if provided
+        if (validatedEloMode.value !== null) {
+            CONFIG.eloMode = validatedEloMode.value;
+        }
+        
+        const response = await axios.get(SERVERS_API_URL, {
             params: DEFAULT_PARAMS,
             timeout: 5000
         });
 
-        if (!data?.servers?.length) {
-            return [{
-                formatted: '```\n  🚫  No active servers found.\n```'
-            }];
+        if (!response.data?.servers?.length) {
+            return '# 🎯 Quake Live Server Status\n\n> 🚫 No active servers found.';
         }
 
-        const sortedServers = data.servers
-            .filter(server => server?.info?.players > 0)
+        // Filter servers by name/IP if provided
+        let filteredServers = response.data.servers.filter(server => server?.info?.players > 0);
+        
+        if (validatedServer.value) {
+            const serverFilterLower = validatedServer.value.toLowerCase();
+            filteredServers = filteredServers.filter(server => {
+                const serverName = stripColorCodes(server.info.name || '').toLowerCase();
+                const serverAddress = (server.address || '').toLowerCase();
+                return serverName.includes(serverFilterLower) || serverAddress.includes(serverFilterLower);
+            });
+        }
+        
+        const sortedServers = filteredServers
             .sort((a, b) => b.info.players - a.info.players)
             .slice(0, CONFIG.maxServers);
 
         if (!sortedServers.length) {
-            return [{
-                formatted: '```\n  🚫  No active servers found.\n```'
-            }];
+            const noServersMessage = serverFilter 
+                ? `No active servers found matching "${serverFilter}".`
+                : 'No active servers found.';
+            
+            return `# 🎯 Quake Live Server Status\n\n> 🚫 ${noServersMessage}`;
         }
 
         // Process all servers to get their stats
+        const serverResponses = [];
         const allServerStats = [];
-        const results = [];
-        let totalSize = 0;
-
-        // Always process at least the first server
-        if (sortedServers.length > 0) {
+        
+        for (const server of sortedServers) {
             try {
-                const server = sortedServers[0];
+                // Validate server address before making API call
+                const validatedAddress = validateServerInput(server.address);
+                if (!validatedAddress.isValid) {
+                    quakeLogger.warn({ address: server.address }, 'Invalid server address');
+                    continue;
+                }
+                
+                // Get server stats
                 const serverStats = extractServerStats(server);
-                const qlstatsData = await getQLStatsData(serverStats.address);
+                
+                // Get QLStats data for the server
+                const qlstatsData = await getQLStatsData(validatedAddress.value);
+                
+                // Format the server response
                 const formattedResponse = formatServerResponse(serverStats, qlstatsData);
-                
-                // Store server stats and add to results
+                serverResponses.push(formattedResponse.formatted);
                 allServerStats.push(serverStats);
-                results.push(formattedResponse);
-                totalSize += formattedResponse.formatted.length;
-                
-                // Process remaining servers
-                for (let i = 1; i < sortedServers.length; i++) {
-                    const server = sortedServers[i];
-                    const serverStats = extractServerStats(server);
-                    const qlstatsData = await getQLStatsData(serverStats.address);
-                    const formattedResponse = formatServerResponse(serverStats, qlstatsData);
-                    
-                    // Store all server stats for potential AI processing
-                    allServerStats.push(serverStats);
-                    
-                    if (totalSize + formattedResponse.formatted.length <= DISCORD_CHAR_LIMIT - BUFFER_SPACE) {
-                        results.push(formattedResponse);
-                        totalSize += formattedResponse.formatted.length;
-                    } else {
-                        break;
-                    }
-                }
             } catch (error) {
-                console.error('Error processing server data:', error);
-                // If we failed to process any servers, create a basic formatted response for the first server
-                if (results.length === 0 && sortedServers.length > 0) {
-                    try {
-                        const server = sortedServers[0];
-                        const serverStats = extractServerStats(server);
-                        allServerStats.push(serverStats);
-                        
-                        // Create a complete formatted response with player information
-                        const steamLink = `steam://connect/${serverStats.address}`;
-                        const playerList = serverStats.players.map(player => {
-                            const cleanName = stripColorCodes(player.name);
-                            return `${cleanName} ${player.score}`;
-                        }).join('\n') || "No players";
-                        
-                        const formattedResponse = {
-                            formatted: [
-                                '```',
-                                '═════════════════════════════════',
-                                `🎮 ${serverStats.serverName}`,
-                                '─────────────────────────────────',
-                                `🗺️ Map: ${serverStats.currentMap}`,
-                                `🎯 Status: ${formatGameStatus(serverStats)}`,
-                                `👥 Players: ${serverStats.playerCount}`,
-                                `⏱️ Uptime: ${serverStats.uptime}`,
-                                '',
-                                '─────────────────────────────────',
-                                '',
-                                // For the fallback case, we don't have team information, so just show players
-                                playerList,
-                                '',
-                                '═════════════════════════════════',
-                                '```'
-                            ].filter(line => line !== '').join('\n')
-                        };
-                        
-                        results.push(formattedResponse);
-                    } catch (innerError) {
-                        console.error('Error creating fallback response:', innerError);
-                        return [{
-                            formatted: '```\n  ⚠️   Error processing server data.\n```'
-                        }];
-                    }
-                }
+                quakeLogger.error({ error, server: server.address }, 'Error getting QLStats data');
+                // If we can't get QLStats data, still include the server but without ELO info
+                const serverStats = extractServerStats(server);
+                const formattedResponse = formatServerResponse(serverStats, null);
+                serverResponses.push(formattedResponse.formatted);
+                allServerStats.push(serverStats);
             }
         }
 
         // If we have no results at this point, return an error
-        if (results.length === 0) {
-            return [{
-                formatted: '```\n  ⚠️   Error retrieving server information.\n```'
-            }];
+        if (serverResponses.length === 0) {
+            return sanitizeOutput('# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.');
         }
 
-        // Check if we need AI processing (if we couldn't fit all servers)
-        if (results.length < sortedServers.length) {
-            try {
-                // Process with AI and return a single result
-                const aiProcessedResult = await processServerStatsWithAI(results, allServerStats);
-                return [{ formatted: aiProcessedResult }];
-            } catch (error) {
-                console.error('Error in AI processing:', error);
-                // Fallback: return what we have plus a message about additional servers
-                const remaining = sortedServers.length - results.length;
-                results.push({
-                    formatted: `\n\`\`\`\n  ℹ️   ${remaining} more server${remaining > 1 ? 's' : ''} not shown due to space constraints.\n\`\`\``
-                });
-                return results;
-            }
+        // If the total response is too long, use AI to summarize
+        const totalLength = serverResponses.join('\n\n').length;
+        if (totalLength > DISCORD_CHAR_LIMIT - BUFFER_SPACE) {
+            quakeLogger.info({ totalLength }, 'Response too long, using AI to summarize');
+            const aiSummary = await processServerStatsWithAI(serverResponses, allServerStats);
+            // Sanitize the AI-generated output
+            return sanitizeOutput(aiSummary);
         }
-
-        return results;
+        
+        // Return the sanitized formatted response
+        return sanitizeOutput(serverResponses.join('\n\n'));
 
     } catch (error) {
-        console.error('Server stats fetch error:', error);
-        return [{
-            formatted: '```\n  ⚠️   Error fetching server stats: ' + error.message + '\n```'
-        }];
+        quakeLogger.error({ error }, 'Server stats fetch error');
+        return sanitizeOutput('# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.');
     }
 }
 
@@ -501,10 +587,8 @@ module.exports = lookupQuakeServer;
 if (require.main === module) {
     (async () => {
         try {
-            const results = await lookupQuakeServer();
-            results.forEach(result => {
-                console.log(result.formatted + '\n');
-            });
+            const result = await lookupQuakeServer();
+            console.log(result);
         } catch (error) {
             console.error('Test execution error:', error);
         }

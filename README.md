@@ -46,6 +46,8 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
    BOT_PERSONALITY = "Your bot's personality"
    IGNORE_MESSAGE_PREFIX = "." # Prefix to ignore messages
    LOADING_EMOJI = <a:loading:1139032461712556062> # say \:emoji: on discord to get this ID
+   LOG_LEVEL = "info" # Logging level (fatal, error, warn, info, debug, trace)
+   # NODE_ENV = "production" # Uncomment in production to disable pretty printing
    ```
 
 4. **Set Up Bot Personality**:
@@ -80,10 +82,17 @@ The bot should now be running and ready to interact in your Discord server.
     And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
 
 4. **Quake Server Stats**:
-    Use the command `!serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
+    Use the command `!serverstats` or `/serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
 
 5. **Wolfram Alpha Queries**:
     Ask factual or computational questions, and the bot will use Wolfram Alpha to provide accurate answers.
+
+6. **Slash Commands**:
+    The bot supports Discord's slash commands. Type `/` to see available commands:
+    - `/help` - Display information about available commands
+    - `/ping` - Check if the bot is responding
+    - `/serverstats` - Display Quake Live server statistics
+    - `/stats` - Display bot health and status information
 
 ## Contributing
 
@@ -91,16 +100,53 @@ If you'd like to contribute to the development of Chimp-GPT, please fork the rep
 
 ## File Structure
 
+### Core Files
 - `chimpGPT.js` - Main Discord bot file
-- `discordClient.js` - Discord client configuration
 - `openaiConfig.js` - OpenAI API configuration
+- `configValidator.js` - Environment variable validation
+- `logger.js` - Structured logging configuration using Pino
+- `rateLimiter.js` - Rate limiting for API calls
+- `healthCheck.js` - Bot health monitoring system
+
+### Feature Modules
 - `quakeLookup.js` - Quake Live server stats functionality
 - `timeLookup.js` - Time lookup functionality
 - `weatherLookup.js` - Weather lookup functionality
 - `wolframLookup.js` - Wolfram Alpha integration
+
+### Command System
+- `commands/commandHandler.js` - Command registration and routing
+- `commands/deploySlashCommands.js` - Slash command deployment
+- `commands/modules/` - Individual command implementations
+
+### Utility Directories
+- `utils/` - Utility scripts for maintenance and debugging
 - `archive/` - Archived files for reference
 
 ## Configuration Options
+
+### Logging
+
+The bot uses Pino for structured JSON logging. You can configure the logging level in the `.env` file:
+
+```env
+# Available log levels: fatal, error, warn, info, debug, trace
+LOG_LEVEL="info"
+
+# Set to 'production' in production environments to disable pretty printing of logs
+# NODE_ENV="production"
+```
+
+In development, logs are formatted with colors for better readability. In production (when `NODE_ENV` is set to "production"), logs are output as JSON for better integration with log management systems.
+
+Each component of the application has its own logger instance for better organization and filtering:
+
+- `discord` - Discord client events and interactions
+- `openai` - OpenAI API requests and responses
+- `quake` - Quake server stats functionality
+- `weather` - Weather lookup functionality
+- `wolfram` - Wolfram Alpha integration
+- `time` - Time lookup functionality
 
 ### Quake Server Stats
 

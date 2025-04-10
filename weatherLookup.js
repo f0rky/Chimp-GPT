@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { weather: weatherLogger } = require('./logger');
 
 async function lookupWeather(location) {
 
@@ -16,11 +17,10 @@ async function lookupWeather(location) {
   };
 
   try {
+    weatherLogger.debug({ location }, 'Requesting current weather data');
     const response = await axios.request(options);
-    //console.log(response.data);
     let weather = response.data;
-    //const currentTemp = weather.current.temp_f;
-    //console.log(currentTemp);
+    weatherLogger.info({ location, temp: weather.current.temp_c, condition: weather.current.condition.text }, 'Weather data received');
     const weatherForecast = `Location: ${weather.location.name} \
     Current Temperature: ${weather.current.temp_c} \
     Condition: ${weather.current.condition.text}. \
@@ -28,7 +28,7 @@ async function lookupWeather(location) {
     High Today: ${weather.forecast.forecastday[0].day.maxtemp_c}`;
     return weatherForecast;
   } catch (error) {
-    console.error(error);
+    weatherLogger.error({ error, location }, 'Error fetching weather data');
     return "No forecast found";
   }
 }
@@ -49,8 +49,10 @@ async function lookupExtendedForecast(location) {
   };
 
   try {
+    weatherLogger.debug({ location, days: 5 }, 'Requesting extended forecast data');
     const response = await axios.request(options);
     let weather = response.data;
+    weatherLogger.info({ location, forecastDays: weather.forecast.forecastday.length }, 'Extended forecast data received');
 
     // Format the forecast for each day
     let forecasts = [];
@@ -60,7 +62,7 @@ async function lookupExtendedForecast(location) {
     return `Location: ${weather.location.name}\n` + forecasts.join('\n');
 
   } catch (error) {
-    console.error(error);
+    weatherLogger.error({ error, location }, 'Error fetching extended forecast data');
     return "No extended forecast found";
   }
 }
