@@ -128,7 +128,20 @@ async function getQLStatsData(serverAddress) {
             return null;
         }
         
-        const response = await axios.get(`${QLSTATS_API_URL}?server=${encodeURIComponent(validatedAddress.value)}`, { timeout: 3000 });
+        const response = await axios.get(`${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`, { 
+            timeout: 5000,
+            validateStatus: status => status < 500 // Accept all responses except server errors
+        });
+        
+        // Log detailed response data for debugging
+        quakeLogger.info({ 
+            serverAddress: validatedAddress.value,
+            hasData: !!response.data,
+            playerCount: response.data?.rankedPlayers?.length || 0,
+            responseData: JSON.stringify(response.data),
+            players: response.data?.rankedPlayers ? JSON.stringify(response.data.rankedPlayers) : 'No players'
+        }, 'QLStats API response (detailed)');
+        
         return response.data;
     } catch (error) {
         quakeLogger.error({ error, serverAddress }, 'Error fetching QLStats data');
@@ -137,6 +150,21 @@ async function getQLStatsData(serverAddress) {
 }
 
 function mergePlayerData(basicPlayers, qlstatsPlayers) {
+    // If no QLStats data is available, try to extract team info from basic player data
+    if (!qlstatsPlayers || qlstatsPlayers.length === 0) {
+        quakeLogger.info('No QLStats data available, using basic player data only');
+        return basicPlayers.map(player => ({
+            name: player.name,
+            score: player.score,
+            totalConnected: player.totalConnected,
+            // Try to determine team from player name (common in Quake Live)
+            team: player.name.toLowerCase().includes('red') ? 1 : 
+                  player.name.toLowerCase().includes('blue') ? 2 : 
+                  player.score < 0 ? 3 : 0, // Negative score often indicates spectator
+            rating: null
+        }));
+    }
+    
     const playerMap = new Map();
     
     basicPlayers.forEach(player => {
@@ -150,13 +178,27 @@ function mergePlayerData(basicPlayers, qlstatsPlayers) {
 
     return qlstatsPlayers.map(qlstatsPlayer => {
         const strippedName = stripColorCodes(qlstatsPlayer.name).toLowerCase();
-        const basicData = playerMap.get(strippedName) || {};
+        
+        // Try different matching strategies
+        let basicData = playerMap.get(strippedName);
+        
+        // If no match found, try partial name matching
+        if (!basicData) {
+            for (const [key, value] of playerMap.entries()) {
+                if (key.includes(strippedName) || strippedName.includes(key)) {
+                    basicData = value;
+                    break;
+                }
+            }
+        }
+        
+        basicData = basicData || {};
         
         return {
             name: qlstatsPlayer.name,
             score: basicData.score || 0,
             totalConnected: basicData.totalConnected || '0:00',
-            team: qlstatsPlayer.team,
+            team: qlstatsPlayer.team || 0, // Default to 0 if team is undefined
             rating: qlstatsPlayer.rating
         };
     });
@@ -203,7 +245,7 @@ function formatPlayerLine(player, isSpectator = false) {
     }
     
     // For active players, show score and ELO based on config
-    const score = `${String(player.score).padStart(2)}`;
+    const score = `${String(player.score || 0).padStart(2)}`;
     
     // Handle different ELO display modes
     let eloDisplay = '';
@@ -215,7 +257,15 @@ function formatPlayerLine(player, isSpectator = false) {
         eloDisplay = `(${String(player.rating).padStart(4)})`;
     }
     
-    return `${cleanName} ${score} ${eloDisplay}`;
+    // Add team indicator
+    let teamIndicator = '';
+    if (player.team === 1) {
+        teamIndicator = '🔴 ';
+    } else if (player.team === 2) {
+        teamIndicator = '🔵 ';
+    }
+    
+    return `${teamIndicator}${cleanName} ${score} ${eloDisplay}`;
 }
 
 /**
@@ -230,20 +280,44 @@ function formatPlayerLine(player, isSpectator = false) {
  * @returns {string} Formatted player list string
  */
 function formatPlayerList(players, basicPlayers = [], serverStats = null) {
-    if (!players?.length) {
-        return basicPlayers.map(player => {
-            const cleanName = stripColorCodes(player.name);
-            return `${cleanName} ${player.score}`;
-        }).join('\n') || "No players";
+    // Debug log for player data
+    quakeLogger.info({
+        qlstatsPlayers: players ? JSON.stringify(players.map(p => ({ name: p.name, team: p.team, rating: p.rating }))) : 'No QLStats players',
+        basicPlayers: basicPlayers ? JSON.stringify(basicPlayers.map(p => ({ name: p.name, score: p.score }))) : 'No basic players',
+        eloMode: CONFIG.eloMode
+    }, 'formatPlayerList debug info');
+    
+    // If no QLStats data and no basic players, show no players message
+    if ((!players || !players.length) && (!basicPlayers || !basicPlayers.length)) {
+        return "No players";
     }
-
-    const mergedPlayers = mergePlayerData(basicPlayers, players);
+    
+    // If no QLStats data, use basic players with team detection
+    const mergedPlayers = players?.length ? mergePlayerData(basicPlayers, players) : mergePlayerData(basicPlayers, []);
     const isWarmup = mergedPlayers.every(p => p.score === 0);
+    
+    // Assign unassigned players to teams based on pattern matching if possible
+    mergedPlayers.forEach(p => {
+        if (!p.team || p.team === 0) {
+            const name = stripColorCodes(p.name).toLowerCase();
+            if (name.includes('red')) {
+                p.team = 1;
+            } else if (name.includes('blue')) {
+                p.team = 2;
+            } else if (p.score < 0) {
+                p.team = 3; // Spectator
+            } else {
+                // If we can't determine team, put them in a general list
+                p.team = 0;
+            }
+        }
+    });
     
     const teams = {
         red: mergedPlayers.filter(p => p.team === 1),
         blue: mergedPlayers.filter(p => p.team === 2),
-        spec: mergedPlayers.filter(p => p.team === 3)
+        spec: mergedPlayers.filter(p => p.team === 3),
+        other: mergedPlayers.filter(p => p.team === 0 || p.team === undefined)
     };
     
     // Add team scores to player objects if available from serverStats
@@ -252,36 +326,43 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
         teams.blue.forEach(p => p.teamScore = serverStats.teamScores.blue);
     }
 
-    const sortFn = isWarmup && CONFIG.showElo ? 
-        ((a, b) => b.rating - a.rating) : 
-        ((a, b) => b.score - a.score);
+    const sortFn = isWarmup && CONFIG.eloMode > 0 ? 
+        ((a, b) => (b.rating || 0) - (a.rating || 0)) : 
+        ((a, b) => (b.score || 0) - (a.score || 0));
 
     Object.values(teams).forEach(team => team.sort(sortFn));
 
     const lines = [];
     
-    // Get team scores from the first player's team data
-    let redScore = 0;
-    let blueScore = 0;
+    // Get team scores from serverStats directly
+    let redScore = serverStats && serverStats.teamScores ? serverStats.teamScores.red : 0;
+    let blueScore = serverStats && serverStats.teamScores ? serverStats.teamScores.blue : 0;
     
-    // Try to find team scores from player data
-    const firstRedPlayer = teams.red[0];
-    const firstBluePlayer = teams.blue[0];
-    
-    if (firstRedPlayer && firstRedPlayer.teamScore) {
-        redScore = firstRedPlayer.teamScore;
+    // If no team scores in serverStats, try to get from player data
+    if (redScore === 0 && blueScore === 0) {
+        const firstRedPlayer = teams.red[0];
+        const firstBluePlayer = teams.blue[0];
+        
+        if (firstRedPlayer && firstRedPlayer.teamScore) {
+            redScore = firstRedPlayer.teamScore;
+        }
+        if (firstBluePlayer && firstBluePlayer.teamScore) {
+            blueScore = firstBluePlayer.teamScore;
+        }
     }
-    if (firstBluePlayer && firstBluePlayer.teamScore) {
-        blueScore = firstBluePlayer.teamScore;
-    }
     
+    // Display teams only if they have players
     if (teams.red.length) {
         lines.push(`🔴 RED TEAM (${redScore})`);
         lines.push('───────────────────────────');
         teams.red.forEach(p => {
             lines.push(formatPlayerLine(p));
         });
-        lines.push('');
+        
+        // Add a separator line if there's also a blue team
+        if (teams.blue.length) {
+            lines.push('');
+        }
     }
     
     if (teams.blue.length) {
@@ -290,7 +371,33 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
         teams.blue.forEach(p => {
             lines.push(formatPlayerLine(p));
         });
-        lines.push('');
+        
+        // Add a separator line if there are other players
+        if (teams.other.length && teams.other.length > 0) {
+            lines.push('');
+        }
+    }
+    
+    // If there are players not assigned to a team, show them
+    if (teams.other.length) {
+        if (!teams.red.length && !teams.blue.length) {
+            // If no team players, just list all players without team headers
+            teams.other.forEach(p => {
+                lines.push(formatPlayerLine(p));
+            });
+        } else {
+            // Otherwise, show them under an 'Other Players' header
+            lines.push('⚪ OTHER PLAYERS');
+            lines.push('───────────────────────────');
+            teams.other.forEach(p => {
+                lines.push(formatPlayerLine(p));
+            });
+        }
+        
+        // Add a separator line if there are spectators
+        if (teams.spec.length && teams.spec.length > 0) {
+            lines.push('');
+        }
     }
     
     // For spectators, only show names in a compact format if there are any
@@ -346,6 +453,15 @@ function extractServerStats(server) {
  */
 function formatServerResponse(serverStats, qlstatsData) {
     const steamLink = `steam://connect/${serverStats.address}`;
+    
+    // Debug log for qlstatsData and player info
+    quakeLogger.info({
+        hasQlstatsData: !!qlstatsData,
+        rankedPlayersCount: qlstatsData?.rankedPlayers?.length || 0,
+        eloMode: CONFIG.eloMode,
+        basicPlayersCount: serverStats.players?.length || 0
+    }, 'formatServerResponse debug info');
+    
     // Check if qlstatsData exists and has rankedPlayers before accessing properties
     const avgRating = CONFIG.eloMode > 0 && qlstatsData && qlstatsData.rankedPlayers && qlstatsData.rankedPlayers.length > 0 
         ? `Avg Rating: ${Math.round(qlstatsData.avg)}` : '';
@@ -361,9 +477,8 @@ function formatServerResponse(serverStats, qlstatsData) {
             `👥 Players: ${serverStats.playerCount}`,
             `⏱️ Uptime: ${serverStats.uptime}`,
             avgRating ? `📊 ${avgRating}` : '',
-            '',
+            '─────────────────────────────────',  // Added separator before player list
             formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
-            '',
             '═════════════════════════════════',
             '```'
         ].filter(line => line !== '').join('\n')
@@ -490,6 +605,7 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
         // Apply ELO mode override if provided
         if (validatedEloMode.value !== null) {
             CONFIG.eloMode = validatedEloMode.value;
+            quakeLogger.info({ eloMode: CONFIG.eloMode }, 'ELO mode set');
         }
         
         const response = await axios.get(SERVERS_API_URL, {
