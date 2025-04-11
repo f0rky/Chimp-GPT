@@ -349,6 +349,9 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
 
     const lines = [];
     
+    // Start with an empty line for better visual separation
+    lines.push('');
+    
     // Get team scores from serverStats directly
     let redScore = serverStats && serverStats.teamScores ? serverStats.teamScores.red : 0;
     let blueScore = serverStats && serverStats.teamScores ? serverStats.teamScores.blue : 0;
@@ -428,7 +431,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     if (teams.spec.length) {
         // Add a clear divider before spectators section
         lines.push('');
-        lines.push('═════════════════════════════');
+        lines.push('═════════════════════════════════');
         lines.push(`${teamLabels.spec} SPECTATORS: ` + teams.spec.slice(0, 5).map(p => stripColorCodes(p.name)).join(', '));
         
         // If there are more than 5 spectators, just show the count
@@ -525,7 +528,6 @@ function formatServerResponse(serverStats, qlstatsData) {
             `${labels.uptime} ${serverStats.uptime}`,
             avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
             '─────────────────────────────────',
-            '',
             formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
             '═════════════════════════════════',
             '```'
