@@ -452,8 +452,11 @@ function extractServerStats(server) {
     const { info, rules, players } = server;
     const uptime = calculateUptime(rules.g_levelStartTime);
     
+    // Normalize whitespace in server name (replace multiple spaces/tabs with a single space)
+    const normalizedServerName = info.serverName.trim().replace(/\s+/g, ' ');
+    
     return {
-        serverName: info.serverName.trim(),
+        serverName: normalizedServerName,
         currentMap: info.map,
         playerCount: `${info.players}/${info.maxPlayers}`,
         gameType: info.gameTypeShort === 'CA' ? 'Clan Arena' : info.gameType,
