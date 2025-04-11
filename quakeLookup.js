@@ -109,6 +109,15 @@ function formatGameStatus(serverStats) {
         const redScore = serverStats.teamScores.red;
         const blueScore = serverStats.teamScores.blue;
         
+        // Check if the game is in warmup mode (all players have 0 score and team scores are 0)
+        const isWarmup = redScore === 0 && blueScore === 0 && 
+                       serverStats.players && 
+                       serverStats.players.every(p => p.score === 0);
+        
+        if (isWarmup) {
+            return `Warmup (First to ${serverStats.roundLimit})`;
+        }
+        
         let winningTeam = '';
         if (redScore > blueScore) {
             winningTeam = 'RED leading';
