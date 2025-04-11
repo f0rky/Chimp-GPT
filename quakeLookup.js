@@ -46,7 +46,11 @@ const CONFIG = {
     // 1 = Categorized (Scrub/Mid/Pro)
     // 2 = Actual ELO value
     eloMode: 1,
-    maxServers: 3
+    maxServers: 3,
+    // Whether to show team emojis (🔴/🔵) next to player names
+    showTeamEmojis: process.env.SHOW_TEAM_EMOJIS === 'true',
+    // Whether to show emojis in server stats output
+    showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS === 'true'
 };
 
 /**
@@ -257,12 +261,14 @@ function formatPlayerLine(player, isSpectator = false) {
         eloDisplay = `(${String(player.rating).padStart(4)})`;
     }
     
-    // Add team indicator
+    // Add team indicator if enabled in config
     let teamIndicator = '';
-    if (player.team === 1) {
-        teamIndicator = '🔴 ';
-    } else if (player.team === 2) {
-        teamIndicator = '🔵 ';
+    if (CONFIG.showTeamEmojis) {
+        if (player.team === 1) {
+            teamIndicator = '🔴 ';
+        } else if (player.team === 2) {
+            teamIndicator = '🔵 ';
+        }
     }
     
     return `${teamIndicator}${cleanName} ${score} ${eloDisplay}`;
@@ -351,9 +357,18 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
         }
     }
     
+    // Always use emojis for all team headings
+    const teamLabels = {
+        // Always show emojis for all team headers
+        red: '🔴',
+        blue: '🔵',
+        other: '⚪',
+        spec: '👁️'
+    };
+
     // Display teams only if they have players
     if (teams.red.length) {
-        lines.push(`🔴 RED TEAM (${redScore})`);
+        lines.push(`${teamLabels.red} RED TEAM (${redScore})`);
         lines.push('───────────────────────────');
         teams.red.forEach(p => {
             lines.push(formatPlayerLine(p));
@@ -366,7 +381,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     }
     
     if (teams.blue.length) {
-        lines.push(`🔵 BLUE TEAM (${blueScore})`);
+        lines.push(`${teamLabels.blue} BLUE TEAM (${blueScore})`);
         lines.push('───────────────────────────');
         teams.blue.forEach(p => {
             lines.push(formatPlayerLine(p));
@@ -387,7 +402,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
             });
         } else {
             // Otherwise, show them under an 'Other Players' header
-            lines.push('⚪ OTHER PLAYERS');
+            lines.push(`${teamLabels.other} OTHER PLAYERS`);
             lines.push('───────────────────────────');
             teams.other.forEach(p => {
                 lines.push(formatPlayerLine(p));
@@ -402,7 +417,10 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     
     // For spectators, only show names in a compact format if there are any
     if (teams.spec.length) {
-        lines.push('👁️ SPECTATORS: ' + teams.spec.slice(0, 5).map(p => stripColorCodes(p.name)).join(', '));
+        // Add a clear divider before spectators section
+        lines.push('');
+        lines.push('═════════════════════════════');
+        lines.push(`${teamLabels.spec} SPECTATORS: ` + teams.spec.slice(0, 5).map(p => stripColorCodes(p.name)).join(', '));
         
         // If there are more than 5 spectators, just show the count
         if (teams.spec.length > 5) {
@@ -466,17 +484,34 @@ function formatServerResponse(serverStats, qlstatsData) {
     const avgRating = CONFIG.eloMode > 0 && qlstatsData && qlstatsData.rankedPlayers && qlstatsData.rankedPlayers.length > 0 
         ? `Avg Rating: ${Math.round(qlstatsData.avg)}` : '';
 
+    // Choose labels based on emoji setting
+    const labels = CONFIG.showServerStatsEmojis ? {
+        server: '🎮',
+        map: '🗺️',
+        status: '🎯',
+        players: '👥',
+        uptime: '⏱️',
+        rating: '📊'
+    } : {
+        server: 'Server:',
+        map: 'Map:',
+        status: 'Status:',
+        players: 'Players:',
+        uptime: 'Uptime:',
+        rating: 'Avg Rating:'
+    };
+    
     return {
         formatted: [
             '```',
             '═════════════════════════════════',
-            `🎮 ${serverStats.serverName}`,
+            `${labels.server} ${serverStats.serverName}`,
             '─────────────────────────────────',
-            `🗺️ Map: ${serverStats.currentMap}`,
-            `🎯 Status: ${formatGameStatus(serverStats)}`,
-            `👥 Players: ${serverStats.playerCount}`,
-            `⏱️ Uptime: ${serverStats.uptime}`,
-            avgRating ? `📊 ${avgRating}` : '',
+            `${labels.map} ${serverStats.currentMap}`,
+            `${labels.status} ${formatGameStatus(serverStats)}`,
+            `${labels.players} ${serverStats.playerCount}`,
+            `${labels.uptime} ${serverStats.uptime}`,
+            avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
             '─────────────────────────────────',  // Added separator before player list
             formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
             '═════════════════════════════════',
