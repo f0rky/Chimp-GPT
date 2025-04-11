@@ -524,7 +524,8 @@ function formatServerResponse(serverStats, qlstatsData) {
             `${labels.players} ${serverStats.playerCount}`,
             `${labels.uptime} ${serverStats.uptime}`,
             avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
-            '─────────────────────────────────',  // Added separator before player list
+            '─────────────────────────────────',
+            '',
             formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
             '═════════════════════════════════',
             '```'
