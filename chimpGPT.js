@@ -361,7 +361,13 @@ client.on('messageCreate', async (message) => {
     // Track message for stats
     trackMessage();
     
-    // Track conversation for status updates
+    // Ignore messages from unauthorized channels
+    if (!allowedChannelIDs.includes(message.channelId)) {
+      discordLogger.debug({ channelId: message.channelId }, 'Ignoring message from unauthorized channel');
+      return;
+    }
+    
+    // Track conversation for status updates - only for allowed channels
     statusManager.trackConversation(message.author.username, message.content);
     
     // Check if this is a stats command
@@ -388,11 +394,7 @@ client.on('messageCreate', async (message) => {
       return;
     }
     
-    // Ignore messages from unauthorized channels
-    if (!allowedChannelIDs.includes(message.channelId)) {
-      discordLogger.debug({ channelId: message.channelId }, 'Ignoring message from unauthorized channel');
-      return;
-    }
+    // Channel check already done above
     
     // Check rate limit for the user
     // OpenAI calls are expensive, so we use a cost of 1 for regular messages
