@@ -1,13 +1,13 @@
 
 # Chimp-GPT Discord Bot
 
-Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to interact with users, provide weather information, tell the current time, display Quake Live server stats, and more.
+Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to interact with users, provide weather information, tell the current time, display Quake Live server stats, and more. It features robust error handling, fallback mechanisms, and a reliable architecture for consistent performance.
 
 ## Features
 
 - **Interactive Conversations**: Engage in dynamic conversations with the bot using natural language.
   Example: ask "Tell me a joke," and the bot will respond with a joke using GPT3.5.
-- **Weather Lookup**: Ask the bot about current weather conditions for a location.
+- **Weather Lookup**: Ask the bot about current weather conditions for a location with reliable responses and fallback mechanisms.
   Example: "What's the weather like in New York?"
 - **Time Inquiry**: Find out the current time of a location by asking the bot.
   Example: "What time is it in London?"
@@ -58,12 +58,21 @@ Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to inter
 
 6. **Run the Bot**:
     ```bash
-    # Using npm
-    npm start
+    # Using PM2 (recommended for all deployments)
+    # For development environment
+    pm2 start combined.js --name chimpGPT --env development
     
-    # Using PM2 (recommended for production)
-    pm2 start chimpGPT.js --name chimpGPT
+    # For production environment
+    pm2 start combined.js --name chimpGPT --env production
+    
+    # Or use the ecosystem.config.js file
+    pm2 start ecosystem.config.js
+    
+    # Save the PM2 configuration
     pm2 save
+    
+    # Check status
+    pm2 status
     ```
 
 The bot should now be running and ready to interact in your Discord server.
@@ -71,7 +80,7 @@ The bot should now be running and ready to interact in your Discord server.
 ## Usage
 
 1. **General Interaction**:
-    Simply send a message in a channel where the bot is present to engage in a conversation.
+    Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
 
 2. **Weather Inquiry**:
     Ask the bot about the weather, for example: "What's the weather like in New York?"
@@ -92,7 +101,18 @@ The bot should now be running and ready to interact in your Discord server.
     - `/help` - Display information about available commands
     - `/ping` - Check if the bot is responding
     - `/serverstats` - Display Quake Live server statistics
-    - `/stats` - Display bot health and status information
+
+## Recent Updates
+
+- **Improved Weather API Integration**: Fixed issues with weather API authentication and implemented robust error handling with fallback mechanisms
+- **Enhanced Rate Limiting**: Adjusted rate limits to 30 requests per 30 seconds with a 5-second cooldown
+- **Fixed Server Count Detection**: Improved Quake server count detection for more accurate status updates
+- **Added Timeout Protection**: Implemented timeout protection for OpenAI API calls to prevent the bot from getting stuck
+- **Added Comprehensive Testing Tools**: Created test scripts for diagnosing and verifying API integrations
+- Added support for Discord's slash commands
+- Improved error handling and logging
+- Enhanced Quake Live server stats display
+- Added Wolfram Alpha integration
 
 ## Contributing
 
@@ -133,11 +153,25 @@ The bot uses Pino for structured JSON logging. You can configure the logging lev
 # Available log levels: fatal, error, warn, info, debug, trace
 LOG_LEVEL="info"
 
-# Set to 'production' in production environments to disable pretty printing of logs
-# NODE_ENV="production"
+# Environment mode - set to 'production' or 'development'
+NODE_ENV="development"
 ```
 
 In development, logs are formatted with colors for better readability. In production (when `NODE_ENV` is set to "production"), logs are output as JSON for better integration with log management systems.
+
+### Port Configuration
+
+The bot uses different ports for its status and health endpoints based on the environment:
+
+```env
+# Server port configuration
+# Production port (used when NODE_ENV=production)
+PROD_PORT=3000
+# Development port (used when NODE_ENV=development)
+DEV_PORT=3001
+```
+
+This allows you to run multiple instances (development and production) on the same machine without port conflicts. The status page and health check endpoints will automatically use the appropriate port based on the `NODE_ENV` setting.
 
 Each component of the application has its own logger instance for better organization and filtering:
 
