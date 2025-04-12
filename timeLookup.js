@@ -1,5 +1,6 @@
 const moment = require('moment-timezone');
 const { time: timeLogger } = require('./logger');
+const functionResults = require('./functionResults');
 
 /**
  * Convert a user-friendly location to a timezone string
@@ -204,6 +205,17 @@ async function lookupTime(location) {
     // If we still don't have a timezone, return an error
     if (!timezone) {
       timeLogger.warn({ location }, 'No matching timezone found');
+      
+      // Store the error result for debugging
+      const errorMessage = `No matching timezone found for ${location}`;
+      
+      await functionResults.storeResult('time', { location }, {
+        error: true,
+        errorMessage,
+        location,
+        formatted: errorMessage
+      });
+      
       return `Sorry, I couldn't find a timezone for "${location}". Please try a more specific location like "New York" or "Tokyo".`;
     }
     
@@ -212,10 +224,35 @@ async function lookupTime(location) {
     const formattedTime = now.format('h:mmA');
     const formattedDate = now.format('dddd, MMMM D, YYYY');
     
+    // Format the response
+    const response = `The current time in ${location} (${timezone}) is ${formattedTime} on ${formattedDate}.`;
+    
+    // Store the result for debugging
+    await functionResults.storeResult('time', { location }, {
+      location,
+      timezone,
+      time: formattedTime,
+      date: formattedDate,
+      timestamp: now.toISOString(),
+      formatted: response
+    });
+    
     timeLogger.info({ location, timezone, formattedTime, formattedDate }, 'Time retrieved successfully');
-    return `The current time in ${location} (${timezone}) is ${formattedTime} on ${formattedDate}.`;
+    return response;
   } catch (error) {
     timeLogger.error({ error, location }, 'Error processing time data');
+    
+    // Store the error result for debugging
+    const errorMessage = error.message || 'Unknown error';
+    const formattedError = `Error processing time data for ${location}: ${errorMessage}`;
+    
+    await functionResults.storeResult('time', { location }, {
+      error: true,
+      errorMessage,
+      location,
+      formatted: formattedError
+    });
+    
     return `Sorry, I encountered an error getting the time for "${location}". Please try a different location.`;
   }
 }

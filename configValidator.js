@@ -60,11 +60,21 @@ const CONFIG_SCHEMA = {
     default: '',
     validate: (value) => typeof value === 'string'
   },
+  BOT_NAME: {
+    required: false,
+    description: 'Bot name for display purposes',
+    default: 'ChimpGPT',
+    validate(value) {
+      return typeof value === 'string' && value.length > 0;
+    }
+  },
   BOT_PERSONALITY: {
     required: false,
     description: 'Bot personality prompt',
     default: 'I am ChimpGPT, a helpful Discord bot.',
-    validate: (value) => typeof value === 'string'
+    validate(value) {
+      return typeof value === 'string' && value.length > 0;
+    }
   },
   IGNORE_MESSAGE_PREFIX: {
     required: false,
@@ -92,12 +102,58 @@ const CONFIG_SCHEMA = {
     validate: (value) => ['development', 'production', 'test'].includes(value),
     transform: (value) => value.toLowerCase()
   },
+  PROD_PORT: {
+    required: false,
+    description: 'Port for all services when running in production mode',
+    default: '3000',
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
+  },
+  DEV_PORT: {
+    required: false,
+    description: 'Port for all services when running in development mode',
+    default: '3001',
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
+  },
+  // Legacy port variables - kept for backward compatibility
   HEALTH_PORT: {
     required: false,
-    description: 'Port for the health check HTTP server',
+    description: 'Legacy port for health check server (deprecated)',
     default: '3000',
-    validate: (value) => !isNaN(parseInt(value)),
-    transform: (value) => parseInt(value)
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
+  },
+  STATUS_PORT: {
+    required: false,
+    description: 'Legacy port for status page server (deprecated)',
+    default: '3000',
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
+  },
+  STATUS_HOSTNAME: {
+    required: false,
+    description: 'Hostname for remote access to status page',
+    default: 'localhost',
+    validate(value) {
+      return typeof value === 'string' && value.length > 0;
+    }
   },
   OWNER_ID: {
     required: false,

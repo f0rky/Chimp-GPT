@@ -79,6 +79,14 @@ web_modules/
 .env.production.local
 .env.local
 
+# Debug and test files
+debug-*.js
+test-*.js
+direct-*.js
+
+# Data directory
+data/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

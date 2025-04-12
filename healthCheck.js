@@ -17,8 +17,10 @@ const logger = createLogger('health');
 const os = require('os');
 const { version } = require('./package.json');
 
-// Import configuration
+// Import configuration and test runners
 const config = require('./configValidator');
+const { runConversationLogTests, runOpenAITests, runQuakeTests } = require('./tests/testRunner');
+const statsStorage = require('./statsStorage');
 
 /**
  * Statistics tracking object for monitoring bot health
@@ -70,9 +72,13 @@ const stats = {
  */
 function initHealthCheck(client) {
   const app = express();
+  const path = require('path');
+  
+  // Serve static files from the public directory
+  app.use(express.static(path.join(__dirname, 'public')));
   
   // Basic info endpoint
-  app.get('/', (req, res) => {
+  app.get('/api', (req, res) => {
     res.json({ 
       name: 'ChimpGPT',
       status: 'online',
@@ -128,10 +134,46 @@ function initHealthCheck(client) {
     res.json(health);
   });
   
+  // Add test endpoint
+  app.get('/run-tests', async (req, res) => {
+    logger.info('Running tests from web interface');
+    
+    try {
+      // Run conversation log tests
+      const conversationLogResults = await runConversationLogTests();
+      
+      // Run OpenAI integration tests
+      const openaiResults = await runOpenAITests();
+      
+      // Run Quake server stats tests
+      const quakeResults = await runQuakeTests();
+      
+      // Return all test results
+      res.json({
+        conversationLog: conversationLogResults,
+        openaiIntegration: openaiResults,
+        quakeServerStats: quakeResults
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error running tests');
+      res.status(500).json({ error: 'Failed to run tests' });
+    }
+  });
+  
   // Start the server
-  const port = process.env.HEALTH_PORT || 3000;
+  // Determine which port to use based on environment
+  let port;
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  
+  if (nodeEnv === 'production') {
+    port = config.PROD_PORT || config.HEALTH_PORT || 3000;
+  } else {
+    port = config.DEV_PORT || config.HEALTH_PORT || 3001;
+  }
+  
   app.listen(port, () => {
-    logger.info(`Health check server running on port ${port}`);
+    logger.info(`Health check server running on port ${port} (${nodeEnv} mode)`);
+    logger.info(`Status page available at http://localhost:${port}`);
   });
   
   // Schedule periodic health reports to owner
@@ -325,6 +367,8 @@ function formatDuration(seconds) {
 function trackApiCall(type) {
   if (stats.apiCalls[type] !== undefined) {
     stats.apiCalls[type]++;
+    // Also store in persistent storage
+    statsStorage.incrementStat(`apiCalls.${type}`);
   }
 }
 
@@ -340,8 +384,12 @@ function trackApiCall(type) {
 function trackError(type) {
   if (stats.errors[type] !== undefined) {
     stats.errors[type]++;
+    // Also store in persistent storage
+    statsStorage.incrementStat(`errors.${type}`);
   } else {
     stats.errors.other++;
+    // Also store in persistent storage
+    statsStorage.incrementStat('errors.other');
   }
 }
 
@@ -357,6 +405,9 @@ function trackError(type) {
 function trackRateLimit(userId) {
   stats.rateLimits.hit++;
   stats.rateLimits.users.add(userId);
+  // Also store in persistent storage
+  statsStorage.incrementStat('rateLimits.hit');
+  statsStorage.addRateLimitedUser(userId);
 }
 
 /**
@@ -369,6 +420,8 @@ function trackRateLimit(userId) {
  */
 function trackMessage() {
   stats.messageCount++;
+  // Also store in persistent storage
+  statsStorage.incrementStat('messageCount');
 }
 
 module.exports = {

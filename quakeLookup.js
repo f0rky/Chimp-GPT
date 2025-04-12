@@ -574,9 +574,16 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
         });
         
         try {
-            // Use OpenAI to generate a concise summary
+            /**
+             * Generate a concise summary of additional servers using OpenAI
+             * 
+             * @requires OpenAI API key in environment variables
+             * @requires openai package to be installed and configured
+             * @param {Object} serverSummaries - Array of simplified server objects with name, map, players, etc.
+             * @returns {string} A 3-4 sentence summary of all additional servers
+             */
             const aiResponse = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
+                model: "gpt-3.5-turbo", // Using GPT-3.5 for cost efficiency and adequate performance
                 messages: [
                     {
                         role: "system",
@@ -587,9 +594,10 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
                         content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`
                     }
                 ],
-                max_tokens: 150
+                max_tokens: 150 // Limiting response length to ensure it fits within Discord's character limits
             });
             
+            // Extract the generated summary text from the API response
             const aiSummary = aiResponse.choices[0].message.content;
             
             // Combine the first server's full details with the AI summary
@@ -747,14 +755,98 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
     }
 }
 
-module.exports = lookupQuakeServer;
+/**
+ * Test the OpenAI server summary functionality
+ * 
+ * This function tests the AI summary generation for multiple servers
+ * without making actual API calls to Quake Live servers.
+ * 
+ * @param {boolean} [mockOpenAIFailure=false] - If true, simulates an OpenAI API failure
+ * @returns {Promise<string>} The generated summary or error message
+ */
+async function testOpenAISummary(mockOpenAIFailure = false) {
+    // Mock server data for testing
+    const mockServerStats = [
+        {
+            serverName: 'Test Server 1',
+            currentMap: 'bloodrun',
+            playerCount: 6,
+            gameType: 'CA',
+            players: [
+                { name: '^1Player1', score: 10, ping: 25 },
+                { name: '^2Player2', score: 5, ping: 30 }
+            ]
+        },
+        {
+            serverName: 'Test Server 2',
+            currentMap: 'campgrounds',
+            playerCount: 4,
+            gameType: 'TDM',
+            players: [
+                { name: '^3Player3', score: 15, ping: 20 },
+                { name: '^4Player4', score: 8, ping: 35 }
+            ]
+        },
+        {
+            serverName: 'Test Server 3',
+            currentMap: 'aerowalk',
+            playerCount: 2,
+            gameType: 'Duel',
+            players: [
+                { name: '^5Player5', score: 12, ping: 15 },
+                { name: '^6Player6', score: 9, ping: 40 }
+            ]
+        }
+    ];
+
+    // Mock formatted responses
+    const mockResponses = [
+        { formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```' }
+    ];
+
+    // If testing OpenAI failure, modify the openai object temporarily
+    const originalCreate = openai.chat.completions.create;
+    if (mockOpenAIFailure) {
+        openai.chat.completions.create = async () => {
+            throw new Error('Simulated OpenAI API failure');
+        };
+    }
+
+    try {
+        // Call the function with our mock data
+        const result = await processServerStatsWithAI(mockResponses, mockServerStats);
+        console.log('AI Summary Test Result:\n', result);
+        return result;
+    } catch (error) {
+        console.error('AI Summary Test Error:', error);
+        return `Error: ${error.message}`;
+    } finally {
+        // Restore original function if we mocked it
+        if (mockOpenAIFailure) {
+            openai.chat.completions.create = originalCreate;
+        }
+    }
+}
+
+// Export the main function and test function
+module.exports = Object.assign(lookupQuakeServer, { testOpenAISummary });
 
 // Allow direct testing
 if (require.main === module) {
     (async () => {
         try {
+            // Test standard server lookup
+            console.log('=== Testing standard server lookup ===');
             const result = await lookupQuakeServer();
             console.log(result);
+            
+            // Test OpenAI summary functionality
+            console.log('\n=== Testing OpenAI summary functionality ===');
+            await testOpenAISummary();
+            
+            // Test OpenAI failure fallback
+            console.log('\n=== Testing OpenAI failure fallback ===');
+            await testOpenAISummary(true);
         } catch (error) {
             console.error('Test execution error:', error);
         }
