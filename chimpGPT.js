@@ -8,17 +8,16 @@ require('dotenv').config();
  * 
  * @module ChimpGPT
  * @author Brett
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 const { Client, GatewayIntentBits } = require('discord.js');
 const OpenAI = require('openai');
-const { 
-  lookupWeather, 
-  lookupExtendedForecast 
-} = require('./weatherLookup');
+const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
+const simplifiedWeather = require('./simplified-weather');
 const lookupTime = require('./timeLookup');
 const lookupQuakeServer = require('./quakeLookup');
+const { initStatusManager } = require('./statusManager');
 const lookupWolfram = require('./wolframLookup');
 
 // Import loggers
@@ -40,6 +39,8 @@ const {
   isStatsCommand,
   handleStatsCommand 
 } = require('./healthCheck');
+
+// Status manager already imported above
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -76,8 +77,9 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-const userConversations = new Map();
-const MAX_CONVERSATION_LENGTH = 8;
+// Import conversation manager
+const { manageConversation, clearConversation } = require('./conversationManager');
+
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
 
@@ -93,36 +95,7 @@ function removeColorCodes(str) {
   return str.replace(/\^\d+/g, '');
 }
 
-/**
- * Manages the conversation context for a specific user
- * 
- * This function maintains a conversation history for each user,
- * adding new messages and ensuring the conversation doesn't exceed
- * the maximum allowed length by removing oldest messages when necessary.
- * 
- * @param {string} userId - The Discord user ID
- * @param {Object|null} newMessage - New message to add to conversation, or null to just retrieve
- * @returns {Array<Object>} The updated conversation log for the user
- */
-function manageConversation(userId, newMessage = null) {
-  if (!userConversations.has(userId)) {
-    userConversations.set(userId, [
-      { role: 'system', content: config.BOT_PERSONALITY }
-    ]);
-  }
-
-  const conversation = userConversations.get(userId);
-  
-  if (newMessage) {
-    conversation.push(newMessage);
-    // Maintain max length
-    while (conversation.length > MAX_CONVERSATION_LENGTH) {
-      conversation.shift();
-    }
-  }
-
-  return conversation;
-}
+// Conversation management has been moved to conversationManager.js
 
 /**
  * Processes a message using OpenAI's GPT model
@@ -220,12 +193,18 @@ async function processOpenAIMessage(content, conversationLog) {
       };
     }
 
+    // Track successful OpenAI API call
+    trackApiCall('openai');
+    
     openaiLogger.debug({ response: responseMessage }, 'Received response from OpenAI');
     return {
       type: 'message',
       content: responseMessage.content
     };
   } catch (error) {
+    // Track OpenAI API error
+    trackError('openai');
+    
     openaiLogger.error({ error }, 'OpenAI API Error');
     return {
       type: 'error',
@@ -247,7 +226,7 @@ async function processOpenAIMessage(content, conversationLog) {
  */
 async function generateNaturalResponse(functionResult, conversationLog, functionName = null) {
   try {
-    openaiLogger.debug({ functionResult, functionName }, 'Generating natural response from function result');
+    openaiLogger.debug({ functionName }, 'Generating natural response from function result');
     
     // Get the last user message to provide context
     const lastUserMessage = [...conversationLog].reverse().find(msg => msg.role === 'user')?.content || '';
@@ -268,33 +247,105 @@ async function generateNaturalResponse(functionResult, conversationLog, function
         5. Format the response in a clear, readable way.
         
         Original user question: "${lastUserMessage}"
-        Function result: "${functionResult}"
       `;
     }
     
-    // Create messages array with appropriate context
+    // For weather lookups, provide special instructions
+    else if (functionName === 'lookupWeather' || functionName === 'lookupExtendedForecast') {
+      systemMessage.content = `
+        The user has asked about the weather in a specific location. The function has returned the current weather information.
+        
+        When responding:
+        1. Be conversational and natural, maintaining your personality.
+        2. Focus on the key weather details: current temperature, condition, and any other relevant information.
+        3. If this is an extended forecast, mention the forecast for the next few days.
+        4. Format the response in a clear, readable way.
+        5. If the data indicates it's mock weather data (has _isMock property), subtly indicate this is an estimate without explicitly saying it's mock data.
+        
+        Original user question: "${lastUserMessage}"
+      `;
+    }
+    
+    // Log the function result size for debugging
+    const resultSize = typeof functionResult === 'object' ? 
+      JSON.stringify(functionResult).length : String(functionResult).length;
+    openaiLogger.debug({ resultSize, functionName }, 'Function result size');
+    
+    // Convert function result to string if it's an object, with proper handling for large objects
+    let functionResultContent;
+    if (typeof functionResult === 'object') {
+      // For weather data, extract only the essential information to reduce size
+      if (functionName === 'lookupWeather' || functionName === 'lookupExtendedForecast') {
+        const essentialData = {
+          location: functionResult.location ? {
+            name: functionResult.location.name,
+            country: functionResult.location.country,
+            localtime: functionResult.location.localtime
+          } : null,
+          current: functionResult.current ? {
+            temp_c: functionResult.current.temp_c,
+            condition: functionResult.current.condition,
+            humidity: functionResult.current.humidity,
+            wind_kph: functionResult.current.wind_kph,
+            wind_dir: functionResult.current.wind_dir
+          } : null,
+          forecast: functionResult.forecast ? {
+            forecastday: functionResult.forecast.forecastday?.map(day => ({
+              date: day.date,
+              day: {
+                maxtemp_c: day.day.maxtemp_c,
+                mintemp_c: day.day.mintemp_c,
+                condition: day.day.condition
+              }
+            }))
+          } : null,
+          _isMock: functionResult._isMock
+        };
+        functionResultContent = JSON.stringify(essentialData);
+      } else {
+        functionResultContent = JSON.stringify(functionResult);
+      }
+    } else {
+      functionResultContent = String(functionResult);
+    }
+    
+    openaiLogger.debug('Preparing messages for OpenAI API call');
     const messages = [
       systemMessage,
       ...conversationLog,
-      { role: 'function', name: 'function_response', content: functionResult }
+      { role: 'function', name: 'function_response', content: functionResultContent }
     ];
     
-    try {
-      const response = await openai.chat.completions.create({
+    // Add a timeout to the OpenAI API call to prevent the bot from getting stuck
+    openaiLogger.debug('Sending request to OpenAI with timeout');
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('OpenAI API call timed out after 15 seconds')), 15000);
+    });
+    
+    const response = await Promise.race([
+      openai.chat.completions.create({
         model: 'gpt-4-turbo-preview',
         messages: messages
-      });
-      trackApiCall('openai');
-      return response.choices[0].message.content;
-    } catch (error) {
-      trackError('openai');
-      throw error;
-    }
+      }),
+      timeoutPromise
+    ]);
+    
+    // Track successful OpenAI API call
+    trackApiCall('openai');
+    openaiLogger.info('Successfully received response from OpenAI');
+    
+    const responseContent = response.choices[0].message.content;
+    openaiLogger.debug({ responseLength: responseContent.length }, 'Response content length');
+    
+    return responseContent;
 
     // This line is now handled in the try/catch block above
   } catch (error) {
+    // Track OpenAI API error
+    trackError('openai');
+    
     openaiLogger.error({ error }, 'Error generating natural response');
-    return functionResult;
+    return `Here's what I found: ${JSON.stringify(functionResult, null, 2)}`;
   }
 }
 
@@ -306,6 +357,18 @@ client.on('messageCreate', async (message) => {
   try {
     // Basic checks
     if (message.author.bot) return;
+    
+    // Track message for stats
+    trackMessage();
+    
+    // Track conversation for status updates
+    statusManager.trackConversation(message.author.username, message.content);
+    
+    // Check if this is a stats command
+    if (isStatsCommand(message)) {
+      await handleStatsCommand(message);
+      return;
+    }
     
     // Try to handle the message as a command first
     const isCommand = await commandHandler.handleCommand(message, config);
@@ -362,9 +425,6 @@ client.on('messageCreate', async (message) => {
       remainingPoints: rateLimitResult.remainingPoints
     }, 'Processing message');
     
-    // Track message in health check system
-    trackMessage();
-
     // Send initial feedback
     const feedbackMessage = await message.reply(`${loadingEmoji} Thinking...`);
 
@@ -410,9 +470,41 @@ async function handleQuakeStats(feedbackMessage) {
     // The AI processing in quakeLookup.js should ensure we're under the Discord character limit
     // but we'll still truncate if needed as a safety measure
     await feedbackMessage.edit(serverStats.slice(0, 1997) + (serverStats.length > 1997 ? '...' : ''));
+    
+    // Count active servers for status update
+    // Extract server count from response (improved parsing)
+    let serverCount = 0;
+    
+    if (serverStats.includes('No active servers found')) {
+      serverCount = 0;
+    } else {
+      // Look for server headings in different formats
+      // Format 1: '# Server: <name>'
+      const serverHeadings1 = (serverStats.match(/# Server:/g) || []).length;
+      
+      // Format 2: '## <name>' (used in some responses)
+      const serverHeadings2 = (serverStats.match(/## [^#]/g) || []).length;
+      
+      // Format 3: 'Server: <name>' (used in AI-generated summaries)
+      const serverHeadings3 = (serverStats.match(/Server: /g) || []).length;
+      
+      // Use the maximum count from any of these patterns
+      serverCount = Math.max(serverHeadings1, serverHeadings2, serverHeadings3);
+      
+      // If we still have 0 but the response doesn't indicate no servers, assume at least 1
+      if (serverCount === 0 && !serverStats.includes('No active servers found')) {
+        serverCount = 1;
+      }
+    }
+    
+    // Update status with server count
+    statusManager.trackQuakeLookup(serverCount);
+    
+    return true;
   } catch (error) {
     console.error('Error in handleQuakeStats:', error);
     await feedbackMessage.edit('# 🎯 Quake Live Server Status\n\n> ⚠️ An error occurred while retrieving server information.');
+    return false;
   }
 }
 
@@ -490,20 +582,90 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
       break;
     case 'lookupWeather':
       try {
-        functionResult = await lookupWeather(gptResponse.parameters.location);
+        // Get the original weather data for status updates
+        const weatherData = await lookupWeather(gptResponse.parameters.location);
         trackApiCall('weather');
+        
+        // Update status if we have valid weather data
+        if (weatherData && weatherData.location && weatherData.current && 
+            weatherData.current.condition && weatherData.current.condition.text) {
+          statusManager.trackWeatherLookup(
+            weatherData.location.name, 
+            weatherData.current.condition.text
+          );
+        } else {
+          discordLogger.warn({ weatherData }, 'Weather data incomplete or has errors, not updating status');
+        }
+        
+        // Use the simplified implementation to get a natural language response
+        const userQuestion = conversationLog.find(msg => msg.role === 'user')?.content || 
+                            `What's the weather in ${gptResponse.parameters.location}?`;
+        
+        const response = await simplifiedWeather.getWeatherResponse(
+          gptResponse.parameters.location,
+          userQuestion
+        );
+        
+        // Update the feedback message directly with the response
+        await feedbackMessage.edit(response);
+        
+        // Add the response to the conversation log
+        conversationLog.push({
+          role: 'assistant',
+          content: response
+        });
+        
+        // Return early since we've already handled the response
+        return;
       } catch (error) {
         trackError('weather');
-        throw error;
+        discordLogger.error({ error }, 'Error in weather lookup');
+        await feedbackMessage.edit('I encountered an error while checking the weather. Please try again later.');
+        return;
       }
       break;
     case 'lookupExtendedForecast':
       try {
-        functionResult = await lookupExtendedForecast(gptResponse.parameters.location);
+        // Get the original weather data for status updates
+        const weatherData = await lookupExtendedForecast(gptResponse.parameters.location, gptResponse.parameters.days);
         trackApiCall('weather');
+        
+        // Update status if we have valid weather data
+        if (weatherData && weatherData.location && weatherData.current && 
+            weatherData.current.condition && weatherData.current.condition.text) {
+          statusManager.trackWeatherLookup(
+            weatherData.location.name, 
+            weatherData.current.condition.text
+          );
+        } else {
+          discordLogger.warn({ weatherData }, 'Weather data incomplete or has errors, not updating status');
+        }
+        
+        // Use the simplified implementation to get a natural language response
+        const userQuestion = conversationLog.find(msg => msg.role === 'user')?.content || 
+                            `What's the ${gptResponse.parameters.days}-day forecast for ${gptResponse.parameters.location}?`;
+        
+        const response = await simplifiedWeather.getWeatherResponse(
+          gptResponse.parameters.location,
+          userQuestion
+        );
+        
+        // Update the feedback message directly with the response
+        await feedbackMessage.edit(response);
+        
+        // Add the response to the conversation log
+        conversationLog.push({
+          role: 'assistant',
+          content: response
+        });
+        
+        // Return early since we've already handled the response
+        return;
       } catch (error) {
         trackError('weather');
-        throw error;
+        discordLogger.error({ error }, 'Error in extended forecast lookup');
+        await feedbackMessage.edit('I encountered an error while checking the forecast. Please try again later.');
+        return;
       }
       break;
     case 'getWolframShortAnswer':
@@ -526,15 +688,62 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
       }
   }
 
-  const naturalResponse = await generateNaturalResponse(functionResult, conversationLog, gptResponse.functionName);
-  if (naturalResponse?.trim()) {
-    conversationLog.push({
-      role: 'assistant',
-      content: naturalResponse
-    });
+  try {
+    // Log the function result for debugging
+    discordLogger.debug({ functionName: gptResponse.functionName }, 'Generating natural response from function result');
+    
+    const naturalResponse = await generateNaturalResponse(functionResult, conversationLog, gptResponse.functionName);
+    
+    if (naturalResponse?.trim()) {
+      conversationLog.push({
+        role: 'assistant',
+        content: naturalResponse
+      });
+      
+      await feedbackMessage.edit(naturalResponse?.slice(0, 1997) + (naturalResponse?.length > 1997 ? '...' : ''));
+    } else {
+      // If no natural response was generated, provide a direct response with the data
+      let directResponse = '';
+      
+      if (gptResponse.functionName === 'lookupWeather' || gptResponse.functionName === 'lookupExtendedForecast') {
+        if (functionResult && functionResult.location && functionResult.current) {
+          directResponse = `Current weather in ${functionResult.location.name}: ${functionResult.current.condition.text}, ${functionResult.current.temp_c}°C`;
+          
+          // Add forecast if available
+          if (functionResult.forecast && functionResult.forecast.forecastday && functionResult.forecast.forecastday.length > 0) {
+            directResponse += '\n\nForecast:';
+            functionResult.forecast.forecastday.forEach(day => {
+              directResponse += `\n${day.date}: ${day.day.condition.text}, ${day.day.maxtemp_c}°C / ${day.day.mintemp_c}°C`;
+            });
+          }
+        } else {
+          directResponse = 'Weather data could not be retrieved. Please try again later.';
+        }
+      } else {
+        directResponse = 'I retrieved the information but couldn\'t generate a natural response. Here\'s the raw data:\n\n' + 
+          JSON.stringify(functionResult, null, 2).slice(0, 1500);
+      }
+      
+      await feedbackMessage.edit(directResponse);
+    }
+  } catch (error) {
+    discordLogger.error({ error, functionName: gptResponse.functionName }, 'Error in natural response generation');
+    
+    // Provide a fallback response with the raw data
+    let fallbackResponse = 'I encountered an error while processing the response, but here\'s what I found:\n\n';
+    
+    if (gptResponse.functionName === 'lookupWeather' || gptResponse.functionName === 'lookupExtendedForecast') {
+      if (functionResult && functionResult.location && functionResult.current) {
+        fallbackResponse += `Current weather in ${functionResult.location.name}: ${functionResult.current.condition.text}, ${functionResult.current.temp_c}°C`;
+      } else {
+        fallbackResponse += 'Weather data could not be retrieved properly.';
+      }
+    } else {
+      fallbackResponse += JSON.stringify(functionResult, null, 2).slice(0, 1500);
+    }
+    
+    await feedbackMessage.edit(fallbackResponse);
   }
-
-  await feedbackMessage.edit(naturalResponse?.slice(0, 1997) + (naturalResponse?.length > 1997 ? '...' : '') || 'No response generated.');
 }
 
 /**
@@ -568,11 +777,17 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
 client.on('ready', async () => {
   discordLogger.info(`Logged in as ${client.user.tag}`);
   
+  // Initialize health check and status manager
+
   // Initialize health check system
   healthCheck = initHealthCheck(client);
   discordLogger.info('Health check system initialized');
   
-    // Load command modules
+  // Initialize status manager
+  statusManager = initStatusManager(client);
+  discordLogger.info('Status manager initialized');
+  
+  // Load command modules
   const commandsLoaded = await commandHandler.loadCommands();
   discordLogger.info({ commandsLoaded }, 'Command modules loaded');
   
@@ -594,10 +809,36 @@ client.on('ready', async () => {
   }
 });
 
-// Login to Discord
-discordLogger.info('Attempting to log in to Discord');
-client.login(config.DISCORD_TOKEN)
-  .catch(error => {
+/**
+ * Initialize and start the Discord bot
+ * 
+ * This function initializes the bot and logs in to Discord.
+ * It's exposed to allow the bot to be started from other modules.
+ * 
+ * @returns {Promise<void>}
+ */
+async function startBot() {
+  discordLogger.info('Attempting to log in to Discord');
+  try {
+    await client.login(config.DISCORD_TOKEN);
+    discordLogger.info('Successfully logged in to Discord');
+  } catch (error) {
     discordLogger.fatal({ error }, 'Failed to log in to Discord');
+    throw error;
+  }
+}
+
+// Start the bot if this file is run directly
+if (require.main === module) {
+  startBot().catch(error => {
+    console.error('Failed to start bot:', error);
     process.exit(1);
   });
+}
+
+// Export the bot functionality for use in other modules
+module.exports = {
+  client,
+  startBot,
+  stats: require('./healthCheck').stats
+};
