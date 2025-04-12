@@ -42,9 +42,9 @@ const defaultStatuses = [
 
 // Quake-related statuses
 const quakeStatuses = [
-  { type: ActivityType.Playing, name: 'Quake with {count} servers' },
+  { type: ActivityType.Watching, name: '{count} Quake servers' },
   { type: ActivityType.Watching, name: '{count} active Quake servers' },
-  { type: ActivityType.Competing, name: 'Quake tournaments' }
+  { type: ActivityType.Watching, name: 'Quake tournaments' }
 ];
 
 // Weather-related statuses
@@ -229,8 +229,8 @@ function getRandomDefaultStatus() {
  */
 function getQuakeStatus(serverCount) {
   return {
-    type: ActivityType.Playing,
-    name: `Quake with ${serverCount} server${serverCount === 1 ? '' : 's'}`
+    type: ActivityType.Watching,
+    name: `${serverCount} Quake server${serverCount === 1 ? '' : 's'}`
   };
 }
 
