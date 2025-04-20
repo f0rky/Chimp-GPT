@@ -160,6 +160,35 @@ const CONFIG_SCHEMA = {
     description: 'Discord user ID of the bot owner for status reports',
     default: '',
     validate: (value) => typeof value === 'string'
+  },
+  CORS_ALLOWED_ORIGINS: {
+    required: false,
+    description: 'Comma-separated list of allowed origins that can access the status page',
+    default: 'http://localhost,http://127.0.0.1',
+    validate: (value) => typeof value === 'string',
+    transform: (value) => value.split(',')
+  },
+  STATUS_RATE_LIMIT_POINTS: {
+    required: false,
+    description: 'Maximum number of requests allowed per client for the status page',
+    default: '60',
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
+  },
+  STATUS_RATE_LIMIT_DURATION: {
+    required: false,
+    description: 'Duration in seconds for the status page rate limit window',
+    default: '60',
+    validate(value) {
+      return /^\d+$/.test(value);
+    },
+    transform(value) {
+      return parseInt(value, 10);
+    }
   }
 };
 

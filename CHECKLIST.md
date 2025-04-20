@@ -3,22 +3,31 @@
 ## High Priority (Easier Implementation)
 
 ### Code Structure & Architecture
+- [ ] Refactor the weather API integration to use a single consistent approach (currently has multiple implementations)
+- [ ] Consolidate error handling patterns across modules
 
 ### Security Improvements
+- [x] Implement rate limiting for the status page to prevent DoS attacks
+- [x] Add CORS protection for the status server
 
 ### Performance & Reliability
-- [ ] Add caching for frequently accessed data (weather, time lookups)
-- [ ] Add retry logic for external API calls
-- [ ] Implement graceful shutdown handling for the bot
+- [ ] Add circuit breaker pattern for external API calls
+- [x] Implement graceful shutdown handling
 
 ## Medium Priority
 
 ### Functionality Enhancements
+- [x] Add support for image generation using DALL-E or similar APIs
+- [x] Add image gallery view for DALL-E generations in the status page
+- [ ] Implement persistent conversation history across bot restarts
+- [ ] Add support for multiple languages
+- [ ] Add image variation and editing capabilities to the DALL-E integration
 
 ### Testing & Quality Assurance
 - [ ] Add Prettier for consistent code formatting
-- [ ] Set up Jest or Mocha for unit testing
+- [ ] Set up Jest or Mocha for unit testing beyond the existing test files
 - [ ] Implement pre-commit hooks with Husky to enforce linting/testing
+- [ ] Add more comprehensive tests for the weather API integration
 
 ### Developer Experience
 - [ ] Create contributor documentation and guidelines
@@ -29,6 +38,7 @@
 
 ### Code Structure & Architecture
 - [ ] Create a proper error handling system with customized error classes
+- [ ] Implement a plugin system for easier extension of bot functionality
 
 ### Testing & Quality Assurance
 - [ ] Implement integration tests for API interactions
@@ -39,19 +49,19 @@
 ### Security Improvements
 - [ ] Review OpenAI API usage for potential security concerns
 - [ ] Add protection against Discord-specific exploits
+- [ ] Implement API key rotation mechanism
 
 ### Functionality Enhancements
 - [ ] Implement message components (buttons, select menus) for interactive responses
 - [ ] Add user preference storage (database/file-based)
 - [ ] Add voice channel capabilities for audio responses
+- [ ] Implement context-aware command suggestions
 
 ### Deployment & Operations
-- [x] Implement a health check endpoint for monitoring
 - [ ] Add automated backup system for user conversation data
 - [ ] Set up Docker containerization for easier deployment
 - [ ] Implement proper versioning and release management
 - [ ] Add automated rollback capabilities
-- [ ] Create a status page or dashboard for bot health
 
 ## Completed Items
 
@@ -68,12 +78,15 @@
 
 ### Testing & Quality Assurance
 - [x] Configure a proper ESLint ruleset (it's installed but minimally configured)
+- [x] Create basic testing infrastructure (conversationLogTest.js and testRunner.js)
 
 ### Performance & Reliability
 - [x] Implement proper error recovery mechanisms
 - [x] Add telemetry/monitoring to track bot performance and usage
 - [x] Optimize conversation management for memory efficiency
 - [x] Implement rate limiting for API calls to prevent quota issues
+- [x] Add timeout protection for OpenAI API calls
+- [x] Implement fallback mechanisms for API failures
 
 ### Security Improvements
 - [x] Implement proper secrets management beyond .env files
@@ -89,10 +102,16 @@
 - [x] Create a help command with dynamic command discovery
 - [x] Implement a command cooldown system to prevent abuse
 - [x] Add slash command support (Discord's preferred interaction method)
+- [x] Implement Wolfram Alpha integration for factual queries
+- [x] Add configurable bot name display
 
 ### Deployment & Operations
 - [x] Create proper deployment documentation beyond PM2 basics
 - [x] Set up proper Git repository structure with appropriate security practices
+- [x] Implement a health check endpoint for monitoring
+- [x] Create a status page/dashboard for bot health
+- [x] Add configurable hostname and port settings for status page
+- [x] Implement multi-instance deployment support
 
 ### Developer Experience
 - [x] Set up a development environment with hot reloading (properly configured nodemon)

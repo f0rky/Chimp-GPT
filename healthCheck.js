@@ -41,7 +41,8 @@ const stats = {
     weather: 0,
     time: 0,
     wolfram: 0,
-    quake: 0
+    quake: 0,
+    dalle: 0
   },
   errors: {
     openai: 0,
@@ -50,6 +51,7 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
+    dalle: 0,
     other: 0
   },
   lastRestart: new Date(),

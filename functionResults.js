@@ -29,6 +29,7 @@ const DEFAULT_RESULTS = {
   time: [],
   wolfram: [],
   quake: [],
+  dalle: [],
   lastUpdated: new Date().toISOString()
 };
 

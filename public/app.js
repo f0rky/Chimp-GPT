@@ -40,9 +40,54 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add active class to clicked button and corresponding pane
             button.classList.add('active');
-            document.getElementById(`${button.dataset.tab}-results`).classList.add('active');
+            const tabId = button.getAttribute('data-tab');
+            document.getElementById(`${tabId}-results`).classList.add('active');
         });
     });
+    
+    // Set up image modal functionality
+    const modal = document.getElementById('gallery-modal');
+    const closeBtn = document.getElementById('modal-close');
+    
+    // Close modal when clicking the close button
+    closeBtn.addEventListener('click', closeImageModal);
+    
+    // Close modal when clicking outside the image
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeImageModal();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeImageModal();
+        }
+    });
+    
+    // Function to open image modal
+    window.openImageModal = function(imageUrl, prompt) {
+        const modal = document.getElementById('gallery-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalPrompt = document.getElementById('modal-prompt');
+        
+        modalImage.src = imageUrl;
+        modalPrompt.textContent = prompt;
+        modal.classList.add('active');
+        
+        // Prevent scrolling on body when modal is open
+        document.body.style.overflow = 'hidden';
+    };
+    
+    // Function to close image modal
+    window.closeImageModal = function() {
+        const modal = document.getElementById('gallery-modal');
+        modal.classList.remove('active');
+        
+        // Re-enable scrolling
+        document.body.style.overflow = 'auto';
+    };
 });
 
 /**
@@ -54,15 +99,16 @@ function initCharts() {
     apiChart = new Chart(apiCtx, {
         type: 'doughnut',
         data: {
-            labels: ['OpenAI', 'Weather', 'Time', 'Wolfram', 'Quake'],
+            labels: ['OpenAI', 'Weather', 'Time', 'Wolfram', 'Quake', 'DALL-E'],
             datasets: [{
-                data: [0, 0, 0, 0, 0],
+                data: [0, 0, 0, 0, 0, 0],
                 backgroundColor: [
                     '#43b581', // Green
                     '#7289da', // Blue
                     '#faa61a', // Yellow
                     '#f04747', // Red
-                    '#b9bbbe'  // Gray
+                    '#b9bbbe', // Gray
+                    '#9b59b6'  // Purple (for DALL-E)
                 ]
             }]
         },
@@ -85,10 +131,10 @@ function initCharts() {
     errorChart = new Chart(errorCtx, {
         type: 'bar',
         data: {
-            labels: ['OpenAI', 'Discord', 'Weather', 'Time', 'Wolfram', 'Quake', 'Other'],
+            labels: ['OpenAI', 'Discord', 'Weather', 'Time', 'Wolfram', 'Quake', 'DALL-E', 'Other'],
             datasets: [{
                 label: 'Errors',
-                data: [0, 0, 0, 0, 0, 0, 0],
+                data: [0, 0, 0, 0, 0, 0, 0, 0],
                 backgroundColor: '#f04747'
             }]
         },
@@ -129,9 +175,15 @@ function initCharts() {
 async function updateFunctionResults() {
     try {
         const response = await fetch('/function-results');
+        if (!response.ok) {
+            console.error(`Error fetching function results: ${response.status} ${response.statusText}`);
+            return;
+        }
+        
         const data = await response.json();
         
         if (!data) {
+            console.error('Empty function results data received');
             return;
         }
         
@@ -140,8 +192,19 @@ async function updateFunctionResults() {
         updateTimeResults(data.time || []);
         updateWolframResults(data.wolfram || []);
         updateQuakeResults(data.quake || []);
+        updateDalleResults(data.dalle || []);
+        updateGallery(data.dalle || []);
     } catch (error) {
-        console.error('Error updating function results:', error);
+        console.error('Error updating function results:', error.message || error);
+        // Display a message in each tab indicating there was an error
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            if (!pane.querySelector('.error-message')) {
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'error-message';
+                errorMsg.textContent = 'Error loading function results. Please try again later.';
+                pane.appendChild(errorMsg);
+            }
+        });
     }
 }
 
@@ -281,14 +344,121 @@ function updateQuakeResults(results) {
 }
 
 /**
+ * Update the DALL-E results tab
+ * @param {Array} results - DALL-E function results
+ */
+function updateDalleResults(results) {
+    const container = document.getElementById('dalle-results');
+    
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="no-data">No recent DALL-E image generations</div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    results.forEach(item => {
+        const callElement = document.createElement('div');
+        callElement.className = 'function-call';
+        
+        const prompt = item.params.prompt || 'Unknown prompt';
+        const model = item.params.model || 'dall-e-3';
+        const modelDisplay = model === 'dall-e-3' ? 'DALL-E 3' : 'DALL-E 2';
+        const timestamp = new Date(item.timestamp).toLocaleString();
+        
+        // Create a more user-friendly display of the image generation
+        callElement.innerHTML = `
+            <div class="function-header">
+                <span class="function-location">${modelDisplay}</span>
+                <span class="function-time">${timestamp}</span>
+            </div>
+            <div class="function-params">Prompt: "${prompt}"</div>
+            <div class="function-details">
+                <div>Size: ${item.params.size || '1024x1024'}</div>
+                ${item.params.enhance ? '<div>Enhanced prompt: Yes</div>' : ''}
+                ${item.result && item.result.success ? '<div class="success">✅ Image generated successfully</div>' : '<div class="error">❌ Image generation failed</div>'}
+            </div>
+        `;
+        
+        container.appendChild(callElement);
+    });
+}
+
+/**
+ * Update the gallery with DALL-E images
+ * @param {Array} results - DALL-E function results
+ */
+function updateGallery(results) {
+    const container = document.querySelector('#gallery-results .gallery-container');
+    
+    if (!results || results.length === 0 || !container) {
+        if (container) {
+            container.innerHTML = '<div class="no-data">No images to display</div>';
+        }
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Filter only successful image generations
+    const successfulResults = results.filter(item => 
+        item.result && 
+        item.result.success && 
+        item.result.images && 
+        item.result.images.length > 0
+    );
+    
+    if (successfulResults.length === 0) {
+        container.innerHTML = '<div class="no-data">No successful image generations found</div>';
+        return;
+    }
+    
+    // Create gallery items for each image
+    successfulResults.forEach(item => {
+        item.result.images.forEach(image => {
+            if (!image.url) return;
+            
+            const galleryItem = document.createElement('div');
+            galleryItem.className = 'gallery-item';
+            
+            const img = document.createElement('img');
+            img.src = image.url;
+            img.alt = 'Generated image';
+            img.loading = 'lazy';
+            
+            const promptDiv = document.createElement('div');
+            promptDiv.className = 'prompt';
+            promptDiv.textContent = image.revisedPrompt || item.params.prompt;
+            
+            galleryItem.appendChild(img);
+            galleryItem.appendChild(promptDiv);
+            
+            // Add click event to open modal
+            galleryItem.addEventListener('click', () => {
+                openImageModal(image.url, image.revisedPrompt || item.params.prompt);
+            });
+            
+            container.appendChild(galleryItem);
+        });
+    });
+}
+
+/**
  * Update the status page with the latest data
  */
 async function updateStatus() {
     try {
         const response = await fetch('/health');
+        if (!response.ok) {
+            console.error(`Error fetching health data: ${response.status} ${response.statusText}`);
+            setStatusIndicator('offline');
+            return;
+        }
+        
         const data = await response.json();
         
         if (!data) {
+            console.error('Empty health data received');
             setStatusIndicator('offline');
             return;
         }
@@ -326,8 +496,20 @@ async function updateStatus() {
         // Update last updated time
         document.getElementById('last-updated').textContent = new Date().toLocaleString();
     } catch (error) {
-        console.error('Error fetching health data:', error);
-        setStatusIndicator('offline');
+        console.error('Error fetching health data:', error.message || error);
+        setStatusIndicator('error');
+        
+        // Display an error message on the page
+        document.querySelectorAll('.card').forEach(card => {
+            const errorBanner = document.createElement('div');
+            errorBanner.className = 'error-banner';
+            errorBanner.textContent = 'Error connecting to server. Please check your connection.';
+            
+            // Only add the error banner if it doesn't already exist
+            if (!card.querySelector('.error-banner')) {
+                card.prepend(errorBanner);
+            }
+        });
     }
 }
 
@@ -371,6 +553,7 @@ function updateApiCalls(apiCalls) {
     document.getElementById('time-calls').textContent = apiCalls.time.toLocaleString();
     document.getElementById('wolfram-calls').textContent = apiCalls.wolfram.toLocaleString();
     document.getElementById('quake-calls').textContent = apiCalls.quake.toLocaleString();
+    document.getElementById('dalle-calls').textContent = apiCalls.dalle ? apiCalls.dalle.toLocaleString() : '0';
     
     // Update chart
     apiChart.data.datasets[0].data = [
@@ -378,7 +561,8 @@ function updateApiCalls(apiCalls) {
         apiCalls.weather,
         apiCalls.time,
         apiCalls.wolfram,
-        apiCalls.quake
+        apiCalls.quake,
+        apiCalls.dalle || 0
     ];
     apiChart.update();
 }
@@ -392,6 +576,7 @@ function updateErrors(errors) {
     document.getElementById('openai-errors').textContent = errors.openai.toLocaleString();
     document.getElementById('discord-errors').textContent = errors.discord.toLocaleString();
     document.getElementById('weather-errors').textContent = errors.weather.toLocaleString();
+    document.getElementById('dalle-errors').textContent = errors.dalle ? errors.dalle.toLocaleString() : '0';
     document.getElementById('other-errors').textContent = errors.other.toLocaleString();
     
     // Update chart
@@ -402,6 +587,7 @@ function updateErrors(errors) {
         errors.time,
         errors.wolfram,
         errors.quake,
+        errors.dalle || 0,
         errors.other
     ];
     errorChart.update();

@@ -69,6 +69,10 @@
                         <span class="label">Quake</span>
                         <span id="quake-calls" class="value">0</span>
                     </div>
+                    <div class="stat">
+                        <span class="label">DALL-E</span>
+                        <span id="dalle-calls" class="value">0</span>
+                    </div>
                 </div>
             </div>
 
@@ -89,6 +93,10 @@
                     <div class="stat">
                         <span class="label">Weather</span>
                         <span id="weather-errors" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">DALL-E</span>
+                        <span id="dalle-errors" class="value">0</span>
                     </div>
                     <div class="stat">
                         <span class="label">Other</span>
@@ -155,6 +163,8 @@
                         <button class="tab-button" data-tab="time">Time</button>
                         <button class="tab-button" data-tab="wolfram">Wolfram</button>
                         <button class="tab-button" data-tab="quake">Quake</button>
+                        <button class="tab-button" data-tab="dalle">DALL-E</button>
+                        <button class="tab-button" data-tab="gallery">Image Gallery</button>
                     </div>
                 </div>
                 <div class="tab-content">
@@ -169,6 +179,14 @@
                     </div>
                     <div class="tab-pane" id="quake-results">
                         <div class="no-data">No recent Quake server stats</div>
+                    </div>
+                    <div class="tab-pane" id="dalle-results">
+                        <div class="no-data">No recent DALL-E image generations</div>
+                    </div>
+                    <div class="tab-pane" id="gallery-results">
+                        <div class="gallery-container">
+                            <div class="no-data">No images to display</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -202,6 +220,15 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Image Gallery Modal -->
+    <div class="gallery-modal" id="gallery-modal">
+        <button class="modal-close" id="modal-close">&times;</button>
+        <div class="modal-content">
+            <img id="modal-image" src="" alt="Generated image">
+        </div>
+        <div class="modal-prompt" id="modal-prompt"></div>
+    </div>
+    
     <script src="app.js"></script>
 </body>
 </html>
