@@ -74,6 +74,7 @@ function generateTestData() {
     };
 }
 
+/* global window */
 // Override the fetch function to return test data
 const originalFetch = window.fetch;
 window.fetch = function(url, options) {

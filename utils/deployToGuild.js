@@ -2,8 +2,6 @@ require('dotenv').config();
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { createLogger } = require('./logger');
-const logger = createLogger('deployToGuild');
 
 // Get configuration
 const config = require('./configValidator');
@@ -58,7 +56,8 @@ async function deployCommands() {
         slashCommands.push(command.slashCommand.toJSON());
         console.log(`Loaded slash command: ${command.name}`);
       } catch (error) {
-        console.error(`Error loading command file ${file}:`, error);
+        const { discord: discordLogger } = require('../logger');
+        discordLogger.error({ error, file }, 'Error loading command file');
       }
     }
     
@@ -84,7 +83,8 @@ async function deployCommands() {
       commands: data
     };
   } catch (error) {
-    console.error('Error deploying commands:', error);
+    const { discord: discordLogger } = require('../logger');
+    discordLogger.error({ error }, 'Error deploying commands');
     return {
       success: false,
       error: error.message
@@ -98,9 +98,11 @@ deployCommands()
     if (result.success) {
       console.log('Command deployment completed successfully!');
     } else {
-      console.error('Command deployment failed:', result.error);
+      const { discord: discordLogger } = require('../logger');
+      discordLogger.error({ error: result.error }, 'Command deployment failed');
     }
   })
   .catch(error => {
-    console.error('Unexpected error:', error);
+    const { discord: discordLogger } = require('../logger');
+    discordLogger.error({ error }, 'Unexpected error during deployment');
   });

@@ -1,4 +1,24 @@
 /**
+ * @typedef {Object} ImageGenerationOptions
+ * @property {string} [model] - The model to use (dall-e-2 or dall-e-3)
+ * @property {string} [size] - Image size
+ * @property {string} [quality] - Image quality
+ * @property {number} [n] - Number of images to generate (DALL-E 2 only)
+ * @property {boolean} [enhance] - Whether to enhance the prompt using GPT
+ *
+ * @typedef {Object} ImageResult
+ * @property {true} success
+ * @property {Array<{ url: string, revisedPrompt: string }>} images
+ *
+ * @typedef {Object} ImageErrorResult
+ * @property {false} success
+ * @property {string} error
+ * @property {string} prompt
+ *
+ * @typedef {Object} EnhancedPromptResult
+ * @property {string} enhancedPrompt
+ */
+/**
  * Image Generation Module for ChimpGPT
  * 
  * This module provides image generation capabilities using OpenAI's DALL-E model.
@@ -51,22 +71,21 @@ const QUALITY = {
 };
 
 /**
- * Generate an image using DALL-E
- * 
+ * Generate an image using DALL-E.
+ *
+ * Standardized error handling: always returns either an ImageResult or ImageErrorResult.
+ * Errors are always logged with stack trace and context.
+ *
  * @param {string} prompt - The text prompt to generate an image from
- * @param {Object} options - Generation options
- * @param {string} [options.model=MODELS.DALLE_3] - The model to use (dall-e-2 or dall-e-3)
- * @param {string} [options.size=SIZES.LARGE] - Image size
- * @param {string} [options.quality=QUALITY.STANDARD] - Image quality
- * @param {number} [options.n=1] - Number of images to generate (DALL-E 2 only)
- * @returns {Promise<Object>} The generated image data
+ * @param {ImageGenerationOptions} [options={}] - Generation options
+ * @returns {Promise<ImageResult|ImageErrorResult>} The generated image result object
  */
 async function generateImage(prompt, options = {}) {
   try {
     // Default to DALL-E 3 with standard quality and large size
     const model = options.model || MODELS.DALLE_3;
-    const size = options.size || SIZES.LARGE;
-    const quality = options.quality || QUALITY.STANDARD;
+    let size = options.size || SIZES.LARGE;
+    let quality = options.quality || QUALITY.STANDARD;
     const n = model === MODELS.DALLE_2 ? (options.n || 1) : 1; // DALL-E 3 only supports n=1
     
     logger.info({
@@ -159,11 +178,10 @@ async function generateImage(prompt, options = {}) {
 }
 
 /**
- * Generate an improved prompt for image generation
- * 
- * This function uses GPT to enhance a basic prompt with more details
- * to produce better image generation results.
- * 
+ * Generate an improved prompt for image generation.
+ *
+ * This function uses GPT to enhance a basic prompt with more details to produce better image generation results.
+ *
  * @param {string} basicPrompt - The basic user prompt
  * @returns {Promise<string>} Enhanced prompt for image generation
  */

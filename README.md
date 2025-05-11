@@ -1,20 +1,152 @@
 
 # Chimp-GPT Discord Bot
 
-Chimp-GPT is a Discord bot powered by OpenAI's API. The bot is designed to interact with users, provide weather information, tell the current time, display Quake Live server stats, and more. It features robust error handling, fallback mechanisms, and a reliable architecture for consistent performance.
+Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
 ## Features
 
-- **Interactive Conversations**: Engage in dynamic conversations with the bot using natural language.
-  Example: ask "Tell me a joke," and the bot will respond with a joke using GPT3.5.
-- **Weather Lookup**: Ask the bot about current weather conditions for a location with reliable responses and fallback mechanisms.
-  Example: "What's the weather like in New York?"
-- **Time Inquiry**: Find out the current time of a location by asking the bot.
-  Example: "What time is it in London?"
-- **Quake Live Server Stats**: Check the status of Quake Live servers.
-  Example: "!serverstats" or ask "What are the current Quake servers?"
-- **Wolfram Alpha Integration**: Get answers to factual and computational questions.
-  Example: "What is the square root of 144?"
+- **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
+- **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT-3.5/4).
+- **Weather Lookup**: Reliable weather info with robust error handling and fallback mechanisms.
+- **Time Inquiry**: Ask for the current time in any location.
+- **Quake Live Server Stats**: View real-time Quake Live server stats with compact, configurable display.
+- **Image Generation**: Use DALL-E (2 & 3) to generate images directly from Discord, with a gallery view on the status page.
+- **Wolfram Alpha Integration**: Ask factual or computational questions.
+- **Status Page**: Real-time dashboard with stats, error logs, and an image gallery for generated images.
+- **Comprehensive Error Handling & Logging**: All error handling and logging are now standardized across all major modules using Pino-based loggers. This ensures detailed, structured logs for easier debugging, monitoring, and reliability.
+- **Slash Commands**: Full support for Discord slash commands, including plugin-provided commands.
+
+## Plugin System
+
+Chimp-GPT supports a powerful plugin architecture:
+- Plugins are placed in the `plugins/` directory, each in its own folder.
+- Each plugin exports metadata, commands, functions, and hooks.
+- Example plugins and a template are provided in `plugins/README.md`.
+- Plugins can add slash commands, message commands, and respond to bot lifecycle events.
+
+### Creating a Plugin
+1. Copy the template in `plugins/README.md`.
+2. Create a new folder in `plugins/` and add your `index.js`.
+3. Export an object with required fields (`id`, `name`, `version`) and optional `commands`, `functions`, and `hooks`.
+4. Restart the bot to load your plugin.
+
+### Plugin Validation
+- Plugins are validated for required metadata and structure.
+- See the [windsurf.config.js](#windsurf-configjs) for plugin validation rules.
+
+## Status Page & Image Gallery
+- Accessible via the configured `STATUS_HOSTNAME` and `STATUS_PORT`.
+- Shows bot uptime, API call stats, error logs, and a gallery of generated images.
+- Responsive design and mobile-friendly.
+
+## Error Handling & Logging
+- All API integrations feature robust error handling and fallbacks.
+- Errors are logged using Pino-based structured loggers and shown on the status page.
+- Logging is consistent across all main modules for easier debugging and monitoring.
+- Graceful shutdown and recovery are implemented throughout the codebase.
+
+## Documentation & Type Safety
+- Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
+- Improved maintainability, developer onboarding, and static analysis.
+
+## Code Quality & Linting
+- The project uses ESLint and Prettier for code quality.
+- Linting and formatting rules are enforced via [windsurf.config.js](#windsurf-configjs).
+- Security checks prevent secrets from being committed.
+
+## windsurf.config.js
+
+A `windsurf.config.js` file is provided at the project root to enforce code quality, plugin validation, and optional deployment rules. These are automatically checked in CI/CD and pre-commit hooks if configured:
+
+```js
+// windsurf.config.js
+module.exports = {
+  lint: {
+    enabled: true,
+    tool: 'eslint',
+    configFile: '.eslintrc.js',
+    failOnError: true,
+    include: ['**/*.js'],
+    exclude: ['node_modules', 'archive', 'plugins/README.md']
+  },
+  prettier: {
+    enabled: true,
+    configFile: '.prettierrc',
+    include: ['**/*.js', '**/*.json', '**/*.md'],
+    exclude: ['node_modules', 'archive']
+  },
+  security: {
+    checkSecrets: true,
+    failOnSecret: true,
+    exclude: ['.env.example', 'archive']
+  },
+  deploy: {
+    enabled: false, // Set to true if using Windsurf for deployment
+    provider: '', // e.g., 'netlify', 'vercel', or leave blank
+    buildCommand: 'npm run build',
+    publishDir: 'dist',
+    env: ['DISCORD_TOKEN', 'OPENAI_API_KEY', 'X_RAPIDAPI_KEY', 'BOT_PERSONALITY', 'STATUS_HOSTNAME', 'STATUS_PORT']
+  },
+  plugins: {
+    validate: true,
+    pluginDir: 'plugins',
+    requireId: true,
+    requireVersion: true,
+    requireDescription: false
+  }
+};
+```
+
+- **Linting**: ESLint is enforced on all JS files except excluded folders/files.
+- **Formatting**: Prettier is run on JS, JSON, and Markdown files.
+- **Security**: Checks for secrets in the codebase (excluding `.env.example` and `archive`).
+- **Plugin Validation**: All plugins in the `plugins/` directory are checked for required fields and structure.
+- **Deployment**: (Optional) Can be enabled for CI/CD deployment with supported providers.
+
+## Implementation Checklist
+
+A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIST.md). This tracks high, medium, and low priority tasks for code structure, security, performance, testing, developer experience, and deployment. Please review and update this file as you work on the project.
+
+## Setup and Installation
+
+1. **Clone the Repository**:
+    ```bash
+    git clone https://github.com/f0rky/Chimp-GPT
+    cd Chimp-GPT
+    ```
+
+2. **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+
+3. **Set Up Environment Variables**:
+   Create a `.env` file in the root directory and set up the following environment variables (refer to `.env.example`).
+
+4. **Linting & Code Quality**:
+    - Before building or deploying, run the linter and fix all errors:
+    ```bash
+    npx eslint . --ext .js --max-warnings=0
+    ```
+    - The build/deploy process requires a successful lint (no errors).
+
+5. **Run the Bot**:
+    ```bash
+    # Using PM2 (recommended)
+    pm2 start chimpGPT.js --name chimpGPT --env development
+    # Or for production
+    pm2 start chimpGPT.js --name chimpGPT --env production
+    ```
+
+6. **Access the Status Page**:
+    - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>`
+
+## Contributing
+- Contributions are welcome! Please follow the plugin template and code style guidelines.
+- All PRs are automatically linted and checked for plugin validity.
+
+## License
+MIT
 
 ## Prerequisites
 

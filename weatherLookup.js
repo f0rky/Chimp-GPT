@@ -1,4 +1,38 @@
 /**
+ * @typedef {Object} WeatherData
+ * @property {Object} location
+ * @property {string} location.name
+ * @property {string} location.region
+ * @property {string} location.country
+ * @property {string} location.localtime
+ * @property {Object} current
+ * @property {number} current.temp_c
+ * @property {Object} current.condition
+ * @property {string} current.condition.text
+ * @property {string} current.condition.icon
+ * @property {number} current.wind_kph
+ * @property {number} current.humidity
+ * @property {Object} forecast
+ * @property {Array<Object>} forecast.forecastday
+ * @property {boolean} [_isMock]
+ *
+ * @typedef {Object} WeatherSuccessResult
+ * @property {true} success
+ * @property {WeatherData} data
+ *
+ * @typedef {Object} WeatherErrorResult
+ * @property {false} success
+ * @property {Error} error
+ * @property {WeatherData} data
+ *
+ * @typedef {Object} ExtendedForecastResult
+ * @property {boolean} success
+ * @property {WeatherData} [data]
+ * @property {Error} [error]
+ *
+ * Retrieves and formats weather data for ChimpGPT.
+ */
+/**
  * Weather lookup module for ChimpGPT
  * 
  * This module provides functions to retrieve weather data from the WeatherAPI.com service.
@@ -51,16 +85,13 @@ const mockWeatherData = {
 };
 
 /**
- * Look up weather for a location
- * 
- * @param {string} location - Location to get weather for
- * @returns {Promise<Object>} Weather data
- */
-/**
- * Standardized error handling: This function always returns an object:
- *   { success: true, data: weatherData } on success
- *   { success: false, error, data: mockData } on error/fallback
+ * Look up weather for a location.
+ *
+ * Standardized error handling: always returns either a WeatherSuccessResult or WeatherErrorResult.
  * Errors are always logged with stack trace and context.
+ *
+ * @param {string} location - Location to get weather for
+ * @returns {Promise<WeatherSuccessResult|WeatherErrorResult>} Weather result object
  */
 async function lookupWeather(location) {
   weatherLogger.debug({ location }, 'Requesting current weather data');
@@ -141,17 +172,16 @@ async function lookupWeather(location) {
 
 
 /**
- * Look up extended weather forecast for a location
- * 
- * @param {string} location - Location to get forecast for
- * @param {number} days - Number of days to forecast
- * @returns {Promise<Object>} Extended forecast data
- */
-/**
- * Standardized error handling: This function always returns an object:
- *   { success: true, data: weatherData } on success
+ * Look up extended weather forecast for a location.
+ *
+ * Standardized error handling: always returns an object:
+ *   { success: true, data: forecastData } on success
  *   { success: false, error, data: mockData } on error/fallback
  * Errors are always logged with stack trace and context.
+ *
+ * @param {string} location - Location to get forecast for
+ * @param {number} [days=5] - Number of days for the forecast
+ * @returns {Promise<ExtendedForecastResult>} Extended forecast result object
  */
 async function lookupExtendedForecast(location, days = 5) {
   weatherLogger.debug({ location, days }, 'Requesting extended forecast data');

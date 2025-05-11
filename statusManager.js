@@ -1,4 +1,18 @@
 /**
+ * @typedef {Object} StatusObject
+ * @property {import('discord.js').ActivityType} type - Discord activity type
+ * @property {string} name - Status message to display
+ *
+ * @typedef {Object} LastActivity
+ * @property {string|null} type - Activity type ('quake', 'weather', 'conversation', etc.)
+ * @property {Object|null} data - Activity-specific data
+ * @property {number|null} timestamp - Unix timestamp (ms) of last activity
+ * @property {string|null} username - Username associated with activity
+ *
+ * @typedef {Object} StatusManagerAPI
+ * @property {function(import('discord.js').Client): Object} initStatusManager
+ */
+/**
  * Status Manager for ChimpGPT
  * 
  * This module manages dynamic status updates for the Discord bot.
@@ -40,33 +54,14 @@ const defaultStatuses = [
   { type: ActivityType.Listening, name: 'to your requests' }
 ];
 
-// Quake-related statuses
-const quakeStatuses = [
-  { type: ActivityType.Watching, name: '{count} Quake servers' },
-  { type: ActivityType.Watching, name: '{count} active Quake servers' },
-  { type: ActivityType.Watching, name: 'Quake tournaments' }
-];
-
-// Weather-related statuses
-const weatherStatuses = [
-  { type: ActivityType.Watching, name: 'the weather in {location}' },
-  { type: ActivityType.Playing, name: 'with {weather} weather' }
-];
-
-// Conversation-related statuses
-const conversationStatuses = [
-  { type: ActivityType.Listening, name: 'to {username}' },
-  { type: ActivityType.Playing, name: 'with words' },
-  { type: ActivityType.Watching, name: 'for interesting questions' }
-];
 
 /**
- * Initialize the status manager
- * 
+ * Initialize the status manager.
+ *
  * Sets up periodic status updates and returns functions to track activities.
- * 
+ *
  * @param {import('discord.js').Client} client - Discord.js client
- * @returns {Object} Status manager functions
+ * @returns {{ trackQuakeLookup: function(number): void, trackWeatherLookup: function(string, string): void, trackConversation: function(string, string): void, shutdown: function(): void }} Status manager functions
  */
 function initStatusManager(client) {
   logger.info('Initializing status manager');
@@ -153,9 +148,10 @@ function initStatusManager(client) {
 }
 
 /**
- * Update the bot's status based on recent activity
- * 
+ * Update the bot's status based on recent activity.
+ *
  * @param {import('discord.js').Client} client - Discord.js client
+ * @returns {Promise<void>} Resolves when status update is complete
  */
 async function updateStatus(client) {
   try {
@@ -212,9 +208,9 @@ async function updateStatus(client) {
 }
 
 /**
- * Get a random default status
- * 
- * @returns {Object} Status object with type and name
+ * Get a random default status.
+ *
+ * @returns {StatusObject} Status object with type and name
  */
 function getRandomDefaultStatus() {
   const index = Math.floor(Math.random() * defaultStatuses.length);
@@ -222,10 +218,10 @@ function getRandomDefaultStatus() {
 }
 
 /**
- * Get a status related to Quake servers
- * 
+ * Get a status related to Quake servers.
+ *
  * @param {number} serverCount - Number of active Quake servers
- * @returns {Object} Status object with type and name
+ * @returns {StatusObject} Status object with type and name
  */
 function getQuakeStatus(serverCount) {
   return {
@@ -235,11 +231,11 @@ function getQuakeStatus(serverCount) {
 }
 
 /**
- * Get a status related to weather
- * 
+ * Get a status related to weather.
+ *
  * @param {string} location - Location name
  * @param {string} weather - Weather condition
- * @returns {Object} Status object with type and name
+ * @returns {StatusObject} Status object with type and name
  */
 function getWeatherStatus(location, weather) {
   return {
@@ -249,10 +245,10 @@ function getWeatherStatus(location, weather) {
 }
 
 /**
- * Get a status related to conversation
- * 
+ * Get a status related to conversation.
+ *
  * @param {string} username - Discord username
- * @returns {Object} Status object with type and name
+ * @returns {StatusObject} Status object with type and name
  */
 function getConversationStatus(username) {
   if (!username) {
@@ -266,8 +262,8 @@ function getConversationStatus(username) {
 }
 
 /**
- * Get the current count of active Quake servers
- * 
+ * Get the current count of active Quake servers.
+ *
  * @returns {Promise<number>} Number of active servers
  */
 async function getActiveQuakeServerCount() {
@@ -294,6 +290,11 @@ async function getActiveQuakeServerCount() {
   }
 }
 
+/**
+ * Status Manager API exports.
+ *
+ * @type {StatusManagerAPI}
+ */
 module.exports = {
   initStatusManager
 };

@@ -10,7 +10,7 @@
  */
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { MessageAttachment } = require('discord.js');
+
 const { generateImage, enhanceImagePrompt, MODELS, SIZES, QUALITY } = require('../../imageGeneration');
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:image');
@@ -66,11 +66,9 @@ module.exports = {
    * Execute the image generation command (for message commands)
    * 
    * @param {Object} message - Discord message object
-   * @param {Array<string>} args - Command arguments
-   * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async execute(message, args, config) {
+  async execute(message) {
     // Not implemented for message commands yet
     return message.reply('Please use the slash command version of this command for now.');
   },
@@ -79,10 +77,9 @@ module.exports = {
    * Execute the image generation command for slash commands
    * 
    * @param {Object} interaction - Discord interaction object
-   * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async interactionExecute(interaction, config) {
+  async interactionExecute(interaction) {
     try {
       // Defer the reply to give us time to generate the image
       await interaction.deferReply();

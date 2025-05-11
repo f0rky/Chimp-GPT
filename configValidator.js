@@ -1,4 +1,18 @@
 /**
+ * @typedef {Object} ConfigSchema
+ * @property {boolean} required - Whether the variable is required for the application to start
+ * @property {string} description - Human-readable description of the variable
+ * @property {Function} [validate] - Function to validate the variable value
+ * @property {Function} [transform] - Function to transform the variable value
+ * @property {*} [default] - Default value if not provided (for optional variables)
+ *
+ * @typedef {Object.<string, ConfigSchema>} ConfigSchemaMap
+ *
+ * @typedef {Object.<string, *>} ValidatedConfig
+ *
+ * @typedef {ValidatedConfig} ConfigValidator
+ */
+/**
  * Configuration Validator for ChimpGPT
  * 
  * This module validates all required environment variables on application startup
@@ -15,18 +29,9 @@ const { createLogger } = require('./logger');
 const logger = createLogger('config');
 
 /**
- * Configuration schema defining all environment variables, their requirements, and validation rules
- * 
- * @typedef {Object} ConfigSchema
- * @property {boolean} required - Whether the variable is required for the application to start
- * @property {string} description - Human-readable description of the variable
- * @property {Function} [validate] - Function to validate the variable value
- * @property {Function} [transform] - Function to transform the variable value
- * @property {*} [default] - Default value if not provided (for optional variables)
- */
-/**
- * Schema for all configuration variables used in the application
- * @type {Object.<string, ConfigSchema>}
+ * Configuration schema defining all environment variables, their requirements, and validation rules.
+ *
+ * @type {ConfigSchemaMap}
  */
 const CONFIG_SCHEMA = {
   // Required variables (application won't start without these)
@@ -193,14 +198,13 @@ const CONFIG_SCHEMA = {
 };
 
 /**
- * Validates all environment variables according to the schema
- * 
+ * Validates all environment variables according to the schema.
+ *
  * This function processes each configuration item defined in CONFIG_SCHEMA,
- * validates its value, applies any transformations, and returns a consolidated
- * configuration object. If any required variables are missing or invalid,
- * it throws an error with detailed information.
- * 
- * @returns {Object} Validated configuration object with all processed values
+ * validates its value, applies any transformations, and returns a consolidated configuration object.
+ * If any required variables are missing or invalid, it throws an error with detailed information.
+ *
+ * @returns {ValidatedConfig} Validated configuration object with all processed values
  * @throws {Error} If any required variables are missing or invalid
  */
 function validateConfig() {
@@ -242,14 +246,14 @@ function validateConfig() {
 }
 
 /**
- * Validated configuration object
- * 
+ * Validated configuration object.
+ *
  * This is the main export of the module - a validated configuration object
  * that contains all the processed environment variables. The validation happens
  * immediately when this module is imported, ensuring that the application
  * has valid configuration before proceeding.
- * 
- * @type {Object.<string, *>}
+ *
+ * @type {ConfigValidator}
  */
 let validatedConfig;
 
@@ -262,5 +266,6 @@ try {
 
 /**
  * @exports ConfigValidator
+ * @type {ConfigValidator}
  */
 module.exports = validatedConfig;

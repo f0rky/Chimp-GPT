@@ -1,3 +1,4 @@
+/* global document window Chart alert confirm openImageModal */
 /**
  * ChimpGPT Status Page
  * 
@@ -16,6 +17,14 @@ let errorChart = null;
 
 // Update interval in milliseconds
 const UPDATE_INTERVAL = 5000; // 5 seconds
+
+function closeImageModal() {
+  const modal = document.getElementById('gallery-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+  }
+}
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
@@ -486,6 +495,9 @@ async function updateStatus() {
         // Update memory usage
         updateMemoryUsage(data.memory, data.system);
         
+        // Update plugin statistics
+        updatePluginStats(data.stats.plugins, data.stats.apiCalls.plugins, data.stats.errors.plugins);
+        
         // Update rate limits
         document.getElementById('rate-limit-hits').textContent = data.stats.rateLimits.count.toLocaleString();
         document.getElementById('rate-limit-users').textContent = data.stats.rateLimits.uniqueUsers.toLocaleString();
@@ -622,23 +634,93 @@ function updateMemoryUsage(memory, system) {
 }
 
 /**
- * Format uptime in days, hours, minutes, seconds
+ * Format uptime in seconds to a readable string
  * @param {number} seconds - Uptime in seconds
- * @returns {string} Formatted uptime string
+ * @returns {string} - Formatted uptime string
  */
 function formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-    
-    return parts.join(' ');
+const days = Math.floor(seconds / 86400);
+seconds %= 86400;
+const hours = Math.floor(seconds / 3600);
+seconds %= 3600;
+const minutes = Math.floor(seconds / 60);
+seconds %= 60;
+
+let result = '';
+if (days > 0) result += `${days}d `;
+if (hours > 0 || days > 0) result += `${hours}h `;
+if (minutes > 0 || hours > 0 || days > 0) result += `${minutes}m `;
+result += `${seconds}s`;
+
+return result;
+}
+
+/**
+ * Update plugin statistics
+ * @param {Object} plugins - Plugin statistics
+ * @param {Object} pluginApiCalls - Plugin API call counts
+ * @param {Object} pluginErrors - Plugin error counts
+ */
+function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
+// Update plugin counters
+document.getElementById('plugin-count').textContent = plugins?.loaded || 0;
+document.getElementById('plugin-commands').textContent = plugins?.commands || 0;
+document.getElementById('plugin-functions').textContent = plugins?.functions || 0;
+document.getElementById('plugin-hooks').textContent = plugins?.hooks || 0;
+
+// Update plugin API calls list
+const apiCallsContainer = document.getElementById('plugin-api-calls');
+apiCallsContainer.innerHTML = '';
+
+if (pluginApiCalls && Object.keys(pluginApiCalls).length > 0) {
+    // Sort plugins by API call count (descending)
+    const sortedPlugins = Object.entries(pluginApiCalls)
+        .sort((a, b) => b[1] - a[1]);
+
+    // Create a list item for each plugin
+    sortedPlugins.forEach(([pluginId, count]) => {
+        const pluginItem = document.createElement('div');
+        pluginItem.className = 'plugin-item';
+        pluginItem.innerHTML = `
+            <span class="plugin-name">${pluginId}</span>
+            <span class="plugin-value">${count.toLocaleString()} calls</span>
+        `;
+        apiCallsContainer.appendChild(pluginItem);
+    });
+} else {
+    // Show empty message
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.textContent = 'No plugin API calls recorded';
+    apiCallsContainer.appendChild(emptyMessage);
+}
+
+// Update plugin errors list
+const errorsContainer = document.getElementById('plugin-errors');
+errorsContainer.innerHTML = '';
+
+if (pluginErrors && Object.keys(pluginErrors).length > 0) {
+    // Sort plugins by error count (descending)
+    const sortedPlugins = Object.entries(pluginErrors)
+        .sort((a, b) => b[1] - a[1]);
+
+    // Create a list item for each plugin
+    sortedPlugins.forEach(([pluginId, count]) => {
+        const pluginItem = document.createElement('div');
+        pluginItem.className = 'plugin-item';
+        pluginItem.innerHTML = `
+            <span class="plugin-name">${pluginId}</span>
+            <span class="plugin-value">${count.toLocaleString()} errors</span>
+        `;
+        errorsContainer.appendChild(pluginItem);
+    });
+} else {
+    // Show empty message
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.textContent = 'No plugin errors recorded';
+    errorsContainer.appendChild(emptyMessage);
+}
 }
 
 /**

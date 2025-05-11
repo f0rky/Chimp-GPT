@@ -1,4 +1,52 @@
 /**
+ * @typedef {Object} QuakeConfig
+ * @property {number} eloMode - ELO display mode: 0=Off, 1=Categorized, 2=Actual value
+ * @property {number} maxServers - Maximum number of servers to display
+ * @property {boolean} showTeamEmojis - Whether to show team emojis next to player names
+ * @property {boolean} showServerStatsEmojis - Whether to show emojis in server stats output
+ *
+ * @typedef {Object} Player
+ * @property {string} name - Player's name
+ * @property {number} [score] - Player's score
+ * @property {string} [totalConnected] - Time connected
+ * @property {number} [team] - Team number
+ * @property {number} [rating] - Player's ELO rating
+ *
+ * @typedef {Object} QLStatsPlayer
+ * @property {string} name - Player's name
+ * @property {number} team - Team number
+ * @property {number} rating - Player's ELO rating
+ *
+ * @typedef {Object} ServerStats
+ * @property {string} serverName
+ * @property {string} currentMap
+ * @property {string} playerCount
+ * @property {string} gameType
+ * @property {Object} teamScores
+ * @property {number} teamScores.red
+ * @property {number} teamScores.blue
+ * @property {number} roundLimit
+ * @property {string} uptime
+ * @property {string} address
+ * @property {Array<Player>} players
+ *
+ * @typedef {Object} QLStatsData
+ * @property {Array<QLStatsPlayer>} rankedPlayers
+ * @property {number} avg
+ *
+ * @typedef {Object} FormattedServerResponse
+ * @property {string} formatted
+ *
+ * @typedef {Promise<string>|string} AISummaryResult
+ *
+ * @typedef {function(string=, number=): Promise<string>} LookupQuakeServerFn
+ * @typedef {function(boolean=): Promise<string>} TestOpenAISummaryFn
+ *
+ * @typedef {Object} QuakeLookupAPI
+ * @property {LookupQuakeServerFn} lookupQuakeServer
+ * @property {TestOpenAISummaryFn} testOpenAISummary
+ */
+/**
  * Quake Live Server Lookup Module
  * 
  * This module provides functionality to query Quake Live servers,
@@ -62,11 +110,10 @@ const openai = new OpenAI({
 });
 
 /**
- * Calculate server uptime from level start time
- * 
- * Converts the level start time (Unix timestamp) to a formatted
- * uptime string in the format HH:MM:SS.
- * 
+ * Calculate server uptime from level start time.
+ *
+ * Converts the level start time (Unix timestamp) to a formatted uptime string in the format HH:MM:SS.
+ *
  * @param {string|number} levelStartTime - Unix timestamp when the level started
  * @returns {string} Formatted uptime string (HH:MM:SS)
  */
@@ -92,11 +139,10 @@ function calculateUptime(levelStartTime) {
 }
 
 /**
- * Remove Quake color codes from text
- * 
- * Quake uses color codes in the format ^n where n is a digit.
- * This function removes these codes to display clean text.
- * 
+ * Remove Quake color codes from text.
+ *
+ * Quake uses color codes in the format ^n where n is a digit. This function removes these codes to display clean text.
+ *
  * @param {string} text - Text potentially containing color codes
  * @returns {string} Text with color codes removed
  */
@@ -218,13 +264,13 @@ function mergePlayerData(basicPlayers, qlstatsPlayers) {
 }
 
 /**
- * Get ELO category (Scrub/Mid/Pro) based on rating
- * 
+ * Get ELO category (Scrub/Mid/Pro) based on rating.
+ *
  * Categorizes players into skill levels based on their ELO rating:
  * - Scrub: 0-799
  * - Mid: 800-1300
  * - Pro: 1301+
- * 
+ *
  * @param {number} rating - Player's ELO rating
  * @returns {string} ELO category label
  */
@@ -235,17 +281,11 @@ function getEloCategory(rating) {
 }
 
 /**
- * Format player line with configurable ELO display
- * 
- * Creates a formatted string for a player entry in the server stats display.
- * The format changes based on whether the player is active or spectating and
- * includes ELO information according to the configured display mode.
- * 
- * @param {Object} player - Player data
- * @param {string} player.name - Player's name
- * @param {number} [player.score] - Player's score (for active players)
- * @param {number} [player.ping] - Player's ping in milliseconds
- * @param {number} [player.elo] - Player's ELO rating if available
+ * Format player line with configurable ELO display.
+ *
+ * Creates a formatted string for a player entry in the server stats display. The format changes based on whether the player is active or spectating and includes ELO information according to the configured display mode.
+ *
+ * @param {Player} player - Player data
  * @param {boolean} [isSpectator=false] - Whether player is a spectator
  * @returns {string} Formatted player line for display
  */
@@ -284,14 +324,13 @@ function formatPlayerLine(player, isSpectator = false) {
 }
 
 /**
- * Format player list for display
- * 
- * Creates a formatted string for the player list, including team scores,
- * player names, and ELO information based on the configured display mode.
- * 
- * @param {Array<Object>} players - Player data array
- * @param {Array<Object>} basicPlayers - Basic player data from server stats
- * @param {Object} serverStats - Server stats object
+ * Format player list for display.
+ *
+ * Creates a formatted string for the player list, including team scores, player names, and ELO information based on the configured display mode.
+ *
+ * @param {Array<Player>} players - Player data array
+ * @param {Array<Player>} basicPlayers - Basic player data from server stats
+ * @param {ServerStats|null} serverStats - Server stats object
  * @returns {string} Formatted player list string
  */
 function formatPlayerList(players, basicPlayers = [], serverStats = null) {
@@ -444,12 +483,12 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
 }
 
 /**
- * Extract server stats from server data
- * 
+ * Extract server stats from server data.
+ *
  * Creates a server stats object with relevant information for display.
- * 
+ *
  * @param {Object} server - Server data object
- * @returns {Object} Server stats object
+ * @returns {ServerStats} Server stats object
  */
 function extractServerStats(server) {
     const { info, rules, players } = server;
@@ -475,17 +514,16 @@ function extractServerStats(server) {
 }
 
 /**
- * Format server response for display
- * 
- * Creates a formatted string for a server response, including server information,
- * player list, and team scores.
- * 
- * @param {Object} serverStats - Server stats object
- * @param {Object} qlstatsData - QLStats data object
- * @returns {Object} Formatted server response object
+ * Format server response for display.
+ *
+ * Creates a formatted string for a server response, including server information, player list, and team scores.
+ *
+ * @param {ServerStats} serverStats - Server stats object
+ * @param {QLStatsData} qlstatsData - QLStats data object
+ * @returns {FormattedServerResponse} Formatted server response object
  */
 function formatServerResponse(serverStats, qlstatsData) {
-    const steamLink = `steam://connect/${serverStats.address}`;
+    // const steamLink = `steam://connect/${serverStats.address}`;
     
     // Debug log for qlstatsData and player info
     quakeLogger.info({
@@ -536,15 +574,13 @@ function formatServerResponse(serverStats, qlstatsData) {
 }
 
 /**
- * Process server stats with AI to create a concise summary
- * 
- * When the full server stats would exceed Discord's character limit,
- * this function uses OpenAI to generate a condensed summary of the
- * most important information from all servers.
- * 
- * @param {Array<string>} serverResponses - Array of formatted server responses
- * @param {Array<Object>} allServerStats - Array of all server stats objects
- * @returns {Promise<Object>} AI-processed summary object with formatted property
+ * Process server stats with AI to create a concise summary.
+ *
+ * When the full server stats would exceed Discord's character limit, this function uses OpenAI to generate a condensed summary of the most important information from all servers.
+ *
+ * @param {Array<FormattedServerResponse>} serverResponses - Array of formatted server responses
+ * @param {Array<ServerStats>} allServerStats - Array of all server stats objects
+ * @returns {AISummaryResult} AI-processed summary string
  */
 async function processServerStatsWithAI(serverResponses, allServerStats) {
     try {
@@ -603,7 +639,7 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
             // Combine the first server's full details with the AI summary
             return firstServerResponse + '\n```\n\n**Additional Servers**\n' + aiSummary + '\n```';
         } catch (openaiError) {
-            console.error('OpenAI API error:', openaiError);
+            quakeLogger.error({ error: openaiError }, 'OpenAI API error');
             // Fallback to a simple manual summary if OpenAI API fails
             const manualSummary = remainingServers.map(server => {
                 return `${server.serverName} - Map: ${server.currentMap}, Players: ${server.playerCount}, Type: ${server.gameType}`;
@@ -612,7 +648,7 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
             return firstServerResponse + '\n```\n\n**Additional Servers**\n' + manualSummary + '\n```';
         }
     } catch (error) {
-        console.error('Error processing server stats with AI:', error);
+        quakeLogger.error({ error }, 'Error processing server stats with AI');
         // Return a valid formatted response even if everything fails
         if (serverResponses && serverResponses.length) {
             return serverResponses.map(r => r.formatted || '').join('\n');
@@ -632,18 +668,14 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
 }
 
 /**
- * Look up Quake Live server statistics
- * 
- * Main function that retrieves server information, player stats, and formats
- * the data for display in Discord. If the formatted output would exceed
- * Discord's character limit, it uses AI to create a condensed summary.
- * 
- * The function implements the compact display format preferred by the user,
- * with team scores next to team names, condensed spectator lists, and
- * configurable ELO display modes.
- * 
- * @param {string} [serverFilter=null] - Optional server name or IP to filter by
- * @param {number} [eloMode=null] - Optional ELO display mode override (0=Off, 1=Categorized, 2=Actual value)
+ * Look up Quake Live server statistics.
+ *
+ * Main function that retrieves server information, player stats, and formats the data for display in Discord. If the formatted output would exceed Discord's character limit, it uses AI to create a condensed summary.
+ *
+ * Implements the compact display format preferred by the user, with team scores next to team names, condensed spectator lists, and configurable ELO display modes.
+ *
+ * @param {string|null} [serverFilter=null] - Optional server name or IP to filter by
+ * @param {number|null} [eloMode=null] - Optional ELO display mode override (0=Off, 1=Categorized, 2=Actual value)
  * @returns {Promise<string>} Formatted server statistics for display in Discord
  */
 async function lookupQuakeServer(serverFilter = null, eloMode = null) {
@@ -756,11 +788,10 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
 }
 
 /**
- * Test the OpenAI server summary functionality
- * 
- * This function tests the AI summary generation for multiple servers
- * without making actual API calls to Quake Live servers.
- * 
+ * Test the OpenAI server summary functionality.
+ *
+ * Tests the AI summary generation for multiple servers without making actual API calls to Quake Live servers.
+ *
  * @param {boolean} [mockOpenAIFailure=false] - If true, simulates an OpenAI API failure
  * @returns {Promise<string>} The generated summary or error message
  */
@@ -818,7 +849,7 @@ async function testOpenAISummary(mockOpenAIFailure = false) {
         console.log('AI Summary Test Result:\n', result);
         return result;
     } catch (error) {
-        console.error('AI Summary Test Error:', error);
+        quakeLogger.error({ error }, 'AI Summary Test Error');
         return `Error: ${error.message}`;
     } finally {
         // Restore original function if we mocked it
@@ -828,7 +859,11 @@ async function testOpenAISummary(mockOpenAIFailure = false) {
     }
 }
 
-// Export the main function and test function
+/**
+ * Quake Lookup API exports.
+ *
+ * @type {QuakeLookupAPI}
+ */
 module.exports = Object.assign(lookupQuakeServer, { testOpenAISummary });
 
 // Allow direct testing
@@ -848,7 +883,7 @@ if (require.main === module) {
             console.log('\n=== Testing OpenAI failure fallback ===');
             await testOpenAISummary(true);
         } catch (error) {
-            console.error('Test execution error:', error);
+            quakeLogger.error({ error }, 'Test execution error');
         }
     })();
 }

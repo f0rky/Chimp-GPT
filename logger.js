@@ -1,4 +1,13 @@
 /**
+ * @typedef {import('pino').Logger} LoggerInstance
+ *
+ * @typedef {Object} DiscordMessageLog
+ * @property {string} id
+ * @property {string} content
+ * @property {string} channelId
+ * @property {{ id: string, username: string } | null} author
+ */
+/**
  * Logger configuration for Chimp-GPT
  * 
  * Provides structured logging with different log levels and formatting options.
@@ -27,14 +36,6 @@ require('dotenv').config();
  * @property {number} debug - Debug-level messages (20)
  * @property {number} trace - Trace-level messages (10)
  */
-const LOG_LEVELS = {
-  fatal: 60,
-  error: 50,
-  warn: 40,
-  info: 30,
-  debug: 20,
-  trace: 10
-};
 
 /**
  * Current log level from environment variables or default to 'info'
@@ -113,26 +114,36 @@ const logger = pino({
 });
 
 /**
- * Creates a child logger for a specific component
- * 
+ * Creates a child logger for a specific component.
+ *
  * Child loggers inherit all settings from the parent logger but include
  * additional component information in every log entry, making it easier
  * to filter and identify logs from specific parts of the application.
- * 
+ *
  * @param {string} component - Name of the component (e.g., 'discord', 'openai', 'health')
- * @returns {import('pino').Logger} Child logger instance for the component
+ * @returns {LoggerInstance} Child logger instance for the component
  */
 function createChildLogger(component) {
   return logger.child({ component });
-};
+}
 
 /**
- * Logger module exports
- * 
+ * Logger module exports.
+ *
  * Exposes the main logger instance, child loggers for specific components,
  * and a helper function to create custom child loggers.
- * 
- * @exports Logger
+ *
+ * @typedef {Object} LoggerExports
+ * @property {LoggerInstance} logger - Main logger instance
+ * @property {LoggerInstance} discord - Child logger for Discord component
+ * @property {LoggerInstance} openai - Child logger for OpenAI component
+ * @property {LoggerInstance} quake - Child logger for Quake component
+ * @property {LoggerInstance} weather - Child logger for Weather component
+ * @property {LoggerInstance} wolfram - Child logger for Wolfram component
+ * @property {LoggerInstance} time - Child logger for Time component
+ * @property {function(string): LoggerInstance} createLogger - Helper to create custom child loggers
+ *
+ * @type {LoggerExports}
  */
 module.exports = {
   logger,

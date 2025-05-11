@@ -1,4 +1,21 @@
 /**
+ * @typedef {Object} RateLimitResult
+ * @property {boolean} limited - Whether the user is currently rate limited
+ * @property {number} remainingPoints - Number of points remaining before hitting limit
+ * @property {number} [msBeforeNext] - Milliseconds before next point is available
+ * @property {number} [secondsBeforeNext] - Seconds before next point is available
+ * @property {string} [message] - User-facing message if limited
+ *
+ * @typedef {Object} UserLimiterOptions
+ * @property {number} [points] - Number of points allowed in the time period
+ * @property {number} [duration] - Duration of the time period in seconds
+ *
+ * @typedef {Object} RateLimiterAPI
+ * @property {function(string, number=, UserLimiterOptions=): import('rate-limiter-flexible').RateLimiterMemory} getUserLimiter
+ * @property {function(string, number=, UserLimiterOptions=): Promise<RateLimitResult>} checkUserRateLimit
+ * @property {function(UserLimiterOptions=): import('rate-limiter-flexible').RateLimiterMemory} createRateLimiter
+ */
+/**
  * Rate Limiter for ChimpGPT
  * 
  * This module provides rate limiting functionality to prevent abuse and manage API usage.
@@ -33,16 +50,13 @@ const COOLDOWN_TIME = 15;      // Cooldown time in seconds after hitting limit
 const userLimiters = new Map();
 
 /**
- * Get or create a rate limiter for a specific user
- * 
- * This function retrieves an existing rate limiter for a user or creates a new one
- * if one doesn't exist. It allows customizing the rate limit parameters per user.
- * 
+ * Get or create a rate limiter for a specific user.
+ *
+ * Retrieves an existing rate limiter for a user or creates a new one if one doesn't exist. Allows customizing the rate limit parameters per user.
+ *
  * @param {string} userId - Discord user ID
- * @param {Object} options - Custom options for the rate limiter
- * @param {number} [options.points=DEFAULT_POINTS] - Number of points allowed in the time period
- * @param {number} [options.duration=DEFAULT_DURATION] - Duration of the time period in seconds
- * @returns {import('rate-limiter-flexible').RateLimiterMemory} - Rate limiter instance for the user
+ * @param {UserLimiterOptions} [options={}] - Custom options for the rate limiter
+ * @returns {import('rate-limiter-flexible').RateLimiterMemory} Rate limiter instance for the user
  */
 function getUserLimiter(userId, options = {}) {
   const points = options.points || DEFAULT_POINTS;
@@ -60,23 +74,14 @@ function getUserLimiter(userId, options = {}) {
 }
 
 /**
- * Check if a user has exceeded their rate limit
- * 
- * This function consumes points from a user's rate limit allocation and determines
- * if they have exceeded their limit. It returns detailed information about the
- * user's current rate limit status, including remaining points and time until reset.
- * 
+ * Check if a user has exceeded their rate limit.
+ *
+ * Consumes points from a user's rate limit allocation and determines if they have exceeded their limit. Returns detailed information about the user's current rate limit status, including remaining points and time until reset.
+ *
  * @param {string} userId - Discord user ID
  * @param {number} [cost=1] - Cost of the current operation (higher for expensive operations)
- * @param {Object} [options={}] - Custom options for the rate limiter
- * @param {number} [options.points] - Custom points limit for this check
- * @param {number} [options.duration] - Custom duration for this check
- * @returns {Promise<Object>} Result object with rate limit information
- * @returns {Promise<Object>} result
- * @returns {boolean} result.limited - Whether the user is currently rate limited
- * @returns {number} result.remainingPoints - Number of points remaining before hitting limit
- * @returns {number} [result.msBeforeNext] - Milliseconds before next point is available
- * @returns {number} [result.secondsBeforeNext] - Seconds before next point is available
+ * @param {UserLimiterOptions} [options={}] - Custom options for the rate limiter
+ * @returns {Promise<RateLimitResult>} Result object with rate limit information
  */
 async function checkUserRateLimit(userId, cost = 1, options = {}) {
   try {
@@ -115,16 +120,12 @@ async function checkUserRateLimit(userId, cost = 1, options = {}) {
 }
 
 /**
- * Create a rate limiter with custom settings
- * 
- * This function creates a new rate limiter instance with custom settings.
- * It's useful for creating specialized rate limiters for different parts of the application.
- * 
- * @param {Object} [options={}] - Rate limiter options
- * @param {string} [options.keyPrefix='global'] - Prefix for rate limiter keys
- * @param {number} [options.points=DEFAULT_POINTS] - Number of points allowed in the time period
- * @param {number} [options.duration=DEFAULT_DURATION] - Duration of the time period in seconds
- * @returns {import('rate-limiter-flexible').RateLimiterMemory} - New rate limiter instance
+ * Create a rate limiter with custom settings.
+ *
+ * Creates a new rate limiter instance with custom settings. Useful for creating specialized rate limiters for different parts of the application.
+ *
+ * @param {UserLimiterOptions} [options={}] - Rate limiter options
+ * @returns {import('rate-limiter-flexible').RateLimiterMemory} New rate limiter instance
  */
 function createRateLimiter(options = {}) {
   const points = options.points || DEFAULT_POINTS;
@@ -137,8 +138,9 @@ function createRateLimiter(options = {}) {
 }
 
 /**
- * Rate limiter module exports
- * @exports RateLimiter
+ * Rate Limiter API exports.
+ *
+ * @type {RateLimiterAPI}
  */
 module.exports = {
   checkUserRateLimit,

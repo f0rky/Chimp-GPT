@@ -19,6 +19,9 @@ const { Collection } = require('discord.js');
 // Import slash command deployment function
 const deploySlashCommands = require('./deploySlashCommands');
 
+// Import plugin manager
+const pluginManager = require('../pluginManager');
+
 /**
  * Command registry to store all registered commands
  * @type {Map<string, Object>}
@@ -95,41 +98,61 @@ function registerCommand(command) {
 }
 
 /**
- * Load all command modules from the commands directory
+ * Load all command modules from the commands directory and plugins
  * 
  * @param {string} [commandsPath=path.join(__dirname, 'modules')] - Path to commands directory
  * @returns {Promise<number>} Number of commands loaded
  */
 async function loadCommands(commandsPath = path.join(__dirname, 'modules')) {
   try {
-    // Ensure the directory exists
-    if (!fs.existsSync(commandsPath)) {
-      logger.warn({ commandsPath }, 'Commands directory does not exist');
-      return 0;
-    }
-    
-    const commandFiles = fs.readdirSync(commandsPath)
-      .filter(file => file.endsWith('.js') && !file.startsWith('_'));
-    
     let loadedCount = 0;
     
-    for (const file of commandFiles) {
-      try {
-        const filePath = path.join(commandsPath, file);
-        // Clear cache to ensure we get the latest version
-        delete require.cache[require.resolve(filePath)];
-        
-        const command = require(filePath);
-        
-        if (registerCommand(command)) {
-          loadedCount++;
+    // 1. Load commands from the commands directory
+    if (fs.existsSync(commandsPath)) {
+      const commandFiles = fs.readdirSync(commandsPath)
+        .filter(file => file.endsWith('.js') && !file.startsWith('_'));
+      
+      for (const file of commandFiles) {
+        try {
+          const filePath = path.join(commandsPath, file);
+          // Clear cache to ensure we get the latest version
+          delete require.cache[require.resolve(filePath)];
+          
+          const command = require(filePath);
+          
+          if (registerCommand(command)) {
+            loadedCount++;
+          }
+        } catch (error) {
+          logger.error({ error, file }, 'Error loading command file');
         }
-      } catch (error) {
-        logger.error({ error, file }, 'Error loading command file');
       }
+      
+      logger.info({ loadedCount, totalFiles: commandFiles.length }, 'Core commands loaded');
+    } else {
+      logger.warn({ commandsPath }, 'Commands directory does not exist');
     }
     
-    logger.info({ loadedCount, totalFiles: commandFiles.length }, 'Commands loaded');
+    // 2. Load commands from plugins
+    try {
+      const pluginCommands = pluginManager.getAllCommands();
+      const pluginCommandCount = Object.keys(pluginCommands).length;
+      
+      if (pluginCommandCount > 0) {
+        // Register each plugin command
+        for (const [, command] of Object.entries(pluginCommands)) {
+          if (registerCommand(command)) {
+            loadedCount++;
+          }
+        }
+        
+        logger.info({ pluginCommandCount }, 'Plugin commands loaded');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Error loading plugin commands');
+    }
+    
+    logger.info({ totalLoadedCount: loadedCount }, 'All commands loaded');
     return loadedCount;
   } catch (error) {
     logger.error({ error, commandsPath }, 'Error loading commands');

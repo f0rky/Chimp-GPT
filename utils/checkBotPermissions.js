@@ -38,7 +38,7 @@ client.on('ready', async () => {
     // Check application command permissions
     console.log('  Application Command Permissions:');
     try {
-      const applicationCommandManager = guild.commands;
+    
       console.log('    - Can create application commands: Yes');
     } catch (error) {
       console.log('    - Can create application commands: No');
@@ -56,7 +56,7 @@ client.on('ready', async () => {
     const globalCommands = await client.application.commands.fetch();
     console.log(`  Found ${globalCommands.size} global commands:`);
     
-    for (const [commandId, command] of globalCommands) {
+    for (const command of globalCommands) {
       console.log(`  - ${command.name}: ${command.description}`);
     }
   } catch (error) {
@@ -72,6 +72,7 @@ client.on('ready', async () => {
 // Login to Discord
 client.login(process.env.DISCORD_TOKEN)
   .catch(error => {
-    console.error('Failed to log in to Discord:', error);
+    const { discord: discordLogger } = require('../logger');
+    discordLogger.error({ error }, 'Failed to log in to Discord');
     process.exit(1);
   });

@@ -4,8 +4,8 @@
 
 ### Code Structure & Architecture
 - [x] Refactor the weather API integration to use a single consistent approach (now unified on weatherLookup.js, legacy code removed)
-- [ ] Consolidate error handling patterns across modules
-- [ ] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript)
+- [x] Consolidate error handling patterns across modules (Logging is now standardized across all main modules with Pino-based loggers. Error handling is consistent and robust.)
+- [x] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript) (JSDoc/type coverage is comprehensive across all major modules and plugin interfaces. Minor gaps may remain for new code.)
 - [ ] Add more granular logging for plugin execution errors (e.g., identify which plugin/hook failed)
 
 ### Security Improvements

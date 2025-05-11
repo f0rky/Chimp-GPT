@@ -93,7 +93,7 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async execute(message, args, config) {
+  async execute(message) {
     logger.info({ 
       userId: message.author.id, 
       username: message.author.username
@@ -120,18 +120,17 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async executeSlash(interaction, config) {
-    return this.interactionExecute(interaction, config);
+  async executeSlash(interaction) {
+    return this.interactionExecute(interaction);
   },
   
   /**
    * Execute the stats command (slash command version)
    * 
    * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord interaction object
-   * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async interactionExecute(interaction, config) {
+  async interactionExecute(interaction) {
     logger.info({ 
       userId: interaction.user.id, 
       username: interaction.user.username

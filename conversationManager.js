@@ -1,4 +1,18 @@
 /**
+ * @typedef {Object} ConversationMessage
+ * @property {string} role - The role of the message sender (e.g., 'system', 'user', 'assistant')
+ * @property {string} content - The content of the message
+ *
+ * @typedef {Array<ConversationMessage>} ConversationLog
+ *
+ * @typedef {Object} ConversationManagerAPI
+ * @property {function(string, (ConversationMessage|null)=): ConversationLog} manageConversation
+ * @property {function(string): boolean} clearConversation
+ * @property {function(): number} getActiveConversationCount
+ * @property {Map<string, ConversationLog>} userConversations
+ * @property {number} MAX_CONVERSATION_LENGTH
+ */
+/**
  * Conversation Manager Module
  * 
  * This module manages conversation context for users interacting with the bot.
@@ -25,15 +39,13 @@ const MAX_CONVERSATION_LENGTH = 8;
 const userConversations = new Map();
 
 /**
- * Manages the conversation context for a specific user
- * 
- * This function maintains a conversation history for each user,
- * adding new messages and ensuring the conversation doesn't exceed
- * the maximum allowed length by removing oldest messages when necessary.
- * 
+ * Manages the conversation context for a specific user.
+ *
+ * Maintains a conversation history for each user, adding new messages and ensuring the conversation doesn't exceed the maximum allowed length by removing oldest messages when necessary.
+ *
  * @param {string} userId - The Discord user ID
- * @param {Object|null} newMessage - New message to add to conversation, or null to just retrieve
- * @returns {Array<Object>} The updated conversation log for the user
+ * @param {ConversationMessage|null} [newMessage=null] - New message to add to conversation, or null to just retrieve
+ * @returns {ConversationLog} The updated conversation log for the user
  */
 function manageConversation(userId, newMessage = null) {
   if (!userConversations.has(userId)) {
@@ -72,8 +84,8 @@ function manageConversation(userId, newMessage = null) {
 }
 
 /**
- * Clears the conversation history for a specific user
- * 
+ * Clears the conversation history for a specific user.
+ *
  * @param {string} userId - The Discord user ID
  * @returns {boolean} True if a conversation was cleared, false if none existed
  */
@@ -84,14 +96,19 @@ function clearConversation(userId) {
 }
 
 /**
- * Gets the current number of active conversations
- * 
+ * Gets the current number of active conversations.
+ *
  * @returns {number} The number of active conversations
  */
 function getActiveConversationCount() {
   return userConversations.size;
 }
 
+/**
+ * Conversation Manager API exports.
+ *
+ * @type {ConversationManagerAPI}
+ */
 module.exports = {
   manageConversation,
   clearConversation,

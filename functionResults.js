@@ -1,4 +1,24 @@
 /**
+ * @typedef {Object} FunctionResult
+ * @property {string} timestamp - ISO timestamp of when the result was stored
+ * @property {Object} params - Parameters passed to the function
+ * @property {Object} result - Result returned by the function
+ *
+ * @typedef {Object} PluginFunctionResult
+ * @property {string} timestamp
+ * @property {Object} params
+ * @property {Object} result
+ *
+ * @typedef {Object} FunctionResultsData
+ * @property {Array<FunctionResult>} weather
+ * @property {Array<FunctionResult>} time
+ * @property {Array<FunctionResult>} wolfram
+ * @property {Array<FunctionResult>} quake
+ * @property {Array<FunctionResult>} dalle
+ * @property {Object.<string, Array<PluginFunctionResult>>} plugins
+ * @property {string} lastUpdated
+ */
+/**
  * Function Results Storage Module
  * 
  * This module provides functionality to store and retrieve recent function call results.
@@ -30,6 +50,7 @@ const DEFAULT_RESULTS = {
   wolfram: [],
   quake: [],
   dalle: [],
+  plugins: {},  // Will store plugin results by plugin ID
   lastUpdated: new Date().toISOString()
 };
 
@@ -48,10 +69,11 @@ function ensureDataDir() {
 }
 
 /**
- * Save function results to the results file
- * 
- * @param {Object} results - The results object to save
+ * Save function results to the results file.
+ *
+ * @param {FunctionResultsData} results - The results object to save
  * @returns {Promise<boolean>} True if successful, false otherwise
+ * @throws {Error} If an error occurs while writing to the file
  */
 async function saveResults(results) {
   try {
@@ -73,9 +95,10 @@ async function saveResults(results) {
 }
 
 /**
- * Load function results from the results file
- * 
- * @returns {Promise<Object>} The loaded results object, or the default results if the file doesn't exist
+ * Load function results from the results file.
+ *
+ * @returns {Promise<FunctionResultsData>} The loaded results object, or the default results if the file doesn't exist
+ * @throws {Error} If an error occurs while reading from the file
  */
 async function loadResults() {
   try {
@@ -95,33 +118,62 @@ async function loadResults() {
 }
 
 /**
- * Store a function result
- * 
- * @param {string} functionType - The type of function (weather, time, wolfram, quake)
+ * Store a function result.
+ *
+ * @param {string} functionType - The type of function (weather, time, wolfram, quake, dalle, plugin.{pluginId})
  * @param {Object} params - The parameters passed to the function
  * @param {Object} result - The result returned by the function
  * @returns {Promise<boolean>} True if successful, false otherwise
+ * @throws {Error} If an error occurs while storing the result
  */
 async function storeResult(functionType, params, result) {
   try {
     // Load existing results
     const results = await loadResults();
     
-    // Initialize the array for this function type if it doesn't exist
-    if (!results[functionType]) {
-      results[functionType] = [];
-    }
-    
-    // Add the new result to the beginning of the array
-    results[functionType].unshift({
-      timestamp: new Date().toISOString(),
-      params,
-      result
-    });
-    
-    // Limit the number of results
-    if (results[functionType].length > MAX_RESULTS_PER_TYPE) {
-      results[functionType] = results[functionType].slice(0, MAX_RESULTS_PER_TYPE);
+    // Check if this is a plugin result
+    if (functionType.startsWith('plugin.')) {
+      const pluginId = functionType.substring(7); // Remove 'plugin.' prefix
+      
+      // Initialize the plugins object if it doesn't exist
+      if (!results.plugins) {
+        results.plugins = {};
+      }
+      
+      // Initialize the array for this plugin if it doesn't exist
+      if (!results.plugins[pluginId]) {
+        results.plugins[pluginId] = [];
+      }
+      
+      // Add the new result to the beginning of the array
+      results.plugins[pluginId].unshift({
+        timestamp: new Date().toISOString(),
+        params,
+        result
+      });
+      
+      // Limit the number of results
+      if (results.plugins[pluginId].length > MAX_RESULTS_PER_TYPE) {
+        results.plugins[pluginId] = results.plugins[pluginId].slice(0, MAX_RESULTS_PER_TYPE);
+      }
+    } else {
+      // Handle regular function types
+      // Initialize the array for this function type if it doesn't exist
+      if (!results[functionType]) {
+        results[functionType] = [];
+      }
+      
+      // Add the new result to the beginning of the array
+      results[functionType].unshift({
+        timestamp: new Date().toISOString(),
+        params,
+        result
+      });
+      
+      // Limit the number of results
+      if (results[functionType].length > MAX_RESULTS_PER_TYPE) {
+        results[functionType] = results[functionType].slice(0, MAX_RESULTS_PER_TYPE);
+      }
     }
     
     // Save the updated results
@@ -133,11 +185,12 @@ async function storeResult(functionType, params, result) {
 }
 
 /**
- * Get recent results for a function type
- * 
+ * Get recent results for a function type.
+ *
  * @param {string} functionType - The type of function (weather, time, wolfram, quake)
  * @param {number} [limit=10] - Maximum number of results to return
- * @returns {Promise<Array>} Array of recent results
+ * @returns {Promise<Array<FunctionResult|PluginFunctionResult>>} Array of recent results
+ * @throws {Error} If an error occurs while loading results
  */
 async function getRecentResults(functionType, limit = 10) {
   try {
@@ -150,17 +203,35 @@ async function getRecentResults(functionType, limit = 10) {
 }
 
 /**
- * Get all function results
- * 
- * @returns {Promise<Object>} All function results
+ * Get all stored function results.
+ *
+ * @returns {Promise<FunctionResultsData>} The complete results object
+ * @throws {Error} If an error occurs while loading results
  */
 async function getAllResults() {
   return await loadResults();
+}
+
+/**
+ * Clear all stored function results.
+ *
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ * @throws {Error} If an error occurs while clearing results
+ */
+async function clearResults() {
+  try {
+    await saveResults(DEFAULT_RESULTS);
+    return true;
+  } catch (error) {
+    logger.error({ error }, 'Failed to clear function results');
+    return false;
+  }
 }
 
 module.exports = {
   storeResult,
   getRecentResults,
   getAllResults,
+  clearResults,
   DEFAULT_RESULTS
 };

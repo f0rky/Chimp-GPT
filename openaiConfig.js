@@ -109,7 +109,8 @@ async function processMessage(userMessage, conversationLog) {
             };
         }
     } catch (error) {
-        console.error('Error processing message:', error);
+        const { openai: openaiLogger } = require('./logger');
+        openaiLogger.error({ error }, 'Error processing message');
         return {
             type: "error",
             content: "Sorry, there was an error processing your request."

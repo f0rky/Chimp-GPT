@@ -1,4 +1,53 @@
 /**
+ * @typedef {Object} ApiCalls
+ * @property {number} openai
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ * @property {number} dalle
+ * @property {Object.<string, number>} plugins
+ *
+ * @typedef {Object} Errors
+ * @property {number} openai
+ * @property {number} discord
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ * @property {number} dalle
+ * @property {Object.<string, number>} plugins
+ * @property {number} other
+ *
+ * @typedef {Object} RateLimits
+ * @property {number} hit
+ * @property {Set<string>} users
+ *
+ * @typedef {Object} PluginStats
+ * @property {number} loaded
+ * @property {number} commands
+ * @property {number} functions
+ * @property {number} hooks
+ *
+ * @typedef {Object} HealthStats
+ * @property {Date} startTime
+ * @property {number} messageCount
+ * @property {ApiCalls} apiCalls
+ * @property {Errors} errors
+ * @property {Date} lastRestart
+ * @property {RateLimits} rateLimits
+ * @property {PluginStats} plugins
+ *
+ * @typedef {Object} HealthReport
+ * @property {string} status
+ * @property {number} uptime
+ * @property {string} version
+ * @property {Object} memory
+ * @property {Object} system
+ * @property {Object} stats
+ * @property {Object} discord
+ */
+/**
  * Health Check System for ChimpGPT
  * 
  * This module provides health monitoring capabilities including:
@@ -42,7 +91,8 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0
+    dalle: 0,
+    plugins: {}
   },
   errors: {
     openai: 0,
@@ -52,25 +102,29 @@ const stats = {
     wolfram: 0,
     quake: 0,
     dalle: 0,
+    plugins: {},
     other: 0
   },
   lastRestart: new Date(),
   rateLimits: {
     hit: 0,
     users: new Set()
+  },
+  plugins: {
+    loaded: 0,
+    commands: 0,
+    functions: 0,
+    hooks: 0
   }
 };
 
 /**
- * Initialize the health check system
- * 
- * Sets up an Express server for health monitoring endpoints and
- * schedules periodic health reports to be sent to the bot owner.
- * 
+ * Initialize the health check system.
+ *
+ * Sets up an Express server for health monitoring endpoints and schedules periodic health reports to be sent to the bot owner.
+ *
  * @param {import('discord.js').Client} client - Discord.js client instance
- * @returns {Object} - Object containing the Express app and stats tracking object
- * @returns {import('express').Application} returns.app - Express application instance
- * @returns {StatsObject} returns.stats - Statistics tracking object
+ * @returns {{ app: import('express').Application, stats: HealthStats }} Object containing the Express app and stats tracking object
  */
 function initHealthCheck(client) {
   const app = express();
@@ -187,12 +241,12 @@ function initHealthCheck(client) {
 }
 
 /**
- * Schedule periodic health reports to be sent to the bot owner
- * 
+ * Schedule periodic health reports to be sent to the bot owner.
+ *
  * Sets up two intervals:
  * 1. A regular interval (every 12 hours) to send health reports
  * 2. A one-time delayed report sent shortly after startup
- * 
+ *
  * @param {import('discord.js').Client} client - Discord.js client
  * @returns {void}
  */
@@ -229,17 +283,17 @@ function scheduleHealthReports(client) {
 }
 
 /**
- * Generate a health report message
- * 
+ * Generate a health report message.
+ *
  * Creates a formatted report containing:
  * - Bot uptime and version
  * - Memory usage statistics
  * - API call counts by service
  * - Error counts by service
  * - Rate limiting statistics
- * 
+ *
  * @param {boolean} isStartup - Whether this is a startup report
- * @returns {string} - Formatted health report as a Markdown string
+ * @returns {string} Formatted health report as a Markdown string
  */
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
@@ -256,7 +310,25 @@ function generateHealthReport(isStartup = false) {
     statusEmoji = '⚠️';
   }
   
-  const report = `
+  // Format plugin API calls if any exist
+let pluginApiCallsText = '';
+if (Object.keys(stats.apiCalls.plugins).length > 0) {
+  pluginApiCallsText = '\n**Plugin API Calls:**\n';
+  for (const [pluginId, count] of Object.entries(stats.apiCalls.plugins)) {
+    pluginApiCallsText += `• ${pluginId}: ${count}\n`;
+  }
+}
+
+// Format plugin errors if any exist
+let pluginErrorsText = '';
+if (Object.keys(stats.errors.plugins).length > 0) {
+  pluginErrorsText = '\n**Plugin Errors:**\n';
+  for (const [pluginId, count] of Object.entries(stats.errors.plugins)) {
+    pluginErrorsText += `• ${pluginId}: ${count}\n`;
+  }
+}
+
+const report = `
 ${title}
 
 **Status:** ${statusEmoji} ${errorSum > 20 ? 'Warning' : 'Healthy'}
@@ -271,12 +343,19 @@ ${title}
 • Time Lookups: ${stats.apiCalls.time}
 • Wolfram Alpha Queries: ${stats.apiCalls.wolfram}
 • Quake Server Lookups: ${stats.apiCalls.quake}
+• DALL-E Image Generations: ${stats.apiCalls.dalle}
+
+**Plugin System:**
+• Loaded Plugins: ${stats.plugins.loaded}
+• Plugin Commands: ${stats.plugins.commands}
+• Plugin Functions: ${stats.plugins.functions}
+• Plugin Hooks: ${stats.plugins.hooks}${pluginApiCallsText}
 
 **Errors:**
 • Total Errors: ${errorSum}
 • OpenAI Errors: ${stats.errors.openai}
 • Discord Errors: ${stats.errors.discord}
-• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake}
+• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.dalle}${pluginErrorsText}
 
 **Rate Limiting:**
 • Rate Limits Hit: ${stats.rateLimits.hit}
@@ -289,13 +368,12 @@ For more details, use one of these commands: 'stats', '!stats', '.stats', or '/s
 }
 
 /**
- * Check if a message is a stats command
- * 
- * Determines if a message content matches any of the supported
- * formats for the stats command (e.g., /stats, !stats, etc.)
- * 
+ * Check if a message is a stats command.
+ *
+ * Determines if a message content matches any of the supported formats for the stats command (e.g., /stats, !stats, etc.)
+ *
  * @param {import('discord.js').Message} message - Discord message
- * @returns {boolean} - Whether the message is a stats command
+ * @returns {boolean} Whether the message is a stats command
  */
 function isStatsCommand(message) {
   const statsCommands = [
@@ -312,13 +390,12 @@ function isStatsCommand(message) {
 }
 
 /**
- * Handle a stats command
- * 
- * Processes a stats command request, generates a health report,
- * and sends it as a reply to the message.
- * 
+ * Handle a stats command.
+ *
+ * Processes a stats command request, generates a health report, and sends it as a reply to the message.
+ *
  * @param {import('discord.js').Message} message - Discord message
- * @returns {Promise<void>}
+ * @returns {Promise<void>} Resolves when the reply is sent
  */
 async function handleStatsCommand(message) {
   logger.info({ 
@@ -332,13 +409,12 @@ async function handleStatsCommand(message) {
 }
 
 /**
- * Format a duration in seconds to a human-readable string
- * 
- * Converts a duration in seconds to a formatted string showing
- * days, hours, minutes, and seconds as appropriate.
- * 
+ * Format a duration in seconds to a human-readable string.
+ *
+ * Converts a duration in seconds to a formatted string showing days, hours, minutes, and seconds as appropriate.
+ *
  * @param {number} seconds - Duration in seconds
- * @returns {string} - Formatted duration string (e.g., "2d 5h 30m 15s")
+ * @returns {string} Formatted duration string (e.g., "2d 5h 30m 15s")
  */
 function formatDuration(seconds) {
   const days = Math.floor(seconds / 86400);
@@ -358,16 +434,25 @@ function formatDuration(seconds) {
 }
 
 /**
- * Track an API call
- * 
- * Increments the counter for a specific API call type.
- * Used for monitoring API usage across different services.
- * 
- * @param {string} type - Type of API call (openai, weather, time, wolfram, quake)
+ * Track an API call.
+ *
+ * Increments the counter for a specific API call type. Used for monitoring API usage across different services.
+ *
+ * @param {string} type - Type of API call (openai, weather, time, wolfram, quake, dalle)
+ * @param {string} [pluginId] - Optional plugin ID if the call is from a plugin
  * @returns {void}
  */
-function trackApiCall(type) {
-  if (stats.apiCalls[type] !== undefined) {
+function trackApiCall(type, pluginId) {
+  if (pluginId) {
+    // Track plugin API call
+    if (!stats.apiCalls.plugins[pluginId]) {
+      stats.apiCalls.plugins[pluginId] = 0;
+    }
+    stats.apiCalls.plugins[pluginId]++;
+    // Also store in persistent storage
+    statsStorage.incrementStat(`apiCalls.plugins.${pluginId}`);
+  } else if (stats.apiCalls[type] !== undefined) {
+    // Track regular API call
     stats.apiCalls[type]++;
     // Also store in persistent storage
     statsStorage.incrementStat(`apiCalls.${type}`);
@@ -375,20 +460,30 @@ function trackApiCall(type) {
 }
 
 /**
- * Track an error
- * 
- * Increments the counter for a specific error type.
- * Used for monitoring error rates across different services.
- * 
- * @param {string} type - Type of error (openai, discord, weather, time, wolfram, quake, other)
+ * Track an error.
+ *
+ * Increments the counter for a specific error type. Used for monitoring error rates across different services.
+ *
+ * @param {string} type - Type of error (openai, discord, weather, time, wolfram, quake, dalle, other)
+ * @param {string} [pluginId] - Optional plugin ID if the error is from a plugin
  * @returns {void}
  */
-function trackError(type) {
-  if (stats.errors[type] !== undefined) {
+function trackError(type, pluginId) {
+  if (pluginId) {
+    // Track plugin error
+    if (!stats.errors.plugins[pluginId]) {
+      stats.errors.plugins[pluginId] = 0;
+    }
+    stats.errors.plugins[pluginId]++;
+    // Also store in persistent storage
+    statsStorage.incrementStat(`errors.plugins.${pluginId}`);
+  } else if (stats.errors[type] !== undefined) {
+    // Track regular error
     stats.errors[type]++;
     // Also store in persistent storage
     statsStorage.incrementStat(`errors.${type}`);
   } else {
+    // Track other error
     stats.errors.other++;
     // Also store in persistent storage
     statsStorage.incrementStat('errors.other');
@@ -396,11 +491,10 @@ function trackError(type) {
 }
 
 /**
- * Track a rate limit hit
- * 
- * Records when a user hits a rate limit. Tracks both the total count
- * and the unique users who have been rate limited.
- * 
+ * Track a rate limit hit.
+ *
+ * Records when a user hits a rate limit. Tracks both the total count and the unique users who have been rate limited.
+ *
  * @param {string} userId - Discord user ID
  * @returns {void}
  */
@@ -413,11 +507,10 @@ function trackRateLimit(userId) {
 }
 
 /**
- * Track a message
- * 
- * Increments the message counter in the stats object.
- * Used to monitor overall bot usage.
- * 
+ * Track a message.
+ *
+ * Increments the message counter in the stats object. Used to monitor overall bot usage.
+ *
  * @returns {void}
  */
 function trackMessage() {
@@ -426,13 +519,68 @@ function trackMessage() {
   statsStorage.incrementStat('messageCount');
 }
 
+/**
+ * Update plugin statistics.
+ *
+ * Updates the statistics for loaded plugins, commands, functions, and hooks. Called when plugins are loaded or updated.
+ *
+ * @param {PluginStats} pluginStats - Object containing plugin statistics
+ * @returns {Promise<void>} Resolves when stats are updated
+ */
+async function updatePluginStats(pluginStats) {
+  if (!pluginStats) return;
+  
+  stats.plugins.loaded = pluginStats.loaded || 0;
+  stats.plugins.commands = pluginStats.commands || 0;
+  stats.plugins.functions = pluginStats.functions || 0;
+  stats.plugins.hooks = pluginStats.hooks || 0;
+  
+  // Also store in persistent storage (asynchronously)
+  await statsStorage.updateStat('plugins.loaded', stats.plugins.loaded);
+  await statsStorage.updateStat('plugins.commands', stats.plugins.commands);
+  await statsStorage.updateStat('plugins.functions', stats.plugins.functions);
+  await statsStorage.updateStat('plugins.hooks', stats.plugins.hooks);
+}
+
+
+/**
+ * Track a plugin function call.
+ *
+ * Records a function call from a plugin in the function results system.
+ *
+ * @param {string} pluginId - ID of the plugin making the function call
+ * @param {string} functionName - Name of the function being called
+ * @param {Object} params - Parameters passed to the function
+ * @param {Object} result - Result of the function call
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function trackPluginFunctionCall(pluginId, functionName, params, result) {
+  try {
+    // Track API call for this plugin
+    trackApiCall('plugins', pluginId);
+    
+    // Store in function results
+    const functionResults = require('./functionResults');
+    return await functionResults.storeResult(`plugin.${pluginId}`, {
+      function: functionName,
+      ...params
+    }, result);
+  } catch (error) {
+    logger.error({ error, pluginId, functionName }, 'Failed to track plugin function call');
+    return false;
+  }
+}
+
 module.exports = {
   initHealthCheck,
   trackApiCall,
   trackError,
-  trackRateLimit,
   trackMessage,
-  stats,
+  trackRateLimit,
   isStatsCommand,
-  handleStatsCommand
+  handleStatsCommand,
+  updatePluginStats,
+  trackPluginFunctionCall,
+  generateHealthReport,
+  stats
 };

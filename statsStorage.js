@@ -1,4 +1,35 @@
 /**
+ * @typedef {Object} ApiCalls
+ * @property {number} openai
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ *
+ * @typedef {Object} Errors
+ * @property {number} openai
+ * @property {number} discord
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ * @property {number} other
+ *
+ * @typedef {Object} RateLimits
+ * @property {number} hit
+ * @property {Array<string>|Set<string>} users
+ * @property {Object} userCounts
+ *
+ * @typedef {Object} StatsData
+ * @property {string} startTime
+ * @property {number} messageCount
+ * @property {ApiCalls} apiCalls
+ * @property {Errors} errors
+ * @property {RateLimits} rateLimits
+ * @property {string} lastRestart
+ * @property {string} lastUpdated
+ */
+/**
  * Stats Storage Module
  * 
  * This module provides functions to save and load bot statistics to/from a file.
@@ -62,10 +93,11 @@ const DEFAULT_STATS = {
 };
 
 /**
- * Save stats to the stats file
- * 
- * @param {Object} stats - The stats object to save
+ * Save stats to the stats file.
+ *
+ * @param {StatsData} stats - The stats object to save
  * @returns {Promise<boolean>} True if successful, false otherwise
+ * @throws {Error} If an error occurs while saving
  */
 async function saveStats(stats) {
   try {
@@ -92,9 +124,10 @@ async function saveStats(stats) {
 }
 
 /**
- * Load stats from the stats file
- * 
- * @returns {Promise<Object>} The loaded stats object, or the default stats if the file doesn't exist
+ * Load stats from the stats file.
+ *
+ * @returns {Promise<StatsData>} The loaded stats object, or the default stats if the file doesn't exist
+ * @throws {Error} If an error occurs while loading
  */
 async function loadStats() {
   try {
@@ -207,9 +240,10 @@ async function addRateLimitedUser(userId) {
 }
 
 /**
- * Reset all stats to their default values
- * 
+ * Reset all stats to default values.
+ *
  * @returns {Promise<boolean>} True if successful, false otherwise
+ * @throws {Error} If an error occurs while resetting
  */
 async function resetStats() {
   try {

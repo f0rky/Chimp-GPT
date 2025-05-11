@@ -1,4 +1,51 @@
 /**
+ * @typedef {Object} ApiCalls
+ * @property {number} openai
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ * @property {number} dalle
+ *
+ * @typedef {Object} Errors
+ * @property {number} openai
+ * @property {number} discord
+ * @property {number} weather
+ * @property {number} time
+ * @property {number} wolfram
+ * @property {number} quake
+ * @property {number} dalle
+ * @property {number} other
+ *
+ * @typedef {Object} RateLimits
+ * @property {number} hit
+ * @property {Set<string>} users
+ *
+ * @typedef {Object} Stats
+ * @property {Date} startTime
+ * @property {number} messageCount
+ * @property {ApiCalls} apiCalls
+ * @property {Errors} errors
+ * @property {RateLimits} rateLimits
+ * @property {Date} lastRestart
+ *
+ * @typedef {Object} DiscordStats
+ * @property {string} status
+ * @property {number} ping
+ * @property {number} guilds
+ * @property {number} channels
+ *
+ * @typedef {Object} StatusHealth
+ * @property {string} status
+ * @property {string} name
+ * @property {number} uptime
+ * @property {string} version
+ * @property {Object} memory
+ * @property {Object} system
+ * @property {Object} stats
+ * @property {DiscordStats} discord
+ */
+/**
  * ChimpGPT Status Server
  * 
  * This script runs a standalone status server for ChimpGPT,
@@ -73,6 +120,11 @@ const stats = {
  * 
  * @returns {Promise<Object>} A promise that resolves when the server is started
  */
+/**
+ * Initialize the status server.
+ *
+ * @returns {Promise<import('express').Application>} A promise that resolves with the Express app when the server is started
+ */
 function initStatusServer() {
   return new Promise((resolve, reject) => {
   const app = express();
@@ -80,12 +132,12 @@ function initStatusServer() {
   // Create rate limiter for the status page
   const statusPageRateLimiter = createRateLimiter({
     keyPrefix: 'status-page',
-    points: config.STATUS_RATE_LIMIT_POINTS || 60,       // Use configured value or default to 60 requests
+    points: config.STATUS_RATE_LIMIT_POINTS || 300,      // Use configured value or default to 300 requests
     duration: config.STATUS_RATE_LIMIT_DURATION || 60     // Use configured value or default to 60 seconds
   });
   
   logger.info({
-    points: config.STATUS_RATE_LIMIT_POINTS || 60,
+    points: config.STATUS_RATE_LIMIT_POINTS || 300,
     duration: config.STATUS_RATE_LIMIT_DURATION || 60
   }, 'Status page rate limiter configured');
   
@@ -98,9 +150,8 @@ function initStatusServer() {
                      req.connection.socket.remoteAddress || 
                      '0.0.0.0';
     
-    // Skip rate limiting for localhost in development
-    if (process.env.NODE_ENV === 'development' && 
-        (clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost')) {
+    // Skip rate limiting for localhost in all environments
+    if (clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost' || clientIp.includes('::ffff:127.0.0.1')) {
       return next();
     }
     
@@ -168,7 +219,13 @@ function initStatusServer() {
   // Serve static files from the public directory
   app.use(express.static(path.join(__dirname, 'public')));
   
-  // Basic info endpoint
+  /**
+   * GET /api
+   * Basic info endpoint for bot status and version.
+   *
+   * @route GET /api
+   * @returns {Object} { name, status, version }
+   */
   app.get('/api', (req, res) => {
     res.json({ 
       name: config.BOT_NAME,
@@ -177,14 +234,20 @@ function initStatusServer() {
     });
   });
   
-  // Detailed health check endpoint
+  /**
+   * GET /health
+   * Detailed health check endpoint.
+   *
+   * @route GET /health
+   * @returns {StatusHealth} Health and stats object
+   */
   app.get('/health', async (req, res) => {
     const uptime = Math.floor((new Date() - stats.startTime) / 1000);
     const memoryUsage = process.memoryUsage();
-    
+
     // Load persistent stats from storage
     const persistentStats = await statsStorage.loadStats();
-    
+
     // Merge in-memory stats with persistent stats (persistent stats take precedence)
     const mergedStats = {
       messageCount: persistentStats.messageCount || stats.messageCount,
@@ -196,10 +259,20 @@ function initStatusServer() {
         userCounts: persistentStats.rateLimits?.userCounts || {}
       }
     };
-    
+
+    // Prefer bot name from persistent stats, then config/env, then fallback
+    const botName = persistentStats.name || config.BOT_NAME || process.env.BOT_NAME || 'ChimpGPT';
+
+    // Prefer discord status from persistent stats, fallback to 'offline' if not present
+    const discordStats = persistentStats.discord || {};
+    const discordStatus = typeof discordStats.status === 'string' ? discordStats.status : 'offline';
+    const discordPing = typeof discordStats.ping === 'number' ? discordStats.ping : 0;
+    const discordGuilds = typeof discordStats.guilds === 'number' ? discordStats.guilds : 0;
+    const discordChannels = typeof discordStats.channels === 'number' ? discordStats.channels : 0;
+
     const health = {
-      status: 'ok',
-      name: config.BOT_NAME,
+      status: discordStatus === 'ok' ? 'ok' : 'offline', // overall status reflects Discord status
+      name: botName,
       uptime: uptime,
       version: version,
       memory: {
@@ -228,17 +301,23 @@ function initStatusServer() {
         }
       },
       discord: {
-        ping: 0,
-        status: 'disconnected',
-        guilds: 0,
-        channels: 0
+        ping: discordPing,
+        status: discordStatus,
+        guilds: discordGuilds,
+        channels: discordChannels
       }
     };
-    
+
     res.json(health);
   });
   
-  // Add function results endpoint
+  /**
+   * GET /function-results
+   * Returns all stored function results.
+   *
+   * @route GET /function-results
+   * @returns {Array<Object>} Array of function results
+   */
   app.get('/function-results', async (req, res) => {
     logger.info('Getting function results');
     
@@ -251,7 +330,13 @@ function initStatusServer() {
     }
   });
   
-  // Add stats reset endpoint
+  /**
+   * POST /reset-stats
+   * Resets all statistics (in-memory and persistent).
+   *
+   * @route POST /reset-stats
+   * @returns {Object} { success, message }
+   */
   app.post('/reset-stats', async (req, res) => {
     logger.info('Resetting stats from web interface');
     
@@ -277,7 +362,13 @@ function initStatusServer() {
     }
   });
   
-  // Add test endpoint
+  /**
+   * GET /run-tests
+   * Runs all configured test suites and returns results.
+   *
+   * @route GET /run-tests
+   * @returns {Object} Test results for conversation logs, OpenAI, Quake, etc.
+   */
   app.get('/run-tests', async (req, res) => {
     logger.info('Running tests from web interface');
     
@@ -507,7 +598,7 @@ if (require.main === module) {
     shutdownGracefully(serverInstance, 'uncaughtException', error);
   });
   
-  process.on('unhandledRejection', (reason, promise) => {
+  process.on('unhandledRejection', (reason) => {
     shutdownGracefully(serverInstance, 'unhandledRejection', new Error(`Unhandled promise rejection: ${reason}`));
   });
   

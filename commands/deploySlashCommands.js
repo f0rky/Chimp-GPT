@@ -15,6 +15,9 @@ const logger = createLogger('slashCommands');
 const fs = require('fs');
 const path = require('path');
 
+// Import plugin manager
+const pluginManager = require('../pluginManager');
+
 /**
  * Deploy slash commands to Discord
  * 
@@ -67,13 +70,62 @@ async function deploySlashCommands(config, guildIds = []) {
         }
         
         slashCommands.push(command.slashCommand.toJSON());
-        logger.info({ commandName: command.name }, 'Loaded slash command');
+        logger.info({ commandName: command.name }, 'Loaded core slash command');
       } catch (error) {
         logger.error({ error, file }, 'Error loading command file');
       }
     }
     
-    logger.info({ commandCount: slashCommands.length }, 'Deploying slash commands');
+    // Load slash commands from plugins
+    try {
+      const pluginCommands = pluginManager.getAllCommands();
+      
+      for (const [, command] of Object.entries(pluginCommands)) {
+        // Skip commands that don't have slash command data
+        if (!command.slashCommand) {
+          continue;
+        }
+        
+        slashCommands.push(command.slashCommand.toJSON());
+        logger.info({ 
+          commandName: command.name,
+          pluginId: command.pluginId 
+        }, 'Loaded plugin slash command');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Error loading plugin slash commands');
+    }
+    
+    // Load plugins before collecting plugin slash commands
+    try {
+      await pluginManager.loadPlugins();
+      const pluginCommands = pluginManager.getAllCommands();
+      
+      for (const [, command] of Object.entries(pluginCommands)) {
+        // Skip commands that don't have slash command data
+        if (!command.slashCommand) {
+          continue;
+        }
+        
+        slashCommands.push(command.slashCommand.toJSON());
+        logger.info({ 
+          commandName: command.name,
+          pluginId: command.pluginId 
+        }, 'Loaded plugin slash command');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Error loading plugin slash commands');
+    }
+    // Deduplicate slash commands by name
+    const seenNames = new Set();
+    const dedupedSlashCommands = [];
+    for (const cmd of slashCommands) {
+      if (!seenNames.has(cmd.name)) {
+        dedupedSlashCommands.push(cmd);
+        seenNames.add(cmd.name);
+      }
+    }
+    logger.info({ commandCount: dedupedSlashCommands.length }, 'Deploying slash commands');
     
     // Deploy commands
     const results = {};
@@ -85,7 +137,7 @@ async function deploySlashCommands(config, guildIds = []) {
           logger.info({ guildId }, 'Deploying guild commands');
           const data = await rest.put(
             Routes.applicationGuildCommands(config.CLIENT_ID, guildId),
-            { body: slashCommands }
+            { body: dedupedSlashCommands }
           );
           results[guildId] = data;
           logger.info({ guildId, commandCount: data.length }, 'Guild commands deployed');
@@ -100,7 +152,7 @@ async function deploySlashCommands(config, guildIds = []) {
         logger.info('Deploying global commands');
         const data = await rest.put(
           Routes.applicationCommands(config.CLIENT_ID),
-          { body: slashCommands }
+          { body: dedupedSlashCommands }
         );
         results.global = data;
         logger.info({ commandCount: data.length }, 'Global commands deployed');

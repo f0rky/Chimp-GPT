@@ -43,6 +43,61 @@
                 </div>
             </div>
 
+            <div class="card memory-usage">
+                <h2>Memory Usage</h2>
+                <div class="stat-grid">
+                    <div class="stat">
+                        <span class="label">RSS</span>
+                        <span id="memory-rss" class="value">-- MB</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Heap Total</span>
+                        <span id="memory-heap-total" class="value">-- MB</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Heap Used</span>
+                        <span id="memory-heap-used" class="value">-- MB</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">System Memory</span>
+                        <span id="system-memory" class="value">-- / -- MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card plugins">
+                <h2>Plugin System</h2>
+                <div class="stat-grid">
+                    <div class="stat">
+                        <span class="label">Loaded Plugins</span>
+                        <span id="plugin-count" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Commands</span>
+                        <span id="plugin-commands" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Functions</span>
+                        <span id="plugin-functions" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Hooks</span>
+                        <span id="plugin-hooks" class="value">0</span>
+                    </div>
+                </div>
+                <div class="plugin-details">
+                    <h3>Plugin API Calls</h3>
+                    <div id="plugin-api-calls" class="plugin-list">
+                        <div class="empty-message">No plugin API calls recorded</div>
+                    </div>
+                    
+                    <h3>Plugin Errors</h3>
+                    <div id="plugin-errors" class="plugin-list">
+                        <div class="empty-message">No plugin errors recorded</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card api-calls">
                 <h2>API Calls</h2>
                 <div class="chart-container">

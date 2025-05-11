@@ -20,9 +20,10 @@ const lookupQuakeServer = require('./quakeLookup');
 const { initStatusManager } = require('./statusManager');
 const lookupWolfram = require('./wolframLookup');
 const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
+const pluginManager = require('./pluginManager');
 
 // Import loggers
-const { discord: discordLogger, openai: openaiLogger, createLogger } = require('./logger');
+const { discord: discordLogger, openai: openaiLogger } = require('./logger');
 
 // Import validated configuration
 const config = require('./configValidator');
@@ -43,6 +44,8 @@ const {
 
 // Import stats storage for graceful shutdown
 const statsStorage = require('./statsStorage');
+
+
 
 // Status manager already imported above
 
@@ -82,7 +85,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Import conversation manager
-const { manageConversation, clearConversation } = require('./conversationManager');
+const { manageConversation } = require('./conversationManager');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
@@ -90,18 +93,6 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
 /**
  * Removes color codes from a string
  * 
- * This function takes a string as input and returns the string with all color codes removed.
- * 
- * @param {string} str - The input string
- * @returns {string} The string with color codes removed
- */
-function removeColorCodes(str) {
-  return str.replace(/\^\d+/g, '');
-}
-
-// Conversation management has been moved to conversationManager.js
-
-/**
  * Processes a message using OpenAI's GPT model
  * 
  * This function sends the user's message along with conversation context
@@ -393,6 +384,23 @@ client.on('messageCreate', async (message) => {
     // Track message for stats
     trackMessage();
     
+    // Execute plugin message hooks first
+    try {
+      const hookResults = await pluginManager.executeHook('onMessageReceived', message);
+      
+      // If any plugin returned false, stop processing this message
+      if (hookResults.some(result => result.result === false)) {
+        discordLogger.debug({ 
+          pluginId: hookResults.find(r => r.result === false)?.pluginId,
+          messageId: message.id 
+        }, 'Message processing stopped by plugin');
+        return;
+      }
+    } catch (hookError) {
+      discordLogger.error({ error: hookError }, 'Error executing message hooks');
+      // Continue processing even if hooks fail
+    }
+    
     // Ignore messages from unauthorized channels
     if (!allowedChannelIDs.includes(message.channelId)) {
       discordLogger.debug({ channelId: message.channelId }, 'Ignoring message from unauthorized channel');
@@ -400,7 +408,7 @@ client.on('messageCreate', async (message) => {
     }
     
     // Track conversation for status updates - only for allowed channels
-    statusManager.trackConversation(message.author.username, message.content);
+    // statusManager.trackConversation(message.author.username, message.content);
     
     // Check if this is a stats command
     if (isStatsCommand(message)) {
@@ -480,7 +488,7 @@ client.on('messageCreate', async (message) => {
       await feedbackMessage.edit(gptResponse.content);
     }
   } catch (error) {
-    console.error('Error in message handler:', error);
+    discordLogger.error({ error }, 'Error in message handler');
     await message.reply('Sorry, I encountered an error processing your request.');
   }
 });
@@ -532,11 +540,11 @@ async function handleQuakeStats(feedbackMessage) {
     }
     
     // Update status with server count
-    statusManager.trackQuakeLookup(serverCount);
+    // statusManager.trackQuakeLookup(serverCount);
     
     return true;
   } catch (error) {
-    console.error('Error in handleQuakeStats:', error);
+    discordLogger.error({ error }, 'Error in handleQuakeStats');
     await feedbackMessage.edit('# 🎯 Quake Live Server Status\n\n> ⚠️ An error occurred while retrieving server information.');
     return false;
   }
@@ -703,10 +711,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         // Update status if we have valid weather data
         if (weatherData && weatherData.location && weatherData.current && 
             weatherData.current.condition && weatherData.current.condition.text) {
-          statusManager.trackWeatherLookup(
-            weatherData.location.name, 
-            weatherData.current.condition.text
-          );
+          // statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
         } else {
           discordLogger.warn({ weatherData }, 'Weather data incomplete or has errors, not updating status');
         }
@@ -737,7 +742,6 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         await feedbackMessage.edit('I encountered an error while checking the weather. Please try again later.');
         return;
       }
-      break;
     case 'lookupExtendedForecast':
       try {
         // Get the original weather data for status updates
@@ -747,10 +751,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         // Update status if we have valid weather data
         if (weatherData && weatherData.location && weatherData.current && 
             weatherData.current.condition && weatherData.current.condition.text) {
-          statusManager.trackWeatherLookup(
-            weatherData.location.name, 
-            weatherData.current.condition.text
-          );
+          // statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
         } else {
           discordLogger.warn({ weatherData }, 'Weather data incomplete or has errors, not updating status');
         }
@@ -781,7 +782,6 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         await feedbackMessage.edit('I encountered an error while checking the forecast. Please try again later.');
         return;
       }
-      break;
     case 'getWolframShortAnswer':
       try {
         functionResult = await lookupWolfram.getWolframShortAnswer(gptResponse.parameters.query);
@@ -800,7 +800,6 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         trackError('quake');
         throw error;
       }
-      break;
     case 'generateImage':
       try {
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
@@ -897,6 +896,22 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
   await feedbackMessage.edit(finalResponse);
 }
 
+// Utility to update Discord status in stats and persist it
+async function updateDiscordStats() {
+  try {
+    const { stats } = require('./healthCheck');
+    stats.discord = {
+      ping: client.ws.ping,
+      status: client.ws.status === 0 ? 'ok' : 'offline',
+      guilds: client.guilds.cache.size,
+      channels: client.channels.cache.size
+    };
+    await statsStorage.saveStats(stats);
+  } catch (err) {
+    discordLogger.error({ err }, 'Failed to update Discord stats');
+  }
+}
+
 // Ready event
 client.on('ready', async () => {
   discordLogger.info(`Logged in as ${client.user.tag}`);
@@ -904,11 +919,16 @@ client.on('ready', async () => {
   // Initialize health check and status manager
 
   // Initialize health check system
-  healthCheck = initHealthCheck(client);
+  initHealthCheck(client);
   discordLogger.info('Health check system initialized');
+
+  // Immediately update Discord stats on startup
+  updateDiscordStats();
+  // Periodically update Discord stats every 30 seconds
+  setInterval(updateDiscordStats, 30000);
   
   // Initialize status manager
-  statusManager = initStatusManager(client);
+  initStatusManager(client);
   discordLogger.info('Status manager initialized');
   
   // Load command modules
@@ -944,10 +964,19 @@ client.on('ready', async () => {
 async function startBot() {
   discordLogger.info('Attempting to log in to Discord');
   try {
+    // Load plugins before connecting to Discord
+    discordLogger.info('Loading plugins...');
+    const pluginCount = await pluginManager.loadPlugins();
+    discordLogger.info({ pluginCount }, 'Plugins loaded successfully');
+    
+    // Connect to Discord
     await client.login(config.DISCORD_TOKEN);
     discordLogger.info('Successfully logged in to Discord');
+    
+    // Execute onBotStart hooks for plugins
+    await pluginManager.executeHook('onBotStart', client);
   } catch (error) {
-    discordLogger.fatal({ error }, 'Failed to log in to Discord');
+    discordLogger.fatal({ error }, 'Failed to start bot');
     throw error;
   }
 }
@@ -984,10 +1013,20 @@ async function shutdownGracefully(signal, error) {
     // Clear the timeout if we exit normally
     forceExitTimeout.unref();
     
-    // 1. Save any pending data
+    // 1. Execute plugin shutdown hooks
+    try {
+      discordLogger.info('Executing plugin shutdown hooks');
+      await pluginManager.executeHook('onBotShutdown');
+      discordLogger.info('Plugin shutdown hooks executed successfully');
+    } catch (shutdownError) {
+      discordLogger.error({ error: shutdownError }, 'Error executing plugin shutdown hooks');
+    }
+    
+    // 2. Save any pending data
     try {
       discordLogger.info('Saving pending statistics');
-      await statsStorage.saveStats();
+      const { stats } = require('./healthCheck');
+      await statsStorage.saveStats(stats);
       discordLogger.info('Statistics saved successfully');
     } catch (saveError) {
       discordLogger.error({ error: saveError }, 'Error saving statistics during shutdown');
@@ -1022,19 +1061,25 @@ process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 process.on('SIGHUP', () => shutdownGracefully('SIGHUP'));
 
+// Update Discord stats on reconnect/disconnect events
+client.on('reconnecting', updateDiscordStats);
+client.on('disconnect', updateDiscordStats);
+client.on('shardResume', updateDiscordStats);
+client.on('shardDisconnect', updateDiscordStats);
+
 // Handle uncaught exceptions and unhandled promise rejections
 process.on('uncaughtException', (error) => {
   shutdownGracefully('uncaughtException', error);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   shutdownGracefully('unhandledRejection', new Error(`Unhandled promise rejection: ${reason}`));
 });
 
 // Start the bot if this file is run directly
 if (require.main === module) {
   startBot().catch(error => {
-    console.error('Failed to start bot:', error);
+    discordLogger.error({ error }, 'Failed to start bot');
     shutdownGracefully('startupError', error);
   });
 }
