@@ -56,49 +56,46 @@ const mockWeatherData = {
  * @param {string} location - Location to get weather for
  * @returns {Promise<Object>} Weather data
  */
+/**
+ * Standardized error handling: This function always returns an object:
+ *   { success: true, data: weatherData } on success
+ *   { success: false, error, data: mockData } on error/fallback
+ * Errors are always logged with stack trace and context.
+ */
 async function lookupWeather(location) {
   weatherLogger.debug({ location }, 'Requesting current weather data');
-  
+
   // Check if API key is missing or empty
   if (!process.env.X_RAPIDAPI_KEY || process.env.X_RAPIDAPI_KEY === 'your_rapidapi_key_here') {
     weatherLogger.warn('RapidAPI key is missing or invalid, using mock weather data');
     const mockData = mockWeatherData.getWeatherForLocation(location);
-    
+
     // Store the mock result for status page
     await functionResults.storeResult('weather', { location }, {
       ...mockData,
       formatted: `Mock weather data for ${location}: ${mockData.current.condition.text}, ${mockData.current.temp_c}°C`
     });
-    
-    return mockData;
+
+    return { success: false, error: new Error('Missing or invalid API key'), data: mockData };
   }
-  
-  // Use a direct axios request with explicit API key reference
-  // This approach was verified to work in our direct API test
+
   try {
     weatherLogger.debug('Using direct axios request with verified format');
-    
-    // Get API key directly from environment
+
     const apiKey = process.env.X_RAPIDAPI_KEY;
     const encodedLocation = encodeURIComponent(location);
-    
-    // Use the current.json endpoint which is working correctly based on our tests
     const url = `https://weatherapi-com.p.rapidapi.com/current.json?q=${encodedLocation}`;
-    
-    // Make the request with the exact header format that worked in our tests
+
     const response = await axios.get(url, {
       headers: {
         'X-RapidAPI-Key': apiKey,
         'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com'
       }
     });
-    
-    // Check for successful response
+
     if (response.status === 200 && response.data) {
       weatherLogger.info('Successfully retrieved weather data');
-      
-      // Store the result for status page
-      // Add a mock forecast since we're only getting current weather
+
       const weatherData = {
         ...response.data,
         forecast: {
@@ -112,32 +109,36 @@ async function lookupWeather(location) {
           }]
         }
       };
-      
+
       await functionResults.storeResult('weather', { location }, {
         ...weatherData,
         formatted: `Weather in ${response.data.location.name}: ${response.data.current.condition.text}, ${response.data.current.temp_c}°C`
       });
-      
-      return weatherData;
+
+      return { success: true, data: weatherData };
     } else {
       throw new Error(`Unexpected response: ${response.status}`);
     }
   } catch (error) {
-    weatherLogger.error({ error }, 'Weather API request failed, using mock data');
-    
+    weatherLogger.error({
+      message: error.message,
+      stack: error.stack,
+      location,
+    }, 'Weather API request failed, using mock data');
+
     // Use mock data as fallback
     const mockData = mockWeatherData.getWeatherForLocation(location);
-    
-    // Store the mock result
+
     await functionResults.storeResult('weather', { location }, {
       ...mockData,
       _isMock: true,
       formatted: `Mock weather data for ${location}: ${mockData.current.condition.text}, ${mockData.current.temp_c}°C`
     });
-    
-    return mockData;
+
+    return { success: false, error, data: mockData };
   }
 }
+
 
 /**
  * Look up extended weather forecast for a location
@@ -145,6 +146,12 @@ async function lookupWeather(location) {
  * @param {string} location - Location to get forecast for
  * @param {number} days - Number of days to forecast
  * @returns {Promise<Object>} Extended forecast data
+ */
+/**
+ * Standardized error handling: This function always returns an object:
+ *   { success: true, data: weatherData } on success
+ *   { success: false, error, data: mockData } on error/fallback
+ * Errors are always logged with stack trace and context.
  */
 async function lookupExtendedForecast(location, days = 5) {
   weatherLogger.debug({ location, days }, 'Requesting extended forecast data');
@@ -247,12 +254,17 @@ async function lookupExtendedForecast(location, days = 5) {
         formatted: `Extended forecast for ${response.data.location.name}: ${weatherData.forecast.forecastday.map(day => `${day.date}: ${day.day.condition.text}`).join(', ')}`
       });
       
-      return weatherData;
+      return { success: true, data: weatherData };
     } else {
       throw new Error(`Unexpected response: ${response.status}`);
     }
   } catch (error) {
-    weatherLogger.error({ error }, 'Extended forecast API request failed, using mock data');
+    weatherLogger.error({
+      message: error.message,
+      stack: error.stack,
+      location,
+      days
+    }, 'Extended forecast API request failed, using mock data');
     
     // Use mock data as fallback
     const mockData = mockWeatherData.getWeatherForLocation(location);

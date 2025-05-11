@@ -3,8 +3,10 @@
 ## High Priority (Easier Implementation)
 
 ### Code Structure & Architecture
-- [ ] Refactor the weather API integration to use a single consistent approach (currently has multiple implementations)
+- [x] Refactor the weather API integration to use a single consistent approach (now unified on weatherLookup.js, legacy code removed)
 - [ ] Consolidate error handling patterns across modules
+- [ ] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript)
+- [ ] Add more granular logging for plugin execution errors (e.g., identify which plugin/hook failed)
 
 ### Security Improvements
 - [x] Implement rate limiting for the status page to prevent DoS attacks
@@ -13,15 +15,19 @@
 ### Performance & Reliability
 - [ ] Add circuit breaker pattern for external API calls
 - [x] Implement graceful shutdown handling
+- [x] Status page now reliably shows live bot online/offline state and name (backend/frontend integration)
+- [x] Status server multi-port fallback and remote access confirmed working
 
 ## Medium Priority
 
 ### Functionality Enhancements
 - [x] Add support for image generation using DALL-E or similar APIs
 - [x] Add image gallery view for DALL-E generations in the status page
+- [x] Status server now reads Discord status and bot name from persistent stats for accurate frontend display
 - [ ] Implement persistent conversation history across bot restarts
 - [ ] Add support for multiple languages
 - [ ] Add image variation and editing capabilities to the DALL-E integration
+- [ ] Support plugin command removal (for deprecated commands)
 
 ### Testing & Quality Assurance
 - [ ] Add Prettier for consistent code formatting
@@ -33,12 +39,14 @@
 - [ ] Create contributor documentation and guidelines
 - [ ] Implement debugging configurations (VSCode/other IDEs)
 - [ ] Add proper command-line arguments for different run modes
+- [ ] Validate uniqueness of plugin command names to avoid conflicts
+- [ ] Document plugin mock fallback behavior in plugin README
 
 ## Lower Priority (More Complex Implementation)
 
 ### Code Structure & Architecture
 - [ ] Create a proper error handling system with customized error classes
-- [ ] Implement a plugin system for easier extension of bot functionality
+- [x] Implement a plugin system for easier extension of bot functionality
 
 ### Testing & Quality Assurance
 - [ ] Implement integration tests for API interactions
@@ -108,6 +116,7 @@
 ### Deployment & Operations
 - [x] Create proper deployment documentation beyond PM2 basics
 - [x] Set up proper Git repository structure with appropriate security practices
+- [x] Investigated why status page runs on ports 3000 and 3002 (both serve the same status page due to multi-instance/fallback logic; not a bug)
 - [x] Implement a health check endpoint for monitoring
 - [x] Create a status page/dashboard for bot health
 - [x] Add configurable hostname and port settings for status page
