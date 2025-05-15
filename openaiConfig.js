@@ -9,9 +9,13 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const { openai: openaiLogger } = require('./logger');
+
 async function processMessage(userMessage, conversationLog) {
     try {
-        const completion = await openai.chat.completions.create({
+        const completion = await retryWithBreaker(
+            () => openai.chat.completions.create({
             model: "gpt-3.5-turbo-0125",
             messages: conversationLog,
             max_tokens: 512, // Limit token usage (optional)
@@ -83,13 +87,14 @@ async function processMessage(userMessage, conversationLog) {
                 }
             ],
             function_call: "auto"
-        });
-
-        //console.log('GPT completion:', completion);
-        //console.log('GPT completion choices:', completion.data.choices);
-        //console.log('GPT function call object:', JSON.stringify(completion.data.choices[0].message.function_call, null, 2));
-
-
+        }, {
+                maxRetries: 3,
+                breakerLimit: 5,
+                breakerTimeoutMs: 120000,
+                onBreakerOpen: (err) => {
+                    openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
+                }
+            });
 
         // Check if GPT recognized a function call
         if (completion.data.choices[0].finish_reason === 'function_call') {
@@ -109,7 +114,6 @@ async function processMessage(userMessage, conversationLog) {
             };
         }
     } catch (error) {
-        const { openai: openaiLogger } = require('./logger');
         openaiLogger.error({ error }, 'Error processing message');
         return {
             type: "error",
@@ -127,14 +131,24 @@ async function generateResponse(functionResult, conversationLog) {
         content: `The result of the function call is: ${functionResult}`,
     });
 
-    console.log("Conversation log before generating response:", JSON.stringify(conversationLog, null, 2));  // Add this line
-    
+    console.log("Conversation log before generating response:", JSON.stringify(conversationLog, null, 2));
+
     // Create a completion with OpenAI, including the updated conversation log
-    const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo-0125',
-        messages: conversationLog,
-        max_tokens: 256,
-    });
+    const completion = await retryWithBreaker(
+        () => openai.chat.completions.create({
+            model: 'gpt-3.5-turbo-0125',
+            messages: conversationLog,
+            max_tokens: 256,
+        }),
+        {
+            maxRetries: 3,
+            breakerLimit: 5,
+            breakerTimeoutMs: 120000,
+            onBreakerOpen: (err) => {
+                openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
+            }
+        }
+    );
 
     // Get the GPT response
     return completion.choices[0].message.content;

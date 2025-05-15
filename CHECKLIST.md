@@ -1,11 +1,48 @@
 # ChimpGPT Implementation Checklist
 
+> **Contributors:** Please keep this checklist updated as you work on the project. Add new features, fixes, and best practices so the team stays aligned!
+
+## ⚠️ Issues/Items to Fix (from Code Review)
+
+- [ ] **Granular plugin error logging:** While errors are logged with pluginId and hookName, some error paths (e.g., in pluginManager.js) could include more detailed context (such as command/function name and plugin version) for easier debugging.
+- [x] **Circuit breaker/retry for external APIs:** (OpenAI API calls now use retry and circuit breaker logic) No evidence of a true circuit breaker or retry/backoff logic for OpenAI, weather, or Quake integrations. Add robust retry/circuit breaker patterns to handle flaky APIs.
+    - [ ] **Human-in-the-loop circuit breaker:** Bot should report status and provide /commands for the owner to approve or deny sensitive function calls (such as writing data or triggering commands). This allows the admin to act as a human circuit breaker by reacting to the bot's status or approval summary before actions are executed.
+    - [ ] **Bot versioning and self-query:** Implement a version identifier for the bot, add a function to return the current version, and enable version queries via @[@prompt] so the bot can self-query its version.
+- [ ] **Persistent conversation history:** ConversationManager only keeps in-memory logs. Add persistent storage (file or DB) to maintain logs across restarts.
+    - [x] **System message preservation:** Ensure the system message (bot personality) is always preserved at index 0 (done).
+- [ ] **Test coverage:** Unit/integration tests are limited. Only conversation log, OpenAI, and Quake stats have basic tests. Add more comprehensive automated tests for all core features, especially weather API integration and plugin system.
+- [ ] **Prettier config/enforcement:** .eslintrc.js is present, but no Prettier config or Husky hooks found. Add Prettier config and enforce via Husky pre-commit hooks.
+- [ ] **Contributor documentation:** No dedicated contributor guide found. Add CONTRIBUTING.md with guidelines for new contributors.
+- [ ] **Plugin command name conflict validation:** No validation to prevent duplicate command names across plugins. Add validation during plugin registration.
+- [ ] **Plugin README improvement:** Document plugin mock fallback behavior and clarify available hooks in plugins/README.md.
+- [ ] **Advanced error handling:** No custom error classes for structured error handling. Consider adding for clarity and maintainability.
+- [ ] **Security review:** Review OpenAI/Discord API usage for security best practices (e.g., input sanitization, rate limiting on commands, API key rotation).
+- [ ] **Docker/CI/CD:** No Dockerfile or GitHub Actions config found. Add for easier deployment and automated testing.
+- [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.
+- [ ] **Command-line run modes:** Add support for different run modes via CLI args (e.g., test, production, demo).
+- [ ] **Debugging configs:** Add VSCode or other IDE debugging configurations for easier development.
+- [x] **Configurable bot name, hostname, port (status page):** Status page now supports BOT_NAME, STATUS_HOSTNAME, and STATUS_PORT environment variables for flexible deployment (done).
+- [x] **Emoji toggles and ELO display for Quake stats:** Added SHOW_TEAM_EMOJIS, SHOW_SERVER_STATS_EMOJIS, and ELO_DISPLAY_MODE environment variables. Team/spectator formatting improved (done).
+- [x] **Image gallery modal/mobile/error handling:** Status page image gallery includes modal viewer, mobile support, and robust error handling (done).
+- [x] **Logger standardization (Pino):** All main modules now use Pino-based logger for error handling and debugging. Test/CLI files reviewed for consistency (done; see README for details).
+
+---
+
+## Targeted Function Enhancement: `greeting`
+
+### Instructions
+
+- **Assessment:** Begin by conducting a thorough examination of the 'greeting' function, noting any discrepancies, limitations, or areas ripe for enhancement.
+- **Modification:** With meticulous care and a bold vision, rewrite or augment the existing code. Whether it be through introducing new algorithms, refining dialogue models, or integrating advanced forms of witty banter, your expertise will lead the way.
+- **Test and Feedback Loop:** Implement the modified functionalities and observe them in action. Engage in a cycle of testing and refinement, with each iteration guided by the principles of creativity, efficiency, and user delight.
+
 ## High Priority (Easier Implementation)
 
 ### Code Structure & Architecture
 - [x] Refactor the weather API integration to use a single consistent approach (now unified on weatherLookup.js, legacy code removed)
 - [x] Consolidate error handling patterns across modules (Logging is now standardized across all main modules with Pino-based loggers. Error handling is consistent and robust.)
 - [x] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript) (JSDoc/type coverage is comprehensive across all major modules and plugin interfaces. Minor gaps may remain for new code.)
+- [x] Logger standardization: All main modules now use Pino-based logger. Test/CLI files reviewed for consistency.
 - [ ] Add more granular logging for plugin execution errors (e.g., identify which plugin/hook failed)
 
 ### Security Improvements
@@ -22,7 +59,7 @@
 
 ### Functionality Enhancements
 - [x] Add support for image generation using DALL-E or similar APIs
-- [x] Add image gallery view for DALL-E generations in the status page
+- [x] Add image gallery view for DALL-E generations in the status page (includes modal, mobile, error handling)
 - [x] Status server now reads Discord status and bot name from persistent stats for accurate frontend display
 - [ ] Implement persistent conversation history across bot restarts
 - [ ] Add support for multiple languages
@@ -45,6 +82,29 @@
 ## Lower Priority (More Complex Implementation)
 
 ### Code Structure & Architecture
+
+---
+
+## Forward-Looking Enhancements & AI Potential
+
+- [ ] **Contextual Memory and Long-Term Conversation Retention:**  
+  Implement advanced state management to enable the bot to retain and utilize conversation history across extended interactions and restarts, providing more natural, context-aware responses.
+
+- [ ] **Dynamic and Diverse Content Generation:**  
+  Integrate advanced NLP techniques and tune content generation algorithms to produce more varied, engaging, and contextually appropriate responses tailored to user needs.
+
+- [ ] **Adaptive Learning and Personalization:**  
+  Explore mechanisms for the bot to learn from user interactions and feedback, allowing it to refine its responses and adapt its style or strategies over time (e.g., via engagement metrics or explicit ratings).
+
+- [ ] **Highly Modular Architecture:**  
+  Refactor core systems into modular, easily extensible components, ensuring new features and integrations can be added or swapped with minimal friction.
+
+- [ ] **Enhanced Error Diagnostics and Reporting:**  
+  Expand error handling to include detailed diagnostics, structured error classes, and user-facing explanations for failures, making troubleshooting easier for both users and developers.
+
+---
+
+
 - [ ] Create a proper error handling system with customized error classes
 - [x] Implement a plugin system for easier extension of bot functionality
 

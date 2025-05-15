@@ -26,7 +26,7 @@
  * 
  * @module RateLimiter
  * @author Brett
- * @version 1.0.0
+ * @version 1.0.2
  */
 
 const { RateLimiterMemory } = require('rate-limiter-flexible');
@@ -39,9 +39,9 @@ const logger = createLogger('ratelimit');
  * @constant {number} DEFAULT_DURATION - Time period in seconds
  * @constant {number} COOLDOWN_TIME - Cooldown time in seconds after hitting limit
  */
-const DEFAULT_POINTS = 20;      // Number of requests allowed
-const DEFAULT_DURATION = 60;   // Time period in seconds
-const COOLDOWN_TIME = 15;      // Cooldown time in seconds after hitting limit
+const DEFAULT_POINTS = 200;      // Number of requests allowed
+const DEFAULT_DURATION = 30;   // Time period in seconds
+const COOLDOWN_TIME = 5;      // Cooldown time in seconds after hitting limit
 
 /**
  * Map to store rate limiters for each user

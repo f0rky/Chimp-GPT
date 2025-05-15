@@ -183,6 +183,8 @@ function initStatusServer() {
   // Configure CORS
   const corsOptions = {
     origin: function (origin, callback) {
+      // Log the incoming origin for debugging
+      logger.debug({ origin }, 'Incoming request origin for CORS');
       // Allow requests with no origin (like mobile apps, curl, etc)
       if (!origin) return callback(null, true);
       
@@ -215,7 +217,51 @@ function initStatusServer() {
   
   // Apply CORS middleware
   app.use(cors(corsOptions));
-  
+
+  // Log startup info (state, CORS, version, etc.)
+  const allowedOriginsStartup = process.env.CORS_ALLOWED_ORIGINS 
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
+    : ['http://localhost', 'http://127.0.0.1'];
+  const hostnameStartup = process.env.STATUS_HOSTNAME || 'localhost';
+  allowedOriginsStartup.push(`http://${hostnameStartup}`);
+  const portStartup = process.env.STATUS_PORT || 3000;
+  logger.info({
+    version,
+    botName: config.BOT_NAME,
+    port: portStartup,
+    allowedOrigins: allowedOriginsStartup,
+    env: process.env.NODE_ENV || 'development'
+  }, 'Status server starting up with configuration');
+
+  // Optionally log a health summary at startup
+  (async () => {
+    try {
+      const uptime = Math.floor((new Date() - stats.startTime) / 1000);
+      const memoryUsage = process.memoryUsage();
+      const persistentStats = await statsStorage.loadStats();
+      const mergedStats = {
+        messageCount: persistentStats.messageCount || stats.messageCount,
+        apiCalls: { ...stats.apiCalls, ...persistentStats.apiCalls },
+        errors: { ...stats.errors, ...persistentStats.errors },
+        rateLimits: {
+          hit: persistentStats.rateLimits?.hit || stats.rateLimits.hit,
+          users: persistentStats.rateLimits?.users || stats.rateLimits.users,
+          userCounts: persistentStats.rateLimits?.userCounts || {}
+        }
+      };
+      logger.info({
+        status: 'online',
+        uptime,
+        version,
+        memory: memoryUsage,
+        stats: mergedStats,
+        botName: config.BOT_NAME
+      }, 'Initial health summary at status server startup');
+    } catch (err) {
+      logger.warn({ err }, 'Could not log initial health summary');
+    }
+  })();
+
   // Serve static files from the public directory
   app.use(express.static(path.join(__dirname, 'public')));
   

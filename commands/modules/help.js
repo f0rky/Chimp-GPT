@@ -10,6 +10,26 @@
  */
 
 const { getCommands, getCommand, prefixes } = require('../commandHandler');
+
+// --- Command Registry Validation ---
+function validateCommandRegistry() {
+  const commands = getCommands ? getCommands() : [];
+  const requiredFields = ['name', 'description', 'aliases', 'dmAllowed'];
+  let hasError = false;
+  for (const cmd of commands) {
+    const missing = requiredFields.filter(f => !(f in cmd));
+    if (missing.length > 0) {
+      hasError = true;
+      // eslint-disable-next-line no-console
+      console.error(`[HELP] Malformed command: ${cmd && cmd.name ? cmd.name : JSON.stringify(cmd)} is missing fields: ${missing.join(', ')}`);
+    }
+  }
+  if (!hasError) {
+    // eslint-disable-next-line no-console
+    console.log('[HELP] Command registry validated: all commands well-formed.');
+  }
+}
+validateCommandRegistry();
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:help');
 const { SlashCommandBuilder } = require('discord.js');
@@ -66,7 +86,7 @@ module.exports = {
       const helpMessage = this.formatHelpMessage(allCommands, config);
       await message.reply(helpMessage);
     } catch (error) {
-      logger.error({ error }, 'Error executing help command');
+      logger.error({ error, stack: error && error.stack }, 'Error executing help command');
       await message.reply('An error occurred while retrieving help information.');
     }
   },
@@ -172,7 +192,7 @@ module.exports = {
     for (const [category, cmds] of Object.entries(categories)) {
       helpEmbed.fields.push({
         name: category,
-        value: cmds.map(cmd => `\`${prefixes[0]}${cmd.name}\` - ${cmd.description || 'No description'}`).join('\n')
+        value: cmds.map(cmd => `\`${prefixes[0]}${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`).join('\n')
       });
     }
     
@@ -275,14 +295,14 @@ module.exports = {
         for (const [category, cmds] of Object.entries(categories)) {
           helpEmbed.fields.push({
             name: category,
-            value: cmds.map(cmd => `\`/${cmd.name}\` - ${cmd.description || 'No description'}`).join('\n')
+            value: cmds.map(cmd => `\`/${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`).join('\n')
           });
         }
         
         await interaction.reply({ embeds: [helpEmbed], ephemeral: false });
       }
     } catch (error) {
-      logger.error({ error }, 'Error executing help slash command');
+      logger.error({ error, stack: error.stack }, 'Error executing help slash command');
       await interaction.reply({ content: 'An error occurred while retrieving help information.', ephemeral: true });
     }
   }

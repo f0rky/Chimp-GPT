@@ -500,6 +500,10 @@ function trackError(type, pluginId) {
  */
 function trackRateLimit(userId) {
   stats.rateLimits.hit++;
+  // Ensure users is always a Set
+  if (!stats.rateLimits.users || typeof stats.rateLimits.users.add !== 'function') {
+    stats.rateLimits.users = new Set(stats.rateLimits.users ? Array.from(stats.rateLimits.users) : []);
+  }
   stats.rateLimits.users.add(userId);
   // Also store in persistent storage
   statsStorage.incrementStat('rateLimits.hit');

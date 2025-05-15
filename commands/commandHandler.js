@@ -278,8 +278,21 @@ async function handleSlashCommand(interaction, config) {
       throw new Error(`Command ${commandName} does not have an interactionExecute or executeSlash method`);
     }
   } catch (error) {
-    logger.error({ error, commandName: interaction.commandName }, 'Error handling slash command');
-    
+    // Enhanced granular error logging for plugin/core slash commands
+    const isPluginCommand = !!command.pluginId;
+    logger.error({
+      error: error.message,
+      stack: error.stack,
+      commandName: interaction.commandName,
+      userId: interaction.user.id,
+      username: interaction.user.username,
+      channelId: interaction.channelId,
+      pluginId: isPluginCommand ? command.pluginId : undefined,
+      pluginVersion: isPluginCommand ? (command.pluginVersion || 'unknown') : undefined,
+      source: isPluginCommand ? 'plugin' : 'core',
+      args: interaction.options?.data || [],
+    }, 'Error handling slash command');
+
     // Reply with error if we haven't replied yet
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: 'An error occurred while executing that command.', ephemeral: true });
@@ -356,7 +369,21 @@ async function handleCommand(message, config) {
     await command.execute(message, args, config);
     return true;
   } catch (error) {
-    logger.error({ error, content: message.content }, 'Error handling command');
+    // Enhanced granular error logging for plugin/core commands
+    const isPluginCommand = !!command.pluginId;
+    logger.error({
+      error: error.message,
+      stack: error.stack,
+      commandName,
+      args,
+      userId: message.author.id,
+      username: message.author.username,
+      channelId: message.channelId,
+      pluginId: isPluginCommand ? command.pluginId : undefined,
+      pluginVersion: isPluginCommand ? (command.pluginVersion || 'unknown') : undefined,
+      source: isPluginCommand ? 'plugin' : 'core',
+      content: message.content
+    }, 'Error handling command');
     await message.reply('An error occurred while executing that command.');
     return true; // We attempted to handle it
   }

@@ -68,13 +68,13 @@ function registerPlugin(plugin) {
   try {
     // Validate plugin structure
     if (!plugin || !plugin.id || !plugin.name || !plugin.version) {
-      logger.error({ plugin }, 'Invalid plugin structure');
+      logger.error({ plugin, pluginId: plugin?.id || 'unknown', pluginVersion: plugin?.version || 'unknown' }, 'Invalid plugin structure');
       return false;
     }
 
     // Check if plugin is already registered
     if (plugins.metadata[plugin.id]) {
-      logger.warn({ pluginId: plugin.id }, 'Plugin already registered');
+      logger.warn({ pluginId: plugin.id, pluginVersion: plugin.version }, 'Plugin already registered');
       return false;
     }
 
@@ -164,7 +164,10 @@ function registerPlugin(plugin) {
   } catch (error) {
     logger.error({ 
       error, 
-      pluginId: plugin?.id || 'unknown' 
+      pluginId: plugin?.id || 'unknown',
+      pluginVersion: plugin?.version || plugins.metadata?.[plugin?.id]?.version || 'unknown',
+      context: 'registerPlugin',
+      pluginName: plugin?.name || 'unknown'
     }, 'Error registering plugin');
     return false;
   }
@@ -233,7 +236,12 @@ async function loadPlugins() {
           }
         }
       } catch (error) {
-        logger.error({ error, folder }, 'Error loading plugin');
+        logger.error({ 
+          error, 
+          folder, 
+          pluginId: plugin?.id || 'unknown',
+          pluginVersion: plugin?.version || plugins.metadata?.[plugin?.id]?.version || 'unknown'
+        }, 'Error loading plugin');
       }
     }
     
@@ -254,7 +262,7 @@ async function loadPlugins() {
     
     return loadedCount;
   } catch (error) {
-    logger.error({ error }, 'Error loading plugins');
+    logger.error({ error, context: 'loadPlugins' }, 'Error loading plugins');
     return 0;
   }
 }
@@ -334,7 +342,8 @@ async function executeFunction(functionName, ...args) {
       message: error.message,
       stack: error.stack,
       functionName,
-      pluginId: func?.pluginId
+      pluginId: func?.pluginId,
+      pluginVersion: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.version || 'unknown') : 'unknown'
     }, 'Error executing plugin function');
     // Track the function call with error
     if (func && func.pluginId) {
@@ -400,7 +409,8 @@ async function executeHook(hookName, ...args) {
           message: error.message,
           stack: error.stack,
           hookName,
-          pluginId: handler.pluginId
+          pluginId: handler.pluginId,
+          pluginVersion: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.version || 'unknown') : 'unknown'
         }, 'Error executing plugin hook');
 
         // Track the hook execution with error
@@ -424,7 +434,9 @@ async function executeHook(hookName, ...args) {
     logger.error({
       message: error.message,
       stack: error.stack,
-      hookName
+      hookName,
+      context: 'executeHook',
+      // No pluginId available here
     }, 'Error executing hooks');
     return [{ success: false, error, hookName }];
   }

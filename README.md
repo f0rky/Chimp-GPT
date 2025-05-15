@@ -1,16 +1,26 @@
 
 # Chimp-GPT Discord Bot
 
+**Bot Version:** 1.0.0 <!-- BOT_VERSION -->
+
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
 ## Features
+
+### Error Resilience for External APIs
+
+OpenAI API calls are now protected by a retry mechanism with exponential backoff (up to 3 attempts) and a circuit breaker. If 5 consecutive failures occur, the circuit breaker will block further calls for 2 minutes and log the outage. This improves reliability and prevents API abuse during outages.
+
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
 - **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT-3.5/4).
 - **Weather Lookup**: Reliable weather info with robust error handling and fallback mechanisms.
 - **Time Inquiry**: Ask for the current time in any location.
 - **Quake Live Server Stats**: View real-time Quake Live server stats with compact, configurable display.
+  - Emoji toggles and ELO display modes are fully configurable via environment variables.
+  - Supports compact formatting to fit Discord's character limits and improved team/spectator presentation.
 - **Image Generation**: Use DALL-E (2 & 3) to generate images directly from Discord, with a gallery view on the status page.
+  - Gallery includes modal viewer, prompt context, keyboard/mouse/touch navigation, and robust error handling.
 - **Wolfram Alpha Integration**: Ask factual or computational questions.
 - **Status Page**: Real-time dashboard with stats, error logs, and an image gallery for generated images.
 - **Comprehensive Error Handling & Logging**: All error handling and logging are now standardized across all major modules using Pino-based loggers. This ensures detailed, structured logs for easier debugging, monitoring, and reliability.
@@ -35,28 +45,54 @@ Chimp-GPT supports a powerful plugin architecture:
 - See the [windsurf.config.js](#windsurf-configjs) for plugin validation rules.
 
 ## Status Page & Image Gallery
-- Accessible via the configured `STATUS_HOSTNAME` and `STATUS_PORT`.
-- Shows bot uptime, API call stats, error logs, and a gallery of generated images.
-- Responsive design and mobile-friendly.
+- Accessible via the configurable `STATUS_HOSTNAME` and `STATUS_PORT` (see Environment Variables below).
+- Supports multi-instance deployment with automatic port fallback and remote access.
+- The status page displays:
+  - Bot uptime and live online/offline state
+  - API call statistics and error logs
+  - Image gallery with modal viewer, prompt display, and mobile support
+  - Quake server stats, including emoji and ELO display options
+- Responsive design and mobile-friendly, with robust error handling for all UI elements.
 
 ## Error Handling & Logging
 - All API integrations feature robust error handling and fallbacks.
 - Errors are logged using Pino-based structured loggers and shown on the status page.
-- Logging is consistent across all main modules for easier debugging and monitoring.
+- Logging is now standardized across all main modules (see checklist for logger migration progress).
 - Graceful shutdown and recovery are implemented throughout the codebase.
+- Test/CLI files may use console.error, but should be reviewed for consistency.
 
 ## Documentation & Type Safety
 - Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
 - Improved maintainability, developer onboarding, and static analysis.
+- Please review and update the [`CHECKLIST.md`](./CHECKLIST.md) as you work on the project.
 
 ## Code Quality & Linting
 - The project uses ESLint and Prettier for code quality.
 - Linting and formatting rules are enforced via [windsurf.config.js](#windsurf-configjs).
 - Security checks prevent secrets from being committed.
+- Husky/pre-commit hooks and Prettier config are recommended (see checklist).
 
 ## windsurf.config.js
 
 A `windsurf.config.js` file is provided at the project root to enforce code quality, plugin validation, and optional deployment rules. These are automatically checked in CI/CD and pre-commit hooks if configured:
+
+## Environment Variables
+
+The bot is configured via environment variables (see `.env.example`). Below is a summary of key variables and their defaults:
+
+| Variable                  | Default        | Description                                                        |
+|---------------------------|----------------|--------------------------------------------------------------------|
+| BOT_NAME                  | CircuitChimp   | Name displayed on the status page and in Discord                   |
+| STATUS_HOSTNAME           | localhost      | Hostname for the status page server                                |
+| STATUS_PORT               | 3000           | Port for the status page server (auto-fallback for multiple bots)  |
+| SHOW_TEAM_EMOJIS          | false          | Show team emojis in Quake stats player names                       |
+| SHOW_SERVER_STATS_EMOJIS  | false          | Show emojis in Quake server info headers                           |
+| ELO_DISPLAY_MODE          | 0              | ELO display: 0=off, 1=categorized, 2=actual values                |
+| ...                       |                | See .env.example for full list and documentation                   |
+
+- All environment variables are validated at startup.
+- For multi-instance deployments, ports are automatically selected and hostname can be set for remote access.
+- Emoji toggles and ELO display modes are configurable for Quake stats.
 
 ```js
 // windsurf.config.js

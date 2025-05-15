@@ -54,6 +54,9 @@ const openai = new OpenAI({
   apiKey: config.OPENAI_API_KEY
 });
 
+// Log bot version at startup
+const { version: botVersion } = require('./package.json');
+console.log(`ChimpGPT starting up - version ${botVersion}`);
 // Initialize Discord client with proper intents
 const client = new Client({
   intents: [
