@@ -4,11 +4,11 @@
 
 ## ⚠️ Issues/Items to Fix (from Code Review)
 
-- [ ] **Granular plugin error logging:** While errors are logged with pluginId and hookName, some error paths (e.g., in pluginManager.js) could include more detailed context (such as command/function name and plugin version) for easier debugging.
+- [x] **Granular plugin error logging:** Enhanced error logging in pluginManager.js to include detailed context such as plugin name, version, author, argument details (sanitized), timestamp, error type/code, and hook type for easier debugging.
 - [x] **Circuit breaker/retry for external APIs:** (OpenAI API calls now use retry and circuit breaker logic) No evidence of a true circuit breaker or retry/backoff logic for OpenAI, weather, or Quake integrations. Add robust retry/circuit breaker patterns to handle flaky APIs.
-    - [ ] **Human-in-the-loop circuit breaker:** Bot should report status and provide /commands for the owner to approve or deny sensitive function calls (such as writing data or triggering commands). This allows the admin to act as a human circuit breaker by reacting to the bot's status or approval summary before actions are executed.
-    - [ ] **Bot versioning and self-query:** Implement a version identifier for the bot, add a function to return the current version, and enable version queries via @[@prompt] so the bot can self-query its version.
-- [ ] **Persistent conversation history:** ConversationManager only keeps in-memory logs. Add persistent storage (file or DB) to maintain logs across restarts.
+    - [x] **Human-in-the-loop circuit breaker:** Implemented comprehensive human approval system that integrates with the existing circuit breaker. Added ability to request owner approval for sensitive operations with detailed notifications and slash commands for approving/denying requests.
+    - [x] **Bot versioning and self-query:** Implemented comprehensive version system with self-query capabilities. Added version command, natural language version queries via @[@prompt], and integrated version info into the human circuit breaker system and status page.
+- [x] **Persistent conversation history:** Implemented persistent conversation storage with automatic loading on startup and saving on shutdown, plus periodic saving to prevent data loss.
     - [x] **System message preservation:** Ensure the system message (bot personality) is always preserved at index 0 (done).
 - [ ] **Test coverage:** Unit/integration tests are limited. Only conversation log, OpenAI, and Quake stats have basic tests. Add more comprehensive automated tests for all core features, especially weather API integration and plugin system.
 - [ ] **Prettier config/enforcement:** .eslintrc.js is present, but no Prettier config or Husky hooks found. Add Prettier config and enforce via Husky pre-commit hooks.
@@ -21,7 +21,7 @@
 - [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.
 - [ ] **Command-line run modes:** Add support for different run modes via CLI args (e.g., test, production, demo).
 - [ ] **Debugging configs:** Add VSCode or other IDE debugging configurations for easier development.
-- [x] **Configurable bot name, hostname, port (status page):** Status page now supports BOT_NAME, STATUS_HOSTNAME, and STATUS_PORT environment variables for flexible deployment (done).
+- [x] **Configurable bot name, hostname, port (status page):** Status page now supports BOT_NAME, STATUS_HOSTNAME, and STATUS_PORT environment variables for flexible deployment (done). Fixed issues with app variable reference in statusServer.js to ensure proper startup.
 - [x] **Emoji toggles and ELO display for Quake stats:** Added SHOW_TEAM_EMOJIS, SHOW_SERVER_STATS_EMOJIS, and ELO_DISPLAY_MODE environment variables. Team/spectator formatting improved (done).
 - [x] **Image gallery modal/mobile/error handling:** Status page image gallery includes modal viewer, mobile support, and robust error handling (done).
 - [x] **Logger standardization (Pino):** All main modules now use Pino-based logger for error handling and debugging. Test/CLI files reviewed for consistency (done; see README for details).
@@ -43,7 +43,7 @@
 - [x] Consolidate error handling patterns across modules (Logging is now standardized across all main modules with Pino-based loggers. Error handling is consistent and robust.)
 - [x] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript) (JSDoc/type coverage is comprehensive across all major modules and plugin interfaces. Minor gaps may remain for new code.)
 - [x] Logger standardization: All main modules now use Pino-based logger. Test/CLI files reviewed for consistency.
-- [ ] Add more granular logging for plugin execution errors (e.g., identify which plugin/hook failed)
+- [x] Add more granular logging for plugin execution errors (e.g., identify which plugin/hook failed)
 
 ### Security Improvements
 - [x] Implement rate limiting for the status page to prevent DoS attacks

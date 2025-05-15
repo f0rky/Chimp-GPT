@@ -8,6 +8,10 @@
  * @property {number} dalle
  * @property {Object.<string, number>} plugins
  *
+ * @typedef {Object} PluginErrorInfo
+ * @property {number} count - Total error count for this plugin
+ * @property {Object.<string, number>} hooks - Error counts by hook name
+ *
  * @typedef {Object} Errors
  * @property {number} openai
  * @property {number} discord
@@ -16,7 +20,7 @@
  * @property {number} wolfram
  * @property {number} quake
  * @property {number} dalle
- * @property {Object.<string, number>} plugins
+ * @property {Object.<string, PluginErrorInfo>} plugins - Error counts by plugin ID with detailed hook information
  * @property {number} other
  *
  * @typedef {Object} RateLimits
@@ -468,15 +472,40 @@ function trackApiCall(type, pluginId) {
  * @param {string} [pluginId] - Optional plugin ID if the error is from a plugin
  * @returns {void}
  */
-function trackError(type, pluginId) {
+/**
+ * Track an error occurrence.
+ *
+ * @param {string} type - The type of error (e.g., 'openai', 'plugins', 'weather')
+ * @param {string} [pluginId] - Optional plugin ID if this is a plugin error
+ * @param {string} [hookName] - Optional hook name for more granular plugin error tracking
+ * @returns {void}
+ */
+function trackError(type, pluginId, hookName) {
   if (pluginId) {
     // Track plugin error
     if (!stats.errors.plugins[pluginId]) {
-      stats.errors.plugins[pluginId] = 0;
+      stats.errors.plugins[pluginId] = { 
+        count: 0,
+        hooks: {}
+      };
     }
-    stats.errors.plugins[pluginId]++;
-    // Also store in persistent storage
-    statsStorage.incrementStat(`errors.plugins.${pluginId}`);
+    
+    // Increment the plugin error count
+    stats.errors.plugins[pluginId].count++;
+    
+    // Track specific hook errors if provided
+    if (hookName) {
+      if (!stats.errors.plugins[pluginId].hooks[hookName]) {
+        stats.errors.plugins[pluginId].hooks[hookName] = 0;
+      }
+      stats.errors.plugins[pluginId].hooks[hookName]++;
+      
+      // Store in persistent storage with hook information
+      statsStorage.incrementStat(`errors.plugins.${pluginId}.hooks.${hookName}`);
+    }
+    
+    // Also store the overall plugin error count in persistent storage
+    statsStorage.incrementStat(`errors.plugins.${pluginId}.count`);
   } else if (stats.errors[type] !== undefined) {
     // Track regular error
     stats.errors[type]++;

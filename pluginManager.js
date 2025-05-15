@@ -331,19 +331,41 @@ async function executeFunction(functionName, ...args) {
     
     return { success: true, data: result, pluginId: func.pluginId, functionName };
   } catch (error) {
-    // Track the error
+    // Track the error with more granular information
     if (func && func.pluginId) {
-      trackError('plugins', func.pluginId);
+      trackError('plugins', func.pluginId, `function:${functionName}`);
     } else {
-      trackError('plugins');
+      trackError('plugins', null, `function:${functionName}`);
     }
-    // Log the error
+    
+    // Get plugin details for better error context
+    const pluginDetails = func?.pluginId ? plugins.metadata[func.pluginId] || {} : {};
+    // Log the error with enhanced context
     logger.error({
       message: error.message,
       stack: error.stack,
       functionName,
       pluginId: func?.pluginId,
-      pluginVersion: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.version || 'unknown') : 'unknown'
+      pluginName: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.name || 'unknown') : 'unknown',
+      pluginVersion: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.version || 'unknown') : 'unknown',
+      pluginAuthor: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.author || 'unknown') : 'unknown',
+      args: args.map(arg => {
+        // Sanitize arguments for logging
+        if (arg === null || arg === undefined) return String(arg);
+        if (typeof arg === 'object') {
+          // Create a safe representation of objects for logging
+          try {
+            // Extract only key names without values for sensitive objects
+            return `Object with keys: [${Object.keys(arg).join(', ')}]`;
+          } catch (e) {
+            return 'Unserializable object';
+          }
+        }
+        return String(arg).substring(0, 100); // Truncate long strings
+      }),
+      timestamp: new Date().toISOString(),
+      errorType: error.name || 'Error',
+      errorCode: error.code || 'UNKNOWN'
     }, 'Error executing plugin function');
     // Track the function call with error
     if (func && func.pluginId) {
@@ -401,16 +423,40 @@ async function executeHook(hookName, ...args) {
           hookName
         });
       } catch (error) {
-        // Track the error
-        trackError('plugins', handler.pluginId);
+        // Track the error with more granular information
+        trackError('plugins', handler.pluginId, `hook:${hookName}`);
         
-        // Log the error
+        // Get plugin details for better error context
+        const pluginDetails = plugins.metadata[handler.pluginId] || {};
+        const hookType = hookName.includes(':') ? hookName.split(':')[0] : 'general';
+        
+        // Log the error with enhanced context
         logger.error({
           message: error.message,
           stack: error.stack,
           hookName,
           pluginId: handler.pluginId,
-          pluginVersion: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.version || 'unknown') : 'unknown'
+          pluginName: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.name || 'unknown') : 'unknown',
+          pluginVersion: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.version || 'unknown') : 'unknown',
+          pluginAuthor: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.author || 'unknown') : 'unknown',
+          args: args.map(arg => {
+            // Sanitize arguments for logging
+            if (arg === null || arg === undefined) return String(arg);
+            if (typeof arg === 'object') {
+              // Create a safe representation of objects for logging
+              try {
+                // Extract only key names without values for sensitive objects
+                return `Object with keys: [${Object.keys(arg).join(', ')}]`;
+              } catch (e) {
+                return 'Unserializable object';
+              }
+            }
+            return String(arg).substring(0, 100); // Truncate long strings
+          }),
+          timestamp: new Date().toISOString(),
+          errorType: error.name || 'Error',
+          errorCode: error.code || 'UNKNOWN',
+          hookType: hookName.includes(':') ? hookName.split(':')[0] : 'general'
         }, 'Error executing plugin hook');
 
         // Track the hook execution with error
@@ -431,13 +477,45 @@ async function executeHook(hookName, ...args) {
     }
     return results;
   } catch (error) {
+    // Track the error with the general 'plugins' category
+    trackError('plugins', null, `hook:${hookName}`);
+    
+    // Get hook type for better categorization
+    const hookType = hookName.includes(':') ? hookName.split(':')[0] : 'general';
+    
+    // Log detailed error information
     logger.error({
       message: error.message,
       stack: error.stack,
       hookName,
       context: 'executeHook',
-      // No pluginId available here
-    }, 'Error executing hooks');
+      // No specific pluginId available here
+      args: args.map(arg => {
+        // Sanitize arguments for logging
+        if (arg === null || arg === undefined) return String(arg);
+        if (typeof arg === 'object') {
+          // Create a safe representation of objects for logging
+          try {
+            // Extract only key names without values for sensitive objects
+            return `Object with keys: [${Object.keys(arg).join(', ')}]`;
+          } catch (e) {
+            return 'Unserializable object';
+          }
+        }
+        return String(arg).substring(0, 100); // Truncate long strings
+      }),
+      timestamp: new Date().toISOString(),
+      errorType: error.name || 'Error',
+      errorCode: error.code || 'UNKNOWN',
+      hookType,
+      registeredHooks: Object.keys(plugins.hooks).length,
+      availablePlugins: Object.keys(plugins.metadata).length,
+      // Include registered hook handlers for this hook
+      registeredHandlersCount: hookHandlers ? hookHandlers.length : 0,
+      // Include registered plugin IDs for this hook to help identify potential culprits
+      registeredPluginsForHook: hookHandlers ? hookHandlers.map(h => h.pluginId) : []
+    }, `Error executing hook: ${hookName}`);
+    
     return [{ success: false, error, hookName }];
   }
 }

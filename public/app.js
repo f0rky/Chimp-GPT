@@ -28,6 +28,61 @@ function closeImageModal() {
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
+    // Admin Breaker Panel
+    const adminPanel = document.createElement('div');
+    adminPanel.className = 'card admin-breaker';
+    adminPanel.innerHTML = `
+      <h2>Circuit Breaker Admin</h2>
+      <div id="breaker-status">Loading...</div>
+      <div id="breaker-approvals"></div>
+      <div style="margin-top:8px;">
+        <input id="owner-token" type="password" placeholder="OWNER_TOKEN" style="width:180px;" />
+        <button id="breaker-reset-btn">Reset Breaker</button>
+      </div>
+    `;
+    document.querySelector('.dashboard').appendChild(adminPanel);
+    function fetchBreakerStatus() {
+      fetch('/api/breaker/status').then(r=>r.json()).then(data => {
+        document.getElementById('breaker-status').innerText =
+          data.breakerOpen ? '🚨 Breaker OPEN' : '✅ Breaker CLOSED';
+        const approvals = data.pendingRequests || [];
+        const approvalsDiv = document.getElementById('breaker-approvals');
+        if (approvals.length === 0) {
+          approvalsDiv.innerHTML = '<em>No pending approvals.</em>';
+        } else {
+          approvalsDiv.innerHTML = approvals.map((req, i) =>
+            `<div style='margin-bottom:6px;'>
+              <b>Request #${i+1}</b> - ${req.type || 'unknown'}<br/>
+              <button data-idx='${i}' data-dec='approve'>Approve</button>
+              <button data-idx='${i}' data-dec='deny'>Deny</button>
+            </div>`
+          ).join('');
+        }
+      });
+    }
+    setInterval(fetchBreakerStatus, 3000);
+    fetchBreakerStatus();
+    document.getElementById('breaker-reset-btn').onclick = () => {
+      const token = document.getElementById('owner-token').value;
+      fetch('/api/breaker/reset', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','x-owner-token':token},
+        body: JSON.stringify({token})
+      }).then(r=>r.json()).then(fetchBreakerStatus);
+    };
+    document.getElementById('breaker-approvals').onclick = (e) => {
+      if (e.target.tagName === 'BUTTON') {
+        const idx = Number(e.target.getAttribute('data-idx'));
+        const dec = e.target.getAttribute('data-dec');
+        const token = document.getElementById('owner-token').value;
+        fetch('/api/breaker/approve', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','x-owner-token':token},
+          body: JSON.stringify({index:idx, decision:dec, token})
+        }).then(r=>r.json()).then(fetchBreakerStatus);
+      }
+    };
+
     initCharts();
     updateStatus();
     updateFunctionResults();
@@ -590,6 +645,80 @@ function updateErrors(errors) {
     document.getElementById('weather-errors').textContent = errors.weather.toLocaleString();
     document.getElementById('dalle-errors').textContent = errors.dalle ? errors.dalle.toLocaleString() : '0';
     document.getElementById('other-errors').textContent = errors.other.toLocaleString();
+    
+    // Handle plugin errors with the new detailed structure
+    const pluginErrorsContainer = document.getElementById('plugin-errors-container');
+    if (pluginErrorsContainer) {
+        // Clear previous content
+        pluginErrorsContainer.innerHTML = '';
+        
+        // Check if there are any plugin errors
+        const pluginIds = Object.keys(errors.plugins || {});
+        
+        if (pluginIds.length === 0) {
+            pluginErrorsContainer.innerHTML = '<p class="text-success">No plugin errors reported.</p>';
+        } else {
+            // Create a table to display plugin errors
+            const table = document.createElement('table');
+            table.className = 'table table-sm table-striped';
+            
+            // Create table header
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>Plugin ID</th>
+                    <th>Total Errors</th>
+                    <th>Hook Details</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+            
+            // Create table body
+            const tbody = document.createElement('tbody');
+            
+            // Add rows for each plugin with errors
+            pluginIds.forEach(pluginId => {
+                const pluginError = errors.plugins[pluginId];
+                const row = document.createElement('tr');
+                
+                // Handle both old and new error format
+                const errorCount = typeof pluginError === 'number' ? 
+                    pluginError : 
+                    (pluginError.count || 0);
+                
+                // Get hook errors if available in the new format
+                const hookErrors = (pluginError.hooks && typeof pluginError.hooks === 'object') ? 
+                    pluginError.hooks : 
+                    {};
+                
+                // Create hook details HTML
+                let hookDetailsHtml = '';
+                const hookNames = Object.keys(hookErrors);
+                
+                if (hookNames.length > 0) {
+                    hookDetailsHtml = '<ul class="mb-0">';
+                    hookNames.forEach(hookName => {
+                        hookDetailsHtml += `<li><strong>${hookName}</strong>: ${hookErrors[hookName]} errors</li>`;
+                    });
+                    hookDetailsHtml += '</ul>';
+                } else {
+                    hookDetailsHtml = '<span class="text-muted">No detailed hook information</span>';
+                }
+                
+                // Set row content
+                row.innerHTML = `
+                    <td><code>${pluginId}</code></td>
+                    <td>${errorCount}</td>
+                    <td>${hookDetailsHtml}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            table.appendChild(tbody);
+            pluginErrorsContainer.appendChild(table);
+        }
+    }
     
     // Update chart
     errorChart.data.datasets[0].data = [
