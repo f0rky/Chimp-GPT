@@ -188,11 +188,23 @@ const CONFIG_SCHEMA = {
     required: false,
     description: 'Duration in seconds for the status page rate limit window',
     default: '60',
-    validate(value) {
-      return /^\d+$/.test(value);
+    validate: (value) => {
+      const num = parseInt(value, 10);
+      return !isNaN(num) && num > 0;
     },
-    transform(value) {
+    transform: (value) => {
       return parseInt(value, 10);
+    }
+  },
+  DEPLOY_COMMANDS: {
+    required: false,
+    description: 'Whether to deploy slash commands on bot startup',
+    default: 'true',
+    validate: (value) => {
+      return value === 'true' || value === 'false';
+    },
+    transform: (value) => {
+      return value === 'true';
     }
   }
 };

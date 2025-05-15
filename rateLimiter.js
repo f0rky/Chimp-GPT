@@ -41,7 +41,7 @@ const logger = createLogger('ratelimit');
  */
 const DEFAULT_POINTS = 200;      // Number of requests allowed
 const DEFAULT_DURATION = 30;   // Time period in seconds
-const COOLDOWN_TIME = 5;      // Cooldown time in seconds after hitting limit
+const COOLDOWN_TIME = 2;      // Cooldown time in seconds after hitting limit
 
 /**
  * Map to store rate limiters for each user

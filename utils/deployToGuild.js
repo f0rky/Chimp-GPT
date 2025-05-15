@@ -6,6 +6,10 @@ const path = require('path');
 // Get configuration
 const config = require('./configValidator');
 
+// Import logger
+const { createLogger } = require('../logger');
+const logger = createLogger('deploy');
+
 // Get the guild ID from the command line or use a default
 const guildId = process.argv[2] || '98265937441984512'; // F.E.S server ID
 
@@ -19,7 +23,7 @@ async function deployCommands() {
       throw new Error('Missing client ID in configuration');
     }
     
-    console.log(`Deploying commands to guild: ${guildId}`);
+    logger.info(`Deploying commands to guild: ${guildId}`);
     
     // Initialize REST API client
     const rest = new REST({ version: '10' }).setToken(config.DISCORD_TOKEN);
@@ -54,14 +58,14 @@ async function deployCommands() {
         }
         
         slashCommands.push(command.slashCommand.toJSON());
-        console.log(`Loaded slash command: ${command.name}`);
+        logger.debug(`Loaded slash command: ${command.name}`);
       } catch (error) {
         const { discord: discordLogger } = require('../logger');
         discordLogger.error({ error, file }, 'Error loading command file');
       }
     }
     
-    console.log(`Deploying ${slashCommands.length} slash commands to guild ${guildId}`);
+    logger.info(`Deploying ${slashCommands.length} slash commands to guild ${guildId}`);
     
     // Deploy commands to the specific guild
     const data = await rest.put(
@@ -69,13 +73,13 @@ async function deployCommands() {
       { body: slashCommands }
     );
     
-    console.log(`Successfully deployed ${data.length} commands to guild ${guildId}`);
+    logger.info(`Successfully deployed ${data.length} commands to guild ${guildId}`);
     
     // Print out the deployed commands
-    console.log('\nDeployed commands:');
-    data.forEach(cmd => {
-      console.log(`- ${cmd.name}: ${cmd.description}`);
-    });
+    logger.info('Deployed commands:');
+    for (const cmd of data) {
+      logger.info(`- ${cmd.name}: ${cmd.description}`);
+    }
     
     return {
       success: true,
@@ -96,7 +100,7 @@ async function deployCommands() {
 deployCommands()
   .then(result => {
     if (result.success) {
-      console.log('Command deployment completed successfully!');
+      logger.info('Command deployment completed successfully!');
     } else {
       const { discord: discordLogger } = require('../logger');
       discordLogger.error({ error: result.error }, 'Command deployment failed');

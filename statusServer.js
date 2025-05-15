@@ -64,7 +64,8 @@ const cors = require('cors');
 const { createLogger } = require('./logger');
 const logger = createLogger('status');
 const os = require('os');
-const { version } = require('./package.json');
+const { getDetailedVersionInfo, formatUptime } = require('./getBotVersion');
+const breakerManager = require('./breakerManager');
 
 // Import configuration
 const config = require('./configValidator');
@@ -80,6 +81,17 @@ const { runConversationLogTests, runOpenAITests, runQuakeTests, runCorsTests, ru
 
 // Import rate limiter
 const { createRateLimiter } = require('./rateLimiter');
+
+// --- Breaker Management API ---
+const OWNER_TOKEN = process.env.OWNER_TOKEN || 'changeme';
+
+function requireOwnerToken(req, res, next) {
+  const token = req.headers['x-owner-token'] || req.query.token || req.body.token;
+  if (token !== OWNER_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}
 
 /**
  * Statistics tracking object for monitoring bot health
@@ -225,8 +237,12 @@ function initStatusServer() {
   const hostnameStartup = process.env.STATUS_HOSTNAME || 'localhost';
   allowedOriginsStartup.push(`http://${hostnameStartup}`);
   const portStartup = process.env.STATUS_PORT || 3000;
+  
+  // Get version info
+  const versionInfo = getDetailedVersionInfo();
+  
   logger.info({
-    version,
+    version: versionInfo.version,
     botName: config.BOT_NAME,
     port: portStartup,
     allowedOrigins: allowedOriginsStartup,
@@ -273,10 +289,11 @@ function initStatusServer() {
    * @returns {Object} { name, status, version }
    */
   app.get('/api', (req, res) => {
+    const versionInfo = getDetailedVersionInfo();
     res.json({ 
       name: config.BOT_NAME,
       status: 'online',
-      version
+      version: versionInfo.version
     });
   });
   
@@ -316,11 +333,23 @@ function initStatusServer() {
     const discordGuilds = typeof discordStats.guilds === 'number' ? discordStats.guilds : 0;
     const discordChannels = typeof discordStats.channels === 'number' ? discordStats.channels : 0;
 
+    // Get detailed version information
+    const versionInfo = getDetailedVersionInfo();
+    
     const health = {
       status: discordStatus === 'ok' ? 'ok' : 'offline', // overall status reflects Discord status
       name: botName,
       uptime: uptime,
-      version: version,
+      formattedUptime: formatUptime(uptime),
+      version: versionInfo.version,
+      versionInfo: {
+        name: versionInfo.name,
+        description: versionInfo.description,
+        author: versionInfo.author,
+        nodeVersion: versionInfo.nodeVersion,
+        environment: versionInfo.environment,
+        startTime: new Date(Date.now() - (uptime * 1000)).toISOString()
+      },
       memory: {
         rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
         heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
@@ -355,6 +384,44 @@ function initStatusServer() {
     };
 
     res.json(health);
+  });
+  
+  /**
+   * GET /version
+   * Returns detailed version information about the bot.
+   *
+   * @route GET /version
+   * @returns {Object} Detailed version information
+   */
+  app.get('/version', (req, res) => {
+    logger.info('Getting version information');
+    
+    try {
+      const versionInfo = getDetailedVersionInfo();
+      const uptime = process.uptime();
+      
+      res.json({
+        success: true,
+        version: versionInfo.version,
+        name: versionInfo.name,
+        description: versionInfo.description,
+        author: versionInfo.author,
+        uptime: uptime,
+        formattedUptime: formatUptime(uptime),
+        nodeVersion: versionInfo.nodeVersion,
+        platform: versionInfo.platform,
+        environment: versionInfo.environment,
+        memory: {
+          rss: Math.round(versionInfo.memory / 1024 / 1024),
+          unit: 'MB'
+        },
+        startTime: new Date(Date.now() - (uptime * 1000)).toISOString(),
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error getting version information');
+      res.status(500).json({ success: false, message: 'Error getting version information' });
+    }
   });
   
   /**

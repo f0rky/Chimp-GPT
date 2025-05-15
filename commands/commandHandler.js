@@ -76,8 +76,8 @@ function registerCommand(command) {
       }
     }
     
-    // Register slash command if available
-    if (command.slashCommand) {
+    // Register slash command if available (check both slashCommand and data properties)
+    if (command.slashCommand || command.data) {
       slashCommands.set(command.name, command);
     }
     
@@ -370,7 +370,8 @@ async function handleCommand(message, config) {
     return true;
   } catch (error) {
     // Enhanced granular error logging for plugin/core commands
-    const isPluginCommand = !!command.pluginId;
+    // Check if command exists before accessing its properties
+    const isPluginCommand = command && !!command.pluginId;
     logger.error({
       error: error.message,
       stack: error.stack,

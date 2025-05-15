@@ -10,6 +10,8 @@
  */
 
 const { getCommands, getCommand, prefixes } = require('../commandHandler');
+const { createLogger } = require('../../logger');
+const logger = createLogger('commands:help');
 
 // --- Command Registry Validation ---
 function validateCommandRegistry() {
@@ -20,18 +22,17 @@ function validateCommandRegistry() {
     const missing = requiredFields.filter(f => !(f in cmd));
     if (missing.length > 0) {
       hasError = true;
-      // eslint-disable-next-line no-console
-      console.error(`[HELP] Malformed command: ${cmd && cmd.name ? cmd.name : JSON.stringify(cmd)} is missing fields: ${missing.join(', ')}`);
+      logger.error({
+        command: cmd && cmd.name ? cmd.name : JSON.stringify(cmd),
+        missingFields: missing
+      }, `Malformed command missing fields: ${missing.join(', ')}`);
     }
   }
   if (!hasError) {
-    // eslint-disable-next-line no-console
-    console.log('[HELP] Command registry validated: all commands well-formed.');
+    logger.info('Command registry validated: all commands well-formed.');
   }
 }
 validateCommandRegistry();
-const { createLogger } = require('../../logger');
-const logger = createLogger('commands:help');
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {

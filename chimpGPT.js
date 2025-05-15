@@ -21,9 +21,10 @@ const { initStatusManager } = require('./statusManager');
 const lookupWolfram = require('./wolframLookup');
 const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
 const pluginManager = require('./pluginManager');
+const { processVersionQuery } = require('./utils/versionSelfQuery');
 
 // Import loggers
-const { discord: discordLogger, openai: openaiLogger } = require('./logger');
+const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
 
 // Import validated configuration
 const config = require('./configValidator');
@@ -56,7 +57,7 @@ const openai = new OpenAI({
 
 // Log bot version at startup
 const { version: botVersion } = require('./package.json');
-console.log(`ChimpGPT starting up - version ${botVersion}`);
+logger.info(`ChimpGPT starting up - version ${botVersion}`);
 // Initialize Discord client with proper intents
 const client = new Client({
   intents: [
@@ -88,7 +89,13 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Import conversation manager
-const { manageConversation } = require('./conversationManager');
+const { 
+  manageConversation, 
+  loadConversationsFromStorage, 
+  saveConversationsToStorage, 
+  startPeriodicSaving, 
+  stopPeriodicSaving 
+} = require('./conversationManager');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
@@ -473,6 +480,24 @@ client.on('messageCreate', async (message) => {
     // Send initial feedback
     const feedbackMessage = await message.reply(`${loadingEmoji} Thinking...`);
 
+    // Check if this is a version query
+    const versionResponse = processVersionQuery(message.content, config);
+    if (versionResponse) {
+      // Track this as a successful API call for stats
+      trackApiCall('version_query', true);
+      
+      // Update the feedback message with the version response
+      await feedbackMessage.edit(versionResponse.content);
+      
+      // Add the response to the conversation log
+      manageConversation(message.author.id, {
+        role: 'assistant',
+        content: versionResponse.content
+      });
+      
+      return;
+    }
+    
     // Handle conversation context
     const conversationLog = manageConversation(message.author.id, {
       role: 'user',
@@ -652,6 +677,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     getWolframShortAnswer: 'Consulting Wolfram Alpha...',
     quakeLookup: 'Checking server stats...',
     generateImage: 'Firing up my imagination...',
+    getVersion: 'Checking my version...',
   };
 
   await feedbackMessage.edit(`${loadingEmoji} ${loadingMessages[gptResponse.functionName] || 'Processing...'}`);
@@ -668,7 +694,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     lookupExtendedForecast: 3,
     getWolframShortAnswer: 3,
     quakeLookup: 2,
-    generateImage: 5 // Higher cost for image generation
+    generateImage: 3, // Higher cost for image generation
+    getVersion: 0.5 // Very low cost for version queries
   };
   
   // Apply stricter rate limits for API-intensive functions
@@ -812,6 +839,42 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         trackError('dalle');
         throw error;
       }
+    case 'getVersion':
+      try {
+        // Import the version utilities
+        const { generateVersionResponse } = require('./utils/versionSelfQuery');
+        
+        // Get parameters with defaults
+        const detailed = gptResponse.parameters?.detailed === true;
+        const technical = gptResponse.parameters?.technical === true;
+        
+        // Generate the version response
+        const versionResponse = generateVersionResponse({
+          detailed,
+          technical,
+          config
+        });
+        
+        // Update the message with the version response
+        await feedbackMessage.edit(versionResponse);
+        
+        // Add the response to the conversation log
+        conversationLog.push({
+          role: 'assistant',
+          content: versionResponse
+        });
+        
+        // Track this as a successful API call for stats
+        trackApiCall('version_query', true);
+        
+        // Return early since we've already handled the response
+        return;
+      } catch (error) {
+        trackError('other');
+        discordLogger.error({ error }, 'Error in version lookup');
+        await feedbackMessage.edit('I encountered an error while checking my version. Please try again later.');
+        return;
+      }
   }
 
   try {
@@ -934,6 +997,18 @@ client.on('ready', async () => {
   initStatusManager(client);
   discordLogger.info('Status manager initialized');
   
+  // Load conversations from persistent storage
+  try {
+    await loadConversationsFromStorage();
+    discordLogger.info('Conversations loaded from persistent storage');
+    
+    // Start periodic saving of conversations
+    startPeriodicSaving();
+    discordLogger.info('Periodic conversation saving started');
+  } catch (error) {
+    discordLogger.error({ error }, 'Error loading conversations from persistent storage');
+  }
+  
   // Load command modules
   const commandsLoaded = await commandHandler.loadCommands();
   discordLogger.info({ commandsLoaded }, 'Command modules loaded');
@@ -971,6 +1046,18 @@ async function startBot() {
     discordLogger.info('Loading plugins...');
     const pluginCount = await pluginManager.loadPlugins();
     discordLogger.info({ pluginCount }, 'Plugins loaded successfully');
+    
+    // Load commands
+    discordLogger.info('Loading commands...');
+    const commandCount = await commandHandler.loadCommands();
+    discordLogger.info({ commandCount }, 'Commands loaded successfully');
+    
+    // Deploy slash commands if enabled
+    if (config.DEPLOY_COMMANDS) {
+      discordLogger.info('Deploying slash commands...');
+      const deployResult = await commandHandler.deployCommands(config);
+      discordLogger.info(deployResult, 'Slash commands deployed');
+    }
     
     // Connect to Discord
     await client.login(config.DISCORD_TOKEN);
@@ -1035,7 +1122,19 @@ async function shutdownGracefully(signal, error) {
       discordLogger.error({ error: saveError }, 'Error saving statistics during shutdown');
     }
     
-    // 2. Close Discord connection
+    // 3. Save conversations and stop periodic saving
+    try {
+      discordLogger.info('Stopping periodic conversation saving');
+      stopPeriodicSaving();
+      
+      discordLogger.info('Saving conversations to persistent storage');
+      await saveConversationsToStorage(true); // Force save
+      discordLogger.info('Conversations saved successfully');
+    } catch (saveError) {
+      discordLogger.error({ error: saveError }, 'Error saving conversations during shutdown');
+    }
+    
+    // 4. Close Discord connection
     try {
       discordLogger.info('Destroying Discord client');
       client.destroy();
@@ -1044,10 +1143,10 @@ async function shutdownGracefully(signal, error) {
       discordLogger.error({ error: discordError }, 'Error destroying Discord client');
     }
     
-    // 3. Close any open API connections or pending requests
+    // 5. Close any open API connections or pending requests
     // This is a placeholder - add specific cleanup for any other services as needed
     
-    // 4. Log successful shutdown
+    // 6. Log successful shutdown
     const shutdownDuration = Date.now() - shutdownStart;
     discordLogger.info({ durationMs: shutdownDuration }, 'Graceful shutdown completed');
     

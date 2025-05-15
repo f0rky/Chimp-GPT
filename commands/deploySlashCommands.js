@@ -64,12 +64,16 @@ async function deploySlashCommands(config, guildIds = []) {
         
         const command = require(filePath);
         
+        // Check for slash command data in either slashCommand or data property
+        const slashCommandData = command.slashCommand || command.data;
+        
         // Skip commands that don't have slash command data
-        if (!command.slashCommand) {
+        if (!slashCommandData) {
+          logger.warn({ commandName: command.name }, 'Command missing slash command data');
           continue;
         }
         
-        slashCommands.push(command.slashCommand.toJSON());
+        slashCommands.push(slashCommandData.toJSON());
         logger.info({ commandName: command.name }, 'Loaded core slash command');
       } catch (error) {
         logger.error({ error, file }, 'Error loading command file');

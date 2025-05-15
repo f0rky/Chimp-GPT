@@ -10,6 +10,9 @@
  */
 
 const { testConversationLog } = require('./conversationLogTest');
+const { testWeatherApi } = require('./weatherApiTest');
+const { testPluginSystem } = require('./pluginSystemTest');
+const { testConversationStorage } = require('./conversationStorageTest');
 const { OpenAI } = require('openai');
 const quakeLookup = require('../quakeLookup');
 const { createLogger } = require('../logger');
@@ -428,10 +431,76 @@ async function runRateLimiterTests(baseUrl = 'http://localhost:3000') {
   }
 }
 
+/**
+ * Run weather API tests
+ * 
+ * Tests the weather API integration and response handling
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runWeatherApiTests() {
+  try {
+    logger.info('Running weather API tests');
+    const results = await testWeatherApi();
+    return results;
+  } catch (error) {
+    logger.error({ error }, 'Error running weather API tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run plugin system tests
+ * 
+ * Tests the plugin system functionality including loading, validation, and execution
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runPluginSystemTests() {
+  try {
+    logger.info('Running plugin system tests');
+    const results = await testPluginSystem();
+    return results;
+  } catch (error) {
+    logger.error({ error }, 'Error running plugin system tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run conversation storage tests
+ * 
+ * Tests the persistent conversation storage functionality
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runConversationStorageTests() {
+  try {
+    logger.info('Running conversation storage tests');
+    const results = await testConversationStorage();
+    return results;
+  } catch (error) {
+    logger.error({ error }, 'Error running conversation storage tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   runConversationLogTests,
   runOpenAITests,
   runQuakeTests,
   runCorsTests,
-  runRateLimiterTests
+  runRateLimiterTests,
+  runWeatherApiTests,
+  runPluginSystemTests,
+  runConversationStorageTests
 };

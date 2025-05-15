@@ -39,7 +39,6 @@
 const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
-const { updatePluginStats, trackPluginFunctionCall, trackError } = require('./healthCheck');
 
 // Create a logger for the plugin manager
 const logger = createLogger('plugins');
@@ -52,15 +51,40 @@ const plugins = {
   metadata: {}
 };
 
+// Forward declarations to avoid circular dependency
+let healthCheckModule = null;
+
+/**
+ * Safely access health check functions to avoid circular dependency issues
+ * @param {string} functionName - The name of the function to call
+ * @param {...any} args - Arguments to pass to the function
+ * @returns {any} - Result of the function call or undefined if function doesn't exist
+ */
+function safeHealthCheck(functionName, ...args) {
+  if (!healthCheckModule) {
+    try {
+      // Lazy load the health check module only when needed
+      healthCheckModule = require('./healthCheck');
+    } catch (error) {
+      logger.warn({ error: error.message }, 'Failed to load healthCheck module');
+      return undefined;
+    }
+  }
+
+  if (typeof healthCheckModule[functionName] === 'function') {
+    try {
+      return healthCheckModule[functionName](...args);
+    } catch (error) {
+      logger.warn({ error: error.message, function: functionName }, 'Error calling healthCheck function');
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Register a plugin with the plugin manager
  * 
- * @param {Object} plugin - The plugin object to register
- * @returns {boolean} True if registration was successful, false otherwise
- */
-/**
- * Register a plugin with the plugin manager.
- *
  * @param {Plugin} plugin - The plugin object to register
  * @returns {boolean} True if registration was successful, false otherwise
  */
@@ -68,13 +92,20 @@ function registerPlugin(plugin) {
   try {
     // Validate plugin structure
     if (!plugin || !plugin.id || !plugin.name || !plugin.version) {
-      logger.error({ plugin, pluginId: plugin?.id || 'unknown', pluginVersion: plugin?.version || 'unknown' }, 'Invalid plugin structure');
+      logger.error({ 
+        plugin, 
+        pluginId: plugin?.id || 'unknown', 
+        pluginVersion: plugin?.version || 'unknown' 
+      }, 'Invalid plugin structure');
       return false;
     }
 
     // Check if plugin is already registered
     if (plugins.metadata[plugin.id]) {
-      logger.warn({ pluginId: plugin.id, pluginVersion: plugin.version }, 'Plugin already registered');
+      logger.warn({ 
+        pluginId: plugin.id, 
+        pluginVersion: plugin.version 
+      }, 'Plugin already registered');
       return false;
     }
 
@@ -163,7 +194,7 @@ function registerPlugin(plugin) {
     return true;
   } catch (error) {
     logger.error({ 
-      error, 
+      error,
       pluginId: plugin?.id || 'unknown',
       pluginVersion: plugin?.version || plugins.metadata?.[plugin?.id]?.version || 'unknown',
       context: 'registerPlugin',
@@ -178,13 +209,14 @@ function registerPlugin(plugin) {
  * 
  * @returns {Promise<number>} The number of successfully loaded plugins
  */
-/**
- * Load all plugins from the plugins directory and register them.
- *
- * @returns {Promise<number>} The number of successfully loaded plugins
- */
 async function loadPlugins() {
   try {
+    let loadedCount = 0;
+    let commandCount = 0;
+    let functionCount = 0;
+    let hookCount = 0;
+    
+    // Get plugins directory path
     const pluginsDir = path.join(__dirname, 'plugins');
     
     // Create plugins directory if it doesn't exist
@@ -198,18 +230,13 @@ async function loadPlugins() {
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name);
     
-    let loadedCount = 0;
-    let commandCount = 0;
-    let functionCount = 0;
-    let hookCount = 0;
-    
     // Load each plugin
     for (const folder of pluginFolders) {
       try {
-        const pluginPath = path.join(pluginsDir, folder);
-        const mainFile = path.join(pluginPath, 'index.js');
+        const folderPath = path.join(pluginsDir, folder);
         
-        // Skip if main file doesn't exist
+        // Check for main plugin file
+        const mainFile = path.join(folderPath, 'index.js');
         if (!fs.existsSync(mainFile)) {
           logger.warn({ folder }, 'Plugin main file not found');
           continue;
@@ -246,7 +273,7 @@ async function loadPlugins() {
     }
     
     // Update plugin statistics
-    await updatePluginStats({
+    safeHealthCheck('updatePluginStats', {
       loaded: loadedCount,
       commands: commandCount,
       functions: functionCount,
@@ -262,7 +289,7 @@ async function loadPlugins() {
     
     return loadedCount;
   } catch (error) {
-    logger.error({ error, context: 'loadPlugins' }, 'Error loading plugins');
+    logger.error({ error }, 'Error loading plugins');
     return 0;
   }
 }
@@ -273,12 +300,6 @@ async function loadPlugins() {
  * @param {string} commandName - The name of the command to get
  * @returns {Object|null} The command object or null if not found
  */
-/**
- * Get a registered command by name.
- *
- * @param {string} commandName - The name of the command to get
- * @returns {PluginCommand|null} The command object or null if not found
- */
 function getCommand(commandName) {
   return plugins.commands[commandName] || null;
 }
@@ -288,13 +309,8 @@ function getCommand(commandName) {
  * 
  * @returns {Object} An object containing all registered commands
  */
-/**
- * Get all registered commands.
- *
- * @returns {Object.<string, PluginCommand>} An object containing all registered commands
- */
 function getAllCommands() {
-  return { ...plugins.commands };
+  return plugins.commands;
 }
 
 /**
@@ -302,18 +318,13 @@ function getAllCommands() {
  * 
  * @param {string} functionName - The name of the function to execute
  * @param {...any} args - Arguments to pass to the function
- * @returns {Promise<Object>} Standardized result: { success, data, error, pluginId, functionName }
- * Always returns an object. Never throws.
- */
-/**
- * Standardized error handling: always returns an object:
- *   { success: true, data, pluginId, functionName } on success
- *   { success: false, error, pluginId, functionName } on error
- * Never throws. Errors are always logged with stack trace and context.
+ * @returns {Promise<Object>} An object containing the result of the function execution
  */
 async function executeFunction(functionName, ...args) {
-  let func;
+  let func = null;
+  
   try {
+    // Get the function
     func = plugins.functions[functionName];
     if (!func) {
       throw new Error(`Plugin function '${functionName}' not found`);
@@ -321,8 +332,9 @@ async function executeFunction(functionName, ...args) {
     
     // Execute the function
     const result = await func.execute(...args);
-    // Track the function call
-    await trackPluginFunctionCall(
+    
+    // Track the function call in the function results system
+    safeHealthCheck('trackPluginFunctionCall', 
       func.pluginId,
       functionName,
       { args: args.map(arg => String(arg).substring(0, 100)) }, // Truncate args for storage
@@ -333,27 +345,27 @@ async function executeFunction(functionName, ...args) {
   } catch (error) {
     // Track the error with more granular information
     if (func && func.pluginId) {
-      trackError('plugins', func.pluginId, `function:${functionName}`);
+      safeHealthCheck('trackError', 'plugins', func.pluginId, `function:${functionName}`);
     } else {
-      trackError('plugins', null, `function:${functionName}`);
+      safeHealthCheck('trackError', 'plugins', null, `function:${functionName}`);
     }
     
     // Get plugin details for better error context
     const pluginDetails = func?.pluginId ? plugins.metadata[func.pluginId] || {} : {};
-    // Log the error with enhanced context
+    
+    // Log detailed error information
     logger.error({
       message: error.message,
       stack: error.stack,
       functionName,
       pluginId: func?.pluginId,
-      pluginName: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.name || 'unknown') : 'unknown',
-      pluginVersion: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.version || 'unknown') : 'unknown',
-      pluginAuthor: func?.pluginId ? (plugins.metadata?.[func.pluginId]?.author || 'unknown') : 'unknown',
+      pluginName: pluginDetails.name,
+      pluginVersion: pluginDetails.version,
+      context: 'executeFunction',
       args: args.map(arg => {
-        // Sanitize arguments for logging
-        if (arg === null || arg === undefined) return String(arg);
+        if (arg === null) return 'null';
+        if (arg === undefined) return 'undefined';
         if (typeof arg === 'object') {
-          // Create a safe representation of objects for logging
           try {
             // Extract only key names without values for sensitive objects
             return `Object with keys: [${Object.keys(arg).join(', ')}]`;
@@ -367,9 +379,10 @@ async function executeFunction(functionName, ...args) {
       errorType: error.name || 'Error',
       errorCode: error.code || 'UNKNOWN'
     }, 'Error executing plugin function');
+    
     // Track the function call with error
     if (func && func.pluginId) {
-      await trackPluginFunctionCall(
+      safeHealthCheck('trackPluginFunctionCall',
         func.pluginId,
         functionName,
         { args: args.map(arg => String(arg).substring(0, 100)) }, // Truncate args for storage
@@ -382,18 +395,11 @@ async function executeFunction(functionName, ...args) {
 }
 
 /**
- * Execute a hook for all plugins that implement it
+ * Execute a hook from plugins
  * 
  * @param {string} hookName - The name of the hook to execute
  * @param {...any} args - Arguments to pass to the hook
- * @returns {Promise<Array<Object>>} Array of standardized results: { success, data, error, pluginId, hookName } for each handler
- * Always returns array of objects. Never throws.
- */
-/**
- * Standardized error handling: always returns array of objects:
- *   { success: true, data, pluginId, hookName } on success
- *   { success: false, error, pluginId, hookName } on error
- * Never throws. Errors are always logged with stack trace and context.
+ * @returns {Promise<Array<Object>>} An array of objects containing the results of the hook executions
  */
 async function executeHook(hookName, ...args) {
   const results = [];
@@ -405,11 +411,21 @@ async function executeHook(hookName, ...args) {
     // Execute each hook handler
     for (const handler of hookHandlers) {
       try {
+        // Skip disabled plugins
+        const pluginMetadata = plugins.metadata[handler.pluginId];
+        if (pluginMetadata && !pluginMetadata.enabled) {
+          logger.debug({ 
+            pluginId: handler.pluginId, 
+            hookName 
+          }, 'Skipping hook for disabled plugin');
+          continue;
+        }
+        
         // Execute the hook
         const result = await handler.execute(...args);
 
         // Track the hook execution
-        await trackPluginFunctionCall(
+        safeHealthCheck('trackPluginFunctionCall',
           handler.pluginId,
           `hook:${hookName}`,
           { args: args.map(arg => String(arg).substring(0, 100)) },
@@ -423,27 +439,25 @@ async function executeHook(hookName, ...args) {
           hookName
         });
       } catch (error) {
-        // Track the error with more granular information
-        trackError('plugins', handler.pluginId, `hook:${hookName}`);
+        // Track the error with the plugin ID and hook name
+        safeHealthCheck('trackError', 'plugins', handler.pluginId, hookName);
         
         // Get plugin details for better error context
         const pluginDetails = plugins.metadata[handler.pluginId] || {};
-        const hookType = hookName.includes(':') ? hookName.split(':')[0] : 'general';
         
-        // Log the error with enhanced context
+        // Log detailed error information
         logger.error({
           message: error.message,
           stack: error.stack,
           hookName,
           pluginId: handler.pluginId,
-          pluginName: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.name || 'unknown') : 'unknown',
-          pluginVersion: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.version || 'unknown') : 'unknown',
-          pluginAuthor: handler.pluginId ? (plugins.metadata?.[handler.pluginId]?.author || 'unknown') : 'unknown',
+          pluginName: pluginDetails.name,
+          pluginVersion: pluginDetails.version,
+          context: 'executeHook',
           args: args.map(arg => {
-            // Sanitize arguments for logging
-            if (arg === null || arg === undefined) return String(arg);
+            if (arg === null) return 'null';
+            if (arg === undefined) return 'undefined';
             if (typeof arg === 'object') {
-              // Create a safe representation of objects for logging
               try {
                 // Extract only key names without values for sensitive objects
                 return `Object with keys: [${Object.keys(arg).join(', ')}]`;
@@ -460,7 +474,7 @@ async function executeHook(hookName, ...args) {
         }, 'Error executing plugin hook');
 
         // Track the hook execution with error
-        await trackPluginFunctionCall(
+        safeHealthCheck('trackPluginFunctionCall',
           handler.pluginId,
           `hook:${hookName}`,
           { args: args.map(arg => String(arg).substring(0, 100)) },
@@ -478,7 +492,7 @@ async function executeHook(hookName, ...args) {
     return results;
   } catch (error) {
     // Track the error with the general 'plugins' category
-    trackError('plugins', null, `hook:${hookName}`);
+    safeHealthCheck('trackError', 'plugins', null, `hook:${hookName}`);
     
     // Get hook type for better categorization
     const hookType = hookName.includes(':') ? hookName.split(':')[0] : 'general';
@@ -489,12 +503,11 @@ async function executeHook(hookName, ...args) {
       stack: error.stack,
       hookName,
       context: 'executeHook',
-      // No specific pluginId available here
+      hookType,
       args: args.map(arg => {
-        // Sanitize arguments for logging
-        if (arg === null || arg === undefined) return String(arg);
+        if (arg === null) return 'null';
+        if (arg === undefined) return 'undefined';
         if (typeof arg === 'object') {
-          // Create a safe representation of objects for logging
           try {
             // Extract only key names without values for sensitive objects
             return `Object with keys: [${Object.keys(arg).join(', ')}]`;
@@ -507,10 +520,7 @@ async function executeHook(hookName, ...args) {
       timestamp: new Date().toISOString(),
       errorType: error.name || 'Error',
       errorCode: error.code || 'UNKNOWN',
-      hookType,
-      registeredHooks: Object.keys(plugins.hooks).length,
-      availablePlugins: Object.keys(plugins.metadata).length,
-      // Include registered hook handlers for this hook
+      // Include information about registered handlers to help debug
       registeredHandlersCount: hookHandlers ? hookHandlers.length : 0,
       // Include registered plugin IDs for this hook to help identify potential culprits
       registeredPluginsForHook: hookHandlers ? hookHandlers.map(h => h.pluginId) : []
@@ -525,13 +535,8 @@ async function executeHook(hookName, ...args) {
  * 
  * @returns {Object} An object containing metadata for all plugins
  */
-/**
- * Get metadata for all registered plugins.
- *
- * @returns {Object.<string, Object>} An object containing metadata for all plugins
- */
 function getPluginMetadata() {
-  return { ...plugins.metadata };
+  return plugins.metadata;
 }
 
 /**
@@ -540,14 +545,9 @@ function getPluginMetadata() {
  * @param {string} pluginId - The ID of the plugin to disable
  * @returns {boolean} True if the plugin was disabled, false otherwise
  */
-/**
- * Disable a plugin by ID.
- *
- * @param {string} pluginId - The ID of the plugin to disable
- * @returns {boolean} True if the plugin was disabled, false otherwise
- */
 function disablePlugin(pluginId) {
   if (!plugins.metadata[pluginId]) {
+    logger.warn({ pluginId }, 'Plugin not found');
     return false;
   }
   
@@ -562,14 +562,9 @@ function disablePlugin(pluginId) {
  * @param {string} pluginId - The ID of the plugin to enable
  * @returns {boolean} True if the plugin was enabled, false otherwise
  */
-/**
- * Enable a plugin by ID.
- *
- * @param {string} pluginId - The ID of the plugin to enable
- * @returns {boolean} True if the plugin was enabled, false otherwise
- */
 function enablePlugin(pluginId) {
   if (!plugins.metadata[pluginId]) {
+    logger.warn({ pluginId }, 'Plugin not found');
     return false;
   }
   
