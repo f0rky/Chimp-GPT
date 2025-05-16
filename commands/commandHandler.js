@@ -310,15 +310,21 @@ async function handleSlashCommand(interaction, config) {
  * @returns {Promise<boolean>} Whether a command was executed
  */
 async function handleCommand(message, config) {
+  // Define command variable outside try block so it's accessible in catch
+  let command;
+  let commandName;
+  let args;
+  
   try {
     // Parse the command from the message
     const parsedCommand = parseCommand(message.content);
     if (!parsedCommand) return false;
     
-    const { commandName, args } = parsedCommand;
+    commandName = parsedCommand.commandName;
+    args = parsedCommand.args;
     
     // Check if the command exists
-    const command = commands.get(commandName);
+    command = commands.get(commandName);
     if (!command) return false;
     
     // Check if the command is allowed in DMs
@@ -373,8 +379,7 @@ async function handleCommand(message, config) {
     // Check if command exists before accessing its properties
     const isPluginCommand = command && !!command.pluginId;
     logger.error({
-      error: error.message,
-      stack: error.stack,
+      error,
       commandName,
       args,
       userId: message.author.id,

@@ -30,7 +30,7 @@ const { logger, discord: discordLogger, openai: openaiLogger } = require('./logg
 const config = require('./configValidator');
 
 // Import rate limiter
-const { checkUserRateLimit } = require('./rateLimiter');
+const { checkUserRateLimit, checkImageGenerationRateLimit, constants: { IMAGE_GEN_POINTS } } = require('./rateLimiter');
 
 // Import health check system
 const { 
@@ -687,39 +687,61 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     (await feedbackMessage.channel.messages.fetch(feedbackMessage.reference.messageId)).author.id : 
     'unknown';
   
-  // Define rate limit costs for different function calls
+  // Define rate limit costs for different function calls - reduced to be more permissive
   const functionCosts = {
     lookupTime: 1,
-    lookupWeather: 2,
-    lookupExtendedForecast: 3,
-    getWolframShortAnswer: 3,
-    quakeLookup: 2,
-    generateImage: 3, // Higher cost for image generation
+    lookupWeather: 1,
+    lookupExtendedForecast: 2,
+    getWolframShortAnswer: 2,
+    quakeLookup: 1,
+    generateImage: 1, // Image generation has its own specialized rate limiter
     getVersion: 0.5 // Very low cost for version queries
   };
   
-  // Apply stricter rate limits for API-intensive functions
-  const cost = functionCosts[gptResponse.functionName] || 1;
-  const rateLimitResult = await checkUserRateLimit(userId, cost, {
-    // Allow more API-intensive requests with shorter duration
-    points: 15,
-    duration: 60 * 3 // 3 minutes
-  });
-  
-  // If user is rate limited for this function, inform them
-  if (rateLimitResult.limited) {
-    discordLogger.info({
-      userId,
-      functionName: gptResponse.functionName,
-      secondsBeforeNext: rateLimitResult.secondsBeforeNext
-    }, 'User rate limited for function call');
+  // Special handling for image generation with dedicated rate limiter
+  if (gptResponse.functionName === 'generateImage') {
+    // Use the specialized image generation rate limiter (3 per minute)
+    const imageRateLimitResult = await checkImageGenerationRateLimit(userId);
     
-    // Track rate limit in health check system
-    trackRateLimit(userId);
+    if (imageRateLimitResult.limited) {
+      discordLogger.info({
+        userId,
+        functionName: gptResponse.functionName,
+        secondsBeforeNext: imageRateLimitResult.secondsBeforeNext
+      }, 'User rate limited for image generation');
+      
+      // Track rate limit in health check system
+      trackRateLimit(userId);
+      
+      await feedbackMessage.edit(`⏱️ You can only generate ${IMAGE_GEN_POINTS} images per minute. Please wait ${imageRateLimitResult.secondsBeforeNext} seconds before generating another image.`);
+      return;
+    }
+  } else {
+    // Apply general rate limits for other functions
+    const cost = functionCosts[gptResponse.functionName] || 1;
+    const rateLimitResult = await checkUserRateLimit(userId, cost, {
+      // More permissive rate limits for general API usage
+      points: 30,
+      duration: 60 // 1 minute
+    });
     
-    await feedbackMessage.edit(`⏱️ Rate limit reached for this function. Please wait ${Math.ceil(rateLimitResult.secondsBeforeNext / 60)} minute(s) before trying again.`);
-    return;
+    // If user is rate limited for this function, inform them
+    if (rateLimitResult.limited) {
+      discordLogger.info({
+        userId,
+        functionName: gptResponse.functionName,
+        secondsBeforeNext: rateLimitResult.secondsBeforeNext
+      }, 'User rate limited for function call');
+      
+      // Track rate limit in health check system
+      trackRateLimit(userId);
+      
+      await feedbackMessage.edit(`⏱️ Rate limit reached. Please wait ${rateLimitResult.secondsBeforeNext} seconds before trying again.`);
+      return;
+    }
   }
+  
+  // Rate limiting is now handled in the conditional blocks above
 
   let functionResult;
   switch (gptResponse.functionName) {

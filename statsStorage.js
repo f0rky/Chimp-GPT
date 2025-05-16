@@ -139,7 +139,29 @@ async function loadStats() {
     }
     
     const data = await fs.promises.readFile(STATS_FILE, 'utf8');
-    const stats = JSON.parse(data);
+    
+    // Validate JSON before parsing
+    let stats;
+    try {
+      stats = JSON.parse(data);
+    } catch (parseError) {
+      logger.error({ error: parseError }, 'JSON parse error in stats file');
+      
+      // Try to recover from corruption by loading the backup
+      if (fs.existsSync(STATS_FILE + '.bak')) {
+        logger.info('Attempting to recover stats from backup file');
+        const backupData = await fs.promises.readFile(STATS_FILE + '.bak', 'utf8');
+        stats = JSON.parse(backupData);
+        
+        // If successful, restore the backup as the main file
+        await fs.promises.copyFile(STATS_FILE + '.bak', STATS_FILE);
+        logger.info('Successfully recovered stats from backup');
+      } else {
+        // If no backup exists or backup is also corrupted, use default stats
+        logger.warn('No valid backup found, using default stats');
+        return { ...DEFAULT_STATS };
+      }
+    }
     
     // Convert users array back to a Set
     if (stats.rateLimits && Array.isArray(stats.rateLimits.users)) {
@@ -149,6 +171,8 @@ async function loadStats() {
     return stats;
   } catch (error) {
     logger.error({ error }, 'Failed to load stats');
+    
+    // Return default stats on error
     return { ...DEFAULT_STATS };
   }
 }

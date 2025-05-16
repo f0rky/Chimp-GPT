@@ -38,10 +38,16 @@ const logger = createLogger('ratelimit');
  * @constant {number} DEFAULT_POINTS - Number of requests allowed in the time period
  * @constant {number} DEFAULT_DURATION - Time period in seconds
  * @constant {number} COOLDOWN_TIME - Cooldown time in seconds after hitting limit
+ * @constant {number} IMAGE_GEN_POINTS - Number of image generations allowed per minute
+ * @constant {number} IMAGE_GEN_DURATION - Time period for image generation limit in seconds
  */
-const DEFAULT_POINTS = 200;      // Number of requests allowed
-const DEFAULT_DURATION = 30;   // Time period in seconds
-const COOLDOWN_TIME = 2;      // Cooldown time in seconds after hitting limit
+const DEFAULT_POINTS = 300;      // Number of requests allowed
+const DEFAULT_DURATION = 60;   // Time period in seconds (1 minute)
+const COOLDOWN_TIME = 1;      // Cooldown time in seconds after hitting limit
+
+// Specific rate limit for image generation
+const IMAGE_GEN_POINTS = 3;    // Allow 3 image generations
+const IMAGE_GEN_DURATION = 60; // Per minute
 
 /**
  * Map to store rate limiters for each user
@@ -138,12 +144,36 @@ function createRateLimiter(options = {}) {
 }
 
 /**
+ * Check if a user has exceeded their image generation rate limit.
+ *
+ * Specialized function for checking image generation rate limits (3 per minute).
+ *
+ * @param {string} userId - Discord user ID
+ * @returns {Promise<RateLimitResult>} Result object with rate limit information
+ */
+async function checkImageGenerationRateLimit(userId) {
+  return checkUserRateLimit(userId, 1, {
+    points: IMAGE_GEN_POINTS,
+    duration: IMAGE_GEN_DURATION
+  });
+}
+
+/**
  * Rate Limiter API exports.
  *
  * @type {RateLimiterAPI}
  */
 module.exports = {
   checkUserRateLimit,
+  checkImageGenerationRateLimit,
   createRateLimiter,
-  getUserLimiter
+  getUserLimiter,
+  // Export constants for use in other modules
+  constants: {
+    DEFAULT_POINTS,
+    DEFAULT_DURATION,
+    COOLDOWN_TIME,
+    IMAGE_GEN_POINTS,
+    IMAGE_GEN_DURATION
+  }
 };

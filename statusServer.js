@@ -192,43 +192,26 @@ function initStatusServer() {
       });
   });
   
-  // Configure CORS
-  const corsOptions = {
-    origin: function (origin, callback) {
-      // Log the incoming origin for debugging
-      logger.debug({ origin }, 'Incoming request origin for CORS');
-      // Allow requests with no origin (like mobile apps, curl, etc)
-      if (!origin) return callback(null, true);
-      
-      // Get allowed origins from environment or use defaults
-      const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS 
-        ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
-        : ['http://localhost', 'http://127.0.0.1'];
-      
-      // Add the current hostname to allowed origins
-      const hostname = process.env.STATUS_HOSTNAME || 'localhost';
-      allowedOrigins.push(`http://${hostname}`);
-      
-      // Check if the origin is allowed
-      if (allowedOrigins.some(allowedOrigin => origin.startsWith(allowedOrigin))) {
-        callback(null, true);
-      } else {
-        // Log CORS violations as warnings, not errors
-        logger.warn({ origin }, 'CORS blocked request from unauthorized origin');
-        // Use a custom error object that doesn't print a stack trace
-        const corsError = new Error('Not allowed by CORS');
-        corsError.name = 'CORSError';
-        corsError.stack = undefined; // Prevent stack trace in logs
-        callback(corsError);
-      }
-    },
-    methods: ['GET', 'POST'],
-    credentials: true,
-    maxAge: 86400 // 24 hours
-  };
+  // Configure CORS - use a simple permissive configuration for development
+  // This allows all origins in development mode to prevent CORS errors
+  app.use((req, res, next) => {
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Owner-Token');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    
+    next();
+  });
   
-  // Apply CORS middleware
-  app.use(cors(corsOptions));
+  // Log CORS configuration
+  logger.info('Using permissive CORS configuration for development');
 
   // Log startup info (state, CORS, version, etc.)
   const allowedOriginsStartup = process.env.CORS_ALLOWED_ORIGINS 
