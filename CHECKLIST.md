@@ -4,6 +4,22 @@
 
 ## ⚠️ Issues/Items to Fix (from Code Review)
 
+- [ ] **GPT Image-1 integration fixes:**
+
+  - [x] Fix URL extraction from GPT Image-1 API response to handle different response formats
+  - [x] Add better error handling and logging for image generation
+  - [x] Update status display to show meaningful actions instead of "to username"
+  - [ ] Complete migration from DALL-E to GPT Image-1 in all references
+  - [ ] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
+
+- [ ] **Enhanced status updates:**
+
+  - [ ] Add progress indicators for long-running operations (counters, elapsed time)
+  - [ ] Update loading icon/message for delayed responses
+  - [ ] Implement contextual status updates that change every 5 seconds for long API calls
+  - [ ] Respect global rate limiter for status updates
+  - [ ] Add more detailed context to status messages for ongoing operations
+
 - [x] **Granular plugin error logging:** Enhanced error logging in pluginManager.js to include detailed context such as plugin name, version, author, argument details (sanitized), timestamp, error type/code, and hook type for easier debugging.
 - [x] **Circuit breaker/retry for external APIs:** (OpenAI API calls now use retry and circuit breaker logic) No evidence of a true circuit breaker or retry/backoff logic for OpenAI, weather, or Quake integrations. Add robust retry/circuit breaker patterns to handle flaky APIs.
   - [x] **Human-in-the-loop circuit breaker:** Implemented comprehensive human approval system that integrates with the existing circuit breaker. Added ability to request owner approval for sensitive operations with detailed notifications and slash commands for approving/denying requests.

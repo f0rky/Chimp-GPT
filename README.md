@@ -27,6 +27,15 @@ ChimpGPT supports multiple run modes via command-line arguments:
 
 Additional options include component-specific startup (bot-only, status-only), debug logging, and quiet mode. See [Run Modes](#run-modes) for more details.
 
+### Enhanced Status Updates
+
+ChimpGPT features a dynamic status system that provides real-time feedback on bot activities:
+
+- **Contextual Status**: Bot status updates based on current activities and conversations
+- **Progressive Updates**: Status changes to reflect ongoing operations and their progress
+- **Rate-Limited Updates**: Optimized update frequency to avoid Discord API rate limits
+- **Owner Privileges**: Special rate limit exemptions for bot owners
+
 ### Error Resilience for External APIs
 
 All external API calls are now protected by a retry mechanism with exponential backoff and a circuit breaker pattern:
@@ -46,7 +55,7 @@ When a circuit breaker opens, it blocks further calls for the specified timeout 
 - **Quake Live Server Stats**: View real-time Quake Live server stats with compact, configurable display.
   - Emoji toggles and ELO display modes are fully configurable via environment variables.
   - Supports compact formatting to fit Discord's character limits and improved team/spectator presentation.
-- **Image Generation**: Use DALL-E (2 & 3) to generate images directly from Discord, with a gallery view on the status page.
+- **Image Generation**: Use GPT Image-1 to generate high-quality images directly from Discord, with a gallery view on the status page.
   - Gallery includes modal viewer, prompt context, keyboard/mouse/touch navigation, and robust error handling.
 - **Wolfram Alpha Integration**: Ask factual or computational questions.
 - **Status Page**: Real-time dashboard with stats, error logs, and an image gallery for generated images.

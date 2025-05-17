@@ -327,7 +327,7 @@ function getConversationStatus(username, phase = 'initial', summary = null) {
     case 'initial':
       return {
         type: ActivityType.Listening,
-        name: `to ${username}`,
+        name: `${username}'s request`,
       };
     case 'summary':
       if (summary) {

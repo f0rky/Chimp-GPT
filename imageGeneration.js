@@ -1,9 +1,7 @@
 /**
  * @typedef {Object} ImageGenerationOptions
- * @property {string} [model] - The model to use (dall-e-2 or dall-e-3)
- * @property {string} [size] - Image size
- * @property {string} [quality] - Image quality
- * @property {number} [n] - Number of images to generate (DALL-E 2 only)
+ * @property {string} [model] - The model to use (gpt-image-1)
+ * @property {string} [size] - Image size (1024x1024, 1792x1024, or 1024x1792)
  * @property {boolean} [enhance] - Whether to enhance the prompt using GPT
  *
  * @typedef {Object} ImageResult
@@ -20,13 +18,13 @@
  */
 /**
  * Image Generation Module for ChimpGPT
- * 
- * This module provides image generation capabilities using OpenAI's DALL-E model.
+ *
+ * This module provides image generation capabilities using OpenAI's GPT Image-1 model.
  * It allows the bot to generate images based on text prompts and send them to Discord.
- * 
+ *
  * @module ImageGeneration
  * @author Brett
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 const { OpenAI } = require('openai');
@@ -37,7 +35,7 @@ const functionResults = require('./functionResults');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**
@@ -45,8 +43,7 @@ const openai = new OpenAI({
  * @enum {string}
  */
 const MODELS = {
-  DALLE_2: 'dall-e-2',
-  DALLE_3: 'dall-e-3'
+  GPT_IMAGE_1: 'gpt-image-1',
 };
 
 /**
@@ -54,9 +51,10 @@ const MODELS = {
  * @enum {string}
  */
 const SIZES = {
-  LARGE: '1024x1024',    // Square - Both models
-  WIDE: '1792x1024',     // Landscape - DALL-E 3 only
-  TALL: '1024x1792'      // Portrait - DALL-E 3 only
+  // GPT Image-1 supported sizes (based on API error message)
+  SQUARE: '1024x1024', // Square - GPT Image-1
+  LANDSCAPE: '1792x1024', // Landscape - GPT Image-1
+  PORTRAIT: '1024x1792', // Portrait - GPT Image-1
 };
 
 /**
@@ -65,11 +63,10 @@ const SIZES = {
  */
 const QUALITY = {
   STANDARD: 'standard',
-  HD: 'hd'  // DALL-E 3 only
 };
 
 /**
- * Generate an image using DALL-E.
+ * Generate an image using GPT Image-1.
  *
  * Standardized error handling: always returns either an ImageResult or ImageErrorResult.
  * Errors are always logged with stack trace and context.
@@ -80,103 +77,146 @@ const QUALITY = {
  */
 async function generateImage(prompt, options = {}) {
   try {
-    // Default to DALL-E 3 with standard quality and large size
-    const model = options.model || MODELS.DALLE_3;
-    let size = options.size || SIZES.LARGE;
-    let quality = options.quality || QUALITY.STANDARD;
-    const n = model === MODELS.DALLE_2 ? (options.n || 1) : 1; // DALL-E 3 only supports n=1
-    
-    logger.info({
-      prompt,
-      model,
-      size,
-      quality,
-      n
-    }, 'Generating image with DALL-E');
-    
+    // Default to GPT Image-1 with medium size for cost effectiveness
+    const model = options.model || MODELS.GPT_IMAGE_1;
+    // Set default size to square if not specified
+    let size = options.size || SIZES.SQUARE;
+
+    logger.info(
+      {
+        prompt,
+        model,
+        size,
+      },
+      'Generating image with GPT Image-1'
+    );
+
     // Validate the model and size combination
-    if (model === MODELS.DALLE_2 && (size === SIZES.WIDE || size === SIZES.TALL)) {
-      logger.warn('DALL-E 2 does not support wide or tall sizes, falling back to large');
-      size = SIZES.LARGE;
+    // Validate that we're using a supported size
+    if (![SIZES.SQUARE, SIZES.LANDSCAPE, SIZES.PORTRAIT].includes(size)) {
+      logger.warn(`GPT Image-1 does not support ${size} size, falling back to square`);
+      size = SIZES.SQUARE;
     }
-    
-    // Ensure we're using a supported size
-    if (![SIZES.LARGE, SIZES.WIDE, SIZES.TALL].includes(size)) {
-      logger.warn(`Unsupported size: ${size}, falling back to large`);
-      size = SIZES.LARGE;
-    }
-    
-    // Validate the model and quality combination
-    if (model === MODELS.DALLE_2 && quality === QUALITY.HD) {
-      logger.warn('DALL-E 2 does not support HD quality, falling back to standard');
-      quality = QUALITY.STANDARD;
-    }
-    
-    // Generate the image
-    const response = await openai.images.generate({
-      model,
+
+    // No quality validation needed for GPT Image-1
+
+    // Generate the image with GPT Image-1
+    const imageParams = {
+      model: MODELS.GPT_IMAGE_1,
       prompt,
-      n,
       size,
-      quality,
-      response_format: 'url'
-    });
-    
+    };
+
+    logger.info({ imageParams }, 'Generating image with GPT Image-1');
+    const response = await openai.images.generate(imageParams);
+
     // Track the API call
-    trackApiCall('dalle');
-    
-    logger.info({
-      imageCount: response.data.length
-    }, 'Successfully generated images');
-    
+    trackApiCall('gptimage');
+
+    // Log the response structure to understand the format
+    logger.debug(
+      {
+        responseStructure: JSON.stringify(response),
+      },
+      'GPT Image-1 response structure'
+    );
+
+    logger.info(
+      {
+        imageCount: response.data.length,
+      },
+      'Successfully generated images'
+    );
+
+    // Calculate approximate cost based on size
+    let estimatedCost = 0;
+    // Approximate costs for GPT Image-1 (these are estimates and may need adjustment)
+    if (size === SIZES.SQUARE) estimatedCost = 0.01;
+    else if (size === SIZES.LANDSCAPE || size === SIZES.PORTRAIT) estimatedCost = 0.015;
+
+    // Extract the image URLs based on the response structure
+    // GPT Image-1 may have a different structure than DALL-E
+    let images = [];
+
+    try {
+      // Handle different possible response formats
+      if (response.data && Array.isArray(response.data)) {
+        images = response.data.map(img => ({
+          url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
+          revisedPrompt: img.revised_prompt || prompt,
+        }));
+      } else if (response.data && response.data.url) {
+        // Single image response format
+        images = [
+          {
+            url: response.data.url,
+            revisedPrompt: response.data.revised_prompt || prompt,
+          },
+        ];
+      }
+
+      // Log the extracted URLs
+      logger.debug(
+        {
+          extractedUrls: images.map(img => (img.url ? 'URL present' : 'URL missing')),
+        },
+        'Extracted image URLs'
+      );
+    } catch (error) {
+      logger.error({ error, response }, 'Error extracting image URLs');
+      throw new Error('Failed to extract image URL from response');
+    }
+
     // Store the function result for the status page
     const result = {
       success: true,
-      images: response.data.map(img => ({
-        url: img.url,
-        revisedPrompt: img.revised_prompt || prompt
-      }))
+      images: images,
+      estimatedCost: estimatedCost,
     };
-    
+
     // Store the result in the function results storage
-    functionResults.storeResult('dalle', {
-      prompt,
-      model,
-      size,
-      quality,
-      enhance: options.enhance || false
-    }, result);
-    
+    functionResults.storeResult(
+      'gptimage',
+      {
+        prompt,
+        model,
+        size,
+        enhance: options.enhance || false,
+      },
+      result
+    );
+
     return {
       success: true,
-      images: response.data.map(img => ({
-        url: img.url,
-        revisedPrompt: img.revised_prompt || prompt
-      }))
+      images: images,
+      estimatedCost: estimatedCost,
     };
   } catch (error) {
-    logger.error({ error, prompt }, 'Error generating image with DALL-E');
-    trackError('dalle');
-    
+    logger.error({ error, prompt }, 'Error generating image with GPT Image-1');
+    trackError('gptimage');
+
     // Store the error result in the function results storage
     const errorResult = {
       success: false,
       error: error.message,
-      prompt
-    };
-    
-    functionResults.storeResult('dalle', {
       prompt,
-      model: options.model || MODELS.DALLE_3,
-      size: options.size || SIZES.LARGE,
-      quality: options.quality || QUALITY.STANDARD,
-      enhance: options.enhance || false
-    }, errorResult);
-    
+    };
+
+    functionResults.storeResult(
+      'gptimage',
+      {
+        prompt,
+        model: options.model || MODELS.GPT_IMAGE_1,
+        size: options.size || SIZES.SQUARE,
+        enhance: options.enhance || false,
+      },
+      errorResult
+    );
+
     return {
       success: false,
       error: error.message,
-      prompt
+      prompt,
     };
   }
 }
@@ -192,40 +232,44 @@ async function generateImage(prompt, options = {}) {
 async function enhanceImagePrompt(basicPrompt) {
   try {
     logger.info({ basicPrompt }, 'Enhancing image prompt');
-    
+
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'o4-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are an expert at creating detailed, vivid prompts for DALL-E image generation. ' +
-                   'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
-                   'and other elements that will result in a high-quality, visually appealing image. ' +
-                   'Do not include any text that would violate content policies (no violence, adult content, etc.).'
+          content:
+            'You are an expert at creating detailed, vivid prompts for GPT Image-1 image generation. ' +
+            'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
+            'and other elements that will result in a high-quality, visually appealing image. ' +
+            'Do not include any text that would violate content policies (no violence, adult content, etc.).',
         },
         {
           role: 'user',
-          content: `Please enhance this basic image prompt for DALL-E: "${basicPrompt}"`
-        }
+          content: `Please enhance this basic image prompt for GPT Image-1: "${basicPrompt}"`,
+        },
       ],
-      max_tokens: 300
+      max_tokens: 300,
     });
-    
+
     const enhancedPrompt = response.choices[0].message.content.trim();
-    
+
     // Track the API call
     trackApiCall('openai');
-    
-    logger.info({
-      basicPrompt,
-      enhancedPrompt
-    }, 'Successfully enhanced image prompt');
-    
+
+    logger.info(
+      {
+        basicPrompt,
+        enhancedPrompt,
+      },
+      'Successfully enhanced image prompt'
+    );
+
     return enhancedPrompt;
   } catch (error) {
     logger.error({ error, basicPrompt }, 'Error enhancing image prompt');
     trackError('openai');
-    
+
     // Fall back to the original prompt
     return basicPrompt;
   }
@@ -236,5 +280,5 @@ module.exports = {
   enhanceImagePrompt,
   MODELS,
   SIZES,
-  QUALITY
+  QUALITY,
 };
