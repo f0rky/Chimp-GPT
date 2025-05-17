@@ -13,6 +13,11 @@ const { testConversationLog } = require('./conversationLogTest');
 const { testWeatherApi } = require('./weatherApiTest');
 const { testPluginSystem } = require('./pluginSystemTest');
 const { testConversationStorage } = require('./conversationStorageTest');
+const testCircuitBreaker = require('./circuitBreakerTest');
+const { testConversationPersistence } = require('./conversationPersistenceTest');
+const { testImageGeneration } = require('./imageGenerationTest');
+const { testMessageHandler } = require('./messageHandlerTest');
+const { testRateLimiter } = require('./rateLimiterTest');
 const { OpenAI } = require('openai');
 const quakeLookup = require('../quakeLookup');
 const { createLogger } = require('../logger');
@@ -494,6 +499,126 @@ async function runConversationStorageTests() {
   }
 }
 
+/**
+ * Run circuit breaker tests
+ * 
+ * Tests the circuit breaker pattern implementation including retries, failures, and circuit opening/closing
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runCircuitBreakerTests() {
+  try {
+    logger.info('Running circuit breaker tests');
+    const results = await testCircuitBreaker();
+    return {
+      success: results.success,
+      details: results.results
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running circuit breaker tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run conversation persistence tests
+ * 
+ * Tests the conversation persistence functionality including saving, loading, pruning, and error recovery
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runConversationPersistenceTests() {
+  try {
+    logger.info('Running conversation persistence tests');
+    const results = await testConversationPersistence();
+    return {
+      success: results.success,
+      details: results.results
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running conversation persistence tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run image generation tests
+ * 
+ * Tests the image generation functionality including DALL-E integration, image downloads, and circuit breaker patterns
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runImageGenerationTests() {
+  try {
+    logger.info('Running image generation tests');
+    const results = await testImageGeneration();
+    return {
+      success: results.success,
+      details: results.results
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running image generation tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run message handler tests
+ * 
+ * Tests the message handling functionality including command parsing, message filtering, and error handling
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runMessageHandlerTests() {
+  try {
+    logger.info('Running message handler tests');
+    const results = await testMessageHandler();
+    return {
+      success: results.success,
+      details: results.results
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running message handler tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Run comprehensive rate limiter tests
+ * 
+ * Tests the rate limiter functionality including different configurations, multiple users, and specialized limiters
+ * 
+ * @returns {Promise<Object>} Test results
+ */
+async function runComprehensiveRateLimiterTests() {
+  try {
+    logger.info('Running comprehensive rate limiter tests');
+    const results = await testRateLimiter();
+    return {
+      success: results.success,
+      details: results.results
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running comprehensive rate limiter tests');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   runConversationLogTests,
   runOpenAITests,
@@ -502,5 +627,10 @@ module.exports = {
   runRateLimiterTests,
   runWeatherApiTests,
   runPluginSystemTests,
-  runConversationStorageTests
+  runConversationStorageTests,
+  runCircuitBreakerTests,
+  runConversationPersistenceTests,
+  runImageGenerationTests,
+  runMessageHandlerTests,
+  runComprehensiveRateLimiterTests
 };

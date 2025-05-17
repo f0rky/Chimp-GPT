@@ -12,6 +12,17 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const axios = require('axios');
 const { createLogger } = require('../../logger');
+const retryWithBreaker = require('../../utils/retryWithBreaker');
+
+// Circuit breaker configuration for dad jokes API
+const DAD_JOKES_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5,  // Open breaker after 5 consecutive failures
+  breakerTimeoutMs: 120000, // 2 minutes timeout
+  onBreakerOpen: (error) => {
+    logger.error({ error }, 'Dad jokes API circuit breaker opened');
+  }
+};
 
 // Create a logger for this plugin
 const logger = createLogger('dad-jokes-plugin');
@@ -37,12 +48,19 @@ const DAD_JOKE_TRIGGERS = [
  */
 async function getRandomDadJoke() {
   try {
-    const response = await axios.get('https://icanhazdadjoke.com/', {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'ChimpGPT Discord Bot (https://github.com/f0rky/Chimp-GPT)'
-      }
-    });
+    logger.debug('Using retryWithBreaker for dad joke API request');
+    const response = await retryWithBreaker(
+      async () => {
+        logger.debug('Making dad joke API request');
+        return await axios.get('https://icanhazdadjoke.com/', {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'ChimpGPT Discord Bot (https://github.com/f0rky/Chimp-GPT)'
+          }
+        });
+      },
+      DAD_JOKES_BREAKER_CONFIG
+    );
     
     if (response.data && response.data.joke) {
       return response.data.joke;
@@ -63,16 +81,23 @@ async function getRandomDadJoke() {
  */
 async function searchDadJokes(query) {
   try {
-    const response = await axios.get(`https://icanhazdadjoke.com/search`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'ChimpGPT Discord Bot (https://github.com/f0rky/Chimp-GPT)'
+    logger.debug('Using retryWithBreaker for dad joke search API request');
+    const response = await retryWithBreaker(
+      async () => {
+        logger.debug('Making dad joke search API request');
+        return await axios.get(`https://icanhazdadjoke.com/search`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'ChimpGPT Discord Bot (https://github.com/f0rky/Chimp-GPT)'
+          },
+          params: {
+            term: query,
+            limit: 5
+          }
+        });
       },
-      params: {
-        term: query,
-        limit: 5
-      }
-    });
+      DAD_JOKES_BREAKER_CONFIG
+    );
     
     if (response.data && response.data.results && response.data.results.length > 0) {
       return response.data.results.map(result => result.joke);

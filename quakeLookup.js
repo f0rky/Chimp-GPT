@@ -60,8 +60,25 @@
  */
 
 const axios = require('axios');
-const OpenAI = require('openai');
 const { quake: quakeLogger } = require('./logger');
+const { openai: openaiLogger } = require('./logger');
+const { Configuration, OpenAIApi } = require('openai');
+const functionResults = require('./functionResults');
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const breakerManager = require('./breakerManager');
+
+// Circuit breaker configuration for Quake API calls
+const QUAKE_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5,  // Open breaker after 5 consecutive failures
+  breakerTimeoutMs: 180000, // 3 minutes timeout
+  onBreakerOpen: (error) => {
+    quakeLogger.error({ error }, 'Quake API circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered('Quake API circuit breaker opened: ' + error.message);
+  }
+};
+
+const OpenAI = require('openai');
 const { validateServerInput, validateEloMode, sanitizeOutput } = require('./utils/inputValidator');
 
 /**
@@ -187,10 +204,18 @@ async function getQLStatsData(serverAddress) {
             return null;
         }
         
-        const response = await axios.get(`${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`, { 
-            timeout: 5000,
-            validateStatus: status => status < 500 // Accept all responses except server errors
-        });
+        // Use retryWithBreaker to handle retries and circuit breaking
+        quakeLogger.debug('Using retryWithBreaker for QLStats API request');
+        const response = await retryWithBreaker(
+            async () => {
+                quakeLogger.debug('Making QLStats API request');
+                return await axios.get(`${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`, { 
+                    timeout: 5000,
+                    validateStatus: status => status < 500 // Accept all responses except server errors
+                });
+            },
+            QUAKE_BREAKER_CONFIG
+        );
         
         // Log detailed response data for debugging
         quakeLogger.info({ 
@@ -698,10 +723,18 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
             quakeLogger.info({ eloMode: CONFIG.eloMode }, 'ELO mode set');
         }
         
-        const response = await axios.get(SERVERS_API_URL, {
-            params: DEFAULT_PARAMS,
-            timeout: 5000
-        });
+        // Use retryWithBreaker to handle retries and circuit breaking
+        quakeLogger.debug('Using retryWithBreaker for Quake servers API request');
+        const response = await retryWithBreaker(
+            async () => {
+                quakeLogger.debug('Making Quake servers API request');
+                return await axios.get(SERVERS_API_URL, {
+                    params: DEFAULT_PARAMS,
+                    timeout: 5000
+                });
+            },
+            QUAKE_BREAKER_CONFIG
+        );
 
         if (!response.data?.servers?.length) {
             return '# 🎯 Quake Live Server Status\n\n> 🚫 No active servers found.';

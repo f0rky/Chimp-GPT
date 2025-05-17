@@ -50,12 +50,6 @@ const SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const userConversations = new Map();
 
 /**
- * Timer for periodic saving of conversations
- * @type {NodeJS.Timeout|null}
- */
-let saveTimer = null;
-
-/**
  * Flag to track if conversations have been loaded from storage
  * @type {boolean}
  */
@@ -68,14 +62,17 @@ let conversationsLoaded = false;
 let conversationsDirty = false;
 
 /**
- * Manages the conversation context for a specific user.
- *
- * Maintains a conversation history for each user, adding new messages and ensuring the conversation doesn't exceed the maximum allowed length by removing oldest messages when necessary.
- *
- * @param {string} userId - The Discord user ID
- * @param {ConversationMessage|null} [newMessage=null] - New message to add to conversation, or null to just retrieve
- * @returns {ConversationLog} The updated conversation log for the user
+ * Timestamp of the last successful save
+ * @type {number|null}
  */
+let lastSaveTime = null;
+
+/**
+ * Timer for periodic saving of conversations
+ * @type {NodeJS.Timeout|null}
+ */
+let saveTimer = null;
+
 /**
  * Loads conversations from persistent storage.
  * This should be called when the bot starts up.
@@ -84,27 +81,43 @@ let conversationsDirty = false;
  */
 async function loadConversationsFromStorage() {
   try {
-    // Only load once
+    // Force reload if explicitly called
     if (conversationsLoaded) {
-      logger.debug('Conversations already loaded, skipping');
-      return true;
+      logger.debug('Conversations already loaded, but reloading on explicit call');
     }
     
     logger.info('Loading conversations from storage');
     const loadedConversations = await conversationStorage.loadConversations();
     
-    // Merge loaded conversations with in-memory ones
-    for (const [userId, conversation] of loadedConversations.entries()) {
-      if (!userConversations.has(userId)) {
-        userConversations.set(userId, conversation);
-      }
+    // Prune old conversations (default: keep conversations from last 7 days)
+    const MAX_CONVERSATION_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+    logger.info('Pruning old conversations');
+    const prunedConversations = await conversationStorage.pruneOldConversations(
+      loadedConversations,
+      MAX_CONVERSATION_AGE_MS
+    );
+    
+    // Log pruning results
+    logger.info({
+      originalCount: loadedConversations.size,
+      prunedCount: prunedConversations.size,
+      removedCount: loadedConversations.size - prunedConversations.size
+    }, 'Pruned old conversations');
+    
+    // Replace in-memory conversations with loaded ones
+    // First, clear existing conversations
+    userConversations.clear();
+    
+    // Then add all pruned conversations
+    for (const [userId, conversation] of prunedConversations.entries()) {
+      userConversations.set(userId, conversation);
     }
     
     conversationsLoaded = true;
-    conversationsDirty = false;
+    conversationsDirty = false; // We just loaded, so not dirty yet
     
     logger.info({ 
-      loadedCount: loadedConversations.size,
+      loadedCount: prunedConversations.size,
       totalCount: userConversations.size 
     }, 'Conversations loaded from storage');
     
@@ -134,6 +147,9 @@ async function saveConversationsToStorage(force = false) {
     await conversationStorage.saveConversations(userConversations);
     
     conversationsDirty = false;
+    lastSaveTime = Date.now();
+    
+    logger.debug({ lastSaveTime: new Date(lastSaveTime).toISOString() }, 'Updated last save timestamp');
     
     return true;
   } catch (error) {
@@ -248,6 +264,23 @@ function getActiveConversationCount() {
 }
 
 /**
+ * Gets the status of the conversation storage system.
+ *
+ * @returns {Object} Status object with information about the conversation storage
+ */
+function getConversationStorageStatus() {
+  return {
+    activeConversations: userConversations.size,
+    loaded: conversationsLoaded,
+    dirty: conversationsDirty,
+    saveIntervalMs: SAVE_INTERVAL_MS,
+    maxConversationLength: MAX_CONVERSATION_LENGTH,
+    lastSaved: lastSaveTime ? new Date(lastSaveTime).toISOString() : null,
+    storageFile: conversationStorage.getStorageFilePath()
+  };
+}
+
+/**
  * Conversation Manager API exports.
  *
  * @type {ConversationManagerAPI}
@@ -256,6 +289,7 @@ module.exports = {
   manageConversation,
   clearConversation,
   getActiveConversationCount,
+  getConversationStorageStatus,
   loadConversationsFromStorage,
   saveConversationsToStorage,
   startPeriodicSaving,

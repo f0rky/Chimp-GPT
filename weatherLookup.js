@@ -41,6 +41,19 @@
 const axios = require('axios');
 const { weather: weatherLogger } = require('./logger');
 const functionResults = require('./functionResults');
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const breakerManager = require('./breakerManager');
+
+// Circuit breaker configuration for weather API
+const WEATHER_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5,  // Open breaker after 5 consecutive failures
+  breakerTimeoutMs: 120000, // 2 minutes timeout
+  onBreakerOpen: (error) => {
+    weatherLogger.error({ error }, 'Weather API circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered('Weather API circuit breaker opened: ' + error.message);
+  }
+};
 
 // Mock weather data for fallback when API fails
 const mockWeatherData = {
@@ -111,18 +124,25 @@ async function lookupWeather(location) {
   }
 
   try {
-    weatherLogger.debug('Using direct axios request with verified format');
+    weatherLogger.debug('Using retryWithBreaker for weather API request');
 
     const apiKey = process.env.X_RAPIDAPI_KEY;
     const encodedLocation = encodeURIComponent(location);
     const url = `https://weatherapi-com.p.rapidapi.com/current.json?q=${encodedLocation}`;
 
-    const response = await axios.get(url, {
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com'
-      }
-    });
+    // Use retryWithBreaker to handle retries and circuit breaking
+    const response = await retryWithBreaker(
+      async () => {
+        weatherLogger.debug('Making weather API request');
+        return await axios.get(url, {
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com'
+          }
+        });
+      },
+      WEATHER_BREAKER_CONFIG
+    );
 
     if (response.status === 200 && response.data) {
       weatherLogger.info('Successfully retrieved weather data');
@@ -224,7 +244,7 @@ async function lookupExtendedForecast(location, days = 5) {
   // Use a direct axios request with explicit API key reference
   // This approach was verified to work in our direct API test
   try {
-    weatherLogger.debug('Using direct axios request for extended forecast');
+    weatherLogger.debug('Using retryWithBreaker for extended forecast request');
     
     // Get API key directly from environment
     const apiKey = process.env.X_RAPIDAPI_KEY;
@@ -234,13 +254,19 @@ async function lookupExtendedForecast(location, days = 5) {
     // Note: Since current.json doesn't support forecast, we'll use mock data for additional days
     const url = `https://weatherapi-com.p.rapidapi.com/current.json?q=${encodedLocation}`;
     
-    // Make the request with the exact header format that worked in our tests
-    const response = await axios.get(url, {
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com'
-      }
-    });
+    // Use retryWithBreaker to handle retries and circuit breaking
+    const response = await retryWithBreaker(
+      async () => {
+        weatherLogger.debug('Making extended forecast API request');
+        return await axios.get(url, {
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com'
+          }
+        });
+      },
+      WEATHER_BREAKER_CONFIG
+    );
     
     // Check for successful response
     if (response.status === 200 && response.data) {

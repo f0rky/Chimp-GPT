@@ -8,14 +8,19 @@
 - [x] **Circuit breaker/retry for external APIs:** (OpenAI API calls now use retry and circuit breaker logic) No evidence of a true circuit breaker or retry/backoff logic for OpenAI, weather, or Quake integrations. Add robust retry/circuit breaker patterns to handle flaky APIs.
     - [x] **Human-in-the-loop circuit breaker:** Implemented comprehensive human approval system that integrates with the existing circuit breaker. Added ability to request owner approval for sensitive operations with detailed notifications and slash commands for approving/denying requests.
     - [x] **Bot versioning and self-query:** Implemented comprehensive version system with self-query capabilities. Added version command, natural language version queries via @[@prompt], and integrated version info into the human circuit breaker system and status page.
-- [x] **Persistent conversation history:** Implemented persistent conversation storage with automatic loading on startup and saving on shutdown, plus periodic saving to prevent data loss.
+- [x] **Persistent conversation history:** Implemented persistent conversation storage with automatic loading on startup and saving on shutdown, plus periodic saving to prevent data loss. Added backup and recovery mechanisms for corrupted files, automatic pruning of old conversations, and status reporting.
     - [x] **System message preservation:** Ensure the system message (bot personality) is always preserved at index 0 (done).
-- [ ] **Test coverage:** Unit/integration tests are limited. Only conversation log, OpenAI, and Quake stats have basic tests. Add more comprehensive automated tests for all core features, especially weather API integration and plugin system.
-- [ ] **Prettier config/enforcement:** .eslintrc.js is present, but no Prettier config or Husky hooks found. Add Prettier config and enforce via Husky pre-commit hooks.
-- [ ] **Contributor documentation:** No dedicated contributor guide found. Add CONTRIBUTING.md with guidelines for new contributors.
-- [ ] **Plugin command name conflict validation:** No validation to prevent duplicate command names across plugins. Add validation during plugin registration.
-- [ ] **Plugin README improvement:** Document plugin mock fallback behavior and clarify available hooks in plugins/README.md.
-- [ ] **Advanced error handling:** No custom error classes for structured error handling. Consider adding for clarity and maintainability.
+- [x] **Test coverage:** Significantly improved test coverage by adding comprehensive tests for core features:
+    - [x] **Image generation tests:** Added tests for DALL-E integration, image downloads, and circuit breaker patterns
+    - [x] **Message handler tests:** Added tests for command parsing, message filtering, and error handling
+    - [x] **Rate limiter tests:** Added tests for different configurations, multiple users, and specialized limiters
+    - [x] **Conversation persistence tests:** Added tests for saving, loading, pruning, and error recovery
+    - [x] **Test runner:** Updated to include all new tests and ensure proper execution
+- [x] **Prettier config/enforcement:** Added Prettier configuration (.prettierrc), integrated with ESLint, and set up Husky pre-commit hooks with lint-staged to enforce code formatting standards.
+- [x] **Contributor documentation:** Added comprehensive CONTRIBUTING.md with guidelines for new contributors, including setup instructions, workflow, coding standards, and issue reporting.
+- [x] **Plugin command name conflict validation:** Added validation to prevent duplicate command names across plugins during registration, with conflict tracking and detailed logging.
+- [x] **Plugin README improvement:** Enhanced plugins/README.md with detailed hook documentation, fallback behavior explanation, and improved examples.
+- [x] **Advanced error handling:** Implemented comprehensive error handling system with custom error classes, utility functions, and detailed documentation.
 - [ ] **Security review:** Review OpenAI/Discord API usage for security best practices (e.g., input sanitization, rate limiting on commands, API key rotation).
 - [ ] **Docker/CI/CD:** No Dockerfile or GitHub Actions config found. Add for easier deployment and automated testing.
 - [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.

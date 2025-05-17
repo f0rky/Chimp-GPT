@@ -55,6 +55,9 @@ async function deploySlashCommands(config, guildIds = []) {
     // Array to store slash command data
     const slashCommands = [];
     
+    // Map to track command names for conflict detection
+    const commandNameMap = new Map();
+    
     // Load each command module
     for (const file of commandFiles) {
       try {
@@ -73,7 +76,23 @@ async function deploySlashCommands(config, guildIds = []) {
           continue;
         }
         
-        slashCommands.push(slashCommandData.toJSON());
+        // Check for command name conflicts
+        const commandJson = slashCommandData.toJSON();
+        const commandName = commandJson.name;
+        
+        if (commandNameMap.has(commandName)) {
+          const existingSource = commandNameMap.get(commandName);
+          logger.warn({ 
+            commandName, 
+            file,
+            existingSource
+          }, `Slash command name conflict: '${commandName}' already registered by ${existingSource}`);
+          continue; // Skip this command due to conflict
+        }
+        
+        // No conflict, add to the list
+        commandNameMap.set(commandName, `core command (${file})`);
+        slashCommands.push(commandJson);
         logger.info({ commandName: command.name }, 'Loaded core slash command');
       } catch (error) {
         logger.error({ error, file }, 'Error loading command file');
@@ -90,7 +109,26 @@ async function deploySlashCommands(config, guildIds = []) {
           continue;
         }
         
-        slashCommands.push(command.slashCommand.toJSON());
+        // Check for command name conflicts
+        const commandJson = command.slashCommand.toJSON();
+        const commandName = commandJson.name;
+        
+        if (commandNameMap.has(commandName)) {
+          const existingSource = commandNameMap.get(commandName);
+          logger.warn({ 
+            commandName, 
+            pluginId: command.pluginId,
+            existingSource
+          }, `Slash command name conflict: '${commandName}' from plugin '${command.pluginId}' conflicts with ${existingSource}`);
+          
+          // Track the conflict in plugin metadata
+          pluginManager.trackPluginConflict(command.pluginId, 'slashCommand', commandName, existingSource);
+          continue; // Skip this command due to conflict
+        }
+        
+        // No conflict, add to the list
+        commandNameMap.set(commandName, `plugin '${command.pluginId}'`);
+        slashCommands.push(commandJson);
         logger.info({ 
           commandName: command.name,
           pluginId: command.pluginId 

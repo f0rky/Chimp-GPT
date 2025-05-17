@@ -64,11 +64,12 @@ const cors = require('cors');
 const { createLogger } = require('./logger');
 const logger = createLogger('status');
 const os = require('os');
+const fs = require('fs');
 const { getDetailedVersionInfo, formatUptime } = require('./getBotVersion');
 const breakerManager = require('./breakerManager');
-
-// Import configuration
+const { getConversationStorageStatus } = require('./conversationManager');
 const config = require('./configValidator');
+const packageJson = require('./package.json');
 
 // Import stats storage
 const statsStorage = require('./statsStorage');
@@ -281,6 +282,32 @@ function initStatusServer() {
   });
   
   /**
+   * GET /conversations/status
+   * Returns detailed information about the conversation storage system.
+   *
+   * @route GET /conversations/status
+   * @returns {Object} Detailed conversation storage status
+   */
+  app.get('/conversations/status', (req, res) => {
+    logger.info('Getting conversation storage status');
+    
+    try {
+      const status = getConversationStorageStatus();
+      res.json({
+        success: true,
+        ...status,
+        lastChecked: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error getting conversation storage status');
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
    * GET /health
    * Detailed health check endpoint.
    *
@@ -363,12 +390,18 @@ function initStatusServer() {
         status: discordStatus,
         guilds: discordGuilds,
         channels: discordChannels
+      },
+      conversations: {
+        ...getConversationStorageStatus(),
+        lastChecked: new Date().toISOString()
       }
     };
 
     res.json(health);
   });
   
+
+
   /**
    * GET /version
    * Returns detailed version information about the bot.

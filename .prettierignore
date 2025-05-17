@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+package-lock.json
+
+# Build artifacts
+dist
+build
+coverage
+
+# Logs
+logs
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Data files
+data/
+*.json
+
+# Archive
+archive/

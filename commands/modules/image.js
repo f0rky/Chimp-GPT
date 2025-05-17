@@ -15,6 +15,19 @@ const { generateImage, enhanceImagePrompt, MODELS, SIZES, QUALITY } = require('.
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:image');
 const axios = require('axios');
+const retryWithBreaker = require('../../utils/retryWithBreaker');
+const breakerManager = require('../../breakerManager');
+
+// Circuit breaker configuration for image downloads
+const IMAGE_DOWNLOAD_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5,  // Open breaker after 5 consecutive failures
+  breakerTimeoutMs: 120000, // 2 minutes timeout
+  onBreakerOpen: (error) => {
+    logger.error({ error }, 'Image download circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered('Image download circuit breaker opened: ' + error.message);
+  }
+};
 
 module.exports = {
   name: 'image',
@@ -131,8 +144,15 @@ module.exports = {
       const imageUrl = result.images[0].url;
       const revisedPrompt = result.images[0].revisedPrompt || finalPrompt;
       
-      // Download the image
-      const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+      // Download the image using retryWithBreaker for better reliability
+      logger.debug('Using retryWithBreaker for image download');
+      const response = await retryWithBreaker(
+        async () => {
+          logger.debug(`Downloading image from ${imageUrl}`);
+          return await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        },
+        IMAGE_DOWNLOAD_BREAKER_CONFIG
+      );
       const buffer = Buffer.from(response.data, 'binary');
       
       // Create attachment

@@ -5,10 +5,19 @@
   "main": "chimpGPT.js",
   "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/testRunner.js",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prestart": "echo 'Starting the app...'",
-    "start": "nodemon chimpGPT.js"
+    "start": "nodemon chimpGPT.js",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   },
   "repository": {
     "type": "git",
@@ -43,10 +52,15 @@
     "openai": "^4.77.0",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
-    "rate-limiter-flexible": "^6.2.1"
+    "rate-limiter-flexible": "^6.2.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "eslint": "^8.46.0",
-    "nodemon": "^3.0.1"
+    "eslint-config-prettier": "^10.1.5",
+    "husky": "^8.0.0",
+    "lint-staged": "^16.0.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.5.3"
   }
 }

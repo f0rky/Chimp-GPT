@@ -1,7 +1,7 @@
 
 # Chimp-GPT Discord Bot
 
-**Bot Version:** 1.0.0 <!-- BOT_VERSION -->
+**Bot Version:** 3.2.0 <!-- BOT_VERSION -->
 
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
@@ -9,7 +9,15 @@ Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It suppo
 
 ### Error Resilience for External APIs
 
-OpenAI API calls are now protected by a retry mechanism with exponential backoff (up to 3 attempts) and a circuit breaker. If 5 consecutive failures occur, the circuit breaker will block further calls for 2 minutes and log the outage. This improves reliability and prevents API abuse during outages.
+All external API calls are now protected by a retry mechanism with exponential backoff and a circuit breaker pattern:
+
+- **OpenAI API**: Up to 3 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Weather API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Quake Server Stats API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (3-minute timeout)
+- **Dad Jokes API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Image Download**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+
+When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and avoids API abuse during outages.
 
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
@@ -24,6 +32,10 @@ OpenAI API calls are now protected by a retry mechanism with exponential backoff
 - **Wolfram Alpha Integration**: Ask factual or computational questions.
 - **Status Page**: Real-time dashboard with stats, error logs, and an image gallery for generated images.
 - **Comprehensive Error Handling & Logging**: All error handling and logging are now standardized across all major modules using Pino-based loggers. This ensures detailed, structured logs for easier debugging, monitoring, and reliability.
+- **Persistent Conversation History**: Conversations are now saved to disk and loaded when the bot restarts, ensuring continuity across restarts.
+  - Automatic pruning of old conversations to manage storage efficiently
+  - Backup and recovery mechanisms for corrupted conversation files
+  - Status reporting via the health endpoint for monitoring
 - **Slash Commands**: Full support for Discord slash commands, including plugin-provided commands.
 
 ## Plugin System
@@ -171,7 +183,7 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIS
     # Using PM2 (recommended)
     pm2 start chimpGPT.js --name chimpGPT --env development
     # Or for production
-    pm2 start chimpGPT.js --name chimpGPT --env production
+    pm2 start chimpGPT.js --name [bot name] --env production
     ```
 
 6. **Access the Status Page**:
@@ -228,10 +240,10 @@ MIT
     ```bash
     # Using PM2 (recommended for all deployments)
     # For development environment
-    pm2 start combined.js --name chimpGPT --env development
+    pm2 start combined.js --name [bot name] --env development
     
     # For production environment
-    pm2 start combined.js --name chimpGPT --env production
+    pm2 start combined.js --name [bot name] --env production
     
     # Or use the ecosystem.config.js file
     pm2 start ecosystem.config.js

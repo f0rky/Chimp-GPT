@@ -129,14 +129,35 @@ function registerPlugin(plugin) {
     if (plugin.commands && Array.isArray(plugin.commands)) {
       plugin.commands.forEach(command => {
         if (command && command.name && typeof command.execute === 'function') {
-          plugins.commands[command.name] = {
-            ...command,
-            pluginId: plugin.id
-          };
-          logger.debug({ 
-            pluginId: plugin.id, 
-            commandName: command.name 
-          }, 'Registered command');
+          // Check for command name conflicts
+          if (plugins.commands[command.name]) {
+            const existingPluginId = plugins.commands[command.name].pluginId;
+            logger.warn({ 
+              pluginId: plugin.id, 
+              commandName: command.name,
+              existingPluginId
+            }, `Command name conflict: '${command.name}' already registered by plugin '${existingPluginId}'`);
+            
+            // Track the conflict in plugin metadata
+            if (!plugins.metadata[plugin.id].conflicts) {
+              plugins.metadata[plugin.id].conflicts = [];
+            }
+            plugins.metadata[plugin.id].conflicts.push({
+              type: 'command',
+              name: command.name,
+              conflictingPluginId: existingPluginId
+            });
+          } else {
+            // No conflict, register the command
+            plugins.commands[command.name] = {
+              ...command,
+              pluginId: plugin.id
+            };
+            logger.debug({ 
+              pluginId: plugin.id, 
+              commandName: command.name 
+            }, 'Registered command');
+          }
         } else {
           logger.warn({ 
             pluginId: plugin.id, 
@@ -573,14 +594,110 @@ function enablePlugin(pluginId) {
   return true;
 }
 
+/**
+ * Track a plugin conflict in the plugin metadata
+ * 
+ * @param {string} pluginId - ID of the plugin with the conflict
+ * @param {string} conflictType - Type of conflict (command, slashCommand, function, hook)
+ * @param {string} itemName - Name of the conflicting item
+ * @param {string} existingSource - Source of the existing item causing the conflict
+ */
+function trackPluginConflict(pluginId, conflictType, itemName, existingSource) {
+  // Make sure the plugin exists
+  if (!plugins.metadata[pluginId]) {
+    logger.warn({ pluginId }, 'Cannot track conflict for unknown plugin');
+    return;
+  }
+  
+  // Initialize conflicts array if it doesn't exist
+  if (!plugins.metadata[pluginId].conflicts) {
+    plugins.metadata[pluginId].conflicts = [];
+  }
+  
+  // Add the conflict to the plugin metadata
+  plugins.metadata[pluginId].conflicts.push({
+    type: conflictType,
+    name: itemName,
+    existingSource: existingSource,
+    timestamp: new Date().toISOString()
+  });
+  
+  logger.debug({ 
+    pluginId, 
+    conflictType, 
+    itemName, 
+    existingSource 
+  }, 'Tracked plugin conflict');
+}
+
+/**
+ * Get a command from a specific plugin
+ * 
+ * @param {string} pluginId - ID of the plugin
+ * @param {string} commandName - Name of the command
+ * @returns {Object|null} The command object or null if not found
+ */
+function getPluginCommand(pluginId, commandName) {
+  // Check if the command exists
+  const command = plugins.commands[commandName];
+  
+  // Check if the command belongs to the specified plugin
+  if (command && command.pluginId === pluginId) {
+    return command;
+  }
+  
+  return null;
+}
+
+/**
+ * Get a function from a specific plugin
+ * 
+ * @param {string} pluginId - ID of the plugin
+ * @param {string} functionName - Name of the function
+ * @returns {Object|null} The function object or null if not found
+ */
+function getPluginFunction(pluginId, functionName) {
+  // Check if the function exists
+  const func = plugins.functions[functionName];
+  
+  // Check if the function belongs to the specified plugin
+  if (func && func.pluginId === pluginId) {
+    return func;
+  }
+  
+  return null;
+}
+
+/**
+ * Get a hook from a specific plugin
+ * 
+ * @param {string} pluginId - ID of the plugin
+ * @param {string} hookName - Name of the hook
+ * @returns {Object|null} The hook object or null if not found
+ */
+function getPluginHook(pluginId, hookName) {
+  // Check if the hook type exists
+  if (!plugins.hooks[hookName]) {
+    return null;
+  }
+  
+  // Find the hook for the specified plugin
+  const hook = plugins.hooks[hookName].find(h => h.pluginId === pluginId);
+  
+  return hook || null;
+}
+
 module.exports = {
-  registerPlugin,
   loadPlugins,
-  getCommand,
-  getAllCommands,
-  executeFunction,
+  registerPlugin,
   executeHook,
+  executeFunction,
+  getAllCommands,
   getPluginMetadata,
+  enablePlugin,
   disablePlugin,
-  enablePlugin
+  getPluginCommand,
+  getPluginFunction,
+  getPluginHook,
+  trackPluginConflict
 };
