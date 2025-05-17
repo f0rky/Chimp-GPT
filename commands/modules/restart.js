@@ -10,6 +10,8 @@ const config = require('../../configValidator');
 module.exports = {
   name: 'restart',
   description: 'Restart the bot (owner only)',
+  aliases: ['reboot', 'reset-bot'],
+  dmAllowed: true,
   ownerOnly: true,
   async execute(message) {
     if (message.author.id !== config.OWNER_ID) {
@@ -22,13 +24,13 @@ module.exports = {
     if (interaction.user.id !== config.OWNER_ID) {
       return interaction.reply({
         content: 'Sorry, only the bot owner can use this command.',
-        ephemeral: true
+        ephemeral: true,
       });
     }
     await interaction.reply({
       content: 'Restarting the bot...',
-      ephemeral: true
+      ephemeral: true,
     });
     process.exit(0); // Assumes process manager will restart the bot
-  }
+  },
 };

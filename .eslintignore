@@ -2,3 +2,7 @@ archive/
 # Ignore markdown files
 *.md
 docs/*.md
+
+# Ignore CSS files
+*.css
+public/*.css

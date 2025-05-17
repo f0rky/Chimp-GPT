@@ -53,12 +53,12 @@
  */
 /**
  * Health Check System for ChimpGPT
- * 
+ *
  * This module provides health monitoring capabilities including:
  * - HTTP endpoint for external monitoring tools
  * - Periodic status reports to the bot owner
  * - On-demand stats command via DM to the owner
- * 
+ *
  * @module HealthCheck
  * @author Brett
  * @version 1.0.0
@@ -77,7 +77,7 @@ const statsStorage = require('./statsStorage');
 
 /**
  * Statistics tracking object for monitoring bot health
- * 
+ *
  * @typedef {Object} StatsObject
  * @property {Date} startTime - When the bot was started
  * @property {number} messageCount - Number of messages processed
@@ -96,7 +96,7 @@ const stats = {
     wolfram: 0,
     quake: 0,
     dalle: 0,
-    plugins: {}
+    plugins: {},
   },
   errors: {
     openai: 0,
@@ -107,19 +107,19 @@ const stats = {
     quake: 0,
     dalle: 0,
     plugins: {},
-    other: 0
+    other: 0,
   },
   lastRestart: new Date(),
   rateLimits: {
     hit: 0,
-    users: new Set()
+    users: new Set(),
   },
   plugins: {
     loaded: 0,
     commands: 0,
     functions: 0,
-    hooks: 0
-  }
+    hooks: 0,
+  },
 };
 
 /**
@@ -133,24 +133,24 @@ const stats = {
 function initHealthCheck(client) {
   const app = express();
   const path = require('path');
-  
+
   // Serve static files from the public directory
   app.use(express.static(path.join(__dirname, 'public')));
-  
+
   // Basic info endpoint
   app.get('/api', (req, res) => {
-    res.json({ 
+    res.json({
       name: 'ChimpGPT',
       status: 'online',
-      version
+      version,
     });
   });
-  
+
   // Detailed health check endpoint
   app.get('/health', (req, res) => {
     const uptime = Math.floor((new Date() - stats.startTime) / 1000);
     const memoryUsage = process.memoryUsage();
-    
+
     const health = {
       status: 'ok',
       uptime: uptime,
@@ -158,7 +158,7 @@ function initHealthCheck(client) {
       memory: {
         rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
         heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`
+        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
       },
       system: {
         platform: process.platform,
@@ -166,7 +166,7 @@ function initHealthCheck(client) {
         cpus: os.cpus().length,
         loadAvg: os.loadavg(),
         freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
-        totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`
+        totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
       },
       stats: {
         messageCount: stats.messageCount,
@@ -174,73 +174,73 @@ function initHealthCheck(client) {
         errors: stats.errors,
         rateLimits: {
           count: stats.rateLimits.hit,
-          uniqueUsers: stats.rateLimits.users.size
-        }
+          uniqueUsers: stats.rateLimits.users.size,
+        },
       },
       discord: {
         ping: client.ws.ping,
         status: client.ws.status,
         guilds: client.guilds.cache.size,
-        channels: client.channels.cache.size
-      }
+        channels: client.channels.cache.size,
+      },
     };
-    
+
     // Check if any error counts are high
     const errorSum = Object.values(stats.errors).reduce((a, b) => a + b, 0);
     if (errorSum > 20 || stats.errors.openai > 10) {
       health.status = 'warning';
     }
-    
+
     res.json(health);
   });
-  
+
   // Add test endpoint
   app.get('/run-tests', async (req, res) => {
     logger.info('Running tests from web interface');
-    
+
     try {
       // Run conversation log tests
       const conversationLogResults = await runConversationLogTests();
-      
+
       // Run OpenAI integration tests
       const openaiResults = await runOpenAITests();
-      
+
       // Run Quake server stats tests
       const quakeResults = await runQuakeTests();
-      
+
       // Return all test results
       res.json({
         conversationLog: conversationLogResults,
         openaiIntegration: openaiResults,
-        quakeServerStats: quakeResults
+        quakeServerStats: quakeResults,
       });
     } catch (error) {
       logger.error({ error }, 'Error running tests');
       res.status(500).json({ error: 'Failed to run tests' });
     }
   });
-  
+
   // Start the server
   // Determine which port to use based on environment
   let port;
   const nodeEnv = process.env.NODE_ENV || 'development';
-  
+
   if (nodeEnv === 'production') {
     port = config.PROD_PORT || config.HEALTH_PORT || 3000;
   } else {
     port = config.DEV_PORT || config.HEALTH_PORT || 3001;
   }
-  
+
   app.listen(port, () => {
     logger.info(`Health check server running on port ${port} (${nodeEnv} mode)`);
     logger.info(`Status page available at http://localhost:${port}`);
   });
-  
+
   // Schedule periodic health reports to owner
   if (config.OWNER_ID) {
     scheduleHealthReports(client);
   }
-  
+
   return { app, stats };
 }
 
@@ -257,7 +257,7 @@ function initHealthCheck(client) {
 function scheduleHealthReports(client) {
   // Send a health report every 12 hours
   const REPORT_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  
+
   setInterval(async () => {
     try {
       const owner = await client.users.fetch(config.OWNER_ID);
@@ -270,7 +270,7 @@ function scheduleHealthReports(client) {
       logger.error({ error }, 'Failed to send health report to owner');
     }
   }, REPORT_INTERVAL);
-  
+
   // Also send a report on startup
   setTimeout(async () => {
     try {
@@ -302,37 +302,37 @@ function scheduleHealthReports(client) {
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
   const memoryUsage = process.memoryUsage();
-  
+
   let title = '📊 ChimpGPT Health Report';
   if (isStartup) {
     title = '🚀 ChimpGPT Started Successfully';
   }
-  
+
   const errorSum = Object.values(stats.errors).reduce((a, b) => a + b, 0);
   let statusEmoji = '✅';
   if (errorSum > 20 || stats.errors.openai > 10) {
     statusEmoji = '⚠️';
   }
-  
+
   // Format plugin API calls if any exist
-let pluginApiCallsText = '';
-if (Object.keys(stats.apiCalls.plugins).length > 0) {
-  pluginApiCallsText = '\n**Plugin API Calls:**\n';
-  for (const [pluginId, count] of Object.entries(stats.apiCalls.plugins)) {
-    pluginApiCallsText += `• ${pluginId}: ${count}\n`;
+  let pluginApiCallsText = '';
+  if (Object.keys(stats.apiCalls.plugins).length > 0) {
+    pluginApiCallsText = '\n**Plugin API Calls:**\n';
+    for (const [pluginId, count] of Object.entries(stats.apiCalls.plugins)) {
+      pluginApiCallsText += `• ${pluginId}: ${count}\n`;
+    }
   }
-}
 
-// Format plugin errors if any exist
-let pluginErrorsText = '';
-if (Object.keys(stats.errors.plugins).length > 0) {
-  pluginErrorsText = '\n**Plugin Errors:**\n';
-  for (const [pluginId, count] of Object.entries(stats.errors.plugins)) {
-    pluginErrorsText += `• ${pluginId}: ${count}\n`;
+  // Format plugin errors if any exist
+  let pluginErrorsText = '';
+  if (Object.keys(stats.errors.plugins).length > 0) {
+    pluginErrorsText = '\n**Plugin Errors:**\n';
+    for (const [pluginId, count] of Object.entries(stats.errors.plugins)) {
+      pluginErrorsText += `• ${pluginId}: ${count}\n`;
+    }
   }
-}
 
-const report = `
+  const report = `
 ${title}
 
 **Status:** ${statusEmoji} ${errorSum > 20 ? 'Warning' : 'Healthy'}
@@ -367,7 +367,7 @@ ${title}
 
 For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'
 `;
-  
+
   return report;
 }
 
@@ -380,16 +380,8 @@ For more details, use one of these commands: 'stats', '!stats', '.stats', or '/s
  * @returns {boolean} Whether the message is a stats command
  */
 function isStatsCommand(message) {
-  const statsCommands = [
-    '/stats', 
-    '!stats', 
-    '.stats',
-    'stats',
-    '/stat',
-    '!stat',
-    '.stat'
-  ];
-  
+  const statsCommands = ['/stats', '!stats', '.stats', 'stats', '/stat', '!stat', '.stat'];
+
   return statsCommands.includes(message.content.toLowerCase().trim());
 }
 
@@ -402,12 +394,15 @@ function isStatsCommand(message) {
  * @returns {Promise<void>} Resolves when the reply is sent
  */
 async function handleStatsCommand(message) {
-  logger.info({ 
-    userId: message.author.id, 
-    command: message.content,
-    isOwner: message.author.id === config.OWNER_ID
-  }, 'Stats command used');
-  
+  logger.info(
+    {
+      userId: message.author.id,
+      command: message.content,
+      isOwner: message.author.id === config.OWNER_ID,
+    },
+    'Stats command used'
+  );
+
   const report = generateHealthReport();
   await message.reply(report);
 }
@@ -427,13 +422,13 @@ function formatDuration(seconds) {
   seconds %= 3600;
   const minutes = Math.floor(seconds / 60);
   seconds %= 60;
-  
+
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
   if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-  
+
   return parts.join(' ');
 }
 
@@ -484,26 +479,26 @@ function trackError(type, pluginId, hookName) {
   if (pluginId) {
     // Track plugin error
     if (!stats.errors.plugins[pluginId]) {
-      stats.errors.plugins[pluginId] = { 
+      stats.errors.plugins[pluginId] = {
         count: 0,
-        hooks: {}
+        hooks: {},
       };
     }
-    
+
     // Increment the plugin error count
     stats.errors.plugins[pluginId].count++;
-    
+
     // Track specific hook errors if provided
     if (hookName) {
       if (!stats.errors.plugins[pluginId].hooks[hookName]) {
         stats.errors.plugins[pluginId].hooks[hookName] = 0;
       }
       stats.errors.plugins[pluginId].hooks[hookName]++;
-      
+
       // Store in persistent storage with hook information
       statsStorage.incrementStat(`errors.plugins.${pluginId}.hooks.${hookName}`);
     }
-    
+
     // Also store the overall plugin error count in persistent storage
     statsStorage.incrementStat(`errors.plugins.${pluginId}.count`);
   } else if (stats.errors[type] !== undefined) {
@@ -531,7 +526,9 @@ function trackRateLimit(userId) {
   stats.rateLimits.hit++;
   // Ensure users is always a Set
   if (!stats.rateLimits.users || typeof stats.rateLimits.users.add !== 'function') {
-    stats.rateLimits.users = new Set(stats.rateLimits.users ? Array.from(stats.rateLimits.users) : []);
+    stats.rateLimits.users = new Set(
+      stats.rateLimits.users ? Array.from(stats.rateLimits.users) : []
+    );
   }
   stats.rateLimits.users.add(userId);
   // Also store in persistent storage
@@ -562,19 +559,18 @@ function trackMessage() {
  */
 async function updatePluginStats(pluginStats) {
   if (!pluginStats) return;
-  
+
   stats.plugins.loaded = pluginStats.loaded || 0;
   stats.plugins.commands = pluginStats.commands || 0;
   stats.plugins.functions = pluginStats.functions || 0;
   stats.plugins.hooks = pluginStats.hooks || 0;
-  
+
   // Also store in persistent storage (asynchronously)
   await statsStorage.updateStat('plugins.loaded', stats.plugins.loaded);
   await statsStorage.updateStat('plugins.commands', stats.plugins.commands);
   await statsStorage.updateStat('plugins.functions', stats.plugins.functions);
   await statsStorage.updateStat('plugins.hooks', stats.plugins.hooks);
 }
-
 
 /**
  * Track a plugin function call.
@@ -591,13 +587,49 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
   try {
     // Track API call for this plugin
     trackApiCall('plugins', pluginId);
-    
+
     // Store in function results
     const functionResults = require('./functionResults');
-    return await functionResults.storeResult(`plugin.${pluginId}`, {
-      function: functionName,
-      ...params
-    }, result);
+    try {
+      return await functionResults.storeResult(
+        `plugin.${pluginId}`,
+        {
+          function: functionName,
+          ...params,
+        },
+        result
+      );
+    } catch (storeError) {
+      // Check if this is a JSON parsing error
+      if (storeError instanceof SyntaxError && storeError.message.includes('JSON')) {
+        logger.warn(
+          { error: storeError },
+          'JSON parsing error in function results, attempting repair'
+        );
+
+        // Attempt to repair the function results file
+        const repaired = await functionResults.repairResultsFile();
+
+        if (repaired) {
+          logger.info('Function results file repaired successfully, retrying store operation');
+          // Retry the store operation
+          return await functionResults.storeResult(
+            `plugin.${pluginId}`,
+            {
+              function: functionName,
+              ...params,
+            },
+            result
+          );
+        } else {
+          logger.error('Failed to repair function results file');
+          return false;
+        }
+      }
+
+      // Re-throw other errors
+      throw storeError;
+    }
   } catch (error) {
     logger.error({ error, pluginId, functionName }, 'Failed to track plugin function call');
     return false;
@@ -606,10 +638,10 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
 
 /**
  * Get the current health status of the bot
- * 
+ *
  * This function returns a simplified version of the health statistics
  * suitable for display in status reports and monitoring dashboards.
- * 
+ *
  * @returns {Object} Object containing key health metrics
  */
 function getHealthStatus() {
@@ -626,7 +658,7 @@ function getHealthStatus() {
     }, 0),
     rateLimits: stats.rateLimits.hit,
     lastRestart: stats.lastRestart,
-    startTime: stats.startTime
+    startTime: stats.startTime,
   };
 }
 
@@ -642,5 +674,5 @@ module.exports = {
   trackPluginFunctionCall,
   generateHealthReport,
   stats,
-  getHealthStatus
+  getHealthStatus,
 };

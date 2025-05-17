@@ -1,4 +1,3 @@
-// Version Plugin for Chimp-GPT: Owner-only diagnostics and version reporting
 const os = require('os');
 const { getBotVersion } = require('../../getBotVersion');
 const fs = require('fs');
@@ -41,7 +40,9 @@ module.exports = {
     {
       name: 'version',
       description: 'Show bot version and diagnostics (owner only)',
-      async execute(context, ...args) {
+      aliases: ['ver', 'v', 'about'],
+      dmAllowed: true,
+      async execute(context) {
         const { user, config } = context;
         if (!isOwner(user.id, config)) {
           return { content: 'This command is owner-only.' };
@@ -52,54 +53,26 @@ module.exports = {
         const env = process.env.NODE_ENV || 'development';
         const hostname = os.hostname();
         const statusUrl = `http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}`;
-        const loadedPlugins = Object.values(context.plugins?.metadata || {}).map(p => `${p.name}@${p.version}`).join(', ') || 'None';
+        const loadedPlugins =
+          Object.values(context.plugins?.metadata || {})
+            .map(p => `${p.name}@${p.version}`)
+            .join(', ') || 'None';
         const logs = getRecentLogs(logFilePath, 10);
         return {
           content:
             `**Chimp-GPT Version:** ${version}\n` +
             `**Uptime:** ${uptime}\n` +
             `**Environment:** ${env}\n` +
-            `**Host:** ${hostname}\n` +
+            `**Hostname:** ${hostname}\n` +
+            `**Memory:** RSS: ${Math.round(mem.rss / 1024 / 1024)}MB, Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB/${Math.round(mem.heapTotal / 1024 / 1024)}MB\n` +
             `**Status Page:** ${statusUrl}\n` +
-            `**Loaded Plugins:** ${loadedPlugins}\n` +
-            `**Memory Usage:** ${(mem.rss / 1024 / 1024).toFixed(1)} MB RSS\n` +
-            `**Recent Logs:**\n\`\`\`\n${logs}\n\`\`\``
-        };
-      }
-    }
-  ],
-  // Optionally add a slash command for Discord.js v14+
-  slashCommands: [
-    {
-      name: 'version',
-      description: 'Show bot version and diagnostics (owner only)',
-      async execute(interaction, context) {
-        const { user, config } = context;
-        if (!isOwner(user.id, config)) {
-          await interaction.reply({ content: 'This command is owner-only.', ephemeral: true });
-          return;
-        }
-        const version = getBotVersion();
-        const uptime = formatUptime(process.uptime());
-        const mem = process.memoryUsage();
-        const env = process.env.NODE_ENV || 'development';
-        const hostname = os.hostname();
-        const statusUrl = `http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}`;
-        const loadedPlugins = Object.values(context.plugins?.metadata || {}).map(p => `${p.name}@${p.version}`).join(', ') || 'None';
-        const logs = getRecentLogs(logFilePath, 10);
-        await interaction.reply({
-          content:
-            `**Chimp-GPT Version:** ${version}\n` +
-            `**Uptime:** ${uptime}\n` +
-            `**Environment:** ${env}\n` +
-            `**Host:** ${hostname}\n` +
-            `**Status Page:** ${statusUrl}\n` +
-            `**Loaded Plugins:** ${loadedPlugins}\n` +
-            `**Memory Usage:** ${(mem.rss / 1024 / 1024).toFixed(1)} MB RSS\n` +
+            `**Loaded Plugins:** ${loadedPlugins}\n\n` +
             `**Recent Logs:**\n\`\`\`\n${logs}\n\`\`\``,
-          ephemeral: true
-        });
-      }
-    }
-  ]
+        };
+      },
+    },
+  ],
+  hooks: {
+    // No hooks needed for this plugin
+  },
 };

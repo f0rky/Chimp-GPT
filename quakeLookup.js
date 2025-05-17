@@ -61,9 +61,63 @@
 
 const axios = require('axios');
 const { quake: quakeLogger } = require('./logger');
-// API key management will be implemented in future updates
 const retryWithBreaker = require('./utils/retryWithBreaker');
 const breakerManager = require('./breakerManager');
+const apiKeyManager = require('./utils/apiKeyManager');
+const OpenAI = require('openai');
+
+/**
+ * OpenAI client instance for AI-powered summaries
+ * @type {OpenAI}
+ */
+let openai = null;
+
+/**
+ * Initializes the OpenAI client if it hasn't been initialized yet.
+ * This ensures the client is ready before any API calls are made.
+ *
+ * @returns {OpenAI} The initialized OpenAI client
+ */
+function initializeOpenAI() {
+  if (openai !== null) {
+    return openai; // Return existing instance if already initialized
+  }
+
+  try {
+    // Try to get API key from secure manager
+    const apiKey = apiKeyManager.getApiKey('OPENAI_API_KEY');
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    quakeLogger.debug('OpenAI client initialized with API key from secure manager');
+  } catch (error) {
+    // Fallback to environment variable if API key manager fails
+    quakeLogger.warn(
+      { error: error.message },
+      'Failed to get API key from manager, falling back to environment variable'
+    );
+
+    if (!process.env.OPENAI_API_KEY) {
+      quakeLogger.error('OpenAI API key not available');
+      // Create a dummy client that will throw appropriate errors when used
+      openai = {
+        chat: {
+          completions: {
+            create: async () => {
+              throw new Error('OpenAI API key not available');
+            },
+          },
+        },
+      };
+    } else {
+      openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+    }
+  }
+
+  return openai;
+}
 
 // Circuit breaker configuration for Quake API calls
 const QUAKE_BREAKER_CONFIG = {
@@ -78,9 +132,64 @@ const QUAKE_BREAKER_CONFIG = {
   },
 };
 
-const OpenAI = require('openai');
+// Circuit breaker configuration for OpenAI API calls
+const OPENAI_BREAKER_CONFIG = {
+  maxRetries: 1,
+  breakerLimit: 3, // Open breaker after 3 consecutive failures
+  breakerTimeoutMs: 300000, // 5 minutes timeout
+  onBreakerOpen: error => {
+    quakeLogger.error({ error }, 'OpenAI API circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered(
+      'OpenAI API circuit breaker opened: ' + error.message
+    );
+  },
+};
+
 const { validateServerInput, validateEloMode, sanitizeOutput } = require('./utils/inputValidator');
 const { sanitizeQuery } = require('./utils/inputSanitizer');
+
+/**
+ * Validates server response data to ensure it's in a usable format.
+ *
+ * @param {*} response - The server response to validate
+ * @returns {Object} Validation result with isValid flag and error message if invalid
+ */
+function validateServerResponse(response) {
+  // Check for null or undefined
+  if (response === null || response === undefined) {
+    return { isValid: false, error: 'Server response is null or undefined' };
+  }
+
+  // Check if it's an object with data and servers properties
+  if (typeof response !== 'object') {
+    return { isValid: false, error: `Expected object, got ${typeof response}` };
+  }
+
+  // Check if data property exists
+  if (!response.data) {
+    return { isValid: false, error: 'Response missing data property' };
+  }
+
+  // Check if servers array exists
+  if (!Array.isArray(response.data.servers)) {
+    return { isValid: false, error: 'Response missing servers array' };
+  }
+
+  // Validate that each server has the expected structure
+  const invalidServers = response.data.servers.filter(server => {
+    return !server || typeof server !== 'object' || !server.info;
+  });
+
+  if (invalidServers.length > 0) {
+    return {
+      isValid: false,
+      error: `Found ${invalidServers.length} invalid server entries`,
+      invalidCount: invalidServers.length,
+    };
+  }
+
+  return { isValid: true };
+}
 
 /**
  * API endpoints and configuration constants
@@ -118,14 +227,6 @@ const CONFIG = {
   // Whether to show emojis in server stats output
   showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS === 'true',
 };
-
-/**
- * OpenAI client instance for AI-powered summaries
- * @type {OpenAI}
- */
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 /**
  * Calculate server uptime from level start time.
@@ -648,14 +749,79 @@ function formatServerResponse(serverStats, qlstatsData) {
  * @returns {AISummaryResult} AI-processed summary string
  */
 async function processServerStatsWithAI(serverResponses, allServerStats) {
+  // Initialize formattedResponses at the function scope so it's available in the catch block
+  let formattedResponses = [];
+
   try {
     // Check if serverResponses is valid
-    if (!serverResponses || !serverResponses.length || !serverResponses[0]?.formatted) {
+    if (!serverResponses || !serverResponses.length) {
+      quakeLogger.warn('Invalid server responses data - empty or null');
       throw new Error('Invalid server responses data');
     }
 
+    // Log the received data format for debugging
+    quakeLogger.debug(
+      {
+        responseType: typeof serverResponses[0],
+        isArray: Array.isArray(serverResponses),
+        hasFormatted: typeof serverResponses[0] === 'object' && 'formatted' in serverResponses[0],
+        firstItem: JSON.stringify(serverResponses[0]).substring(0, 100), // Log first 100 chars
+      },
+      'Server response format details'
+    );
+
+    // Handle different formats for serverResponses
+    if (typeof serverResponses[0] === 'string') {
+      // If we already have strings, use them directly
+      formattedResponses = serverResponses;
+      quakeLogger.debug('Using string format responses');
+    } else if (typeof serverResponses[0] === 'object') {
+      if (serverResponses[0]?.formatted) {
+        // If we have objects with formatted property, extract those
+        formattedResponses = serverResponses.map(response => response.formatted);
+        quakeLogger.debug('Extracted formatted strings from objects');
+      } else if (serverResponses[0]?.serverName) {
+        // If we have server objects directly, format them on the fly
+        formattedResponses = serverResponses.map(server => {
+          return (
+            '```\n' +
+            `Server: ${server.serverName}\n` +
+            `Map: ${server.currentMap || 'Unknown'}\n` +
+            `Players: ${server.playerCount || 0}\n` +
+            `Game Type: ${server.gameType || 'Unknown'}\n` +
+            '```'
+          );
+        });
+        quakeLogger.debug('Created formatted strings from server objects');
+      } else {
+        // Unknown object format
+        quakeLogger.error(
+          { sample: JSON.stringify(serverResponses[0]).substring(0, 200) },
+          'Unknown server response object format'
+        );
+        throw new Error('Invalid server responses format - unknown object structure');
+      }
+    } else {
+      // If we don't have strings or objects, error
+      quakeLogger.error(
+        { type: typeof serverResponses[0] },
+        'Invalid server responses format - neither string nor object'
+      );
+      throw new Error(`Invalid server responses format - received ${typeof serverResponses[0]}`);
+    }
+
+    // Verify we have valid formatted responses
+    if (!formattedResponses.length || !formattedResponses[0]) {
+      quakeLogger.error('Failed to extract formatted responses');
+      throw new Error('Failed to extract formatted responses');
+    }
+
     // Always include the first server's full details
-    const firstServerResponse = serverResponses[0].formatted;
+    const firstServerResponse = formattedResponses[0];
+    quakeLogger.debug(
+      { firstResponseLength: firstServerResponse.length },
+      'First server response extracted'
+    );
 
     // Create a summary of the remaining servers
     const remainingServers = allServerStats.slice(1);
@@ -683,21 +849,28 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
        * @param {Object} serverSummaries - Array of simplified server objects with name, map, players, etc.
        * @returns {string} A 3-4 sentence summary of all additional servers
        */
-      const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo', // Using GPT-3.5 for cost efficiency and adequate performance
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types.',
-          },
-          {
-            role: 'user',
-            content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
-          },
-        ],
-        max_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
-      });
+      // Ensure OpenAI client is initialized before making API call
+      const openaiClient = initializeOpenAI();
+
+      quakeLogger.debug('Using retryWithBreaker for OpenAI API request');
+      const aiResponse = await retryWithBreaker(async () => {
+        quakeLogger.debug('Making OpenAI API request for server summary');
+        return await openaiClient.chat.completions.create({
+          model: 'gpt-3.5-turbo', // Using GPT-3.5 for cost efficiency and adequate performance
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types.',
+            },
+            {
+              role: 'user',
+              content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
+            },
+          ],
+          max_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
+        });
+      }, OPENAI_BREAKER_CONFIG);
 
       // Extract the generated summary text from the API response
       const aiSummary = aiResponse.choices[0].message.content;
@@ -716,22 +889,41 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
       return firstServerResponse + '\n```\n\n**Additional Servers**\n' + manualSummary + '\n```';
     }
   } catch (error) {
-    quakeLogger.error({ error }, 'Error processing server stats with AI');
+    // Log the error with detailed context
+    quakeLogger.error(
+      {
+        error,
+        errorName: error.name,
+        errorMessage: error.message,
+        hasFormattedResponses: Boolean(formattedResponses && formattedResponses.length),
+        hasServerStats: Boolean(allServerStats && allServerStats.length),
+        serverResponsesType: typeof serverResponses,
+        serverStatsType: typeof allServerStats,
+      },
+      'Error processing server stats with AI'
+    );
+
     // Return a valid formatted response even if everything fails
-    if (serverResponses && serverResponses.length) {
-      return serverResponses.map(r => r.formatted || '').join('\n');
+    if (formattedResponses && formattedResponses.length) {
+      quakeLogger.info(
+        { count: formattedResponses.length },
+        'Falling back to available formatted responses'
+      );
+      return formattedResponses.join('\n');
     } else if (allServerStats && allServerStats.length) {
       // Create a basic formatted response from the first server stats
+      quakeLogger.info('Falling back to generating basic response from server stats');
       const firstServer = allServerStats[0];
       return (
         '```\n' +
-        `Server: ${firstServer.serverName}\n` +
-        `Map: ${firstServer.currentMap}\n` +
-        `Players: ${firstServer.playerCount}\n` +
-        `Game Type: ${firstServer.gameType}\n` +
+        `Server: ${firstServer.serverName || 'Unknown'}\n` +
+        `Map: ${firstServer.currentMap || 'Unknown'}\n` +
+        `Players: ${firstServer.playerCount || 0}\n` +
+        `Game Type: ${firstServer.gameType || 'Unknown'}\n` +
         '```'
       );
     } else {
+      quakeLogger.warn('No fallback data available, returning error message');
       return '```\n  ⚠️   Error processing server stats\n```';
     }
   }
@@ -796,6 +988,13 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
         timeout: 5000,
       });
     }, QUAKE_BREAKER_CONFIG);
+
+    // Validate the server response
+    const validationResult = validateServerResponse(response);
+    if (!validationResult.isValid) {
+      quakeLogger.error({ error: validationResult.error }, 'Invalid server response');
+      return `# 🎯 Quake Live Server Status\n\n> ⚠️ Error: ${validationResult.error}`;
+    }
 
     if (!response.data?.servers?.length) {
       return '# 🎯 Quake Live Server Status\n\n> 🚫 No active servers found.';
@@ -888,11 +1087,27 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
  * Test the OpenAI server summary functionality.
  *
  * Tests the AI summary generation for multiple servers without making actual API calls to Quake Live servers.
+ * Supports multiple test scenarios including different response formats and error conditions.
  *
- * @param {boolean} [mockOpenAIFailure=false] - If true, simulates an OpenAI API failure
+ * @param {Object} options - Test configuration options
+ * @param {boolean} [options.mockOpenAIFailure=false] - If true, simulates an OpenAI API failure
+ * @param {string} [options.responseFormat='object'] - Format of mock responses ('object', 'string', 'server', 'invalid')
+ * @param {boolean} [options.emptyResponse=false] - If true, tests with empty response data
+ * @param {boolean} [options.nullResponse=false] - If true, tests with null response data
  * @returns {Promise<string>} The generated summary or error message
  */
-async function testOpenAISummary(mockOpenAIFailure = false) {
+async function testOpenAISummary(options = {}) {
+  // Default options
+  const testOptions = {
+    mockOpenAIFailure: false,
+    responseFormat: 'object',
+    emptyResponse: false,
+    nullResponse: false,
+    ...options,
+  };
+
+  quakeLogger.info({ testOptions }, 'Starting OpenAI summary test');
+
   // Mock server data for testing
   const mockServerStats = [
     {
@@ -927,31 +1142,76 @@ async function testOpenAISummary(mockOpenAIFailure = false) {
     },
   ];
 
-  // Mock formatted responses
-  const mockResponses = [
-    { formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```' },
-  ];
+  // Create mock responses based on the specified format
+  let mockResponses;
+
+  if (testOptions.nullResponse) {
+    mockResponses = null;
+  } else if (testOptions.emptyResponse) {
+    mockResponses = [];
+  } else {
+    switch (testOptions.responseFormat) {
+      case 'string':
+        mockResponses = [
+          '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```',
+        ];
+        break;
+      case 'object':
+        mockResponses = [
+          {
+            formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```',
+          },
+        ];
+        break;
+      case 'server':
+        // Pass the server objects directly
+        mockResponses = [mockServerStats[0]];
+        break;
+      case 'invalid':
+        // Create an invalid format to test error handling
+        mockResponses = [{ invalid: 'format' }];
+        break;
+      default:
+        mockResponses = [
+          {
+            formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```',
+          },
+        ];
+    }
+  }
+
+  // Ensure OpenAI client is initialized
+  const openaiClient = initializeOpenAI();
 
   // If testing OpenAI failure, modify the openai object temporarily
-  const originalCreate = openai.chat.completions.create;
-  if (mockOpenAIFailure) {
-    openai.chat.completions.create = async () => {
+  const originalCreate = openaiClient.chat.completions.create;
+  if (testOptions.mockOpenAIFailure) {
+    openaiClient.chat.completions.create = async () => {
       throw new Error('Simulated OpenAI API failure');
     };
   }
 
   try {
     // Call the function with our mock data
+    quakeLogger.debug(
+      {
+        mockResponsesType: typeof mockResponses,
+        mockResponsesLength: mockResponses?.length,
+        firstItem: mockResponses?.[0] ? JSON.stringify(mockResponses[0]).substring(0, 100) : null,
+      },
+      'Test data details'
+    );
+
     const result = await processServerStatsWithAI(mockResponses, mockServerStats);
-    console.log('AI Summary Test Result:\n', result);
+    quakeLogger.info('AI Summary Test Result:\n' + result);
     return result;
   } catch (error) {
     quakeLogger.error({ error }, 'AI Summary Test Error');
     return `Error: ${error.message}`;
   } finally {
     // Restore original function if we mocked it
-    if (mockOpenAIFailure) {
-      openai.chat.completions.create = originalCreate;
+    if (testOptions.mockOpenAIFailure) {
+      openaiClient.chat.completions.create = originalCreate;
     }
   }
 }
@@ -968,17 +1228,34 @@ if (require.main === module) {
   (async () => {
     try {
       // Test standard server lookup
-      console.log('=== Testing standard server lookup ===');
+      quakeLogger.info('=== Testing standard server lookup ===');
       const result = await lookupQuakeServer();
-      console.log(result);
+      quakeLogger.info(result);
 
-      // Test OpenAI summary functionality
-      console.log('\n=== Testing OpenAI summary functionality ===');
-      await testOpenAISummary();
+      // Test OpenAI summary functionality with different formats
+      quakeLogger.info('\n=== Testing OpenAI summary with object format ===');
+      await testOpenAISummary({ responseFormat: 'object' });
 
-      // Test OpenAI failure fallback
-      console.log('\n=== Testing OpenAI failure fallback ===');
-      await testOpenAISummary(true);
+      quakeLogger.info('\n=== Testing OpenAI summary with string format ===');
+      await testOpenAISummary({ responseFormat: 'string' });
+
+      quakeLogger.info('\n=== Testing OpenAI summary with server object format ===');
+      await testOpenAISummary({ responseFormat: 'server' });
+
+      // Test error handling
+      quakeLogger.info('\n=== Testing OpenAI failure fallback ===');
+      await testOpenAISummary({ mockOpenAIFailure: true });
+
+      quakeLogger.info('\n=== Testing invalid response format handling ===');
+      await testOpenAISummary({ responseFormat: 'invalid' });
+
+      quakeLogger.info('\n=== Testing empty response handling ===');
+      await testOpenAISummary({ emptyResponse: true });
+
+      quakeLogger.info('\n=== Testing null response handling ===');
+      await testOpenAISummary({ nullResponse: true });
+
+      quakeLogger.info('\n=== All tests completed successfully ===');
     } catch (error) {
       quakeLogger.error({ error }, 'Test execution error');
     }

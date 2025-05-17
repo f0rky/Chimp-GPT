@@ -258,20 +258,42 @@ function initStatusServer(options = {}) {
     let allowedOriginsStartup = ['http://localhost', 'http://127.0.0.1'];
     if (process.env.CORS_ALLOWED_ORIGINS) {
       try {
-        // Split by comma and trim each entry
-        allowedOriginsStartup = process.env.CORS_ALLOWED_ORIGINS.split(',').map(origin =>
-          origin.trim()
-        );
-        // Filter out any invalid URLs
-        allowedOriginsStartup = allowedOriginsStartup.filter(origin => {
+        // Get the raw value and sanitize it
+        const rawOrigins = process.env.CORS_ALLOWED_ORIGINS;
+
+        // Check for common environment variable parsing issues
+        const sanitizedOrigins = rawOrigins
+          .replace(/=true/g, '') // Remove =true which might be from command line args
+          .replace(/\s+/g, ''); // Remove any whitespace
+
+        logger.info({ raw: rawOrigins, sanitized: sanitizedOrigins }, 'Sanitized CORS origins');
+
+        // Split by comma
+        const originList = sanitizedOrigins.split(',');
+
+        // Process each origin
+        const validOrigins = [];
+        for (const origin of originList) {
+          const trimmed = origin.trim();
+          if (!trimmed) continue; // Skip empty entries
+
+          // Validate URL format
           try {
-            new URL(origin);
-            return true;
+            // Make sure it has a protocol
+            const originWithProtocol = trimmed.startsWith('http') ? trimmed : `http://${trimmed}`;
+            new URL(originWithProtocol);
+            validOrigins.push(originWithProtocol);
+            logger.info({ origin: originWithProtocol }, 'Added valid CORS origin');
           } catch (e) {
-            logger.warn({ origin }, 'Invalid origin in CORS_ALLOWED_ORIGINS');
-            return false;
+            logger.warn({ origin: trimmed }, 'Invalid origin in CORS_ALLOWED_ORIGINS');
           }
-        });
+        }
+
+        if (validOrigins.length > 0) {
+          allowedOriginsStartup = validOrigins;
+        } else {
+          logger.warn('No valid origins found in CORS_ALLOWED_ORIGINS, using defaults');
+        }
       } catch (err) {
         logger.warn({ err }, 'Error parsing CORS_ALLOWED_ORIGINS, using defaults');
       }
@@ -553,6 +575,78 @@ function initStatusServer(options = {}) {
       } catch (error) {
         logger.error({ error }, 'Error resetting stats');
         res.status(500).json({ success: false, message: 'Error resetting stats' });
+      }
+    });
+
+    /**
+     * POST /repair-stats
+     * Repairs the stats file if it's corrupted.
+     *
+     * @route POST /repair-stats
+     * @returns {Object} { success, message }
+     */
+    app.post('/repair-stats', async (req, res) => {
+      logger.info('Manual stats file repair requested');
+
+      try {
+        const repairResult = await statsStorage.repairStatsFile();
+
+        if (repairResult) {
+          logger.info('Manual stats file repair completed successfully');
+          res.json({
+            success: true,
+            message: 'Stats file repaired successfully',
+          });
+        } else {
+          logger.warn('Manual stats file repair failed');
+          res.status(500).json({
+            success: false,
+            message: 'Failed to repair stats file',
+          });
+        }
+      } catch (error) {
+        logger.error({ error }, 'Error repairing stats file');
+        res.status(500).json({
+          success: false,
+          error: 'Error repairing stats file: ' + error.message,
+        });
+      }
+    });
+
+    /**
+     * POST /repair-function-results
+     * Repairs the function results file if it's corrupted.
+     *
+     * @route POST /repair-function-results
+     * @returns {Object} { success, message }
+     */
+    app.post('/repair-function-results', async (req, res) => {
+      logger.info('Manual function results file repair requested');
+
+      try {
+        const functionResults = require('./functionResults');
+        const repairResult = await functionResults.repairResultsFile();
+
+        if (repairResult) {
+          logger.info('Manual function results file repair completed successfully');
+          res.json({
+            success: true,
+            message: 'Function results file repaired successfully',
+          });
+        } else {
+          logger.warn('Manual function results file repair failed');
+          res.status(500).json({
+            success: false,
+            message: 'Failed to repair function results file',
+          });
+        }
+      } catch (error) {
+        logger.error({ error }, 'Error during manual function results file repair');
+        res.status(500).json({
+          success: false,
+          message: 'Error during function results file repair',
+          error: error.message,
+        });
       }
     });
 
