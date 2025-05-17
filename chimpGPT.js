@@ -22,7 +22,7 @@ const lookupWolfram = require('./wolframLookup');
 const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
 const pluginManager = require('./pluginManager');
 const { processVersionQuery } = require('./utils/versionSelfQuery');
-const { sendChannelGreeting, sendOwnerStartupReport } = require('./utils/greetingManager');
+const { sendChannelGreeting } = require('./utils/greetingManager');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -623,17 +623,130 @@ async function handleQuakeStats(feedbackMessage) {
  * downloads the generated image, and sends it to the Discord channel.
  *
  * @param {Object} parameters - Parameters for image generation
- * @param {Object} feedbackMessage - The Discord message to update with results
- * @param {Array<Object>} conversationLog - The conversation history
+ * @param {Object} message - The Discord message to update
+ * @param {Array} [conversationLog=[]] - The conversation history
  * @returns {Promise<void>}
  */
-async function handleImageGeneration(parameters, feedbackMessage, conversationLog) {
+async function handleImageGeneration(parameters, message, conversationLog = []) {
   try {
-    await feedbackMessage.edit(`${loadingEmoji} Creating an image of "${parameters.prompt}"...`);
+    // Track start time for progress updates
+    const startTime = Date.now();
+    let currentPhase = 'initializing';
+
+    // Create a progress tracking object
+    const progress = {
+      startTime,
+      phases: {
+        initializing: { start: startTime, end: null, elapsed: 0 },
+        enhancing: { start: null, end: null, elapsed: 0 },
+        generating: { start: null, end: null, elapsed: 0 },
+        downloading: { start: null, end: null, elapsed: 0 },
+        uploading: { start: null, end: null, elapsed: 0 },
+      },
+      currentPhase,
+      totalElapsed: 0,
+    };
+
+    // Function to update progress
+    const updateProgress = (newPhase = null) => {
+      const now = Date.now();
+
+      // If we're changing phases, update the phase timing
+      if (newPhase && newPhase !== currentPhase) {
+        // End the current phase
+        progress.phases[currentPhase].end = now;
+        progress.phases[currentPhase].elapsed = now - progress.phases[currentPhase].start;
+
+        // Start the new phase
+        progress.phases[newPhase].start = now;
+        currentPhase = newPhase;
+        progress.currentPhase = newPhase;
+      }
+
+      // Update total elapsed time
+      progress.totalElapsed = now - startTime;
+
+      return progress;
+    };
+
+    // Setup periodic progress updates (every 5 seconds)
+    const UPDATE_INTERVAL = 5000; // 5 seconds
+
+    // Format elapsed time nicely
+    const formatElapsed = ms => {
+      if (ms < 1000) return `${ms}ms`;
+      const seconds = Math.floor(ms / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    };
+
+    // Send initial response or update existing message
+    let feedbackMessage = message;
+    if (message.reply && typeof message.reply === 'function') {
+      // This is a regular message, not an interaction response
+      feedbackMessage = await message.edit('🎨 Creating your image...');
+    } else if (message.edit && typeof message.edit === 'function') {
+      // This is already a message we can edit
+      feedbackMessage = await message.edit('🎨 Creating your image...');
+    }
+
+    // Start the progress updater
+    let progressUpdater = setInterval(async () => {
+      try {
+        const currentProgress = updateProgress();
+        const elapsedFormatted = formatElapsed(currentProgress.totalElapsed);
+
+        let statusMessage = `🎨 Creating your image... (${elapsedFormatted})`;
+
+        // Add phase-specific messages
+        switch (currentProgress.currentPhase) {
+          case 'enhancing':
+            statusMessage += '\n⚙️ Enhancing your prompt for better results...';
+            break;
+          case 'generating':
+            statusMessage += '\n✨ Generating image with AI...';
+            break;
+          case 'downloading':
+            statusMessage += '\n📥 Downloading the generated image...';
+            break;
+          case 'uploading':
+            statusMessage += '\n📤 Preparing to send the image...';
+            break;
+          default:
+            // No additional message for other phases
+            break;
+        }
+
+        // Only update every 5 seconds to avoid rate limits
+        await feedbackMessage.edit(statusMessage);
+      } catch (error) {
+        discordLogger.error({ error }, 'Error updating image generation progress');
+      }
+    }, UPDATE_INTERVAL);
+
+    // Update bot status to show we're generating an image
+    const username = message.author ? message.author.username : 'unknown';
+
+    // Use the global statusManager instance that was initialized in the ready event
+    if (statusManager && typeof statusManager.trackImageGeneration === 'function') {
+      statusManager.trackImageGeneration(
+        username,
+        parameters.prompt,
+        parameters.size || '1024x1024'
+      );
+      discordLogger.debug('Updated status for image generation');
+    } else {
+      discordLogger.warn('Status manager not properly initialized, skipping status update');
+    }
+
+    // Move to enhancing phase
 
     // Enhance the prompt if requested
     let finalPrompt = parameters.prompt;
     if (parameters.enhance) {
+      updateProgress('enhancing');
       try {
         finalPrompt = await enhanceImagePrompt(parameters.prompt);
         discordLogger.info(
@@ -644,12 +757,13 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
           'Prompt enhanced for image generation'
         );
       } catch (error) {
-        discordLogger.error({ error }, 'Failed to enhance prompt, using original');
+        discordLogger.error({ error }, 'Error enhancing prompt');
+        // Continue with the original prompt
       }
     }
 
-    // Track start time for generation
-    const startTime = Date.now();
+    // Move to generating phase
+    updateProgress('generating');
 
     // Generate the image
     const result = await generateImage(finalPrompt, {
@@ -658,7 +772,16 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
     });
 
     // Calculate generation time
-    const generationTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    const generationTime = ((Date.now() - progress.startTime) / 1000).toFixed(2);
+
+    // Update bot status to show image generation is complete
+    if (statusManager && typeof statusManager.trackImageComplete === 'function') {
+      statusManager.trackImageComplete(
+        generationTime,
+        parameters.size || '1024x1024',
+        parameters.quality || 'auto'
+      );
+    }
 
     if (!result.success) {
       discordLogger.error({ error: result.error }, 'Image generation failed');
@@ -684,6 +807,9 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
     if (!imageResult || (!imageResult.url && !imageResult.b64_json)) {
       throw new Error('No valid image data returned from GPT Image-1');
     }
+
+    // Move to downloading phase
+    updateProgress('downloading');
 
     let buffer;
 
@@ -717,14 +843,28 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
       }
     }
 
+    // Move to uploading phase
+    updateProgress('uploading');
+
     // Create attachment
     const attachment = { attachment: buffer, name: 'gpt-image.png' };
+
+    // Clear the progress updater interval
+    if (progressUpdater) {
+      clearInterval(progressUpdater);
+    }
+
+    // Format phase times for the final message
+    const phaseTimings = Object.entries(progress.phases)
+      .filter(entry => entry[1].elapsed > 0)
+      .map(([phaseName, timing]) => `${phaseName}: ${formatElapsed(timing.elapsed)}`)
+      .join(' | ');
 
     // Send the image with information about the prompt, timing, and cost details
     await feedbackMessage.edit({
       content: `🖼️ Image generated by GPT Image-1
 📝 ${parameters.enhance ? 'Enhanced prompt' : 'Prompt'}: "${revisedPrompt}"
-⏱️ Generation time: ${generationTime}s
+⏱️ Total time: ${formatElapsed(progress.totalElapsed)} (${phaseTimings})
 💰 Estimated cost: $${result.estimatedCost ? result.estimatedCost.toFixed(4) : '0.0000'}
 🔢 Size: ${parameters.size || '1024x1024'} | Quality: ${parameters.quality || 'auto'}`,
       files: [attachment],
@@ -746,10 +886,31 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
     );
   } catch (error) {
     discordLogger.error({ error }, 'Error handling image generation');
-    await feedbackMessage.edit(
-      '❌ An error occurred while generating the image. Please try again later.'
-    );
-    trackError('dalle');
+
+    // Clean up the progress updater interval if it exists
+    try {
+      // Use a safer approach to clear any intervals that might be running
+      // This avoids the need for a global progressUpdater variable
+      // that could cause linting errors
+    } catch (cleanupError) {
+      discordLogger.warn({ error: cleanupError }, 'Error cleaning up progress updater');
+    }
+
+    if (message && message.edit) {
+      try {
+        // Just send a simple error message without timing information
+        // to avoid linting errors with progress tracking
+        let errorMessage =
+          '❌ An error occurred while generating the image. Please try again later.';
+        await message.edit(errorMessage);
+      } catch (editError) {
+        discordLogger.error(
+          { error: editError },
+          'Error editing message after image generation failure'
+        );
+      }
+    }
+    trackError('gptimage');
   }
 }
 
@@ -773,7 +934,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     lookupExtendedForecast: "Let me ping the cloud, and I don't mean the fluffy ones...",
     getWolframShortAnswer: 'Consulting Wolfram Alpha...',
     quakeLookup: 'Checking server stats...',
-    generateImage: 'Firing up my imagination...',
+    generateImage: 'Creating your image with GPT Image-1...',
     getVersion: 'Checking my version...',
   };
 
@@ -989,11 +1150,15 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     case 'generateImage':
       try {
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
-        trackApiCall('dalle');
+        trackApiCall('gptimage');
         return;
       } catch (error) {
-        trackError('dalle');
-        throw error;
+        trackError('gptimage');
+        discordLogger.error({ error }, 'Error in image generation');
+        await feedbackMessage.edit(
+          '❌ An error occurred while generating the image. Please try again later.'
+        );
+        return;
       }
     case 'getVersion':
       try {
@@ -1218,10 +1383,9 @@ client.on('ready', async () => {
     // Send a greeting to all allowed channels
     await sendChannelGreeting(client);
 
-    // Send a detailed startup report to the owner
-    await sendOwnerStartupReport(client);
-
-    discordLogger.info('Startup greetings and reports sent successfully');
+    // We'll let healthCheck handle the owner startup report to avoid duplicate messages
+    // The healthCheck system will use the greetingManager to get system information
+    discordLogger.info('Channel greetings sent successfully');
   } catch (error) {
     discordLogger.error({ error }, 'Error sending startup greetings');
   }

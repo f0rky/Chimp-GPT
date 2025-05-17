@@ -32,7 +32,9 @@ const logger = createLogger('status');
 // Constants
 const STATUS_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const CONVERSATION_SUMMARY_DELAY = 5 * 1000; // 5 seconds before showing conversation summary
-const CONVERSATION_TIMEOUT = 5 * 60 * 1000; // 5 minutes before returning to default status
+// Time before returning to default status (used in updateStatus logic)
+// Commented out as it's not currently used, but kept for future reference
+// const CONVERSATION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 const MAX_WEATHER_ERRORS = 3; // Disable weather status after 3 consecutive errors
 
 // Last activity tracking
@@ -135,40 +137,31 @@ function initStatusManager(client) {
   }
 
   // Track when the bot is having a conversation
-  function trackConversation(username, message) {
+  function trackConversation(username, summary = null) {
     const now = Date.now();
     const isNewConversation =
-      !lastActivity.conversationStarted ||
+      !lastActivity.timestamp ||
       lastActivity.type !== 'conversation' ||
-      lastActivity.username !== username ||
-      now - lastActivity.timestamp > CONVERSATION_TIMEOUT;
+      lastActivity.username !== username;
 
-    // If this is a new conversation, reset the conversation state
     if (isNewConversation) {
       lastActivity = {
         type: 'conversation',
-        data: { message },
+        data: {},
         timestamp: now,
         username,
         conversationStarted: now,
-        conversationSummary: null,
+        conversationSummary: summary,
         conversationPhase: 'initial',
       };
-      logger.debug({ username }, 'Started new conversation');
     } else {
       // Update existing conversation
-      lastActivity.data.message = message;
       lastActivity.timestamp = now;
 
-      // If we've been in the initial phase for CONVERSATION_SUMMARY_DELAY, move to summary phase
-      if (
-        lastActivity.conversationPhase === 'initial' &&
-        now - lastActivity.conversationStarted > CONVERSATION_SUMMARY_DELAY
-      ) {
+      // If we have a summary and enough time has passed, update the phase
+      if (summary && now - lastActivity.conversationStarted > CONVERSATION_SUMMARY_DELAY) {
+        lastActivity.conversationSummary = summary;
         lastActivity.conversationPhase = 'summary';
-
-        // Generate an intelligent conversation summary based on the message content
-        lastActivity.conversationSummary = generateConversationSummary(message);
 
         logger.debug(
           { username, summary: lastActivity.conversationSummary },
@@ -178,6 +171,50 @@ function initStatusManager(client) {
     }
 
     updateStatus(client);
+  }
+
+  // Track when the bot is generating images
+  function trackImageGeneration(username, prompt, size = '1024x1024') {
+    const now = Date.now();
+    lastActivity = {
+      type: 'image',
+      data: {
+        prompt,
+        size,
+        startTime: now,
+      },
+      timestamp: now,
+      username,
+      imagePhase: 'generating', // 'generating' or 'completed'
+    };
+
+    logger.debug(
+      { username, prompt: prompt.substring(0, 30) + '...' },
+      'Tracking image generation'
+    );
+
+    // Update status immediately
+    updateStatus(client);
+  }
+
+  // Track when image generation is complete
+  function trackImageComplete(generationTime, size = '1024x1024', quality = 'auto') {
+    if (lastActivity.type === 'image') {
+      const now = Date.now();
+      lastActivity.imagePhase = 'completed';
+      lastActivity.data.generationTime = generationTime;
+      lastActivity.data.size = size;
+      lastActivity.data.quality = quality;
+      lastActivity.timestamp = now;
+
+      logger.debug(
+        { username: lastActivity.username, generationTime },
+        'Image generation completed'
+      );
+
+      // Update status immediately
+      updateStatus(client);
+    }
   }
 
   // Clean up on shutdown
@@ -190,6 +227,8 @@ function initStatusManager(client) {
     trackQuakeLookup,
     trackWeatherLookup,
     trackConversation,
+    trackImageGeneration,
+    trackImageComplete,
     shutdown,
   };
 }
@@ -235,6 +274,14 @@ async function updateStatus(client) {
             lastActivity.username,
             lastActivity.conversationPhase,
             lastActivity.conversationSummary
+          );
+          break;
+        case 'image':
+          // Use the appropriate image generation status based on the phase
+          status = getImageGenerationStatus(
+            lastActivity.username,
+            lastActivity.imagePhase,
+            lastActivity.data
           );
           break;
         default:
@@ -347,6 +394,45 @@ function getConversationStatus(username, phase = 'initial', summary = null) {
 }
 
 /**
+ * Get a status related to image generation.
+ *
+ * @param {string} username - Discord username
+ * @param {string} phase - Image generation phase ('generating' or 'completed')
+ * @param {Object} data - Image generation data
+ * @returns {StatusObject} Status object with type and name
+ */
+function getImageGenerationStatus(username, phase = 'generating', data = {}) {
+  if (!username) {
+    return getRandomDefaultStatus();
+  }
+
+  // Different status based on image generation phase
+  switch (phase) {
+    case 'generating':
+      // Show a creative status when generating an image
+      return {
+        type: ActivityType.Playing,
+        name: `Creating art for ${username}`,
+      };
+    case 'completed':
+      // If we have generation time data, include it in the status
+      if (data && data.generationTime) {
+        return {
+          type: ActivityType.Competing,
+          name: `Generated ${data.size} image in ${data.generationTime}s`,
+        };
+      } else {
+        return {
+          type: ActivityType.Competing,
+          name: `Created art for ${username}`,
+        };
+      }
+    default:
+      return getRandomDefaultStatus();
+  }
+}
+
+/**
  * Get the current count of active Quake servers.
  *
  * @returns {Promise<number>} Number of active servers
@@ -358,15 +444,15 @@ async function getActiveQuakeServerCount() {
 }
 
 /**
- * Generate an intelligent summary of a conversation message.
- *
- * This function analyzes the message content and extracts key topics
- * or intents to create a meaningful status summary.
- *
- * @param {string} message - The message content to analyze
+ * Generates a concise summary of the conversation topic based on the message
+ * Used internally by getConversationStatus
+ * This function is currently not used but kept for future reference
+ * @param {string} message - The message to analyze
  * @returns {string} A concise summary of the conversation topic
+ * @private
  */
-function generateConversationSummary(message) {
+// eslint-disable-next-line no-unused-vars
+function _generateConversationSummary(message) {
   if (!message || typeof message !== 'string') {
     return 'a conversation';
   }

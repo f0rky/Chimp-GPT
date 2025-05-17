@@ -16,11 +16,12 @@
 
 - [ ] **Enhanced status updates:**
 
-  - [ ] Add progress indicators for long-running operations (counters, elapsed time)
+  - [x] Add progress indicators for long-running operations (counters, elapsed time)
   - [ ] Update loading icon/message for delayed responses
+  - [x] Implement contextual status updates for image generation (showing both generating and completed phases)
   - [ ] Implement contextual status updates that change every 5 seconds for long API calls
   - [ ] Respect global rate limiter for status updates
-  - [ ] Add more detailed context to status messages for ongoing operations
+  - [x] Add more detailed context to status messages for ongoing operations
 
 - [x] **Granular plugin error logging:** Enhanced error logging in pluginManager.js to include detailed context such as plugin name, version, author, argument details (sanitized), timestamp, error type/code, and hook type for easier debugging.
 - [x] **Circuit breaker/retry for external APIs:** (OpenAI API calls now use retry and circuit breaker logic) No evidence of a true circuit breaker or retry/backoff logic for OpenAI, weather, or Quake integrations. Add robust retry/circuit breaker patterns to handle flaky APIs.

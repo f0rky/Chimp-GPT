@@ -5,7 +5,7 @@
  * @property {number} time
  * @property {number} wolfram
  * @property {number} quake
- * @property {number} dalle
+ * @property {number} gptimage
  * @property {Object.<string, number>} plugins
  *
  * @typedef {Object} PluginErrorInfo
@@ -19,7 +19,7 @@
  * @property {number} time
  * @property {number} wolfram
  * @property {number} quake
- * @property {number} dalle
+ * @property {number} gptimage
  * @property {Object.<string, PluginErrorInfo>} plugins - Error counts by plugin ID with detailed hook information
  * @property {number} other
  *
@@ -95,7 +95,7 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
     plugins: {},
   },
   errors: {
@@ -105,7 +105,7 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
     plugins: {},
     other: 0,
   },
@@ -271,14 +271,65 @@ function scheduleHealthReports(client) {
     }
   }, REPORT_INTERVAL);
 
-  // Also send a report on startup
+  // Use the startup message coordinator for startup notifications
+  const startupCoordinator = require('./utils/startupMessageCoordinator');
+
+  // Register health check as a component that will contribute to the startup message
+  startupCoordinator.registerComponent('healthCheck');
+
+  // Send the startup message after a short delay
   setTimeout(async () => {
     try {
-      const owner = await client.users.fetch(config.OWNER_ID);
-      if (owner) {
-        const report = generateHealthReport(true);
-        await owner.send(report);
-        logger.info('Sent startup health report to owner');
+      if (config.OWNER_ID) {
+        const owner = await client.users.fetch(config.OWNER_ID);
+        if (owner) {
+          // Send the initial startup message if not already sent
+          if (!startupCoordinator.hasMessage) {
+            await startupCoordinator.sendStartupMessage(owner);
+          }
+
+          // Wait a bit to gather more startup information
+          setTimeout(async () => {
+            try {
+              // Import the greeting manager to get system information
+              const greetingManager = require('./utils/greetingManager');
+              const report = generateHealthReport(true);
+              const version = require('./getBotVersion').getBotVersion();
+
+              // Generate the system information embed
+              try {
+                const systemEmbed = greetingManager.generateStartupReport();
+                // Update the color to match our success theme
+                systemEmbed.setColor(0x00ff00);
+                startupCoordinator.addEmbed('greetingManager', systemEmbed);
+              } catch (err) {
+                logger.error({ error: err }, 'Failed to generate system information embed');
+              }
+
+              // Add health data as a second embed
+              startupCoordinator.addEmbed('healthCheck', {
+                title: '📊 Detailed Health Information',
+                description: report,
+                color: 0x00ff00, // Green color for success
+                timestamp: new Date(),
+                footer: {
+                  text: `ChimpGPT v${version}`,
+                },
+              });
+
+              // Update the startup message with all embeds
+              await startupCoordinator.updateStartupMessage();
+              logger.info('Updated startup message with comprehensive report');
+
+              // Reset the coordinator after some time to free memory
+              setTimeout(() => {
+                startupCoordinator.reset();
+              }, 10000);
+            } catch (updateError) {
+              logger.error({ error: updateError }, 'Failed to update startup message with details');
+            }
+          }, 5000); // Wait 5 seconds before updating with details
+        }
       }
     } catch (error) {
       logger.error({ error }, 'Failed to send startup health report to owner');
@@ -302,6 +353,44 @@ function scheduleHealthReports(client) {
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
   const memoryUsage = process.memoryUsage();
+  const { getBotVersion } = require('./getBotVersion');
+  const version = getBotVersion();
+  const os = require('os');
+  const hostname = os.hostname();
+  const fs = require('fs');
+  const path = require('path');
+
+  // Get recent logs if available
+  const getRecentLogs = (maxLines = 10) => {
+    try {
+      const logFilePath = path.join(__dirname, './logs/chimp-gpt.log');
+      if (fs.existsSync(logFilePath)) {
+        const data = fs.readFileSync(logFilePath, 'utf8');
+        const lines = data.trim().split('\n');
+        return lines.slice(-maxLines).join('\n');
+      }
+      return 'No recent logs available.';
+    } catch (err) {
+      return `Error reading logs: ${err.message}`;
+    }
+  };
+
+  // Get loaded plugins information
+  const getLoadedPlugins = () => {
+    try {
+      const pluginManager = require('./pluginManager');
+      if (pluginManager && pluginManager.getPluginMetadata) {
+        const plugins = Object.values(pluginManager.getPluginMetadata());
+        if (plugins.length === 0) return 'No plugins loaded.';
+
+        // Format each plugin on its own line with a bullet point
+        return '\n' + plugins.map(p => `  • ${p.name}@${p.version}`).join('\n') || 'None';
+      }
+      return 'None';
+    } catch (err) {
+      return 'Plugin information unavailable';
+    }
+  };
 
   let title = '📊 ChimpGPT Health Report';
   if (isStartup) {
@@ -338,7 +427,13 @@ ${title}
 **Status:** ${statusEmoji} ${errorSum > 20 ? 'Warning' : 'Healthy'}
 **Version:** ${version}
 **Uptime:** ${formatDuration(uptime)}
-**Memory:** ${Math.round(memoryUsage.rss / 1024 / 1024)} MB
+**Memory:** ${Math.round(memoryUsage.rss / 1024 / 1024)} MB${
+    isStartup
+      ? `
+**Version:** ${version}
+**Hostname:** ${hostname}`
+      : ''
+  }
 
 **Statistics:**
 • Messages Processed: ${stats.messageCount}
@@ -347,25 +442,38 @@ ${title}
 • Time Lookups: ${stats.apiCalls.time}
 • Wolfram Alpha Queries: ${stats.apiCalls.wolfram}
 • Quake Server Lookups: ${stats.apiCalls.quake}
-• DALL-E Image Generations: ${stats.apiCalls.dalle}
+• GPT Image-1 Generations: ${stats.apiCalls.gptimage}
 
 **Plugin System:**
 • Loaded Plugins: ${stats.plugins.loaded}
 • Plugin Commands: ${stats.plugins.commands}
 • Plugin Functions: ${stats.plugins.functions}
-• Plugin Hooks: ${stats.plugins.hooks}${pluginApiCallsText}
+• Plugin Hooks: ${stats.plugins.hooks}${pluginApiCallsText}${
+    isStartup
+      ? `
+• Plugin Details: ${getLoadedPlugins()}`
+      : ''
+  }
 
 **Errors:**
 • Total Errors: ${errorSum}
 • OpenAI Errors: ${stats.errors.openai}
 • Discord Errors: ${stats.errors.discord}
-• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.dalle}${pluginErrorsText}
+• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}
 
 **Rate Limiting:**
 • Rate Limits Hit: ${stats.rateLimits.hit}
 • Unique Users Limited: ${stats.rateLimits.users.size}
 
-For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'
+For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'${
+    isStartup
+      ? `
+
+**Status Page:** http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}
+
+${isStartup ? '**Recent Logs:**\n```\n' + getRecentLogs(15) + '\n```' : ''}`
+      : ''
+  }
 `;
 
   return report;
@@ -389,6 +497,7 @@ function isStatsCommand(message) {
  * Handle a stats command.
  *
  * Processes a stats command request, generates a health report, and sends it as a reply to the message.
+ * Also updates the startup message if it exists and the user is the bot owner.
  *
  * @param {import('discord.js').Message} message - Discord message
  * @returns {Promise<void>} Resolves when the reply is sent
@@ -405,6 +514,36 @@ async function handleStatsCommand(message) {
 
   const report = generateHealthReport();
   await message.reply(report);
+
+  // If the user is the owner, also update the startup message with the latest health report
+  if (message.author.id === config.OWNER_ID) {
+    try {
+      // Get the startup message coordinator
+      const startupCoordinator = require('./utils/startupMessageCoordinator');
+
+      // If the coordinator has a message reference, update it
+      if (startupCoordinator.hasMessage && startupCoordinator.messageRef) {
+        const version = require('./getBotVersion').getBotVersion();
+
+        // Update the health check embed with the latest report
+        startupCoordinator.addEmbed('healthCheck', {
+          title: '📊 Updated Health Information',
+          description: report,
+          color: 0x00ff00, // Green color for success
+          timestamp: new Date(),
+          footer: {
+            text: `ChimpGPT v${version} | Updated at ${new Date().toLocaleTimeString()}`,
+          },
+        });
+
+        // Update the startup message with the latest embeds
+        await startupCoordinator.updateStartupMessage();
+        logger.info('Updated startup message with latest health report');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to update startup message with latest health report');
+    }
+  }
 }
 
 /**
@@ -437,7 +576,7 @@ function formatDuration(seconds) {
  *
  * Increments the counter for a specific API call type. Used for monitoring API usage across different services.
  *
- * @param {string} type - Type of API call (openai, weather, time, wolfram, quake, dalle)
+ * @param {string} type - Type of API call (openai, weather, time, wolfram, quake, gptimage)
  * @param {string} [pluginId] - Optional plugin ID if the call is from a plugin
  * @returns {void}
  */
@@ -463,7 +602,7 @@ function trackApiCall(type, pluginId) {
  *
  * Increments the counter for a specific error type. Used for monitoring error rates across different services.
  *
- * @param {string} type - Type of error (openai, discord, weather, time, wolfram, quake, dalle, other)
+ * @param {string} type - Type of error (openai, discord, weather, time, wolfram, quake, gptimage, other)
  * @param {string} [pluginId] - Optional plugin ID if the error is from a plugin
  * @returns {void}
  */
