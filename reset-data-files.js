@@ -27,7 +27,7 @@ const DEFAULT_STATS = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
     plugins: {},
   },
   errors: {
@@ -37,7 +37,7 @@ const DEFAULT_STATS = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
     plugins: {},
     other: 0,
   },
@@ -67,7 +67,7 @@ const DEFAULT_FUNCTION_RESULTS = {
   time: [],
   wolfram: [],
   quake: [],
-  dalle: [],
+  gptimage: [],
   plugins: {},
   lastUpdated: new Date().toISOString(),
 };

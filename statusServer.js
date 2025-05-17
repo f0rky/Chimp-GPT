@@ -5,7 +5,7 @@
  * @property {number} time
  * @property {number} wolfram
  * @property {number} quake
- * @property {number} dalle
+ * @property {@property {number} dalle} gptimage
  *
  * @typedef {Object} Errors
  * @property {number} openai
@@ -14,7 +14,7 @@
  * @property {number} time
  * @property {number} wolfram
  * @property {number} quake
- * @property {number} dalle
+ * @property {@property {number} dalle} gptimage
  * @property {number} other
  *
  * @typedef {Object} RateLimits
@@ -115,7 +115,7 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
   },
   errors: {
     openai: 0,
@@ -124,7 +124,7 @@ const stats = {
     time: 0,
     wolfram: 0,
     quake: 0,
-    dalle: 0,
+    gptimage: 0,
     other: 0,
   },
   rateLimits: {
