@@ -11,6 +11,7 @@
   - [x] Update status display to show meaningful actions instead of "to username"
   - [x] Complete migration from DALL-E to GPT Image-1 in all references
   - [x] Fix parameter naming: use `output_format` instead of `response_format` for GPT Image-1
+  - [x] Add timing and cost details to image generation output
   - [ ] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
 
 - [ ] **Enhanced status updates:**
