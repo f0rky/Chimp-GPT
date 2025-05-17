@@ -14,7 +14,7 @@
  * @property {Array<FunctionResult>} time
  * @property {Array<FunctionResult>} wolfram
  * @property {Array<FunctionResult>} quake
- * @property {Array<FunctionResult>} dalle
+ * @property {@property {Array<FunctionResult>} dalle} gptimage
  * @property {Object.<string, Array<PluginFunctionResult>>} plugins
  * @property {string} lastUpdated
  */
@@ -49,7 +49,7 @@ const DEFAULT_RESULTS = {
   time: [],
   wolfram: [],
   quake: [],
-  dalle: [],
+  gptimage: [],
   plugins: {}, // Will store plugin results by plugin ID
   lastUpdated: new Date().toISOString(),
 };
@@ -367,7 +367,7 @@ async function loadResults() {
       }
 
       // Ensure all required fields exist
-      const requiredFields = ['weather', 'time', 'wolfram', 'quake', 'dalle', 'plugins'];
+      const requiredFields = ['weather', 'time', 'wolfram', 'quake', 'gptimage', 'plugins'];
       const missingFields = requiredFields.filter(field => !(field in results));
 
       if (missingFields.length > 0) {
@@ -414,7 +414,7 @@ async function loadResults() {
 /**
  * Store a function result.
  *
- * @param {string} functionType - The type of function (weather, time, wolfram, quake, dalle, plugin.{pluginId})
+ * @param {string} functionType - The type of function (weather, time, wolfram, quake, gptimage, plugin.{pluginId})
  * @param {Object} params - The parameters passed to the function
  * @param {Object} result - The result returned by the function
  * @returns {Promise<boolean>} True if successful, false otherwise
@@ -562,7 +562,7 @@ async function repairResultsFile() {
         'time',
         'wolfram',
         'quake',
-        'dalle',
+        'gptimage',
         'plugins',
         'lastUpdated',
       ];

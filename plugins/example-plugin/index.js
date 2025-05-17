@@ -151,12 +151,27 @@ module.exports = {
       logger.info('Bot started! Example plugin is now active.');
       logger.info(`Connected to ${client.guilds.cache.size} servers.`);
 
-      // Send an initial status report to the owner
+      // Use the startup message coordinator
       try {
-        await sendStatusReport(client);
-        logger.info('Initial status report sent to owner');
+        const startupCoordinator = require('../../utils/startupMessageCoordinator');
+
+        // Register example plugin as a component
+        startupCoordinator.registerComponent('example-plugin');
+
+        // Generate the status report
+        const statusReport = generateStatusReport();
+
+        // Add the embed to the coordinator
+        startupCoordinator.addEmbed('example-plugin', {
+          title: '🔌 Plugin Status',
+          description: statusReport,
+          color: 0x00ff00,
+          timestamp: new Date(),
+        });
+
+        logger.info('Added plugin status to startup message');
       } catch (error) {
-        logger.error({ error }, 'Failed to send initial status report');
+        logger.error({ error }, 'Failed to add plugin status to startup message');
       }
 
       // Schedule periodic status reports (every 6 hours)

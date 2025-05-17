@@ -26,6 +26,12 @@ function getRecentLogs(logFilePath, maxLines = 10) {
 function isOwner(userId, config) {
   // config.OWNER_ID or process.env.OWNER_ID can be used
   const ownerId = config?.OWNER_ID || process.env.OWNER_ID;
+
+  // If no owner ID is configured, allow anyone to use the command in development
+  if (!ownerId && process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
   return userId === ownerId;
 }
 
@@ -42,10 +48,10 @@ module.exports = {
       description: 'Show bot version and diagnostics (owner only)',
       aliases: ['ver', 'v', 'about'],
       dmAllowed: true,
-      async execute(context) {
-        const { user, config } = context;
-        if (!isOwner(user.id, config)) {
-          return { content: 'This command is owner-only.' };
+      async execute(message, args, config) {
+        // Check if the user is the owner
+        if (!isOwner(message.author.id, config)) {
+          return message.reply('This command is owner-only.');
         }
         const version = getBotVersion();
         const uptime = formatUptime(process.uptime());
@@ -53,12 +59,21 @@ module.exports = {
         const env = process.env.NODE_ENV || 'development';
         const hostname = os.hostname();
         const statusUrl = `http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}`;
-        const loadedPlugins =
-          Object.values(context.plugins?.metadata || {})
-            .map(p => `${p.name}@${p.version}`)
-            .join(', ') || 'None';
+        // Get loaded plugins from global plugin manager if available
+        let loadedPlugins = 'None';
+        try {
+          const pluginManager = require('../../pluginManager');
+          if (pluginManager && pluginManager.getPluginMetadata) {
+            loadedPlugins =
+              Object.values(pluginManager.getPluginMetadata())
+                .map(p => `${p.name}@${p.version}`)
+                .join(', ') || 'None';
+          }
+        } catch (err) {
+          // If plugin manager is not available, just continue with 'None'
+        }
         const logs = getRecentLogs(logFilePath, 10);
-        return {
+        return message.reply({
           content:
             `**Chimp-GPT Version:** ${version}\n` +
             `**Uptime:** ${uptime}\n` +
@@ -68,7 +83,7 @@ module.exports = {
             `**Status Page:** ${statusUrl}\n` +
             `**Loaded Plugins:** ${loadedPlugins}\n\n` +
             `**Recent Logs:**\n\`\`\`\n${logs}\n\`\`\``,
-        };
+        });
       },
     },
   ],
