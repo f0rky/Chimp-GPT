@@ -48,12 +48,12 @@
  */
 /**
  * Quake Live Server Lookup Module
- * 
+ *
  * This module provides functionality to query Quake Live servers,
  * retrieve player statistics, and format the data for display in Discord.
  * It supports configurable ELO display modes and uses AI to summarize
  * data when it exceeds Discord's character limits.
- * 
+ *
  * @module QuakeLookup
  * @author Brett
  * @version 1.0.0
@@ -61,25 +61,26 @@
 
 const axios = require('axios');
 const { quake: quakeLogger } = require('./logger');
-const { openai: openaiLogger } = require('./logger');
-const { Configuration, OpenAIApi } = require('openai');
-const functionResults = require('./functionResults');
+// API key management will be implemented in future updates
 const retryWithBreaker = require('./utils/retryWithBreaker');
 const breakerManager = require('./breakerManager');
 
 // Circuit breaker configuration for Quake API calls
 const QUAKE_BREAKER_CONFIG = {
   maxRetries: 2,
-  breakerLimit: 5,  // Open breaker after 5 consecutive failures
+  breakerLimit: 5, // Open breaker after 5 consecutive failures
   breakerTimeoutMs: 180000, // 3 minutes timeout
-  onBreakerOpen: (error) => {
+  onBreakerOpen: error => {
     quakeLogger.error({ error }, 'Quake API circuit breaker opened');
-    breakerManager.notifyOwnerBreakerTriggered('Quake API circuit breaker opened: ' + error.message);
-  }
+    breakerManager.notifyOwnerBreakerTriggered(
+      'Quake API circuit breaker opened: ' + error.message
+    );
+  },
 };
 
 const OpenAI = require('openai');
 const { validateServerInput, validateEloMode, sanitizeOutput } = require('./utils/inputValidator');
+const { sanitizeQuery } = require('./utils/inputSanitizer');
 
 /**
  * API endpoints and configuration constants
@@ -92,9 +93,9 @@ const { validateServerInput, validateEloMode, sanitizeOutput } = require('./util
 const SERVERS_API_URL = 'https://ql.syncore.org/api/servers';
 const QLSTATS_API_URL = 'https://ql.syncore.org/api/qlstats/rankings';
 const DEFAULT_PARAMS = {
-    regions: 'Oceania',
-    hasPlayers: true,
-    hasBots: false
+  regions: 'Oceania',
+  hasPlayers: true,
+  hasBots: false,
 };
 const DISCORD_CHAR_LIMIT = 2000;
 const BUFFER_SPACE = 100;
@@ -106,16 +107,16 @@ const BUFFER_SPACE = 100;
  * @property {number} maxServers - Maximum number of servers to display
  */
 const CONFIG = {
-    // ELO display mode:
-    // 0 = Off (don't show ELO)
-    // 1 = Categorized (Scrub/Mid/Pro)
-    // 2 = Actual ELO value
-    eloMode: 1,
-    maxServers: 3,
-    // Whether to show team emojis (🔴/🔵) next to player names
-    showTeamEmojis: process.env.SHOW_TEAM_EMOJIS === 'true',
-    // Whether to show emojis in server stats output
-    showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS === 'true'
+  // ELO display mode:
+  // 0 = Off (don't show ELO)
+  // 1 = Categorized (Scrub/Mid/Pro)
+  // 2 = Actual ELO value
+  eloMode: 1,
+  maxServers: 3,
+  // Whether to show team emojis (🔴/🔵) next to player names
+  showTeamEmojis: process.env.SHOW_TEAM_EMOJIS === 'true',
+  // Whether to show emojis in server stats output
+  showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS === 'true',
 };
 
 /**
@@ -123,7 +124,7 @@ const CONFIG = {
  * @type {OpenAI}
  */
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**
@@ -135,24 +136,24 @@ const openai = new OpenAI({
  * @returns {string} Formatted uptime string (HH:MM:SS)
  */
 function calculateUptime(levelStartTime) {
-    try {
-        const startTime = parseInt(levelStartTime, 10);
-        if (isNaN(startTime)) {
-            throw new Error("Invalid level start time");
-        }
-
-        const currentTime = Math.floor(Date.now() / 1000);
-        const uptimeSeconds = Math.max(0, currentTime - startTime);
-        
-        const hours = Math.floor(uptimeSeconds / 3600);
-        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-        const seconds = uptimeSeconds % 60;
-
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    } catch (error) {
-        quakeLogger.error({ error }, 'Uptime calculation error');
-        return '00:00:00';
+  try {
+    const startTime = parseInt(levelStartTime, 10);
+    if (isNaN(startTime)) {
+      throw new Error('Invalid level start time');
     }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const uptimeSeconds = Math.max(0, currentTime - startTime);
+
+    const hours = Math.floor(uptimeSeconds / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    const seconds = uptimeSeconds % 60;
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  } catch (error) {
+    quakeLogger.error({ error }, 'Uptime calculation error');
+    return '00:00:00';
+  }
 }
 
 /**
@@ -164,128 +165,139 @@ function calculateUptime(levelStartTime) {
  * @returns {string} Text with color codes removed
  */
 function stripColorCodes(text) {
-    return text ? text.replace(/\^\d+/g, '') : '';
+  return text ? text.replace(/\^\d+/g, '') : '';
 }
 
 function formatGameStatus(serverStats) {
-    if (serverStats.gameType === 'Clan Arena') {
-        const redScore = serverStats.teamScores.red;
-        const blueScore = serverStats.teamScores.blue;
-        
-        // Check if the game is in warmup mode (all players have 0 score and team scores are 0)
-        const isWarmup = redScore === 0 && blueScore === 0 && 
-                       serverStats.players && 
-                       serverStats.players.every(p => p.score === 0);
-        
-        if (isWarmup) {
-            return `Warmup (First to ${serverStats.roundLimit})`;
-        }
-        
-        let winningTeam = '';
-        if (redScore > blueScore) {
-            winningTeam = 'RED leading';
-        } else if (blueScore > redScore) {
-            winningTeam = 'BLUE leading';
-        } else {
-            winningTeam = 'Teams tied';
-        }
-        
-        return `${winningTeam} (First to ${serverStats.roundLimit})`;
+  if (serverStats.gameType === 'Clan Arena') {
+    const redScore = serverStats.teamScores.red;
+    const blueScore = serverStats.teamScores.blue;
+
+    // Check if the game is in warmup mode (all players have 0 score and team scores are 0)
+    const isWarmup =
+      redScore === 0 &&
+      blueScore === 0 &&
+      serverStats.players &&
+      serverStats.players.every(p => p.score === 0);
+
+    if (isWarmup) {
+      return `Warmup (First to ${serverStats.roundLimit})`;
     }
-    return serverStats.gameType;
+
+    let winningTeam = '';
+    if (redScore > blueScore) {
+      winningTeam = 'RED leading';
+    } else if (blueScore > redScore) {
+      winningTeam = 'BLUE leading';
+    } else {
+      winningTeam = 'Teams tied';
+    }
+
+    return `${winningTeam} (First to ${serverStats.roundLimit})`;
+  }
+  return serverStats.gameType;
 }
 
 async function getQLStatsData(serverAddress) {
-    try {
-        // Validate server address before making API call
-        const validatedAddress = validateServerInput(serverAddress);
-        if (!validatedAddress.isValid) {
-            quakeLogger.warn({ address: serverAddress }, 'Invalid server address in getQLStatsData');
-            return null;
-        }
-        
-        // Use retryWithBreaker to handle retries and circuit breaking
-        quakeLogger.debug('Using retryWithBreaker for QLStats API request');
-        const response = await retryWithBreaker(
-            async () => {
-                quakeLogger.debug('Making QLStats API request');
-                return await axios.get(`${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`, { 
-                    timeout: 5000,
-                    validateStatus: status => status < 500 // Accept all responses except server errors
-                });
-            },
-            QUAKE_BREAKER_CONFIG
-        );
-        
-        // Log detailed response data for debugging
-        quakeLogger.info({ 
-            serverAddress: validatedAddress.value,
-            hasData: !!response.data,
-            playerCount: response.data?.rankedPlayers?.length || 0,
-            responseData: JSON.stringify(response.data),
-            players: response.data?.rankedPlayers ? JSON.stringify(response.data.rankedPlayers) : 'No players'
-        }, 'QLStats API response (detailed)');
-        
-        return response.data;
-    } catch (error) {
-        quakeLogger.error({ error, serverAddress }, 'Error fetching QLStats data');
-        return null;
+  try {
+    // Validate server address before making API call
+    const validatedAddress = validateServerInput(serverAddress);
+    if (!validatedAddress.isValid) {
+      quakeLogger.warn({ address: serverAddress }, 'Invalid server address in getQLStatsData');
+      return null;
     }
+
+    // Use retryWithBreaker to handle retries and circuit breaking
+    quakeLogger.debug('Using retryWithBreaker for QLStats API request');
+    const response = await retryWithBreaker(async () => {
+      quakeLogger.debug('Making QLStats API request');
+      return await axios.get(
+        `${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`,
+        {
+          timeout: 5000,
+          validateStatus: status => status < 500, // Accept all responses except server errors
+        }
+      );
+    }, QUAKE_BREAKER_CONFIG);
+
+    // Log detailed response data for debugging
+    quakeLogger.info(
+      {
+        serverAddress: validatedAddress.value,
+        hasData: !!response.data,
+        playerCount: response.data?.rankedPlayers?.length || 0,
+        responseData: JSON.stringify(response.data),
+        players: response.data?.rankedPlayers
+          ? JSON.stringify(response.data.rankedPlayers)
+          : 'No players',
+      },
+      'QLStats API response (detailed)'
+    );
+
+    return response.data;
+  } catch (error) {
+    quakeLogger.error({ error, serverAddress }, 'Error fetching QLStats data');
+    return null;
+  }
 }
 
 function mergePlayerData(basicPlayers, qlstatsPlayers) {
-    // If no QLStats data is available, try to extract team info from basic player data
-    if (!qlstatsPlayers || qlstatsPlayers.length === 0) {
-        quakeLogger.info('No QLStats data available, using basic player data only');
-        return basicPlayers.map(player => ({
-            name: player.name,
-            score: player.score,
-            totalConnected: player.totalConnected,
-            // Try to determine team from player name (common in Quake Live)
-            team: player.name.toLowerCase().includes('red') ? 1 : 
-                  player.name.toLowerCase().includes('blue') ? 2 : 
-                  player.score < 0 ? 3 : 0, // Negative score often indicates spectator
-            rating: null
-        }));
-    }
-    
-    const playerMap = new Map();
-    
-    basicPlayers.forEach(player => {
-        const strippedName = stripColorCodes(player.name).toLowerCase();
-        playerMap.set(strippedName, {
-            name: player.name,
-            score: player.score,
-            totalConnected: player.totalConnected,
-        });
-    });
+  // If no QLStats data is available, try to extract team info from basic player data
+  if (!qlstatsPlayers || qlstatsPlayers.length === 0) {
+    quakeLogger.info('No QLStats data available, using basic player data only');
+    return basicPlayers.map(player => ({
+      name: player.name,
+      score: player.score,
+      totalConnected: player.totalConnected,
+      // Try to determine team from player name (common in Quake Live)
+      team: player.name.toLowerCase().includes('red')
+        ? 1
+        : player.name.toLowerCase().includes('blue')
+          ? 2
+          : player.score < 0
+            ? 3
+            : 0, // Negative score often indicates spectator
+      rating: null,
+    }));
+  }
 
-    return qlstatsPlayers.map(qlstatsPlayer => {
-        const strippedName = stripColorCodes(qlstatsPlayer.name).toLowerCase();
-        
-        // Try different matching strategies
-        let basicData = playerMap.get(strippedName);
-        
-        // If no match found, try partial name matching
-        if (!basicData) {
-            for (const [key, value] of playerMap.entries()) {
-                if (key.includes(strippedName) || strippedName.includes(key)) {
-                    basicData = value;
-                    break;
-                }
-            }
-        }
-        
-        basicData = basicData || {};
-        
-        return {
-            name: qlstatsPlayer.name,
-            score: basicData.score || 0,
-            totalConnected: basicData.totalConnected || '0:00',
-            team: qlstatsPlayer.team || 0, // Default to 0 if team is undefined
-            rating: qlstatsPlayer.rating
-        };
+  const playerMap = new Map();
+
+  basicPlayers.forEach(player => {
+    const strippedName = stripColorCodes(player.name).toLowerCase();
+    playerMap.set(strippedName, {
+      name: player.name,
+      score: player.score,
+      totalConnected: player.totalConnected,
     });
+  });
+
+  return qlstatsPlayers.map(qlstatsPlayer => {
+    const strippedName = stripColorCodes(qlstatsPlayer.name).toLowerCase();
+
+    // Try different matching strategies
+    let basicData = playerMap.get(strippedName);
+
+    // If no match found, try partial name matching
+    if (!basicData) {
+      for (const [key, value] of playerMap.entries()) {
+        if (key.includes(strippedName) || strippedName.includes(key)) {
+          basicData = value;
+          break;
+        }
+      }
+    }
+
+    basicData = basicData || {};
+
+    return {
+      name: qlstatsPlayer.name,
+      score: basicData.score || 0,
+      totalConnected: basicData.totalConnected || '0:00',
+      team: qlstatsPlayer.team || 0, // Default to 0 if team is undefined
+      rating: qlstatsPlayer.rating,
+    };
+  });
 }
 
 /**
@@ -300,9 +312,9 @@ function mergePlayerData(basicPlayers, qlstatsPlayers) {
  * @returns {string} ELO category label
  */
 function getEloCategory(rating) {
-    if (rating < 800) return 'Scrub';
-    if (rating < 1301) return 'Mid';
-    return 'Pro';
+  if (rating < 800) return 'Scrub';
+  if (rating < 1301) return 'Mid';
+  return 'Pro';
 }
 
 /**
@@ -315,37 +327,37 @@ function getEloCategory(rating) {
  * @returns {string} Formatted player line for display
  */
 function formatPlayerLine(player, isSpectator = false) {
-    const cleanName = stripColorCodes(player.name).padEnd(20);
-    
-    // For spectators, only show name to save space
-    if (isSpectator) {
-        return `${cleanName}`;
+  const cleanName = stripColorCodes(player.name).padEnd(20);
+
+  // For spectators, only show name to save space
+  if (isSpectator) {
+    return `${cleanName}`;
+  }
+
+  // For active players, show score and ELO based on config
+  const score = `${String(player.score || 0).padStart(2)}`;
+
+  // Handle different ELO display modes
+  let eloDisplay = '';
+  if (CONFIG.eloMode === 1 && player.rating) {
+    // Mode 1: Show category (Scrub/Mid/Pro)
+    eloDisplay = `(${getEloCategory(player.rating)})`;
+  } else if (CONFIG.eloMode === 2 && player.rating) {
+    // Mode 2: Show actual ELO value
+    eloDisplay = `(${String(player.rating).padStart(4)})`;
+  }
+
+  // Add team indicator if enabled in config
+  let teamIndicator = '';
+  if (CONFIG.showTeamEmojis) {
+    if (player.team === 1) {
+      teamIndicator = '🔴 ';
+    } else if (player.team === 2) {
+      teamIndicator = '🔵 ';
     }
-    
-    // For active players, show score and ELO based on config
-    const score = `${String(player.score || 0).padStart(2)}`;
-    
-    // Handle different ELO display modes
-    let eloDisplay = '';
-    if (CONFIG.eloMode === 1 && player.rating) {
-        // Mode 1: Show category (Scrub/Mid/Pro)
-        eloDisplay = `(${getEloCategory(player.rating)})`;
-    } else if (CONFIG.eloMode === 2 && player.rating) {
-        // Mode 2: Show actual ELO value
-        eloDisplay = `(${String(player.rating).padStart(4)})`;
-    }
-    
-    // Add team indicator if enabled in config
-    let teamIndicator = '';
-    if (CONFIG.showTeamEmojis) {
-        if (player.team === 1) {
-            teamIndicator = '🔴 ';
-        } else if (player.team === 2) {
-            teamIndicator = '🔵 ';
-        }
-    }
-    
-    return `${teamIndicator}${cleanName} ${score} ${eloDisplay}`;
+  }
+
+  return `${teamIndicator}${cleanName} ${score} ${eloDisplay}`;
 }
 
 /**
@@ -359,152 +371,168 @@ function formatPlayerLine(player, isSpectator = false) {
  * @returns {string} Formatted player list string
  */
 function formatPlayerList(players, basicPlayers = [], serverStats = null) {
-    // Debug log for player data
-    quakeLogger.info({
-        qlstatsPlayers: players ? JSON.stringify(players.map(p => ({ name: p.name, team: p.team, rating: p.rating }))) : 'No QLStats players',
-        basicPlayers: basicPlayers ? JSON.stringify(basicPlayers.map(p => ({ name: p.name, score: p.score }))) : 'No basic players',
-        eloMode: CONFIG.eloMode
-    }, 'formatPlayerList debug info');
-    
-    // If no QLStats data and no basic players, show no players message
-    if ((!players || !players.length) && (!basicPlayers || !basicPlayers.length)) {
-        return "No players";
+  // Debug log for player data
+  quakeLogger.info(
+    {
+      qlstatsPlayers: players
+        ? JSON.stringify(players.map(p => ({ name: p.name, team: p.team, rating: p.rating })))
+        : 'No QLStats players',
+      basicPlayers: basicPlayers
+        ? JSON.stringify(basicPlayers.map(p => ({ name: p.name, score: p.score })))
+        : 'No basic players',
+      eloMode: CONFIG.eloMode,
+    },
+    'formatPlayerList debug info'
+  );
+
+  // If no QLStats data and no basic players, show no players message
+  if ((!players || !players.length) && (!basicPlayers || !basicPlayers.length)) {
+    return 'No players';
+  }
+
+  // If no QLStats data, use basic players with team detection
+  const mergedPlayers = players?.length
+    ? mergePlayerData(basicPlayers, players)
+    : mergePlayerData(basicPlayers, []);
+  const isWarmup = mergedPlayers.every(p => p.score === 0);
+
+  // Assign unassigned players to teams based on pattern matching if possible
+  mergedPlayers.forEach(p => {
+    if (!p.team || p.team === 0) {
+      const name = stripColorCodes(p.name).toLowerCase();
+      if (name.includes('red')) {
+        p.team = 1;
+      } else if (name.includes('blue')) {
+        p.team = 2;
+      } else if (p.score < 0) {
+        p.team = 3; // Spectator
+      } else {
+        // If we can't determine team, put them in a general list
+        p.team = 0;
+      }
     }
-    
-    // If no QLStats data, use basic players with team detection
-    const mergedPlayers = players?.length ? mergePlayerData(basicPlayers, players) : mergePlayerData(basicPlayers, []);
-    const isWarmup = mergedPlayers.every(p => p.score === 0);
-    
-    // Assign unassigned players to teams based on pattern matching if possible
-    mergedPlayers.forEach(p => {
-        if (!p.team || p.team === 0) {
-            const name = stripColorCodes(p.name).toLowerCase();
-            if (name.includes('red')) {
-                p.team = 1;
-            } else if (name.includes('blue')) {
-                p.team = 2;
-            } else if (p.score < 0) {
-                p.team = 3; // Spectator
-            } else {
-                // If we can't determine team, put them in a general list
-                p.team = 0;
-            }
-        }
+  });
+
+  const teams = {
+    red: mergedPlayers.filter(p => p.team === 1),
+    blue: mergedPlayers.filter(p => p.team === 2),
+    spec: mergedPlayers.filter(p => p.team === 3),
+    other: mergedPlayers.filter(p => p.team === 0 || p.team === undefined),
+  };
+
+  // Add team scores to player objects if available from serverStats
+  if (serverStats && serverStats.teamScores) {
+    teams.red.forEach(p => (p.teamScore = serverStats.teamScores.red));
+    teams.blue.forEach(p => (p.teamScore = serverStats.teamScores.blue));
+  }
+
+  const sortFn =
+    isWarmup && CONFIG.eloMode > 0
+      ? (a, b) => (b.rating || 0) - (a.rating || 0)
+      : (a, b) => (b.score || 0) - (a.score || 0);
+
+  Object.values(teams).forEach(team => team.sort(sortFn));
+
+  const lines = [];
+
+  // Start with an empty line for better visual separation
+  lines.push('');
+
+  // Get team scores from serverStats directly
+  let redScore = serverStats && serverStats.teamScores ? serverStats.teamScores.red : 0;
+  let blueScore = serverStats && serverStats.teamScores ? serverStats.teamScores.blue : 0;
+
+  // If no team scores in serverStats, try to get from player data
+  if (redScore === 0 && blueScore === 0) {
+    const firstRedPlayer = teams.red[0];
+    const firstBluePlayer = teams.blue[0];
+
+    if (firstRedPlayer && firstRedPlayer.teamScore) {
+      redScore = firstRedPlayer.teamScore;
+    }
+    if (firstBluePlayer && firstBluePlayer.teamScore) {
+      blueScore = firstBluePlayer.teamScore;
+    }
+  }
+
+  // Always use emojis for all team headings
+  const teamLabels = {
+    // Always show emojis for all team headers
+    red: '🔴',
+    blue: '🔵',
+    other: '⚪',
+    spec: '👁️',
+  };
+
+  // Display teams only if they have players
+  if (teams.red.length) {
+    lines.push(`${teamLabels.red} RED TEAM (${redScore})`);
+    lines.push('───────────────────────────');
+    teams.red.forEach(p => {
+      lines.push(formatPlayerLine(p));
     });
-    
-    const teams = {
-        red: mergedPlayers.filter(p => p.team === 1),
-        blue: mergedPlayers.filter(p => p.team === 2),
-        spec: mergedPlayers.filter(p => p.team === 3),
-        other: mergedPlayers.filter(p => p.team === 0 || p.team === undefined)
-    };
-    
-    // Add team scores to player objects if available from serverStats
-    if (serverStats && serverStats.teamScores) {
-        teams.red.forEach(p => p.teamScore = serverStats.teamScores.red);
-        teams.blue.forEach(p => p.teamScore = serverStats.teamScores.blue);
-    }
 
-    const sortFn = isWarmup && CONFIG.eloMode > 0 ? 
-        ((a, b) => (b.rating || 0) - (a.rating || 0)) : 
-        ((a, b) => (b.score || 0) - (a.score || 0));
-
-    Object.values(teams).forEach(team => team.sort(sortFn));
-
-    const lines = [];
-    
-    // Start with an empty line for better visual separation
-    lines.push('');
-    
-    // Get team scores from serverStats directly
-    let redScore = serverStats && serverStats.teamScores ? serverStats.teamScores.red : 0;
-    let blueScore = serverStats && serverStats.teamScores ? serverStats.teamScores.blue : 0;
-    
-    // If no team scores in serverStats, try to get from player data
-    if (redScore === 0 && blueScore === 0) {
-        const firstRedPlayer = teams.red[0];
-        const firstBluePlayer = teams.blue[0];
-        
-        if (firstRedPlayer && firstRedPlayer.teamScore) {
-            redScore = firstRedPlayer.teamScore;
-        }
-        if (firstBluePlayer && firstBluePlayer.teamScore) {
-            blueScore = firstBluePlayer.teamScore;
-        }
-    }
-    
-    // Always use emojis for all team headings
-    const teamLabels = {
-        // Always show emojis for all team headers
-        red: '🔴',
-        blue: '🔵',
-        other: '⚪',
-        spec: '👁️'
-    };
-
-    // Display teams only if they have players
-    if (teams.red.length) {
-        lines.push(`${teamLabels.red} RED TEAM (${redScore})`);
-        lines.push('───────────────────────────');
-        teams.red.forEach(p => {
-            lines.push(formatPlayerLine(p));
-        });
-        
-        // Add a separator line if there's also a blue team
-        if (teams.blue.length) {
-            lines.push('');
-        }
-    }
-    
+    // Add a separator line if there's also a blue team
     if (teams.blue.length) {
-        lines.push(`${teamLabels.blue} BLUE TEAM (${blueScore})`);
-        lines.push('───────────────────────────');
-        teams.blue.forEach(p => {
-            lines.push(formatPlayerLine(p));
-        });
-        
-        // Add a separator line if there are other players
-        if (teams.other.length && teams.other.length > 0) {
-            lines.push('');
-        }
+      lines.push('');
     }
-    
-    // If there are players not assigned to a team, show them
-    if (teams.other.length) {
-        if (!teams.red.length && !teams.blue.length) {
-            // If no team players, just list all players without team headers
-            teams.other.forEach(p => {
-                lines.push(formatPlayerLine(p));
-            });
-        } else {
-            // Otherwise, show them under an 'Other Players' header
-            lines.push(`${teamLabels.other} OTHER PLAYERS`);
-            lines.push('───────────────────────────');
-            teams.other.forEach(p => {
-                lines.push(formatPlayerLine(p));
-            });
-        }
-        
-        // Add a separator line if there are spectators
-        if (teams.spec.length && teams.spec.length > 0) {
-            lines.push('');
-        }
+  }
+
+  if (teams.blue.length) {
+    lines.push(`${teamLabels.blue} BLUE TEAM (${blueScore})`);
+    lines.push('───────────────────────────');
+    teams.blue.forEach(p => {
+      lines.push(formatPlayerLine(p));
+    });
+
+    // Add a separator line if there are other players
+    if (teams.other.length && teams.other.length > 0) {
+      lines.push('');
     }
-    
-    // For spectators, only show names in a compact format if there are any
-    if (teams.spec.length) {
-        // Add a clear divider before spectators section
-        lines.push('');
-        lines.push('═════════════════════════════════');
-        lines.push(`${teamLabels.spec} SPECTATORS: ` + teams.spec.slice(0, 5).map(p => stripColorCodes(p.name)).join(', '));
-        
-        // If there are more than 5 spectators, just show the count
-        if (teams.spec.length > 5) {
-            lines.push(`...and ${teams.spec.length - 5} more`);
-        }
+  }
+
+  // If there are players not assigned to a team, show them
+  if (teams.other.length) {
+    if (!teams.red.length && !teams.blue.length) {
+      // If no team players, just list all players without team headers
+      teams.other.forEach(p => {
+        lines.push(formatPlayerLine(p));
+      });
+    } else {
+      // Otherwise, show them under an 'Other Players' header
+      lines.push(`${teamLabels.other} OTHER PLAYERS`);
+      lines.push('───────────────────────────');
+      teams.other.forEach(p => {
+        lines.push(formatPlayerLine(p));
+      });
     }
-    
-    return lines.join('\n');
+
+    // Add a separator line if there are spectators
+    if (teams.spec.length && teams.spec.length > 0) {
+      lines.push('');
+    }
+  }
+
+  // For spectators, only show names in a compact format if there are any
+  if (teams.spec.length) {
+    // Add a clear divider before spectators section
+    lines.push('');
+    lines.push('═════════════════════════════════');
+    lines.push(
+      `${teamLabels.spec} SPECTATORS: ` +
+        teams.spec
+          .slice(0, 5)
+          .map(p => stripColorCodes(p.name))
+          .join(', ')
+    );
+
+    // If there are more than 5 spectators, just show the count
+    if (teams.spec.length > 5) {
+      lines.push(`...and ${teams.spec.length - 5} more`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /**
@@ -516,26 +544,26 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
  * @returns {ServerStats} Server stats object
  */
 function extractServerStats(server) {
-    const { info, rules, players } = server;
-    const uptime = calculateUptime(rules.g_levelStartTime);
-    
-    // Normalize whitespace in server name (replace multiple spaces/tabs with a single space)
-    const normalizedServerName = info.serverName.trim().replace(/\s+/g, ' ');
-    
-    return {
-        serverName: normalizedServerName,
-        currentMap: info.map,
-        playerCount: `${info.players}/${info.maxPlayers}`,
-        gameType: info.gameTypeShort === 'CA' ? 'Clan Arena' : info.gameType,
-        teamScores: {
-            red: rules.g_redScore,
-            blue: rules.g_blueScore
-        },
-        roundLimit: rules.roundlimit,
-        uptime,
-        address: server.address,
-        players
-    };
+  const { info, rules, players } = server;
+  const uptime = calculateUptime(rules.g_levelStartTime);
+
+  // Normalize whitespace in server name (replace multiple spaces/tabs with a single space)
+  const normalizedServerName = info.serverName.trim().replace(/\s+/g, ' ');
+
+  return {
+    serverName: normalizedServerName,
+    currentMap: info.map,
+    playerCount: `${info.players}/${info.maxPlayers}`,
+    gameType: info.gameTypeShort === 'CA' ? 'Clan Arena' : info.gameType,
+    teamScores: {
+      red: rules.g_redScore,
+      blue: rules.g_blueScore,
+    },
+    roundLimit: rules.roundlimit,
+    uptime,
+    address: server.address,
+    players,
+  };
 }
 
 /**
@@ -548,54 +576,66 @@ function extractServerStats(server) {
  * @returns {FormattedServerResponse} Formatted server response object
  */
 function formatServerResponse(serverStats, qlstatsData) {
-    // const steamLink = `steam://connect/${serverStats.address}`;
-    
-    // Debug log for qlstatsData and player info
-    quakeLogger.info({
-        hasQlstatsData: !!qlstatsData,
-        rankedPlayersCount: qlstatsData?.rankedPlayers?.length || 0,
-        eloMode: CONFIG.eloMode,
-        basicPlayersCount: serverStats.players?.length || 0
-    }, 'formatServerResponse debug info');
-    
-    // Check if qlstatsData exists and has rankedPlayers before accessing properties
-    const avgRating = CONFIG.eloMode > 0 && qlstatsData && qlstatsData.rankedPlayers && qlstatsData.rankedPlayers.length > 0 
-        ? `Avg Rating: ${Math.round(qlstatsData.avg)}` : '';
+  // const steamLink = `steam://connect/${serverStats.address}`;
 
-    // Choose labels based on emoji setting
-    const labels = CONFIG.showServerStatsEmojis ? {
+  // Debug log for qlstatsData and player info
+  quakeLogger.info(
+    {
+      hasQlstatsData: !!qlstatsData,
+      rankedPlayersCount: qlstatsData?.rankedPlayers?.length || 0,
+      eloMode: CONFIG.eloMode,
+      basicPlayersCount: serverStats.players?.length || 0,
+    },
+    'formatServerResponse debug info'
+  );
+
+  // Check if qlstatsData exists and has rankedPlayers before accessing properties
+  const avgRating =
+    CONFIG.eloMode > 0 &&
+    qlstatsData &&
+    qlstatsData.rankedPlayers &&
+    qlstatsData.rankedPlayers.length > 0
+      ? `Avg Rating: ${Math.round(qlstatsData.avg)}`
+      : '';
+
+  // Choose labels based on emoji setting
+  const labels = CONFIG.showServerStatsEmojis
+    ? {
         server: '🎮',
         map: '🗺️',
         status: '🎯',
         players: '👥',
         uptime: '⏱️',
-        rating: '📊'
-    } : {
+        rating: '📊',
+      }
+    : {
         server: 'Server:',
         map: 'Map:',
         status: 'Status:',
         players: 'Players:',
         uptime: 'Uptime:',
-        rating: 'Avg Rating:'
-    };
-    
-    return {
-        formatted: [
-            '```',
-            '═════════════════════════════════',
-            `${labels.server} ${serverStats.serverName}`,
-            '─────────────────────────────────',
-            `${labels.map} ${serverStats.currentMap}`,
-            `${labels.status} ${formatGameStatus(serverStats)}`,
-            `${labels.players} ${serverStats.playerCount}`,
-            `${labels.uptime} ${serverStats.uptime}`,
-            avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
-            '─────────────────────────────────',
-            formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
-            '═════════════════════════════════',
-            '```'
-        ].filter(line => line !== '').join('\n')
-    };
+        rating: 'Avg Rating:',
+      };
+
+  return {
+    formatted: [
+      '```',
+      '═════════════════════════════════',
+      `${labels.server} ${serverStats.serverName}`,
+      '─────────────────────────────────',
+      `${labels.map} ${serverStats.currentMap}`,
+      `${labels.status} ${formatGameStatus(serverStats)}`,
+      `${labels.players} ${serverStats.playerCount}`,
+      `${labels.uptime} ${serverStats.uptime}`,
+      avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
+      '─────────────────────────────────',
+      formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
+      '═════════════════════════════════',
+      '```',
+    ]
+      .filter(line => line !== '')
+      .join('\n'),
+  };
 }
 
 /**
@@ -608,88 +648,93 @@ function formatServerResponse(serverStats, qlstatsData) {
  * @returns {AISummaryResult} AI-processed summary string
  */
 async function processServerStatsWithAI(serverResponses, allServerStats) {
-    try {
-        // Check if serverResponses is valid
-        if (!serverResponses || !serverResponses.length || !serverResponses[0]?.formatted) {
-            throw new Error('Invalid server responses data');
-        }
-        
-        // Always include the first server's full details
-        const firstServerResponse = serverResponses[0].formatted;
-        
-        // Create a summary of the remaining servers
-        const remainingServers = allServerStats.slice(1);
-        if (remainingServers.length === 0) {
-            return firstServerResponse;
-        }
-        
-        // Create a condensed representation of the remaining servers
-        const serverSummaries = remainingServers.map(server => {
-            return {
-                name: server.serverName,
-                map: server.currentMap,
-                players: server.playerCount,
-                gameType: server.gameType,
-                playerNames: server.players.map(p => stripColorCodes(p.name))
-            };
-        });
-        
-        try {
-            /**
-             * Generate a concise summary of additional servers using OpenAI
-             * 
-             * @requires OpenAI API key in environment variables
-             * @requires openai package to be installed and configured
-             * @param {Object} serverSummaries - Array of simplified server objects with name, map, players, etc.
-             * @returns {string} A 3-4 sentence summary of all additional servers
-             */
-            const aiResponse = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo", // Using GPT-3.5 for cost efficiency and adequate performance
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types."
-                    },
-                    {
-                        role: "user",
-                        content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`
-                    }
-                ],
-                max_tokens: 150 // Limiting response length to ensure it fits within Discord's character limits
-            });
-            
-            // Extract the generated summary text from the API response
-            const aiSummary = aiResponse.choices[0].message.content;
-            
-            // Combine the first server's full details with the AI summary
-            return firstServerResponse + '\n```\n\n**Additional Servers**\n' + aiSummary + '\n```';
-        } catch (openaiError) {
-            quakeLogger.error({ error: openaiError }, 'OpenAI API error');
-            // Fallback to a simple manual summary if OpenAI API fails
-            const manualSummary = remainingServers.map(server => {
-                return `${server.serverName} - Map: ${server.currentMap}, Players: ${server.playerCount}, Type: ${server.gameType}`;
-            }).join('\n');
-            
-            return firstServerResponse + '\n```\n\n**Additional Servers**\n' + manualSummary + '\n```';
-        }
-    } catch (error) {
-        quakeLogger.error({ error }, 'Error processing server stats with AI');
-        // Return a valid formatted response even if everything fails
-        if (serverResponses && serverResponses.length) {
-            return serverResponses.map(r => r.formatted || '').join('\n');
-        } else if (allServerStats && allServerStats.length) {
-            // Create a basic formatted response from the first server stats
-            const firstServer = allServerStats[0];
-            return '```\n' + 
-                   `Server: ${firstServer.serverName}\n` +
-                   `Map: ${firstServer.currentMap}\n` +
-                   `Players: ${firstServer.playerCount}\n` +
-                   `Game Type: ${firstServer.gameType}\n` +
-                   '```';
-        } else {
-            return '```\n  ⚠️   Error processing server stats\n```';
-        }
+  try {
+    // Check if serverResponses is valid
+    if (!serverResponses || !serverResponses.length || !serverResponses[0]?.formatted) {
+      throw new Error('Invalid server responses data');
     }
+
+    // Always include the first server's full details
+    const firstServerResponse = serverResponses[0].formatted;
+
+    // Create a summary of the remaining servers
+    const remainingServers = allServerStats.slice(1);
+    if (remainingServers.length === 0) {
+      return firstServerResponse;
+    }
+
+    // Create a condensed representation of the remaining servers
+    const serverSummaries = remainingServers.map(server => {
+      return {
+        name: server.serverName,
+        map: server.currentMap,
+        players: server.playerCount,
+        gameType: server.gameType,
+        playerNames: server.players.map(p => stripColorCodes(p.name)),
+      };
+    });
+
+    try {
+      /**
+       * Generate a concise summary of additional servers using OpenAI
+       *
+       * @requires OpenAI API key in environment variables
+       * @requires openai package to be installed and configured
+       * @param {Object} serverSummaries - Array of simplified server objects with name, map, players, etc.
+       * @returns {string} A 3-4 sentence summary of all additional servers
+       */
+      const aiResponse = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo', // Using GPT-3.5 for cost efficiency and adequate performance
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types.',
+          },
+          {
+            role: 'user',
+            content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
+          },
+        ],
+        max_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
+      });
+
+      // Extract the generated summary text from the API response
+      const aiSummary = aiResponse.choices[0].message.content;
+
+      // Combine the first server's full details with the AI summary
+      return firstServerResponse + '\n```\n\n**Additional Servers**\n' + aiSummary + '\n```';
+    } catch (openaiError) {
+      quakeLogger.error({ error: openaiError }, 'OpenAI API error');
+      // Fallback to a simple manual summary if OpenAI API fails
+      const manualSummary = remainingServers
+        .map(server => {
+          return `${server.serverName} - Map: ${server.currentMap}, Players: ${server.playerCount}, Type: ${server.gameType}`;
+        })
+        .join('\n');
+
+      return firstServerResponse + '\n```\n\n**Additional Servers**\n' + manualSummary + '\n```';
+    }
+  } catch (error) {
+    quakeLogger.error({ error }, 'Error processing server stats with AI');
+    // Return a valid formatted response even if everything fails
+    if (serverResponses && serverResponses.length) {
+      return serverResponses.map(r => r.formatted || '').join('\n');
+    } else if (allServerStats && allServerStats.length) {
+      // Create a basic formatted response from the first server stats
+      const firstServer = allServerStats[0];
+      return (
+        '```\n' +
+        `Server: ${firstServer.serverName}\n` +
+        `Map: ${firstServer.currentMap}\n` +
+        `Players: ${firstServer.playerCount}\n` +
+        `Game Type: ${firstServer.gameType}\n` +
+        '```'
+      );
+    } else {
+      return '```\n  ⚠️   Error processing server stats\n```';
+    }
+  }
 }
 
 /**
@@ -704,120 +749,139 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
  * @returns {Promise<string>} Formatted server statistics for display in Discord
  */
 async function lookupQuakeServer(serverFilter = null, eloMode = null) {
-    // Validate inputs (these should already be validated by the command module,
-    // but we validate again here for safety and to handle direct calls)
-    const validatedServer = validateServerInput(serverFilter);
-    const validatedEloMode = validateEloMode(eloMode);
-    
-    quakeLogger.info({
-        serverFilter: validatedServer.value,
-        eloMode: validatedEloMode.value,
-        originalServerFilter: serverFilter,
-        originalEloMode: eloMode
-    }, 'lookupQuakeServer: Function started');
+  // Sanitize server filter input first
+  if (serverFilter !== null && serverFilter !== undefined) {
+    const sanitizedServerFilter = sanitizeQuery(serverFilter);
 
-    try {
-        // Apply ELO mode override if provided
-        if (validatedEloMode.value !== null) {
-            CONFIG.eloMode = validatedEloMode.value;
-            quakeLogger.info({ eloMode: CONFIG.eloMode }, 'ELO mode set');
-        }
-        
-        // Use retryWithBreaker to handle retries and circuit breaking
-        quakeLogger.debug('Using retryWithBreaker for Quake servers API request');
-        const response = await retryWithBreaker(
-            async () => {
-                quakeLogger.debug('Making Quake servers API request');
-                return await axios.get(SERVERS_API_URL, {
-                    params: DEFAULT_PARAMS,
-                    timeout: 5000
-                });
-            },
-            QUAKE_BREAKER_CONFIG
-        );
-
-        if (!response.data?.servers?.length) {
-            return '# 🎯 Quake Live Server Status\n\n> 🚫 No active servers found.';
-        }
-
-        // Filter servers by name/IP if provided
-        let filteredServers = response.data.servers.filter(server => server?.info?.players > 0);
-        
-        if (validatedServer.value) {
-            const serverFilterLower = validatedServer.value.toLowerCase();
-            filteredServers = filteredServers.filter(server => {
-                const serverName = stripColorCodes(server.info.name || '').toLowerCase();
-                const serverAddress = (server.address || '').toLowerCase();
-                return serverName.includes(serverFilterLower) || serverAddress.includes(serverFilterLower);
-            });
-        }
-        
-        const sortedServers = filteredServers
-            .sort((a, b) => b.info.players - a.info.players)
-            .slice(0, CONFIG.maxServers);
-
-        if (!sortedServers.length) {
-            const noServersMessage = serverFilter 
-                ? `No active servers found matching "${serverFilter}".`
-                : 'No active servers found.';
-            
-            return `# 🎯 Quake Live Server Status\n\n> 🚫 ${noServersMessage}`;
-        }
-
-        // Process all servers to get their stats
-        const serverResponses = [];
-        const allServerStats = [];
-        
-        for (const server of sortedServers) {
-            try {
-                // Validate server address before making API call
-                const validatedAddress = validateServerInput(server.address);
-                if (!validatedAddress.isValid) {
-                    quakeLogger.warn({ address: server.address }, 'Invalid server address');
-                    continue;
-                }
-                
-                // Get server stats
-                const serverStats = extractServerStats(server);
-                
-                // Get QLStats data for the server
-                const qlstatsData = await getQLStatsData(validatedAddress.value);
-                
-                // Format the server response
-                const formattedResponse = formatServerResponse(serverStats, qlstatsData);
-                serverResponses.push(formattedResponse.formatted);
-                allServerStats.push(serverStats);
-            } catch (error) {
-                quakeLogger.error({ error, server: server.address }, 'Error getting QLStats data');
-                // If we can't get QLStats data, still include the server but without ELO info
-                const serverStats = extractServerStats(server);
-                const formattedResponse = formatServerResponse(serverStats, null);
-                serverResponses.push(formattedResponse.formatted);
-                allServerStats.push(serverStats);
-            }
-        }
-
-        // If we have no results at this point, return an error
-        if (serverResponses.length === 0) {
-            return sanitizeOutput('# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.');
-        }
-
-        // If the total response is too long, use AI to summarize
-        const totalLength = serverResponses.join('\n\n').length;
-        if (totalLength > DISCORD_CHAR_LIMIT - BUFFER_SPACE) {
-            quakeLogger.info({ totalLength }, 'Response too long, using AI to summarize');
-            const aiSummary = await processServerStatsWithAI(serverResponses, allServerStats);
-            // Sanitize the AI-generated output
-            return sanitizeOutput(aiSummary);
-        }
-        
-        // Return the sanitized formatted response
-        return sanitizeOutput(serverResponses.join('\n\n'));
-
-    } catch (error) {
-        quakeLogger.error({ error }, 'Server stats fetch error');
-        return sanitizeOutput('# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.');
+    // Log if the server filter was modified during sanitization
+    if (sanitizedServerFilter !== serverFilter) {
+      quakeLogger.warn(
+        { original: serverFilter, sanitized: sanitizedServerFilter },
+        'Server filter was sanitized before Quake lookup'
+      );
     }
+
+    // Use the sanitized input for validation
+    serverFilter = sanitizedServerFilter;
+  }
+
+  // Validate inputs (these should already be validated by the command module,
+  // but we validate again here for safety and to handle direct calls)
+  const validatedServer = validateServerInput(serverFilter);
+  const validatedEloMode = validateEloMode(eloMode);
+
+  quakeLogger.info(
+    {
+      serverFilter: validatedServer.value,
+      eloMode: validatedEloMode.value,
+      originalServerFilter: serverFilter,
+      originalEloMode: eloMode,
+    },
+    'lookupQuakeServer: Function started'
+  );
+
+  try {
+    // Apply ELO mode override if provided
+    if (validatedEloMode.value !== null) {
+      CONFIG.eloMode = validatedEloMode.value;
+      quakeLogger.info({ eloMode: CONFIG.eloMode }, 'ELO mode set');
+    }
+
+    // Use retryWithBreaker to handle retries and circuit breaking
+    quakeLogger.debug('Using retryWithBreaker for Quake servers API request');
+    const response = await retryWithBreaker(async () => {
+      quakeLogger.debug('Making Quake servers API request');
+      return await axios.get(SERVERS_API_URL, {
+        params: DEFAULT_PARAMS,
+        timeout: 5000,
+      });
+    }, QUAKE_BREAKER_CONFIG);
+
+    if (!response.data?.servers?.length) {
+      return '# 🎯 Quake Live Server Status\n\n> 🚫 No active servers found.';
+    }
+
+    // Filter servers by name/IP if provided
+    let filteredServers = response.data.servers.filter(server => server?.info?.players > 0);
+
+    if (validatedServer.value) {
+      const serverFilterLower = validatedServer.value.toLowerCase();
+      filteredServers = filteredServers.filter(server => {
+        const serverName = stripColorCodes(server.info.name || '').toLowerCase();
+        const serverAddress = (server.address || '').toLowerCase();
+        return serverName.includes(serverFilterLower) || serverAddress.includes(serverFilterLower);
+      });
+    }
+
+    const sortedServers = filteredServers
+      .sort((a, b) => b.info.players - a.info.players)
+      .slice(0, CONFIG.maxServers);
+
+    if (!sortedServers.length) {
+      const noServersMessage = serverFilter
+        ? `No active servers found matching "${serverFilter}".`
+        : 'No active servers found.';
+
+      return `# 🎯 Quake Live Server Status\n\n> 🚫 ${noServersMessage}`;
+    }
+
+    // Process all servers to get their stats
+    const serverResponses = [];
+    const allServerStats = [];
+
+    for (const server of sortedServers) {
+      try {
+        // Validate server address before making API call
+        const validatedAddress = validateServerInput(server.address);
+        if (!validatedAddress.isValid) {
+          quakeLogger.warn({ address: server.address }, 'Invalid server address');
+          continue;
+        }
+
+        // Get server stats
+        const serverStats = extractServerStats(server);
+
+        // Get QLStats data for the server
+        const qlstatsData = await getQLStatsData(validatedAddress.value);
+
+        // Format the server response
+        const formattedResponse = formatServerResponse(serverStats, qlstatsData);
+        serverResponses.push(formattedResponse.formatted);
+        allServerStats.push(serverStats);
+      } catch (error) {
+        quakeLogger.error({ error, server: server.address }, 'Error getting QLStats data');
+        // If we can't get QLStats data, still include the server but without ELO info
+        const serverStats = extractServerStats(server);
+        const formattedResponse = formatServerResponse(serverStats, null);
+        serverResponses.push(formattedResponse.formatted);
+        allServerStats.push(serverStats);
+      }
+    }
+
+    // If we have no results at this point, return an error
+    if (serverResponses.length === 0) {
+      return sanitizeOutput(
+        '# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.'
+      );
+    }
+
+    // If the total response is too long, use AI to summarize
+    const totalLength = serverResponses.join('\n\n').length;
+    if (totalLength > DISCORD_CHAR_LIMIT - BUFFER_SPACE) {
+      quakeLogger.info({ totalLength }, 'Response too long, using AI to summarize');
+      const aiSummary = await processServerStatsWithAI(serverResponses, allServerStats);
+      // Sanitize the AI-generated output
+      return sanitizeOutput(aiSummary);
+    }
+
+    // Return the sanitized formatted response
+    return sanitizeOutput(serverResponses.join('\n\n'));
+  } catch (error) {
+    quakeLogger.error({ error }, 'Server stats fetch error');
+    return sanitizeOutput(
+      '# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.'
+    );
+  }
 }
 
 /**
@@ -829,67 +893,67 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
  * @returns {Promise<string>} The generated summary or error message
  */
 async function testOpenAISummary(mockOpenAIFailure = false) {
-    // Mock server data for testing
-    const mockServerStats = [
-        {
-            serverName: 'Test Server 1',
-            currentMap: 'bloodrun',
-            playerCount: 6,
-            gameType: 'CA',
-            players: [
-                { name: '^1Player1', score: 10, ping: 25 },
-                { name: '^2Player2', score: 5, ping: 30 }
-            ]
-        },
-        {
-            serverName: 'Test Server 2',
-            currentMap: 'campgrounds',
-            playerCount: 4,
-            gameType: 'TDM',
-            players: [
-                { name: '^3Player3', score: 15, ping: 20 },
-                { name: '^4Player4', score: 8, ping: 35 }
-            ]
-        },
-        {
-            serverName: 'Test Server 3',
-            currentMap: 'aerowalk',
-            playerCount: 2,
-            gameType: 'Duel',
-            players: [
-                { name: '^5Player5', score: 12, ping: 15 },
-                { name: '^6Player6', score: 9, ping: 40 }
-            ]
-        }
-    ];
+  // Mock server data for testing
+  const mockServerStats = [
+    {
+      serverName: 'Test Server 1',
+      currentMap: 'bloodrun',
+      playerCount: 6,
+      gameType: 'CA',
+      players: [
+        { name: '^1Player1', score: 10, ping: 25 },
+        { name: '^2Player2', score: 5, ping: 30 },
+      ],
+    },
+    {
+      serverName: 'Test Server 2',
+      currentMap: 'campgrounds',
+      playerCount: 4,
+      gameType: 'TDM',
+      players: [
+        { name: '^3Player3', score: 15, ping: 20 },
+        { name: '^4Player4', score: 8, ping: 35 },
+      ],
+    },
+    {
+      serverName: 'Test Server 3',
+      currentMap: 'aerowalk',
+      playerCount: 2,
+      gameType: 'Duel',
+      players: [
+        { name: '^5Player5', score: 12, ping: 15 },
+        { name: '^6Player6', score: 9, ping: 40 },
+      ],
+    },
+  ];
 
-    // Mock formatted responses
-    const mockResponses = [
-        { formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```' }
-    ];
+  // Mock formatted responses
+  const mockResponses = [
+    { formatted: '```\nServer: Test Server 1\nMap: bloodrun\nPlayers: 6\nGame Type: CA\n```' },
+  ];
 
-    // If testing OpenAI failure, modify the openai object temporarily
-    const originalCreate = openai.chat.completions.create;
+  // If testing OpenAI failure, modify the openai object temporarily
+  const originalCreate = openai.chat.completions.create;
+  if (mockOpenAIFailure) {
+    openai.chat.completions.create = async () => {
+      throw new Error('Simulated OpenAI API failure');
+    };
+  }
+
+  try {
+    // Call the function with our mock data
+    const result = await processServerStatsWithAI(mockResponses, mockServerStats);
+    console.log('AI Summary Test Result:\n', result);
+    return result;
+  } catch (error) {
+    quakeLogger.error({ error }, 'AI Summary Test Error');
+    return `Error: ${error.message}`;
+  } finally {
+    // Restore original function if we mocked it
     if (mockOpenAIFailure) {
-        openai.chat.completions.create = async () => {
-            throw new Error('Simulated OpenAI API failure');
-        };
+      openai.chat.completions.create = originalCreate;
     }
-
-    try {
-        // Call the function with our mock data
-        const result = await processServerStatsWithAI(mockResponses, mockServerStats);
-        console.log('AI Summary Test Result:\n', result);
-        return result;
-    } catch (error) {
-        quakeLogger.error({ error }, 'AI Summary Test Error');
-        return `Error: ${error.message}`;
-    } finally {
-        // Restore original function if we mocked it
-        if (mockOpenAIFailure) {
-            openai.chat.completions.create = originalCreate;
-        }
-    }
+  }
 }
 
 /**
@@ -901,22 +965,22 @@ module.exports = Object.assign(lookupQuakeServer, { testOpenAISummary });
 
 // Allow direct testing
 if (require.main === module) {
-    (async () => {
-        try {
-            // Test standard server lookup
-            console.log('=== Testing standard server lookup ===');
-            const result = await lookupQuakeServer();
-            console.log(result);
-            
-            // Test OpenAI summary functionality
-            console.log('\n=== Testing OpenAI summary functionality ===');
-            await testOpenAISummary();
-            
-            // Test OpenAI failure fallback
-            console.log('\n=== Testing OpenAI failure fallback ===');
-            await testOpenAISummary(true);
-        } catch (error) {
-            quakeLogger.error({ error }, 'Test execution error');
-        }
-    })();
+  (async () => {
+    try {
+      // Test standard server lookup
+      console.log('=== Testing standard server lookup ===');
+      const result = await lookupQuakeServer();
+      console.log(result);
+
+      // Test OpenAI summary functionality
+      console.log('\n=== Testing OpenAI summary functionality ===');
+      await testOpenAISummary();
+
+      // Test OpenAI failure fallback
+      console.log('\n=== Testing OpenAI failure fallback ===');
+      await testOpenAISummary(true);
+    } catch (error) {
+      quakeLogger.error({ error }, 'Test execution error');
+    }
+  })();
 }

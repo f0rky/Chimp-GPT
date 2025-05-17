@@ -1,186 +1,247 @@
 /**
  * OpenAI Configuration for ChimpGPT
- * Updated to use the latest models and API format
+ * Updated to use the latest models and API format with secure API key management
  */
 const OpenAI = require('openai');
+const apiKeyManager = require('./utils/apiKeyManager');
+const { openai: openaiLogger } = require('./logger');
+
+// Get the API key with fallback to environment variable if needed
+let apiKey;
+try {
+  apiKey = apiKeyManager.getApiKey('OPENAI_API_KEY');
+  openaiLogger.info('Using API key from secure manager');
+} catch (error) {
+  openaiLogger.warn(
+    { error: error.message },
+    'Failed to get API key from manager, falling back to environment variable'
+  );
+  apiKey = process.env.OPENAI_API_KEY;
+}
 
 // Initialize the OpenAI client with the API key
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+  apiKey: apiKey,
 });
 
 const retryWithBreaker = require('./utils/retryWithBreaker');
-const { openai: openaiLogger } = require('./logger');
+const { sanitizeUserMessage } = require('./utils/inputSanitizer');
 
 async function processMessage(userMessage, conversationLog) {
-    try {
-        const completion = await retryWithBreaker(
-            () => openai.chat.completions.create({
-                model: "o4-mini",
-                messages: conversationLog,
-                max_tokens: 512, // Limit token usage (optional)
-                functions: [
-                {
-                    name: "lookupTime",
-                    description: "get the current time in a given location",
-                    parameters: {
-                        type: "object",
-                        properties: {
-                            location: {
-                                type: "string",
-                                description: "The location, e.g., Beijing, China. But it should be written in a timezone name like Asia/Shanghai"
-                            }
-                        },
-                        required: ["location"]
-                    }
-                },
-                {
-                    name: "quakeLookup",
-                    description: "get the current quake server stats",
-                    parameters: {
-                        type: "object",
-                        properties: {},
-                        required: []
-                    }
-                },
-                {
-                    name: "lookupWeather",
-                    description: "get the weather forecast in a given location",
-                    parameters: {
-                        type: "object",
-                        properties: {
-                            location: {
-                                type: "string",
-                                description: "The location, e.g., Beijing, China. But it should be written in a city, state, country"
-                            }
-                        },
-                        required: ["location"]
-                    }
-                },
-                {
-                    name: "lookupExtendedForecast",
-                    description: "get the weather forecast for the next 5 days in a given location",
-                    parameters: {
-                        type: "object",
-                        properties: {
-                            location: {
-                                type: "string",
-                                description: "The location, e.g., Beijing, China. But it should be written in a city, state, country"
-                            }
-                        },
-                        required: ["location"]
-                    }
-                },
-                {
-                    name: "getWolframShortAnswer",
-                    description: "Get a short answer to a query using Wolfram Alpha",
-                    parameters: {
-                        type: "object",
-                        properties: {
-                            query: {
-                                type: "string",
-                                description: "The query you want to ask Wolfram Alpha, e.g., 'What is the square root of 16?'"
-                            }
-                        },
-                        required: ["query"]
-                    }
-                },
-                {
-                    name: "getVersion",
-                    description: "Get information about the bot's version and system details",
-                    parameters: {
-                        type: "object",
-                        properties: {
-                            detailed: {
-                                type: "boolean",
-                                description: "Whether to include detailed system information"
-                            },
-                            technical: {
-                                type: "boolean",
-                                description: "Whether to include technical details like memory usage and uptime"
-                            }
-                        },
-                        required: []
-                    }
-                }
-            ],
-            function_call: "auto"
-        }),
-        {
-            maxRetries: 3,
-            breakerLimit: 5,
-            breakerTimeoutMs: 120000,
-            onBreakerOpen: (err) => {
-                openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
-            }
-        }
-    );
+  try {
+    // Sanitize the user message and conversation log before processing
+    const sanitizedMessage = sanitizeUserMessage(userMessage);
 
-        // Check if GPT recognized a function call
-        if (completion.data.choices[0].finish_reason === 'function_call') {
-            const functionName = completion.data.choices[0].message.function_call.name;
-            const functionArgs = JSON.parse(completion.data.choices[0].message.function_call.arguments);
-            return {
-                type: "functionCall",
-                functionName: functionName,
-                parameters: functionArgs
-            };
-        } else {
-            // Get the GPT response
-            const gptResponse = completion.data.choices[0].message.content;
-            return {
-                type: "message",
-                content: gptResponse
-            };
-        }
-    } catch (error) {
-        openaiLogger.error({ error }, 'Error processing message');
-        return {
-            type: "error",
-            content: "Sorry, there was an error processing your request."
-        };
+    // Create a sanitized copy of the conversation log
+    const sanitizedLog = conversationLog.map(entry => ({
+      role: entry.role,
+      content: entry.role === 'user' ? sanitizeUserMessage(entry.content) : entry.content,
+    }));
+
+    // Log if the message was modified during sanitization
+    if (sanitizedMessage !== userMessage) {
+      openaiLogger.warn('User message was sanitized before processing');
     }
+    const completion = await retryWithBreaker(
+      async () => {
+        try {
+          return await openai.chat.completions.create({
+            model: 'o4-mini',
+            messages: sanitizedLog,
+            max_tokens: 512, // Limit token usage (optional)
+            functions: [
+              {
+                name: 'lookupTime',
+                description: 'get the current time in a given location',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    location: {
+                      type: 'string',
+                      description:
+                        'The location, e.g., Beijing, China. But it should be written in a timezone name like Asia/Shanghai',
+                    },
+                  },
+                  required: ['location'],
+                },
+              },
+              {
+                name: 'lookupWeather',
+                description: 'get the current weather in a given location',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    location: {
+                      type: 'string',
+                      description: 'The location, e.g., New York, NY',
+                    },
+                  },
+                  required: ['location'],
+                },
+              },
+              {
+                name: 'lookupExtendedForecast',
+                description: 'get the extended weather forecast for a given location',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    location: {
+                      type: 'string',
+                      description: 'The location, e.g., New York, NY',
+                    },
+                    days: {
+                      type: 'integer',
+                      description: 'Number of days to forecast (1-5)',
+                    },
+                  },
+                  required: ['location'],
+                },
+              },
+              {
+                name: 'lookupQuakeServer',
+                description: 'get information about Quake Live servers',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    serverFilter: {
+                      type: 'string',
+                      description: 'Optional server name or IP to filter by',
+                    },
+                    eloMode: {
+                      type: 'integer',
+                      description:
+                        'Optional ELO display mode (0=Off, 1=Categorized, 2=Actual value)',
+                    },
+                  },
+                },
+              },
+              {
+                name: 'getWolframShortAnswer',
+                description: 'get a short answer from Wolfram Alpha for a given query',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    query: {
+                      type: 'string',
+                      description: 'The question or query to send to Wolfram Alpha',
+                    },
+                  },
+                  required: ['query'],
+                },
+              },
+              {
+                name: 'getVersion',
+                description: "Get information about the bot's version and system details",
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    detailed: {
+                      type: 'boolean',
+                      description: 'Whether to include detailed system information',
+                    },
+                    technical: {
+                      type: 'boolean',
+                      description:
+                        'Whether to include technical details like memory usage and uptime',
+                    },
+                  },
+                  required: [],
+                },
+              },
+            ],
+            function_call: 'auto',
+          });
+        } catch (error) {
+          // Record API key error for monitoring
+          apiKeyManager.recordApiKeyError('OPENAI_API_KEY', error);
+          throw error; // Re-throw for the retry handler
+        }
+      },
+      {
+        maxRetries: 3,
+        breakerLimit: 5,
+        breakerTimeoutMs: 120000,
+        onBreakerOpen: err => {
+          openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
+        },
+      }
+    );
+    openaiLogger.debug('Received response from OpenAI');
+
+    // Check if GPT recognized a function call
+    if (completion.data.choices[0].finish_reason === 'function_call') {
+      const functionName = completion.data.choices[0].message.function_call.name;
+      const functionArgs = JSON.parse(completion.data.choices[0].message.function_call.arguments);
+      return {
+        type: 'functionCall',
+        functionName: functionName,
+        parameters: functionArgs,
+      };
+    } else {
+      // Get the GPT response
+      const gptResponse = completion.data.choices[0].message.content;
+      return {
+        type: 'message',
+        content: gptResponse,
+      };
+    }
+  } catch (error) {
+    openaiLogger.error({ error }, 'Error processing message');
+    return {
+      type: 'error',
+      content: 'Sorry, there was an error processing your request.',
+    };
+  }
 }
 
 async function generateResponse(functionResult, conversationLog) {
-    openaiLogger.debug({ functionResult }, "Generating response with function result");
-    
-    // Add the function result to the conversation log
-    conversationLog.push({
-        role: 'system',
-        content: `The result of the function call is: ${functionResult}`,
-    });
+  openaiLogger.debug({ functionResult }, 'Generating response with function result');
 
-    openaiLogger.debug({ conversationLog }, "Conversation log before generating response");
+  // Add the function result to the conversation log
+  conversationLog.push({
+    role: 'system',
+    content: `The result of the function call is: ${functionResult}`,
+  });
 
-    // Create a completion with OpenAI, including the updated conversation log
-    const completion = await retryWithBreaker(
-        () => openai.chat.completions.create({
-            model: 'o4-mini',
-            messages: conversationLog,
-            max_tokens: 256,
-        }),
-        {
-            maxRetries: 3,
-            breakerLimit: 5,
-            breakerTimeoutMs: 120000,
-            onBreakerOpen: (err) => {
-                openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
-            }
-        }
-    );
+  openaiLogger.debug({ conversationLog }, 'Conversation log before generating response');
 
-    // Get the GPT response
-    return completion.choices[0].message.content;
+  // Create a completion with OpenAI, including the updated conversation log
+  const completion = await retryWithBreaker(
+    async () => {
+      try {
+        return await openai.chat.completions.create({
+          model: 'o4-mini',
+          messages: conversationLog,
+          max_tokens: 256,
+        });
+      } catch (error) {
+        // Record API key error for monitoring
+        apiKeyManager.recordApiKeyError('OPENAI_API_KEY', error);
+        throw error; // Re-throw for the retry handler
+      }
+    },
+    {
+      maxRetries: 3,
+      breakerLimit: 5,
+      breakerTimeoutMs: 120000,
+      onBreakerOpen: err => {
+        openaiLogger.error({ error: err }, 'OpenAI circuit breaker triggered: too many failures');
+      },
+    }
+  );
+  openaiLogger.debug('Received response from OpenAI');
+
+  // Get the GPT response
+  return completion.choices[0].message.content;
 }
 
 /**
  * Get the current OpenAI model being used
- * 
+ *
  * @returns {string} The model name
  */
 function getOpenAIModel() {
-  return "o4-mini"; // This should match the model in processMessage function
+  return 'o4-mini'; // This should match the model in processMessage function
 }
 
 // openaiConfig.js
@@ -188,5 +249,5 @@ function getOpenAIModel() {
 module.exports = {
   processMessage,
   generateResponse,
-  getOpenAIModel
+  getOpenAIModel,
 };

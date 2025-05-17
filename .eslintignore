@@ -1,1 +1,4 @@
 archive/
+# Ignore markdown files
+*.md
+docs/*.md
