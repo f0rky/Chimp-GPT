@@ -140,7 +140,7 @@ async function generateImage(prompt, options = {}) {
       prompt,
       size,
       quality,
-      response_format: format,
+      output_format: format,
     };
 
     // Only add background parameter if it's not the default
@@ -377,4 +377,6 @@ module.exports = {
   MODELS,
   SIZES,
   QUALITY,
+  FORMAT,
+  BACKGROUND,
 };

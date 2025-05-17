@@ -10,7 +10,7 @@
   - [x] Add better error handling and logging for image generation
   - [x] Update status display to show meaningful actions instead of "to username"
   - [x] Complete migration from DALL-E to GPT Image-1 in all references
-  - [x] Update code to conform to OpenAI's GPT Image-1 API standards
+  - [x] Fix parameter naming: use `output_format` instead of `response_format` for GPT Image-1
   - [ ] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
 
 - [ ] **Enhanced status updates:**
