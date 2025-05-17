@@ -219,14 +219,27 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIS
 5. **Run the Bot**:
 
    ```bash
-   # Using PM2 (recommended)
-   pm2 start chimpGPT.js --name chimpGPT --env development
-   # Or for production
-   pm2 start chimpGPT.js --name [bot name] --env production
+   # Using the start.sh script (recommended)
+   chmod +x start.sh  # Make sure it's executable
+
+   # Start in development mode (default)
+   ./start.sh
+
+   # Start in production mode
+   ./start.sh -m production
+
+   # Start only the status server
+   ./start.sh -c status
+
+   # Start only the Discord bot
+   ./start.sh -c bot
+
+   # Start in demo mode (no API keys needed)
+   ./start.sh --demo
    ```
 
 6. **Access the Status Page**:
-   - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>`
+   - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>` (default: http://localhost:3000)
 
 ## Docker Deployment
 
@@ -251,6 +264,8 @@ ChimpGPT can be easily deployed using Docker:
    # Build and start the container
    docker-compose up -d
    ```
+
+   > **Note about environment variables**: The Docker setup mounts your local `.env` file directly into the container, so it will use the same environment variables you've set for development. This makes it easy to switch between local and containerized deployment without changing your configuration.
 
 3. **Access the Status Page**:
 
