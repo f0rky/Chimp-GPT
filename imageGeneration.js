@@ -139,20 +139,57 @@ async function generateImage(prompt, options = {}) {
     let images = [];
 
     try {
-      // Handle different possible response formats
-      if (response.data && Array.isArray(response.data)) {
-        images = response.data.map(img => ({
-          url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
-          revisedPrompt: img.revised_prompt || prompt,
-        }));
-      } else if (response.data && response.data.url) {
-        // Single image response format
-        images = [
-          {
-            url: response.data.url,
-            revisedPrompt: response.data.revised_prompt || prompt,
-          },
-        ];
+      // Log the full response to understand its structure
+      logger.debug({ fullResponse: JSON.stringify(response) }, 'Full GPT Image-1 response');
+
+      // Handle different possible response formats based on OpenAI API documentation
+      if (response && response.data) {
+        // For OpenAI Node.js SDK v4+
+        if (Array.isArray(response.data)) {
+          // Array of images
+          images = response.data.map(img => ({
+            url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
+            revisedPrompt: img.revised_prompt || prompt,
+          }));
+        } else if (typeof response.data === 'object') {
+          if (Array.isArray(response.data.data)) {
+            // New format with nested data array
+            images = response.data.data.map(img => ({
+              url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
+              revisedPrompt: img.revised_prompt || prompt,
+            }));
+          } else {
+            // Single image response
+            images = [
+              {
+                url:
+                  response.data.url ||
+                  (response.data.b64_json
+                    ? `data:image/png;base64,${response.data.b64_json}`
+                    : null),
+                revisedPrompt: response.data.revised_prompt || prompt,
+              },
+            ];
+          }
+        }
+      }
+
+      // Ensure we have at least one image with a valid URL
+      if (images.length === 0 || !images.some(img => img.url)) {
+        // If we couldn't extract a URL, try to find any URL-like string in the response
+        const responseStr = JSON.stringify(response);
+        const urlMatch = responseStr.match(/https?:\/\/[^"'\s]+/g);
+        if (urlMatch && urlMatch.length > 0) {
+          images = [
+            {
+              url: urlMatch[0],
+              revisedPrompt: prompt,
+            },
+          ];
+          logger.info({ extractedUrl: urlMatch[0] }, 'Extracted URL from response string');
+        } else {
+          throw new Error('No valid image URL found in the response');
+        }
       }
 
       // Log the extracted URLs

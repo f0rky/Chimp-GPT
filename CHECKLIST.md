@@ -6,7 +6,7 @@
 
 - [ ] **GPT Image-1 integration fixes:**
 
-  - [x] Fix URL extraction from GPT Image-1 API response to handle different response formats
+  - [ ] Fix URL extraction from GPT Image-1 API response to handle different response formats
   - [x] Add better error handling and logging for image generation
   - [x] Update status display to show meaningful actions instead of "to username"
   - [ ] Complete migration from DALL-E to GPT Image-1 in all references
