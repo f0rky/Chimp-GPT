@@ -362,10 +362,65 @@ function getStorageFilePath() {
   return CONVERSATIONS_FILE;
 }
 
+/**
+ * Get the current status of conversation storage
+ * 
+ * This function returns information about the conversation storage system,
+ * including the number of conversations, last save time, and storage size.
+ * 
+ * @returns {Object} Object containing storage metrics
+ */
+function getConversationStorageStatus() {
+  try {
+    // Check if the file exists
+    if (!fs.existsSync(CONVERSATIONS_FILE)) {
+      return {
+        totalConversations: 0,
+        lastSave: null,
+        storageSize: 0,
+        exists: false
+      };
+    }
+    
+    // Get file stats
+    const stats = fs.statSync(CONVERSATIONS_FILE);
+    
+    // Try to read the file to get conversation count
+    let conversationCount = 0;
+    let lastSave = null;
+    
+    try {
+      const data = JSON.parse(fs.readFileSync(CONVERSATIONS_FILE, 'utf8'));
+      conversationCount = Object.keys(data.conversations || {}).length;
+      lastSave = data.lastUpdated || stats.mtime.toISOString();
+    } catch (parseError) {
+      logger.error({ error: parseError }, 'Error parsing conversation file for status');
+    }
+    
+    return {
+      totalConversations: conversationCount,
+      lastSave: lastSave,
+      storageSize: stats.size,
+      exists: true,
+      lastModified: stats.mtime
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error getting conversation storage status');
+    return {
+      totalConversations: 0,
+      lastSave: null,
+      storageSize: 0,
+      exists: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   saveConversations,
   loadConversations,
   clearAllConversations,
   pruneOldConversations,
-  getStorageFilePath
+  getStorageFilePath,
+  getConversationStorageStatus
 };

@@ -22,6 +22,7 @@ const lookupWolfram = require('./wolframLookup');
 const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
 const pluginManager = require('./pluginManager');
 const { processVersionQuery } = require('./utils/versionSelfQuery');
+const { sendChannelGreeting, sendOwnerStartupReport } = require('./utils/greetingManager');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -1050,6 +1051,19 @@ client.on('ready', async () => {
     }
   } else {
     discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed');
+  }
+  
+  // Send greeting messages
+  try {
+    // Send a greeting to all allowed channels
+    await sendChannelGreeting(client);
+    
+    // Send a detailed startup report to the owner
+    await sendOwnerStartupReport(client);
+    
+    discordLogger.info('Startup greetings and reports sent successfully');
+  } catch (error) {
+    discordLogger.error({ error }, 'Error sending startup greetings');
   }
 });
 

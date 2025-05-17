@@ -604,6 +604,32 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
   }
 }
 
+/**
+ * Get the current health status of the bot
+ * 
+ * This function returns a simplified version of the health statistics
+ * suitable for display in status reports and monitoring dashboards.
+ * 
+ * @returns {Object} Object containing key health metrics
+ */
+function getHealthStatus() {
+  return {
+    uptime: Math.floor((new Date() - stats.startTime) / 1000), // uptime in seconds
+    messagesProcessed: stats.messageCount,
+    apiCalls: Object.values(stats.apiCalls).reduce((sum, val) => {
+      if (typeof val === 'number') return sum + val;
+      return sum;
+    }, 0),
+    errors: Object.values(stats.errors).reduce((sum, val) => {
+      if (typeof val === 'number') return sum + val;
+      return sum;
+    }, 0),
+    rateLimits: stats.rateLimits.hit,
+    lastRestart: stats.lastRestart,
+    startTime: stats.startTime
+  };
+}
+
 module.exports = {
   initHealthCheck,
   trackApiCall,
@@ -615,5 +641,6 @@ module.exports = {
   updatePluginStats,
   trackPluginFunctionCall,
   generateHealthReport,
-  stats
+  stats,
+  getHealthStatus
 };

@@ -174,9 +174,19 @@ async function generateResponse(functionResult, conversationLog) {
     return completion.choices[0].message.content;
 }
 
+/**
+ * Get the current OpenAI model being used
+ * 
+ * @returns {string} The model name
+ */
+function getOpenAIModel() {
+  return "o4-mini"; // This should match the model in processMessage function
+}
+
 // openaiConfig.js
 
 module.exports = {
   processMessage,
   generateResponse,
+  getOpenAIModel
 };

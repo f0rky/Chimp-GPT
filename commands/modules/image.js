@@ -58,9 +58,7 @@ module.exports = {
         .addChoices(
           { name: 'Square (1024x1024)', value: SIZES.LARGE },
           { name: 'Wide (1792x1024)', value: SIZES.WIDE },
-          { name: 'Tall (1024x1792)', value: SIZES.TALL },
-          { name: 'Medium (512x512, DALL-E 2 only)', value: SIZES.MEDIUM },
-          { name: 'Small (256x256, DALL-E 2 only)', value: SIZES.SMALL }
+          { name: 'Tall (1024x1792)', value: SIZES.TALL }
         ))
     .addStringOption(option => 
       option.setName('quality')

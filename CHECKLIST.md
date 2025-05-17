@@ -22,6 +22,7 @@
 - [x] **Plugin README improvement:** Enhanced plugins/README.md with detailed hook documentation, fallback behavior explanation, and improved examples.
 - [x] **Advanced error handling:** Implemented comprehensive error handling system with custom error classes, utility functions, and detailed documentation.
 - [ ] **Security review:** Review OpenAI/Discord API usage for security best practices (e.g., input sanitization, rate limiting on commands, API key rotation).
+- [x] **Upgrade undici:** Upgrade undici to version 6.21.2 or later to fix Dependabot security alert in package-lock.json.
 - [ ] **Docker/CI/CD:** No Dockerfile or GitHub Actions config found. Add for easier deployment and automated testing.
 - [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.
 - [ ] **Command-line run modes:** Add support for different run modes via CLI args (e.g., test, production, demo).

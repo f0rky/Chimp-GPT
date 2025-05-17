@@ -54,11 +54,9 @@ const MODELS = {
  * @enum {string}
  */
 const SIZES = {
-  SMALL: '256x256',      // DALL-E 2 only
-  MEDIUM: '512x512',     // DALL-E 2 only
-  LARGE: '1024x1024',    // Both models
-  WIDE: '1792x1024',     // DALL-E 3 only
-  TALL: '1024x1792'      // DALL-E 3 only
+  LARGE: '1024x1024',    // Square - Both models
+  WIDE: '1792x1024',     // Landscape - DALL-E 3 only
+  TALL: '1024x1792'      // Portrait - DALL-E 3 only
 };
 
 /**
@@ -99,6 +97,12 @@ async function generateImage(prompt, options = {}) {
     // Validate the model and size combination
     if (model === MODELS.DALLE_2 && (size === SIZES.WIDE || size === SIZES.TALL)) {
       logger.warn('DALL-E 2 does not support wide or tall sizes, falling back to large');
+      size = SIZES.LARGE;
+    }
+    
+    // Ensure we're using a supported size
+    if (![SIZES.LARGE, SIZES.WIDE, SIZES.TALL].includes(size)) {
+      logger.warn(`Unsupported size: ${size}, falling back to large`);
       size = SIZES.LARGE;
     }
     
