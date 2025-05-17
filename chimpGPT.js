@@ -660,30 +660,56 @@ async function handleImageGeneration(parameters, feedbackMessage, conversationLo
       return;
     }
 
-    // Get the first image URL and validate it
-    const imageUrl = result.images[0]?.url;
-    const revisedPrompt = result.images[0]?.revisedPrompt || finalPrompt;
+    // Get the first image result and validate it
+    const imageResult = result.images[0];
+    const revisedPrompt = imageResult?.revisedPrompt || finalPrompt;
 
-    // Log the image URL for debugging
-    logger.debug({ imageUrl }, 'Image URL from GPT Image-1 response');
+    // Log the image data for debugging
+    logger.debug(
+      {
+        hasUrl: !!imageResult?.url,
+        hasBase64: !!imageResult?.b64_json,
+        urlType: imageResult?.url?.substring(0, 30), // Log just the beginning of the URL for privacy
+      },
+      'Image data from GPT Image-1 response'
+    );
 
-    // Validate URL before proceeding
-    if (!imageUrl) {
-      throw new Error('No valid image URL returned from GPT Image-1');
+    // Validate we have either a URL or base64 data
+    if (!imageResult || (!imageResult.url && !imageResult.b64_json)) {
+      throw new Error('No valid image data returned from GPT Image-1');
     }
 
-    try {
-      // Validate URL format
-      new URL(imageUrl);
-    } catch (error) {
-      logger.error({ error, imageUrl }, 'Invalid image URL format');
-      throw new Error(`Invalid image URL format: ${imageUrl}`);
-    }
+    let buffer;
 
-    // Download the image
-    const axios = require('axios');
-    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-    const buffer = Buffer.from(response.data, 'binary');
+    // Handle either URL or base64 data
+    if (imageResult.b64_json) {
+      // Directly use the base64 data if available
+      buffer = Buffer.from(imageResult.b64_json, 'base64');
+      logger.info('Using base64 image data directly from API response');
+    } else {
+      // Otherwise download from URL
+      try {
+        // Validate URL format
+        new URL(imageResult.url);
+
+        // Check if it's a data URL
+        if (imageResult.url.startsWith('data:')) {
+          // Extract the base64 part from the data URL
+          const base64Data = imageResult.url.split(',')[1];
+          buffer = Buffer.from(base64Data, 'base64');
+          logger.info('Extracted base64 data from data URL');
+        } else {
+          // Download from remote URL
+          const axios = require('axios');
+          const response = await axios.get(imageResult.url, { responseType: 'arraybuffer' });
+          buffer = Buffer.from(response.data, 'binary');
+          logger.info('Downloaded image from remote URL');
+        }
+      } catch (error) {
+        logger.error({ error, url: imageResult.url }, 'Error processing image URL');
+        throw new Error(`Error processing image data: ${error.message}`);
+      }
+    }
 
     // Create attachment
     const attachment = { attachment: buffer, name: 'gpt-image.png' };

@@ -2,6 +2,10 @@
  * @typedef {Object} ImageGenerationOptions
  * @property {string} [model] - The model to use (gpt-image-1)
  * @property {string} [size] - Image size (1024x1024, 1792x1024, or 1024x1792)
+ * @property {string} [quality] - Image quality (low, medium, high, auto)
+ * @property {string} [format] - Output format (png, jpeg, webp)
+ * @property {string} [background] - Background type (opaque, transparent, auto)
+ * @property {number} [compression] - Compression level (0-100) for jpeg and webp
  * @property {boolean} [enhance] - Whether to enhance the prompt using GPT
  *
  * @typedef {Object} ImageResult
@@ -62,7 +66,30 @@ const SIZES = {
  * @enum {string}
  */
 const QUALITY = {
-  STANDARD: 'standard',
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  AUTO: 'auto',
+};
+
+/**
+ * Available image formats
+ * @enum {string}
+ */
+const FORMAT = {
+  PNG: 'png',
+  JPEG: 'jpeg',
+  WEBP: 'webp',
+};
+
+/**
+ * Background options
+ * @enum {string}
+ */
+const BACKGROUND = {
+  DEFAULT: 'opaque',
+  TRANSPARENT: 'transparent',
+  AUTO: 'auto',
 };
 
 /**
@@ -98,14 +125,35 @@ async function generateImage(prompt, options = {}) {
       size = SIZES.SQUARE;
     }
 
-    // No quality validation needed for GPT Image-1
+    // Set default quality to auto if not specified
+    const quality = options.quality || QUALITY.AUTO;
 
-    // Generate the image with GPT Image-1
+    // Set default format to png if not specified
+    const format = options.format || FORMAT.PNG;
+
+    // Set default background to opaque if not specified
+    const background = options.background || BACKGROUND.DEFAULT;
+
+    // Build the image parameters object according to OpenAI's API
     const imageParams = {
       model: MODELS.GPT_IMAGE_1,
       prompt,
       size,
+      quality,
+      response_format: format,
     };
+
+    // Only add background parameter if it's not the default
+    if (background !== BACKGROUND.DEFAULT) {
+      imageParams.background = background;
+    }
+
+    // Add compression parameter if format is jpeg or webp and compression is specified
+    if ((format === FORMAT.JPEG || format === FORMAT.WEBP) && options.compression !== undefined) {
+      // Ensure compression is between 0 and 100
+      const compression = Math.max(0, Math.min(100, options.compression));
+      imageParams.output_compression = compression;
+    }
 
     logger.info({ imageParams }, 'Generating image with GPT Image-1');
     const response = await openai.images.generate(imageParams);
@@ -142,36 +190,47 @@ async function generateImage(prompt, options = {}) {
       // Log the full response to understand its structure
       logger.debug({ fullResponse: JSON.stringify(response) }, 'Full GPT Image-1 response');
 
-      // Handle different possible response formats based on OpenAI API documentation
+      // According to OpenAI's documentation, the response should have a data array
+      // Each item in the array can have either a url or b64_json property
       if (response && response.data) {
-        // For OpenAI Node.js SDK v4+
-        if (Array.isArray(response.data)) {
-          // Array of images
-          images = response.data.map(img => ({
-            url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
-            revisedPrompt: img.revised_prompt || prompt,
-          }));
-        } else if (typeof response.data === 'object') {
-          if (Array.isArray(response.data.data)) {
-            // New format with nested data array
-            images = response.data.data.map(img => ({
-              url: img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null),
+        // Handle the standard OpenAI v4 SDK response format
+        const dataArray = Array.isArray(response.data)
+          ? response.data
+          : response.data.data && Array.isArray(response.data.data)
+            ? response.data.data
+            : [response.data];
+
+        images = dataArray.map(img => {
+          // For image formats that support base64 encoding
+          if (img.b64_json) {
+            // Create a data URL with the appropriate MIME type
+            const mimeType =
+              format === FORMAT.JPEG
+                ? 'image/jpeg'
+                : format === FORMAT.WEBP
+                  ? 'image/webp'
+                  : 'image/png';
+            return {
+              url: `data:${mimeType};base64,${img.b64_json}`,
               revisedPrompt: img.revised_prompt || prompt,
-            }));
+              // Store the raw base64 data for direct file saving if needed
+              b64_json: img.b64_json,
+            };
+          } else if (img.url) {
+            // For URL responses
+            return {
+              url: img.url,
+              revisedPrompt: img.revised_prompt || prompt,
+            };
           } else {
-            // Single image response
-            images = [
-              {
-                url:
-                  response.data.url ||
-                  (response.data.b64_json
-                    ? `data:image/png;base64,${response.data.b64_json}`
-                    : null),
-                revisedPrompt: response.data.revised_prompt || prompt,
-              },
-            ];
+            // Fallback for unexpected response format
+            logger.warn({ img }, 'Unexpected image data format in response');
+            return {
+              url: null,
+              revisedPrompt: prompt,
+            };
           }
-        }
+        });
       }
 
       // Ensure we have at least one image with a valid URL

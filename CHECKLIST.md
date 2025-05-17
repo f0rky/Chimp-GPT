@@ -6,10 +6,11 @@
 
 - [ ] **GPT Image-1 integration fixes:**
 
-  - [ ] Fix URL extraction from GPT Image-1 API response to handle different response formats
+  - [x] Fix URL extraction from GPT Image-1 API response to handle different response formats
   - [x] Add better error handling and logging for image generation
   - [x] Update status display to show meaningful actions instead of "to username"
-  - [ ] Complete migration from DALL-E to GPT Image-1 in all references
+  - [x] Complete migration from DALL-E to GPT Image-1 in all references
+  - [x] Update code to conform to OpenAI's GPT Image-1 API standards
   - [ ] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
 
 - [ ] **Enhanced status updates:**
