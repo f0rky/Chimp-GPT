@@ -1,4 +1,3 @@
-
 # Chimp-GPT Discord Bot
 
 **Bot Version:** 3.2.0 <!-- BOT_VERSION -->
@@ -6,6 +5,27 @@
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
 ## Features
+
+### Docker & CI/CD Support
+
+ChimpGPT now includes Docker support for easy deployment and GitHub Actions workflows for CI/CD:
+
+- **Docker Integration**: Complete with Dockerfile and docker-compose.yml for containerized deployment
+- **GitHub Actions**: Automated testing, linting, and Docker image building/publishing
+- **Deployment Documentation**: Comprehensive guide for Docker-based deployment
+
+See [Docker Deployment](#docker-deployment) for more details.
+
+### Flexible Run Modes
+
+ChimpGPT supports multiple run modes via command-line arguments:
+
+- **Production Mode**: Optimized for production environments with minimal logging
+- **Development Mode**: Enhanced debugging and verbose logging for development
+- **Test Mode**: Runs the test suite without starting the bot or status server
+- **Demo Mode**: Generates mock data for the status page without requiring API keys
+
+Additional options include component-specific startup (bot-only, status-only), debug logging, and quiet mode. See [Run Modes](#run-modes) for more details.
 
 ### Error Resilience for External APIs
 
@@ -18,7 +38,6 @@ All external API calls are now protected by a retry mechanism with exponential b
 - **Image Download**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
 
 When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and avoids API abuse during outages.
-
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
 - **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT-3.5/4).
@@ -41,22 +60,26 @@ When a circuit breaker opens, it blocks further calls for the specified timeout 
 ## Plugin System
 
 Chimp-GPT supports a powerful plugin architecture:
+
 - Plugins are placed in the `plugins/` directory, each in its own folder.
 - Each plugin exports metadata, commands, functions, and hooks.
 - Example plugins and a template are provided in `plugins/README.md`.
 - Plugins can add slash commands, message commands, and respond to bot lifecycle events.
 
 ### Creating a Plugin
+
 1. Copy the template in `plugins/README.md`.
 2. Create a new folder in `plugins/` and add your `index.js`.
 3. Export an object with required fields (`id`, `name`, `version`) and optional `commands`, `functions`, and `hooks`.
 4. Restart the bot to load your plugin.
 
 ### Plugin Validation
+
 - Plugins are validated for required metadata and structure.
 - See the [windsurf.config.js](#windsurf-configjs) for plugin validation rules.
 
 ## Status Page & Image Gallery
+
 - Accessible via the configurable `STATUS_HOSTNAME` and `STATUS_PORT` (see Environment Variables below).
 - Supports multi-instance deployment with automatic port fallback and remote access.
 - The status page displays:
@@ -67,6 +90,7 @@ Chimp-GPT supports a powerful plugin architecture:
 - Responsive design and mobile-friendly, with robust error handling for all UI elements.
 
 ## Error Handling & Logging
+
 - All API integrations feature robust error handling and fallbacks.
 - Errors are logged using Pino-based structured loggers and shown on the status page.
 - Logging is now standardized across all main modules (see checklist for logger migration progress).
@@ -74,11 +98,13 @@ Chimp-GPT supports a powerful plugin architecture:
 - Test/CLI files may use console.error, but should be reviewed for consistency.
 
 ## Documentation & Type Safety
+
 - Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
 - Improved maintainability, developer onboarding, and static analysis.
 - Please review and update the [`CHECKLIST.md`](./CHECKLIST.md) as you work on the project.
 
 ## Code Quality & Linting
+
 - The project uses ESLint and Prettier for code quality.
 - Linting and formatting rules are enforced via [windsurf.config.js](#windsurf-configjs).
 - Security checks prevent secrets from being committed.
@@ -92,15 +118,15 @@ A `windsurf.config.js` file is provided at the project root to enforce code qual
 
 The bot is configured via environment variables (see `.env.example`). Below is a summary of key variables and their defaults:
 
-| Variable                  | Default        | Description                                                        |
-|---------------------------|----------------|--------------------------------------------------------------------|
-| BOT_NAME                  | CircuitChimp   | Name displayed on the status page and in Discord                   |
-| STATUS_HOSTNAME           | localhost      | Hostname for the status page server                                |
-| STATUS_PORT               | 3000           | Port for the status page server (auto-fallback for multiple bots)  |
-| SHOW_TEAM_EMOJIS          | false          | Show team emojis in Quake stats player names                       |
-| SHOW_SERVER_STATS_EMOJIS  | false          | Show emojis in Quake server info headers                           |
-| ELO_DISPLAY_MODE          | 0              | ELO display: 0=off, 1=categorized, 2=actual values                |
-| ...                       |                | See .env.example for full list and documentation                   |
+| Variable                 | Default      | Description                                                       |
+| ------------------------ | ------------ | ----------------------------------------------------------------- |
+| BOT_NAME                 | CircuitChimp | Name displayed on the status page and in Discord                  |
+| STATUS_HOSTNAME          | localhost    | Hostname for the status page server                               |
+| STATUS_PORT              | 3000         | Port for the status page server (auto-fallback for multiple bots) |
+| SHOW_TEAM_EMOJIS         | false        | Show team emojis in Quake stats player names                      |
+| SHOW_SERVER_STATS_EMOJIS | false        | Show emojis in Quake server info headers                          |
+| ELO_DISPLAY_MODE         | 0            | ELO display: 0=off, 1=categorized, 2=actual values                |
+| ...                      |              | See .env.example for full list and documentation                  |
 
 - All environment variables are validated at startup.
 - For multi-instance deployments, ports are automatically selected and hostname can be set for remote access.
@@ -115,33 +141,40 @@ module.exports = {
     configFile: '.eslintrc.js',
     failOnError: true,
     include: ['**/*.js'],
-    exclude: ['node_modules', 'archive', 'plugins/README.md']
+    exclude: ['node_modules', 'archive', 'plugins/README.md'],
   },
   prettier: {
     enabled: true,
     configFile: '.prettierrc',
     include: ['**/*.js', '**/*.json', '**/*.md'],
-    exclude: ['node_modules', 'archive']
+    exclude: ['node_modules', 'archive'],
   },
   security: {
     checkSecrets: true,
     failOnSecret: true,
-    exclude: ['.env.example', 'archive']
+    exclude: ['.env.example', 'archive'],
   },
   deploy: {
     enabled: false, // Set to true if using Windsurf for deployment
     provider: '', // e.g., 'netlify', 'vercel', or leave blank
     buildCommand: 'npm run build',
     publishDir: 'dist',
-    env: ['DISCORD_TOKEN', 'OPENAI_API_KEY', 'X_RAPIDAPI_KEY', 'BOT_PERSONALITY', 'STATUS_HOSTNAME', 'STATUS_PORT']
+    env: [
+      'DISCORD_TOKEN',
+      'OPENAI_API_KEY',
+      'X_RAPIDAPI_KEY',
+      'BOT_PERSONALITY',
+      'STATUS_HOSTNAME',
+      'STATUS_PORT',
+    ],
   },
   plugins: {
     validate: true,
     pluginDir: 'plugins',
     requireId: true,
     requireVersion: true,
-    requireDescription: false
-  }
+    requireDescription: false,
+  },
 };
 ```
 
@@ -158,42 +191,117 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIS
 ## Setup and Installation
 
 1. **Clone the Repository**:
-    ```bash
-    git clone https://github.com/f0rky/Chimp-GPT
-    cd Chimp-GPT
-    ```
+
+   ```bash
+   git clone https://github.com/f0rky/Chimp-GPT
+   cd Chimp-GPT
+   ```
 
 2. **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+
+   ```bash
+   npm install
+   ```
 
 3. **Set Up Environment Variables**:
    Create a `.env` file in the root directory and set up the following environment variables (refer to `.env.example`).
 
 4. **Linting & Code Quality**:
-    - Before building or deploying, run the linter and fix all errors:
-    ```bash
-    npx eslint . --ext .js --max-warnings=0
-    ```
-    - The build/deploy process requires a successful lint (no errors).
+
+   - Before building or deploying, run the linter and fix all errors:
+
+   ```bash
+   npx eslint . --ext .js --max-warnings=0
+   ```
+
+   - The build/deploy process requires a successful lint (no errors).
 
 5. **Run the Bot**:
-    ```bash
-    # Using PM2 (recommended)
-    pm2 start chimpGPT.js --name chimpGPT --env development
-    # Or for production
-    pm2 start chimpGPT.js --name [bot name] --env production
-    ```
+
+   ```bash
+   # Using PM2 (recommended)
+   pm2 start chimpGPT.js --name chimpGPT --env development
+   # Or for production
+   pm2 start chimpGPT.js --name [bot name] --env production
+   ```
 
 6. **Access the Status Page**:
-    - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>`
+   - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>`
+
+## Docker Deployment
+
+ChimpGPT can be easily deployed using Docker:
+
+1. **Prerequisites**:
+
+   - Docker and Docker Compose installed
+   - Valid `.env` file with required environment variables
+
+2. **Quick Start**:
+
+   ```bash
+   # Clone the repository
+   git clone https://github.com/yourusername/Chimp-GPT.git
+   cd Chimp-GPT
+
+   # Create .env file
+   cp .env.example .env
+   nano .env  # Edit with your API keys and settings
+
+   # Build and start the container
+   docker-compose up -d
+   ```
+
+3. **Access the Status Page**:
+
+   - Open your browser to `http://localhost:3000` (or the port specified in your `.env` file)
+
+4. **View Logs**:
+   ```bash
+   docker-compose logs -f
+   ```
+
+For more details, see the [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
+
+## Run Modes
+
+ChimpGPT supports different run modes via the included `start.sh` script:
+
+```bash
+# Start in development mode (default)
+./start.sh
+
+# Start in production mode
+./start.sh -m production
+
+# Start only the status server in demo mode
+./start.sh -c status --demo
+
+# Run tests
+./start.sh -m test
+
+# Start with debug logging
+./start.sh --debug
+```
+
+Available options:
+
+- `-m, --mode MODE`: Set run mode (production, development, test, demo)
+- `-c, --component COMP`: Component to run (all, bot, status)
+- `-d, --demo`: Enable demo mode (generates mock data)
+- `--debug`: Enable debug logging
+- `-q, --quiet`: Minimize logging (errors only)
+
+For VSCode users, debugging configurations are available in the `.vscode/launch.json` file.
 
 ## Contributing
+
 - Contributions are welcome! Please follow the plugin template and code style guidelines.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - All PRs are automatically linted and checked for plugin validity.
 
 ## License
+
 MIT
 
 ## Prerequisites
@@ -206,18 +314,21 @@ MIT
 ## Setup and Installation
 
 1. **Clone the Repository**:
-    ```bash
-    git clone https://github.com/f0rky/Chimp-GPT
-    cd Chimp-GPT
-    ```
+
+   ```bash
+   git clone https://github.com/f0rky/Chimp-GPT
+   cd Chimp-GPT
+   ```
 
 2. **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+
+   ```bash
+   npm install
+   ```
 
 3. **Set Up Environment Variables**:
    Create a `.env` file in the root directory and set up the following environment variables (refer to `.env.example`):
+
    ```env
    DISCORD_TOKEN = your_discord_bot_token
    OPENAI_API_KEY = your_openai_api_key
@@ -237,50 +348,51 @@ MIT
    Modify the `CHANNEL_ID` variable in the code to specify the Discord channel where the bot will operate in, this can be multiple (comma seperated)
 
 6. **Run the Bot**:
-    ```bash
-    # Using PM2 (recommended for all deployments)
-    # For development environment
-    pm2 start combined.js --name [bot name] --env development
-    
-    # For production environment
-    pm2 start combined.js --name [bot name] --env production
-    
-    # Or use the ecosystem.config.js file
-    pm2 start ecosystem.config.js
-    
-    # Save the PM2 configuration
-    pm2 save
-    
-    # Check status
-    pm2 status
-    ```
+
+   ```bash
+   # Using PM2 (recommended for all deployments)
+   # For development environment
+   pm2 start combined.js --name [bot name] --env development
+
+   # For production environment
+   pm2 start combined.js --name [bot name] --env production
+
+   # Or use the ecosystem.config.js file
+   pm2 start ecosystem.config.js
+
+   # Save the PM2 configuration
+   pm2 save
+
+   # Check status
+   pm2 status
+   ```
 
 The bot should now be running and ready to interact in your Discord server.
 
 ## Usage
 
 1. **General Interaction**:
-    Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
+   Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
 
 2. **Weather Inquiry**:
-    Ask the bot about the weather, for example: "What's the weather like in New York?"
-    And it will use OpenAI's GPT-3.5 to provide a natural response using the RapidAPI accurate weather information.
+   Ask the bot about the weather, for example: "What's the weather like in New York?"
+   And it will use OpenAI's GPT-3.5 to provide a natural response using the RapidAPI accurate weather information.
 
 3. **Time Inquiry**:
-    Ask the bot for the current time, like: "Whats the time in New York?"
-    And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
+   Ask the bot for the current time, like: "Whats the time in New York?"
+   And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
 
 4. **Quake Server Stats**:
-    Use the command `!serverstats` or `/serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
+   Use the command `!serverstats` or `/serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
 
 5. **Wolfram Alpha Queries**:
-    Ask factual or computational questions, and the bot will use Wolfram Alpha to provide accurate answers.
+   Ask factual or computational questions, and the bot will use Wolfram Alpha to provide accurate answers.
 
 6. **Slash Commands**:
-    The bot supports Discord's slash commands. Type `/` to see available commands:
-    - `/help` - Display information about available commands
-    - `/ping` - Check if the bot is responding
-    - `/serverstats` - Display Quake Live server statistics
+   The bot supports Discord's slash commands. Type `/` to see available commands:
+   - `/help` - Display information about available commands
+   - `/ping` - Check if the bot is responding
+   - `/serverstats` - Display Quake Live server statistics
 
 ## Recent Updates
 
@@ -301,6 +413,7 @@ If you'd like to contribute to the development of Chimp-GPT, please fork the rep
 ## File Structure
 
 ### Core Files
+
 - `chimpGPT.js` - Main Discord bot file
 - `openaiConfig.js` - OpenAI API configuration
 - `configValidator.js` - Environment variable validation
@@ -309,17 +422,20 @@ If you'd like to contribute to the development of Chimp-GPT, please fork the rep
 - `healthCheck.js` - Bot health monitoring system
 
 ### Feature Modules
+
 - `quakeLookup.js` - Quake Live server stats functionality
 - `timeLookup.js` - Time lookup functionality
 - `weatherLookup.js` - Weather lookup functionality
 - `wolframLookup.js` - Wolfram Alpha integration
 
 ### Command System
+
 - `commands/commandHandler.js` - Command registration and routing
 - `commands/deploySlashCommands.js` - Slash command deployment
 - `commands/modules/` - Individual command implementations
 
 ### Utility Directories
+
 - `utils/` - Utility scripts for maintenance and debugging
 - `archive/` - Archived files for reference
 
@@ -368,12 +484,12 @@ You can configure the ELO display mode in `quakeLookup.js` by changing the `eloM
 
 ```javascript
 const CONFIG = {
-    // ELO display mode:
-    // 0 = Off (don't show ELO)
-    // 1 = Categorized (Scrub/Mid/Pro)
-    // 2 = Actual ELO value
-    eloMode: 1,
-    maxServers: 3
+  // ELO display mode:
+  // 0 = Off (don't show ELO)
+  // 1 = Categorized (Scrub/Mid/Pro)
+  // 2 = Actual ELO value
+  eloMode: 1,
+  maxServers: 3,
 };
 ```
 

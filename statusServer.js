@@ -144,9 +144,26 @@ const stats = {
  *
  * @returns {Promise<import('express').Application>} A promise that resolves with the Express app when the server is started
  */
-function initStatusServer() {
+/**
+ * Initialize and start the status server
+ * @param {Object} options - Configuration options
+ * @param {boolean} [options.demoMode=false] - Whether to run in demo mode with mock data
+ * @returns {Promise<Object>} The Express app and server instances
+ */
+function initStatusServer(options = {}) {
+  // Extract options with defaults
+  const { demoMode = false } = options;
+
   return new Promise((resolve, reject) => {
     const app = express();
+
+    // If demo mode is enabled, import the demo data generator
+    if (demoMode) {
+      logger.info('Starting status server in DEMO MODE');
+      const { initDemoMode } = require('./utils/demoDataGenerator');
+      // Initialize demo mode with mock data
+      initDemoMode(stats, functionResults);
+    }
 
     // Create rate limiter for the status page
     const statusPageRateLimiter = createRateLimiter({

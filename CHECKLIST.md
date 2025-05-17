@@ -25,10 +25,10 @@
   - [x] **Input sanitization:** Implemented comprehensive input sanitization across all external API integrations (OpenAI, Weather, Time, Wolfram Alpha, Quake) to prevent injection attacks and ensure secure data handling.
   - [x] **API key management:** Created a centralized API key management system with usage tracking, error monitoring, and rotation support. Updated all external API integrations to use the secure key manager.
 - [x] **Upgrade undici:** Upgrade undici to version 6.21.2 or later to fix Dependabot security alert in package-lock.json.
-- [ ] **Docker/CI/CD:** No Dockerfile or GitHub Actions config found. Add for easier deployment and automated testing.
+- [x] **Docker/CI/CD:** Added Dockerfile, docker-compose.yml, and GitHub Actions workflows for CI/CD. Created comprehensive deployment documentation and container configuration for easier deployment and automated testing.
 - [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.
-- [ ] **Command-line run modes:** Add support for different run modes via CLI args (e.g., test, production, demo).
-- [ ] **Debugging configs:** Add VSCode or other IDE debugging configurations for easier development.
+- [x] **Command-line run modes:** Added support for different run modes via CLI args (production, development, test, demo) with the runModes.js module and start.sh script. Implemented component-specific startup options (bot-only, status-only) and demo mode with mock data generation.
+- [x] **Debugging configs:** Added VSCode debugging configurations in .vscode/launch.json for the combined app, bot-only, status-only, and test debugging.
 - [x] **Configurable bot name, hostname, port (status page):** Status page now supports BOT_NAME, STATUS_HOSTNAME, and STATUS_PORT environment variables for flexible deployment (done). Fixed issues with app variable reference in statusServer.js to ensure proper startup.
 - [x] **Emoji toggles and ELO display for Quake stats:** Added SHOW_TEAM_EMOJIS, SHOW_SERVER_STATS_EMOJIS, and ELO_DISPLAY_MODE environment variables. Team/spectator formatting improved (done).
 - [x] **Image gallery modal/mobile/error handling:** Status page image gallery includes modal viewer, mobile support, and robust error handling (done).
@@ -102,19 +102,19 @@
 ## Forward-Looking Enhancements & AI Potential
 
 - [ ] **Contextual Memory and Long-Term Conversation Retention:**  
-      Implement advanced state management to enable the bot to retain and utilize conversation history across extended interactions and restarts, providing more natural, context-aware responses.
+       Implement advanced state management to enable the bot to retain and utilize conversation history across extended interactions and restarts, providing more natural, context-aware responses.
 
 - [ ] **Dynamic and Diverse Content Generation:**  
-      Integrate advanced NLP techniques and tune content generation algorithms to produce more varied, engaging, and contextually appropriate responses tailored to user needs.
+       Integrate advanced NLP techniques and tune content generation algorithms to produce more varied, engaging, and contextually appropriate responses tailored to user needs.
 
 - [ ] **Adaptive Learning and Personalization:**  
-      Explore mechanisms for the bot to learn from user interactions and feedback, allowing it to refine its responses and adapt its style or strategies over time (e.g., via engagement metrics or explicit ratings).
+       Explore mechanisms for the bot to learn from user interactions and feedback, allowing it to refine its responses and adapt its style or strategies over time (e.g., via engagement metrics or explicit ratings).
 
 - [ ] **Highly Modular Architecture:**  
-      Refactor core systems into modular, easily extensible components, ensuring new features and integrations can be added or swapped with minimal friction.
+       Refactor core systems into modular, easily extensible components, ensuring new features and integrations can be added or swapped with minimal friction.
 
 - [ ] **Enhanced Error Diagnostics and Reporting:**  
-      Expand error handling to include detailed diagnostics, structured error classes, and user-facing explanations for failures, making troubleshooting easier for both users and developers.
+       Expand error handling to include detailed diagnostics, structured error classes, and user-facing explanations for failures, making troubleshooting easier for both users and developers.
 
 ---
 
