@@ -11,15 +11,13 @@
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
-const {
-  generateImage,
-  enhanceImagePrompt,
-  MODELS,
-  SIZES,
-  QUALITY,
-  FORMAT,
-  BACKGROUND,
-} = require('../../imageGeneration');
+// Import the module as a whole instead of destructuring to avoid circular dependency issues
+const imageGeneration = require('../../imageGeneration');
+const MODELS = imageGeneration.MODELS;
+const SIZES = imageGeneration.SIZES;
+const QUALITY = imageGeneration.QUALITY;
+const FORMAT = imageGeneration.FORMAT;
+const BACKGROUND = imageGeneration.BACKGROUND;
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:image');
 const axios = require('axios');
@@ -191,7 +189,7 @@ module.exports = {
       let finalPrompt = prompt;
       if (enhance) {
         try {
-          finalPrompt = await enhanceImagePrompt(prompt);
+          finalPrompt = await imageGeneration.enhanceImagePrompt(prompt);
           logger.info({ originalPrompt: prompt, enhancedPrompt: finalPrompt }, 'Prompt enhanced');
         } catch (error) {
           logger.error({ error }, 'Failed to enhance prompt, using original');
@@ -199,7 +197,7 @@ module.exports = {
       }
 
       // Generate the image with all parameters
-      const result = await generateImage(finalPrompt, {
+      const result = await imageGeneration.generateImage(finalPrompt, {
         model,
         size,
         quality,
