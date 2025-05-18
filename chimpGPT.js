@@ -33,12 +33,13 @@ const performanceMonitor = require('./utils/performanceMonitor');
 // Import validated configuration
 const config = require('./configValidator');
 
-// Import the optimization patches
+// Import the function results optimization patch
 const optimizationPatch = require('./optimizationPatch');
 logger.info(`Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
 
-const conversationOptimizationPatch = require('./conversationOptimizationPatch');
-logger.info(`Conversation optimization patch applied: ${conversationOptimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
+// Note: We're now using a direct replacement for the conversation manager
+// instead of a patch to avoid circular dependency issues
+logger.info('Using simple conversation optimizer for better performance');
 
 // Configuration option to disable plugins for better performance
 // This can be controlled via environment variable or set directly
@@ -112,14 +113,18 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Import conversation manager
+// Import conversation manager - using simple optimized version
+// IMPORTANT: We're using the simple version to avoid the circular dependency issues
 const {
   manageConversation,
   loadConversationsFromStorage,
   saveConversationsToStorage,
-  startPeriodicSaving,
-  stopPeriodicSaving,
-} = require('./conversationManager');
+  stopPeriodicSaving,  // Note: startPeriodicSaving is not needed with the optimized version
+  getActiveConversationCount,
+  getConversationStorageStatus,
+  clearConversation,
+  shutdown: shutdownConversations
+} = require('./useSimpleOptimizer');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
@@ -1615,11 +1620,10 @@ client.on('ready', async () => {
   // Load conversations from persistent storage
   try {
     await loadConversationsFromStorage();
-    discordLogger.info('Conversations loaded from persistent storage');
+    discordLogger.info('Conversations loaded from persistent storage using optimized storage');
 
-    // Start periodic saving of conversations
-    startPeriodicSaving();
-    discordLogger.info('Periodic conversation saving started');
+    // Note: Periodic saving is handled internally by the optimizer
+    discordLogger.info('Conversation optimization active - periodic saving handled automatically');
   } catch (error) {
     discordLogger.error({ error }, 'Error loading conversations from persistent storage');
   }
@@ -1749,16 +1753,13 @@ async function shutdownGracefully(signal, error) {
       discordLogger.error({ error: saveError }, 'Error saving statistics during shutdown');
     }
 
-    // 3. Save conversations and stop periodic saving
+    // 3. Save conversations using the optimized storage
     try {
-      discordLogger.info('Stopping periodic conversation saving');
-      stopPeriodicSaving();
-
-      discordLogger.info('Saving conversations to persistent storage');
-      await saveConversationsToStorage(true); // Force save
-      discordLogger.info('Conversations saved successfully');
+      discordLogger.info('Shutting down conversation manager');
+      await shutdownConversations();
+      discordLogger.info('Conversation manager shut down successfully');
     } catch (saveError) {
-      discordLogger.error({ error: saveError }, 'Error saving conversations during shutdown');
+      discordLogger.error({ error: saveError }, 'Error shutting down conversation manager');
     }
 
     // 4. Close Discord connection
@@ -1779,14 +1780,7 @@ async function shutdownGracefully(signal, error) {
       logger.error({ error: optimizationError }, 'Error cleaning up optimization patch resources');
     }
     
-    // 6. Clean up conversation optimization resources
-    try {
-      logger.info('Cleaning up conversation optimization resources');
-      await conversationOptimizationPatch.shutdown();
-      logger.info('Conversation optimization resources cleaned up successfully');
-    } catch (convOptError) {
-      logger.error({ error: convOptError }, 'Error cleaning up conversation optimization resources');
-    }
+    // Note: Conversation optimization resources are now cleaned up in step 3
 
     // 7. Close any open API connections or pending requests
     // This is a placeholder - add specific cleanup for any other services as needed
