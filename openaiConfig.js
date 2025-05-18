@@ -46,7 +46,7 @@ async function processMessage(userMessage, conversationLog) {
       async () => {
         try {
           return await openai.chat.completions.create({
-            model: 'o4-mini',
+            model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
             messages: sanitizedLog,
             max_tokens: 512, // Limit token usage (optional)
             functions: [
@@ -210,7 +210,7 @@ async function generateResponse(functionResult, conversationLog) {
     async () => {
       try {
         return await openai.chat.completions.create({
-          model: 'o4-mini',
+          model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
           messages: conversationLog,
           max_tokens: 256,
         });
@@ -241,7 +241,7 @@ async function generateResponse(functionResult, conversationLog) {
  * @returns {string} The model name
  */
 function getOpenAIModel() {
-  return 'o4-mini'; // This should match the model in processMessage function
+  return 'gpt-3.5-turbo'; // Using faster model for better responsiveness
 }
 
 // openaiConfig.js

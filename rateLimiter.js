@@ -42,7 +42,7 @@ const logger = createLogger('ratelimit');
  * @constant {number} IMAGE_GEN_DURATION - Time period for image generation limit in seconds
  */
 const DEFAULT_POINTS = 300;      // Number of requests allowed
-const DEFAULT_DURATION = 60;   // Time period in seconds (1 minute)
+const DEFAULT_DURATION = 30;   // Time period in seconds (30 seconds)
 const COOLDOWN_TIME = 1;      // Cooldown time in seconds after hitting limit
 
 // Specific rate limit for image generation

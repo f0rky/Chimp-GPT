@@ -235,7 +235,7 @@ async function generateResponse(weatherData, userQuestion) {
     
     const response = await Promise.race([
       openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
         messages: messages
       }),
       timeoutPromise

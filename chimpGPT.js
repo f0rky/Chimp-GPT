@@ -135,7 +135,7 @@ async function processOpenAIMessage(content, conversationLog) {
   try {
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview', // Using the latest model, adjust as needed
+      model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
       messages: conversationLog,
       functions: [
         {
@@ -401,7 +401,7 @@ async function generateNaturalResponse(functionResult, conversationLog, function
 
     const response = await Promise.race([
       openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
         messages: messages,
       }),
       timeoutPromise,
@@ -513,9 +513,9 @@ client.on('messageCreate', async message => {
     // Check rate limit for the user
     // OpenAI calls are expensive, so we use a cost of 1 for regular messages
     const rateLimitResult = await checkUserRateLimit(message.author.id, 1, {
-      // Allow 5 requests per minute by default
-      points: 5,
-      duration: 60,
+      // Allow 30 requests per 30 seconds for better responsiveness
+      points: 30,
+      duration: 30,
     });
 
     // If user is rate limited, inform them and stop processing
@@ -1059,7 +1059,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     const rateLimitResult = await checkUserRateLimit(userId, cost, {
       // More permissive rate limits for general API usage
       points: 30,
-      duration: 60, // 1 minute
+      duration: 30, // 30 seconds for better responsiveness
     });
 
     // If user is rate limited for this function, inform them
