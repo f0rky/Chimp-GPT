@@ -445,32 +445,34 @@ client.on('messageCreate', async message => {
     // Track message for stats
     trackMessage();
 
-    // Execute plugin message hooks first
-    try {
-      const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
-        hook: 'onMessageReceived'
+    // Start plugin message hooks execution in the background
+    // This prevents plugins from blocking the main message processing flow
+    const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
+      hook: 'onMessageReceived'
+    });
+    const pluginPromise = pluginManager.executeHook('onMessageReceived', message)
+      .then(hookResults => {
+        performanceMonitor.stopTimer(pluginTimerId, { 
+          success: true,
+          pluginCount: hookResults.length
+        });
+        
+        // Log if any plugin would have stopped processing
+        if (hookResults.some(result => result.result === false)) {
+          discordLogger.debug(
+            {
+              pluginId: hookResults.find(r => r.result === false)?.pluginId,
+              messageId: message.id,
+            },
+            'Plugin would have stopped message processing (async execution)'
+          );
+        }
+        return hookResults;
+      })
+      .catch(hookError => {
+        discordLogger.error({ error: hookError }, 'Error executing message hooks');
+        return []; // Return empty array to allow processing to continue
       });
-      const hookResults = await pluginManager.executeHook('onMessageReceived', message);
-      performanceMonitor.stopTimer(pluginTimerId, { 
-        success: true,
-        pluginCount: hookResults.length
-      });
-
-      // If any plugin returned false, stop processing this message
-      if (hookResults.some(result => result.result === false)) {
-        discordLogger.debug(
-          {
-            pluginId: hookResults.find(r => r.result === false)?.pluginId,
-            messageId: message.id,
-          },
-          'Message processing stopped by plugin'
-        );
-        return;
-      }
-    } catch (hookError) {
-      discordLogger.error({ error: hookError }, 'Error executing message hooks');
-      // Continue processing even if hooks fail
-    }
 
     // Ignore messages from unauthorized channels
     if (!allowedChannelIDs.includes(message.channelId)) {
@@ -552,6 +554,10 @@ client.on('messageCreate', async message => {
     
     // Track conversation for status updates AFTER sending the thinking message
     statusManager.trackConversation(message.author.username, message.content);
+    
+    // Start the conversation storage save operation (but don't await it)
+    // This makes it happen in the background without blocking the main processing flow
+    const savePromise = conversationManager.saveConversationsToStorage();
 
     // Check if this is a version query
     const versionResponse = processVersionQuery(message.content, config);

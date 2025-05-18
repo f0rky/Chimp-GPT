@@ -137,6 +137,9 @@ function initStatusManager(client) {
   }
 
   // Track when the bot is having a conversation
+  // Flag to control status update frequency
+  let statusUpdateDebounceTimeout = null;
+  
   function trackConversation(username, summary = null) {
     const now = Date.now();
     const isNewConversation =
@@ -170,7 +173,16 @@ function initStatusManager(client) {
       }
     }
 
-    updateStatus(client);
+    // Debounce status updates to prevent multiple rapid updates
+    // which can slow down message processing
+    if (statusUpdateDebounceTimeout) {
+      clearTimeout(statusUpdateDebounceTimeout);
+    }
+    
+    statusUpdateDebounceTimeout = setTimeout(() => {
+      updateStatus(client);
+      statusUpdateDebounceTimeout = null;
+    }, 100); // Delay status updates by 100ms to allow batching
   }
 
   // Track when the bot is generating images
