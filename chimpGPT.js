@@ -954,8 +954,11 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     } else {
       discordLogger.warn('Status manager not properly initialized, skipping status update');
     }
-
-    // Move to enhancing phase
+    
+    // IMPORTANT FIX: Move to generating phase BEFORE the OpenAI function call happens
+    // This ensures that the time spent waiting for OpenAI is properly attributed
+    // to the generating phase, not initializing
+    updateProgress('generating');
 
     // Enhance the prompt if requested
     let finalPrompt = parameters.prompt;
@@ -974,10 +977,12 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         discordLogger.error({ error }, 'Error enhancing prompt');
         // Continue with the original prompt
       }
+      
+      // Return to generating phase after enhancement is complete
+      updateProgress('generating');
     }
-
-    // Move to generating phase
-    updateProgress('generating');
+    
+    // No need for another updateProgress here since we've already set it
 
     // Generate the image
     const result = await generateImage(finalPrompt, {
