@@ -441,9 +441,29 @@ client.on('messageCreate', async message => {
   try {
     // Basic checks
     if (message.author.bot) return;
+    
+    // For messages in DMs or with the ignore prefix, we can return early without any processing
+    if (message.channel.isDMBased()) return;
+    if (message.content.startsWith(config.IGNORE_MESSAGE_PREFIX)) return;
+    
+    // Ignore messages from unauthorized channels - quick check that doesn't need any async operations
+    if (!allowedChannelIDs.includes(message.channelId)) {
+      discordLogger.debug(
+        { channelId: message.channelId },
+        'Ignoring message from unauthorized channel'
+      );
+      return;
+    }
 
-    // Track message for stats
+    // HIGHEST PRIORITY: Send initial feedback IMMEDIATELY before any other processing
+    // This ensures users get immediate feedback that their message was received
+    const feedbackPromise = message.reply(`${loadingEmoji} Thinking...`);
+    
+    // Track message for stats - this is fast and helps with metrics
     trackMessage();
+    
+    // Now that we've sent the initial feedback, we can perform the rest of the checks
+    // in parallel with receiving the feedback message
 
     // Start plugin message hooks execution in the background
     // This prevents plugins from blocking the main message processing flow
@@ -474,40 +494,22 @@ client.on('messageCreate', async message => {
         return []; // Return empty array to allow processing to continue
       });
 
-    // Ignore messages from unauthorized channels
-    if (!allowedChannelIDs.includes(message.channelId)) {
-      discordLogger.debug(
-        { channelId: message.channelId },
-        'Ignoring message from unauthorized channel'
-      );
-      return;
-    }
-
-    // Check if this is a stats command
+    // Check if this is a stats command - can be checked quickly
     if (isStatsCommand(message)) {
+      const feedbackMessage = await feedbackPromise; // Make sure we have the feedback message first
+      await feedbackMessage.delete().catch(() => {}); // Delete the thinking message
       await handleStatsCommand(message);
       return;
     }
 
-    // Try to handle the message as a command first
+    // Try to handle the message as a command
     const isCommand = await commandHandler.handleCommand(message, config);
     if (isCommand) {
-      // If it was a command, we're done
+      // If it was a command, delete the thinking message and exit
+      const feedbackMessage = await feedbackPromise;
+      await feedbackMessage.delete().catch(() => {});
       return;
     }
-
-    // If it's a DM and not a command, ignore it
-    // Regular DM conversations aren't supported
-    if (message.channel.isDMBased()) {
-      return;
-    }
-
-    // Ignore messages with ignore prefix
-    if (message.content.startsWith(config.IGNORE_MESSAGE_PREFIX)) {
-      return;
-    }
-
-    // Channel check already done above
 
     // Check rate limit for the user
     // OpenAI calls are expensive, so we use a cost of 1 for regular messages
@@ -517,7 +519,7 @@ client.on('messageCreate', async message => {
       duration: 30,
     });
 
-    // If user is rate limited, inform them and stop processing
+    // If user is rate limited, update the feedback message and exit
     if (rateLimitResult.limited) {
       discordLogger.info(
         {
@@ -531,12 +533,13 @@ client.on('messageCreate', async message => {
       // Track rate limit in health check system
       trackRateLimit(message.author.id);
 
-      await message.reply(`⏱️ ${rateLimitResult.message}`);
+      // Update the feedback message instead of sending a new one
+      const feedbackMessage = await feedbackPromise;
+      await feedbackMessage.edit(`⏱️ ${rateLimitResult.message}`);
       return;
     }
-
-    // Send initial feedback IMMEDIATELY before any processing
-    const feedbackPromise = message.reply(`${loadingEmoji} Thinking...`);
+    
+    // By this point, we have sent the thinking message and all checks have passed
     
     discordLogger.info(
       {
@@ -549,7 +552,7 @@ client.on('messageCreate', async message => {
       'Processing message'
     );
 
-    // Await the feedback message after logging
+    // Await the feedback message if we haven't already
     const feedbackMessage = await feedbackPromise;
     
     // Track conversation for status updates AFTER sending the thinking message
