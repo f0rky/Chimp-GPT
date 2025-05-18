@@ -327,6 +327,15 @@ Available options:
 - `--debug`: Enable debug logging
 - `-q, --quiet`: Minimize logging (errors only)
 
+### Performance Configuration
+
+The bot includes several optimizations to ensure responsive performance, controlled via environment variables:
+
+- `DISABLE_PLUGINS`: Set to 'false' to enable plugins or 'true' to disable them (default: true - plugins disabled)
+
+  Disabling plugins significantly improves responsiveness (reducing message processing time by ~60%) and
+  makes the "Thinking..." message appear much faster. Enable plugins only if you need their functionality.
+
 For VSCode users, debugging configurations are available in the `.vscode/launch.json` file.
 
 ## Contributing

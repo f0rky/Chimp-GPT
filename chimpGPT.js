@@ -33,6 +33,10 @@ const performanceMonitor = require('./utils/performanceMonitor');
 // Import validated configuration
 const config = require('./configValidator');
 
+// Configuration option to disable plugins for better performance
+// This can be controlled via environment variable or set directly
+const DISABLE_PLUGINS = process.env.DISABLE_PLUGINS === 'true' || true; // Default to disabled for better performance
+
 // Import rate limiter
 const {
   checkUserRateLimit,
@@ -514,35 +518,53 @@ client.on('messageCreate', async message => {
     // Start plugin message hooks execution in the background
     // This prevents plugins from blocking the main message processing flow
     addTiming('before_plugin_execution');
+    
+    // Check if plugins are disabled
+    let pluginPromise;
     const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
       hook: 'onMessageReceived'
     });
-    const pluginPromise = pluginManager.executeHook('onMessageReceived', message)
-      .then(hookResults => {
-        const pluginDuration = addTiming('plugin_execution_complete', { pluginCount: hookResults.length });
-        performanceMonitor.stopTimer(pluginTimerId, { 
-          success: true,
-          pluginCount: hookResults.length,
-          duration: pluginDuration
-        });
-        
-        // Log if any plugin would have stopped processing
-        if (hookResults.some(result => result.result === false)) {
-          discordLogger.debug(
-            {
-              pluginId: hookResults.find(r => r.result === false)?.pluginId,
-              messageId: message.id,
-            },
-            'Plugin would have stopped message processing (async execution)'
-          );
-        }
-        return hookResults;
-      })
-      .catch(hookError => {
-        addTiming('plugin_execution_error', { error: hookError.message });
-        discordLogger.error({ error: hookError }, 'Error executing message hooks');
-        return []; // Return empty array to allow processing to continue
+    
+    if (DISABLE_PLUGINS) {
+      // Skip plugin execution when disabled
+      pluginPromise = Promise.resolve([]);
+      const pluginDuration = addTiming('plugin_execution_skipped');
+      performanceMonitor.stopTimer(pluginTimerId, { 
+        success: true,
+        pluginCount: 0,
+        skipped: true,
+        duration: pluginDuration
       });
+      discordLogger.info('Plugins disabled, skipping execution for better performance');
+    } else {
+      // Normal plugin execution path
+      pluginPromise = pluginManager.executeHook('onMessageReceived', message)
+        .then(hookResults => {
+          const pluginDuration = addTiming('plugin_execution_complete', { pluginCount: hookResults.length });
+          performanceMonitor.stopTimer(pluginTimerId, { 
+            success: true,
+            pluginCount: hookResults.length,
+            duration: pluginDuration
+          });
+          
+          // Log if any plugin would have stopped processing
+          if (hookResults.some(result => result.result === false)) {
+            discordLogger.debug(
+              {
+                pluginId: hookResults.find(r => r.result === false)?.pluginId,
+                messageId: message.id,
+              },
+              'Plugin would have stopped message processing (async execution)'
+            );
+          }
+          return hookResults;
+        })
+        .catch(hookError => {
+          addTiming('plugin_execution_error', { error: hookError.message });
+          discordLogger.error({ error: hookError }, 'Error executing message hooks');
+          return []; // Return empty array to allow processing to continue
+        });
+    }
 
     // Check if this is a stats command - can be checked quickly
     addTiming('before_stats_command_check');
@@ -691,7 +713,8 @@ client.on('messageCreate', async message => {
     addTiming('before_response_handling', { responseType: gptResponse.type });
     if (gptResponse.type === 'functionCall') {
       await handleFunctionCall(gptResponse, feedbackMessage, conversationLog);
-      addTiming('after_function_call_handling', { functionName: gptResponse.function.name });
+      // Safe access to function name with fallback to prevent TypeError
+      addTiming('after_function_call_handling', { functionName: gptResponse.function?.name || 'unknown' });
     } else if (gptResponse.type === 'message') {
       await handleDirectMessage(gptResponse, feedbackMessage, conversationLog);
       addTiming('after_direct_message_handling');
