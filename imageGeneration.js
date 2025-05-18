@@ -327,6 +327,12 @@ async function generateImage(prompt, options = {}) {
  */
 async function enhanceImagePrompt(basicPrompt) {
   try {
+    // Validate input prompt
+    if (!basicPrompt || basicPrompt.trim().length === 0) {
+      logger.warn('Empty prompt provided to enhanceImagePrompt, cannot enhance');
+      return 'A generic image'; // Provide a safe fallback
+    }
+    
     logger.info({ basicPrompt }, 'Enhancing image prompt');
 
     const response = await openai.chat.completions.create({
@@ -352,6 +358,12 @@ async function enhanceImagePrompt(basicPrompt) {
 
     // Track the API call
     trackApiCall('openai');
+    
+    // Validate that the enhanced prompt is not empty
+    if (!enhancedPrompt || enhancedPrompt.trim().length === 0) {
+      logger.warn({ basicPrompt }, 'OpenAI returned empty enhanced prompt, falling back to original');
+      return basicPrompt;
+    }
 
     logger.info(
       {

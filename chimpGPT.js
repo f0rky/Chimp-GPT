@@ -965,14 +965,25 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     if (parameters.enhance) {
       updateProgress('enhancing');
       try {
-        finalPrompt = await enhanceImagePrompt(parameters.prompt);
-        discordLogger.info(
-          {
-            originalPrompt: parameters.prompt,
-            enhancedPrompt: finalPrompt,
-          },
-          'Prompt enhanced for image generation'
-        );
+        const enhancedPrompt = await enhanceImagePrompt(parameters.prompt);
+        
+        // IMPORTANT FIX: Validate that the enhanced prompt is not empty
+        if (enhancedPrompt && enhancedPrompt.trim().length > 0) {
+          finalPrompt = enhancedPrompt;
+          discordLogger.info(
+            {
+              originalPrompt: parameters.prompt,
+              enhancedPrompt: finalPrompt,
+            },
+            'Prompt enhanced for image generation'
+          );
+        } else {
+          discordLogger.warn(
+            { originalPrompt: parameters.prompt },
+            'Enhanced prompt was empty, falling back to original prompt'
+          );
+          // Keep using the original prompt (finalPrompt is already set to parameters.prompt)
+        }
       } catch (error) {
         discordLogger.error({ error }, 'Error enhancing prompt');
         // Continue with the original prompt
