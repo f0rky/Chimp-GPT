@@ -85,6 +85,7 @@ const statsStorage = require('./statsStorage');
  * @property {Object} errors - Count of errors by service
  * @property {Date} lastRestart - When the bot was last restarted
  * @property {Object} rateLimits - Rate limiting statistics
+ * @property {Object} customStats - Custom statistics
  */
 const stats = {
   startTime: new Date(),
@@ -98,6 +99,8 @@ const stats = {
     gptimage: 0,
     plugins: {},
   },
+  customStats: {},
+
   errors: {
     openai: 0,
     discord: 0,
@@ -802,6 +805,32 @@ function getHealthStatus() {
 }
 
 /**
+ * Add a custom stats source to the health check system
+ * 
+ * This allows external modules to contribute statistics that will be included
+ * in health reports and exposed via the status API.
+ * 
+ * @param {string} name - The name of the stats source
+ * @param {Function} dataFn - Function that returns the stats data when called
+ * @returns {void}
+ */
+function addCustomStatsSource(name, dataFn) {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Custom stats source name must be a non-empty string');
+  }
+  
+  if (typeof dataFn !== 'function') {
+    throw new Error('Custom stats source must provide a data function');
+  }
+  
+  // Store the data provider function
+  stats.customStats[name] = dataFn;
+  
+  // Log the registration
+  logger.info({ statSource: name }, 'Custom stats source registered');
+}
+
+/**
  * Calculate the total error count properly, avoiding "[object Object]" issues
  * by separating numeric error properties from complex objects
  * 
@@ -850,4 +879,5 @@ module.exports = {
   stats,
   getHealthStatus,
   calculateTotalErrors,
+  addCustomStatsSource,
 };

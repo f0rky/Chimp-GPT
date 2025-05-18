@@ -48,7 +48,8 @@ const {
   trackMessage,
   trackRateLimit,
   isStatsCommand,
-  handleStatsCommand
+  handleStatsCommand,
+  addCustomStatsSource
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
