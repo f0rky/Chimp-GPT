@@ -536,6 +536,9 @@ client.on('messageCreate', async message => {
       return;
     }
 
+    // Send initial feedback IMMEDIATELY before any processing
+    const feedbackPromise = message.reply(`${loadingEmoji} Thinking...`);
+    
     discordLogger.info(
       {
         message: message.content,
@@ -547,8 +550,8 @@ client.on('messageCreate', async message => {
       'Processing message'
     );
 
-    // Send initial feedback
-    const feedbackMessage = await message.reply(`${loadingEmoji} Thinking...`);
+    // Await the feedback message after logging
+    const feedbackMessage = await feedbackPromise;
 
     // Check if this is a version query
     const versionResponse = processVersionQuery(message.content, config);
