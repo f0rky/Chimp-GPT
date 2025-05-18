@@ -345,7 +345,7 @@ async function enhanceImagePrompt(basicPrompt) {
           content: `Please enhance this basic image prompt for GPT Image-1: "${basicPrompt}"`,
         },
       ],
-      max_tokens: 300,
+      max_completion_tokens: 300,
     });
 
     const enhancedPrompt = response.choices[0].message.content.trim();

@@ -868,7 +868,7 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
               content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
             },
           ],
-          max_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
+          max_completion_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
         });
       }, OPENAI_BREAKER_CONFIG);
 

@@ -105,7 +105,7 @@ async function runOpenAITests() {
           content: 'Run test',
         },
       ],
-      max_tokens: 20,
+      max_completion_tokens: 20,
     });
 
     const content = response.choices[0].message.content;

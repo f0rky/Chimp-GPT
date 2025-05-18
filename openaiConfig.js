@@ -48,7 +48,7 @@ async function processMessage(userMessage, conversationLog) {
           return await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
             messages: sanitizedLog,
-            max_tokens: 512, // Limit token usage (optional)
+            max_completion_tokens: 512, // Limit token usage (optional)
             functions: [
               {
                 name: 'lookupTime',
@@ -212,7 +212,7 @@ async function generateResponse(functionResult, conversationLog) {
         return await openai.chat.completions.create({
           model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
           messages: conversationLog,
-          max_tokens: 256,
+          max_completion_tokens: 256,
         });
       } catch (error) {
         // Record API key error for monitoring
