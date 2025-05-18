@@ -33,9 +33,12 @@ const performanceMonitor = require('./utils/performanceMonitor');
 // Import validated configuration
 const config = require('./configValidator');
 
-// Import the optimization patch
+// Import the optimization patches
 const optimizationPatch = require('./optimizationPatch');
 logger.info(`Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
+
+const conversationOptimizationPatch = require('./conversationOptimizationPatch');
+logger.info(`Conversation optimization patch applied: ${conversationOptimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
 
 // Configuration option to disable plugins for better performance
 // This can be controlled via environment variable or set directly
@@ -1775,11 +1778,20 @@ async function shutdownGracefully(signal, error) {
     } catch (optimizationError) {
       logger.error({ error: optimizationError }, 'Error cleaning up optimization patch resources');
     }
+    
+    // 6. Clean up conversation optimization resources
+    try {
+      logger.info('Cleaning up conversation optimization resources');
+      await conversationOptimizationPatch.shutdown();
+      logger.info('Conversation optimization resources cleaned up successfully');
+    } catch (convOptError) {
+      logger.error({ error: convOptError }, 'Error cleaning up conversation optimization resources');
+    }
 
-    // 6. Close any open API connections or pending requests
+    // 7. Close any open API connections or pending requests
     // This is a placeholder - add specific cleanup for any other services as needed
 
-    // 7. Log successful shutdown
+    // 8. Log successful shutdown
     const shutdownDuration = Date.now() - shutdownStart;
     discordLogger.info({ durationMs: shutdownDuration }, 'Graceful shutdown completed');
 
