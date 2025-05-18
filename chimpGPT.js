@@ -33,9 +33,13 @@ const performanceMonitor = require('./utils/performanceMonitor');
 // Import validated configuration
 const config = require('./configValidator');
 
+// Import the optimization patch
+const optimizationPatch = require('./optimizationPatch');
+logger.info(`Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
+
 // Configuration option to disable plugins for better performance
 // This can be controlled via environment variable or set directly
-const DISABLE_PLUGINS = process.env.DISABLE_PLUGINS === 'true' || true; // Default to disabled for better performance
+const DISABLE_PLUGINS = process.env.DISABLE_PLUGINS !== 'false'; // Default to disabled for better performance
 
 // Import rate limiter
 const {
@@ -1763,10 +1767,19 @@ async function shutdownGracefully(signal, error) {
       discordLogger.error({ error: discordError }, 'Error destroying Discord client');
     }
 
-    // 5. Close any open API connections or pending requests
+    // 5. Clean up optimization patch resources
+    try {
+      logger.info('Cleaning up optimization patch resources');
+      await optimizationPatch.shutdown();
+      logger.info('Optimization resources cleaned up successfully');
+    } catch (optimizationError) {
+      logger.error({ error: optimizationError }, 'Error cleaning up optimization patch resources');
+    }
+
+    // 6. Close any open API connections or pending requests
     // This is a placeholder - add specific cleanup for any other services as needed
 
-    // 6. Log successful shutdown
+    // 7. Log successful shutdown
     const shutdownDuration = Date.now() - shutdownStart;
     discordLogger.info({ durationMs: shutdownDuration }, 'Graceful shutdown completed');
 
