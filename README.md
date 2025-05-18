@@ -60,7 +60,7 @@ All external API calls are now protected by a retry mechanism with exponential b
 When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and avoids API abuse during outages.
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
-- **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT-3.5/4).
+- **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT o4-mini).
 - **Weather Lookup**: Reliable weather info with robust error handling and fallback mechanisms.
 - **Time Inquiry**: Ask for the current time in any location.
 - **Quake Live Server Stats**: View real-time Quake Live server stats with compact, configurable display.
@@ -373,12 +373,12 @@ MIT
    IGNORE_MESSAGE_PREFIX = "." # Prefix to ignore messages
    LOADING_EMOJI = <a:loading:1139032461712556062> # say \:emoji: on discord to get this ID
    LOG_LEVEL = "info" # Logging level (fatal, error, warn, info, debug, trace)
-   
+
    # Reply Context Feature
    ENABLE_REPLY_CONTEXT = "true" # Enable/disable reply context feature
    MAX_REFERENCE_DEPTH = "5" # Maximum depth for message reference chains
    MAX_REFERENCE_CONTEXT = "5" # Maximum number of reference messages to include in context
-   
+
    # NODE_ENV = "production" # Uncomment in production to disable pretty printing
    ```
 
