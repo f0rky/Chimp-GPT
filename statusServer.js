@@ -66,12 +66,29 @@ const os = require('os');
 const { getDetailedVersionInfo, formatUptime } = require('./getBotVersion');
 const { getConversationStorageStatus } = require('./conversationManager');
 const config = require('./configValidator');
+const performanceMonitor = require('./utils/performanceMonitor');
 
 // Import stats storage
 const statsStorage = require('./statsStorage');
 
 // Import function results storage
 const functionResults = require('./functionResults');
+
+// Track server health status
+let serverHealthy = true;
+let lastError = null;
+
+// Set up periodic health check
+setInterval(() => {
+  const memUsage = process.memoryUsage();
+  
+  // Check if memory usage is too high (over 80% of 1.5GB)
+  if (memUsage.rss > 1200000000) {
+    logger.warn({ memoryUsage: memUsage }, 'Memory usage is high, consider restarting server');
+  }
+  
+  serverHealthy = true;
+}, 30000); // Every 30 seconds
 
 // Import test runners
 const {
@@ -543,6 +560,78 @@ function initStatusServer(options = {}) {
       } catch (error) {
         logger.error({ error }, 'Error getting function results');
         res.status(500).json({ success: false, message: 'Error getting function results' });
+      }
+    });
+
+    /**
+     * GET /performance
+     * Returns performance monitoring data.
+     *
+     * @route GET /performance
+     * @returns {Object} Performance metrics and timing statistics
+     */
+    app.get('/performance', (req, res) => {
+      logger.info('Getting performance metrics');
+
+      try {
+        // Wrap in try/catch to prevent crashes
+        let metrics = {};
+        try {
+          metrics = performanceMonitor.getAllTimingStats() || {};
+        } catch (statsError) {
+          logger.error({ error: statsError }, 'Error retrieving performance stats');
+          metrics = { error: 'Failed to retrieve performance metrics' };
+          lastError = statsError;
+          serverHealthy = false;
+        }
+        
+        // Create a summary object with avg and p95 for each operation
+        const summary = {};
+        for (const op in metrics) {
+          if (metrics[op] && metrics[op].count > 0) {
+            summary[op] = {
+              avg: Math.round(metrics[op].avg) || 0,
+              p95: Math.round(metrics[op].p95) || 0,
+              count: metrics[op].count || 0,
+              max: Math.round(metrics[op].max) || 0
+            };
+          }
+        }
+
+        // Add memory usage info to help with debugging
+        const memUsage = process.memoryUsage();
+        const memoryInfo = {
+          rss: `${Math.round(memUsage.rss / 1024 / 1024)} MB`,
+          heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`,
+          heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`,
+          external: `${Math.round(memUsage.external / 1024 / 1024)} MB`,
+        };
+        
+        res.json({
+          success: true,
+          summary,
+          detailed: metrics,
+          serverHealth: {
+            status: serverHealthy ? 'healthy' : 'degraded',
+            lastError: lastError ? lastError.message : null,
+            memory: memoryInfo
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error({ error }, 'Critical error getting performance metrics');
+        lastError = error;
+        serverHealthy = false;
+        
+        // Simplified response in case of critical error
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          serverHealth: {
+            status: 'critical',
+            message: 'Server encountered a critical error'
+          }
+        });
       }
     });
 

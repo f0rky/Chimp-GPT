@@ -27,6 +27,9 @@ const { sendChannelGreeting } = require('./utils/greetingManager');
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
 
+// Import performance monitoring
+const performanceMonitor = require('./utils/performanceMonitor');
+
 // Import validated configuration
 const config = require('./configValidator');
 
@@ -45,7 +48,7 @@ const {
   trackMessage,
   trackRateLimit,
   isStatsCommand,
-  handleStatsCommand,
+  handleStatsCommand
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
@@ -124,6 +127,10 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
  * @throws {Error} If the API call fails
  */
 async function processOpenAIMessage(content, conversationLog) {
+  const timerId = performanceMonitor.startTimer('openai_api_detail', {
+    messageLength: content.length,
+    contextLength: JSON.stringify(conversationLog).length
+  });
   try {
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
@@ -228,21 +235,36 @@ async function processOpenAIMessage(content, conversationLog) {
     const responseMessage = response.choices[0].message;
 
     if (responseMessage.function_call) {
-      return {
+      const result = {
         type: 'functionCall',
         functionName: responseMessage.function_call.name,
         parameters: JSON.parse(responseMessage.function_call.arguments),
       };
+  
+      performanceMonitor.stopTimer(timerId, {
+        responseType: 'functionCall',
+        functionName: responseMessage.function_call.name,
+        success: true
+      });
+  
+      return result;
     }
 
     // Track successful OpenAI API call
     trackApiCall('openai');
 
     openaiLogger.debug({ response: responseMessage }, 'Received response from OpenAI');
-    return {
+    const result = {
       type: 'message',
       content: responseMessage.content,
     };
+  
+    performanceMonitor.stopTimer(timerId, {
+      responseType: 'message',
+      success: true
+    });
+  
+    return result;
   } catch (error) {
     // Track OpenAI API error
     trackError('openai');
@@ -408,6 +430,13 @@ const commandHandler = require('./commands/commandHandler');
 
 // Handle message creation
 client.on('messageCreate', async message => {
+  // Start overall message processing timer
+  const messageTimerId = performanceMonitor.startTimer('message_processing', {
+    userId: message.author.id,
+    channelId: message.channelId,
+    messageId: message.id,
+    messageLength: message.content.length
+  });
   try {
     // Basic checks
     if (message.author.bot) return;
@@ -417,7 +446,14 @@ client.on('messageCreate', async message => {
 
     // Execute plugin message hooks first
     try {
+      const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
+        hook: 'onMessageReceived'
+      });
       const hookResults = await pluginManager.executeHook('onMessageReceived', message);
+      performanceMonitor.stopTimer(pluginTimerId, { 
+        success: true,
+        pluginCount: hookResults.length
+      });
 
       // If any plugin returned false, stop processing this message
       if (hookResults.some(result => result.result === false)) {
@@ -550,7 +586,16 @@ client.on('messageCreate', async message => {
     );
 
     // Process message with OpenAI
+    const openaiTimerId = performanceMonitor.startTimer('openai_api', {
+      userId: message.author.id,
+      messageLength: message.content.length,
+      operation: 'processMessage'
+    });
     const gptResponse = await processOpenAIMessage(message.content, conversationLog);
+    performanceMonitor.stopTimer(openaiTimerId, {
+      responseType: gptResponse.type,
+      success: true
+    });
 
     // Handle different response types
     if (gptResponse.type === 'functionCall') {
@@ -563,6 +608,15 @@ client.on('messageCreate', async message => {
   } catch (error) {
     discordLogger.error({ error }, 'Error in message handler');
     await message.reply('Sorry, I encountered an error processing your request.');
+    
+    // Stop the timer with error information
+    performanceMonitor.stopTimer(messageTimerId, {
+      success: false,
+      error: error.message
+    });
+  } finally {
+    // Always stop the timer if it hasn't been stopped yet
+    performanceMonitor.stopTimer(messageTimerId, { success: true });
   }
 });
 
@@ -940,6 +994,11 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
  * @returns {Promise<void>}
  */
 async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog) {
+  // Start function call timer
+  const functionCallTimerId = performanceMonitor.startTimer('function_call', {
+    functionName: gptResponse.functionName,
+    hasParameters: !!gptResponse.parameters
+  });
   const loadingMessages = {
     lookupTime: 'Checking watch...',
     lookupWeather: 'Looking outside...',
@@ -1029,7 +1088,11 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
   switch (gptResponse.functionName) {
     case 'lookupTime':
       try {
+        const timeTimerId = performanceMonitor.startTimer('time_api', {
+          location: gptResponse.parameters.location
+        });
         functionResult = await lookupTime(gptResponse.parameters.location);
+        performanceMonitor.stopTimer(timeTimerId, { success: true });
         trackApiCall('time');
       } catch (error) {
         trackError('time');
@@ -1059,6 +1122,9 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         }
 
         // Use the simplified implementation to get a natural language response
+        performanceMonitor.startTimer('weather_api', {
+          location: gptResponse.parameters.location
+        });
         const userQuestion =
           conversationLog.find(msg => msg.role === 'user')?.content ||
           `What's the weather in ${gptResponse.parameters.location}?`;
@@ -1077,7 +1143,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
           content: response,
         });
 
-        // Return early since we've already handled the response
+        // Stop timer and return early since we've already handled the response
+        performanceMonitor.stopTimer(functionCallTimerId, { success: true });
         return;
       } catch (error) {
         trackError('weather');
@@ -1131,7 +1198,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
           content: response,
         });
 
-        // Return early since we've already handled the response
+        // Stop timer and return early since we've already handled the response
+        performanceMonitor.stopTimer(functionCallTimerId, { success: true });
         return;
       } catch (error) {
         trackError('weather');
@@ -1143,7 +1211,11 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
       }
     case 'getWolframShortAnswer':
       try {
+        const wolframTimerId = performanceMonitor.startTimer('wolfram_api', {
+          query: gptResponse.parameters.query
+        });
         functionResult = await lookupWolfram.getWolframShortAnswer(gptResponse.parameters.query);
+        performanceMonitor.stopTimer(wolframTimerId, { success: true });
         trackApiCall('wolfram');
       } catch (error) {
         trackError('wolfram');
@@ -1200,7 +1272,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         // Track this as a successful API call for stats
         trackApiCall('version_query', true);
 
-        // Return early since we've already handled the response
+        // Stop timer and return early since we've already handled the response
+        performanceMonitor.stopTimer(functionCallTimerId, { success: true });
         return;
       } catch (error) {
         trackError('other');
@@ -1354,6 +1427,9 @@ client.on('ready', async () => {
 
   // Initialize health check system
   initHealthCheck(client);
+  discordLogger.info('Initializing performance monitoring');
+  const { initPerformanceMonitoring } = require('./utils/healthCheckIntegration');
+  initPerformanceMonitoring();
   discordLogger.info('Health check system initialized');
 
   // Immediately update Discord stats on startup
