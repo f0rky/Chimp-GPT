@@ -186,7 +186,7 @@ function initHealthCheck(client) {
     };
 
     // Check if any error counts are high
-    const errorSum = Object.values(stats.errors).reduce((a, b) => a + b, 0);
+    const errorSum = calculateTotalErrors(stats.errors);
     if (errorSum > 20 || stats.errors.openai > 10) {
       health.status = 'warning';
     }
@@ -397,7 +397,7 @@ function generateHealthReport(isStartup = false) {
     title = '🚀 ChimpGPT Started Successfully';
   }
 
-  const errorSum = Object.values(stats.errors).reduce((a, b) => a + b, 0);
+  const errorSum = calculateTotalErrors(stats.errors);
   let statusEmoji = '✅';
   if (errorSum > 20 || stats.errors.openai > 10) {
     statusEmoji = '⚠️';
@@ -456,7 +456,7 @@ ${title}
   }
 
 **Errors:**
-• Total Errors: ${errorSum}
+• Total Errors: ${calculateTotalErrors(stats.errors)}
 • OpenAI Errors: ${stats.errors.openai}
 • Discord Errors: ${stats.errors.discord}
 • Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}
@@ -801,6 +801,41 @@ function getHealthStatus() {
   };
 }
 
+/**
+ * Calculate the total error count properly, avoiding "[object Object]" issues
+ * by separating numeric error properties from complex objects
+ * 
+ * @param {Object} errors - The stats.errors object
+ * @returns {number} The total error count
+ */
+function calculateTotalErrors(errors) {
+  // Initialize with 0 for safety if properties are undefined
+  const basicErrors = 
+    (errors.openai || 0) +
+    (errors.discord || 0) +
+    (errors.weather || 0) +
+    (errors.time || 0) +
+    (errors.wolfram || 0) +
+    (errors.quake || 0) +
+    (errors.gptimage || 0) +
+    (errors.other || 0);
+  
+  // Calculate plugin errors separately
+  let pluginErrors = 0;
+  if (errors.plugins && typeof errors.plugins === 'object') {
+    // Handle the case where plugins is an object with plugin IDs as keys
+    Object.values(errors.plugins).forEach(plugin => {
+      if (plugin && typeof plugin === 'object' && typeof plugin.count === 'number') {
+        pluginErrors += plugin.count;
+      } else if (typeof plugin === 'number') {
+        pluginErrors += plugin;
+      }
+    });
+  }
+  
+  return basicErrors + pluginErrors;
+}
+
 module.exports = {
   initHealthCheck,
   trackApiCall,
@@ -814,4 +849,5 @@ module.exports = {
   generateHealthReport,
   stats,
   getHealthStatus,
+  calculateTotalErrors,
 };
