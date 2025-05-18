@@ -371,7 +371,8 @@ async function enhanceImagePrompt(basicPrompt) {
   }
 }
 
-module.exports = {
+// Export as a single object to avoid circular dependency issues
+const imageGenerationModule = {
   generateImage,
   enhanceImagePrompt,
   MODELS,
@@ -380,3 +381,5 @@ module.exports = {
   FORMAT,
   BACKGROUND,
 };
+
+module.exports = imageGenerationModule;
