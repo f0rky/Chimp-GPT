@@ -259,7 +259,7 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIS
    ```
 
 6. **Access the Status Page**:
-   - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>` (default: http://localhost:3000)
+   - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>` (default: http://localhost:3002 for development mode, http://localhost:3000 for production)
 
 ## Docker Deployment
 
@@ -396,10 +396,109 @@ MIT
    pm2 start combined.js --name [bot name] --env development
 
    # For production environment
-   pm2 start combined.js --name [bot name] --env production
+   pm2 start chimpGPT.js --name [bot name] --env production
 
    # Or use the ecosystem.config.js file
    pm2 start ecosystem.config.js
+
+## PM2 Management & Performance Monitoring
+
+ChimpGPT is designed to be managed using PM2, which provides advanced process management capabilities. This section covers how to monitor and debug performance issues using PM2.
+
+### Basic PM2 Commands
+
+```bash
+# View all running processes
+pm2 status
+
+# Start ChimpGPT
+pm2 start chimpGPT.js --name chimpGPT
+
+# Restart the bot
+pm2 restart chimpGPT
+
+# Stop the bot
+pm2 stop chimpGPT
+
+# View logs (most recent 100 lines)
+pm2 logs chimpGPT --lines 100
+
+# Monitor resource usage in real-time
+pm2 monit
+```
+
+### Troubleshooting Slow Reaction Times
+
+If you experience slow reactions from ChimpGPT, use these steps to diagnose and resolve the issue:
+
+1. **Check Resource Usage**:
+   ```bash
+   # View real-time resource metrics
+   pm2 monit
+   ```
+   Look for high CPU or memory usage which may indicate bottlenecks.
+
+2. **Examine Logs for Delays**:
+   ```bash
+   # View error logs
+   pm2 logs chimpGPT --err --lines 100
+   
+   # Search logs for timeout errors
+   pm2 logs chimpGPT --lines 1000 | grep -i "timeout"
+   ```
+
+3. **Monitor API Response Times**:
+   Access the performance dashboard at `http://localhost:3000/performance.html` to view detailed timing metrics for all operations.
+
+4. **Identify API Bottlenecks**:
+   The most common causes of slow reactions are:
+   - OpenAI API delays (most common)
+   - External API timeouts (weather, Wolfram Alpha)
+   - Large conversation context sizes
+   - Plugin execution overhead
+
+5. **Adjust Timeouts**:
+   You can modify timeouts in `.env`:
+   ```
+   # Add these to your .env file
+   OPENAI_TIMEOUT_MS=15000
+   EXTERNAL_API_TIMEOUT_MS=10000
+   ```
+
+6. **Reset the Bot**:
+   If ChimpGPT becomes unresponsive:
+   ```bash
+   pm2 reload chimpGPT --update-env
+   ```
+   This will restart the process and reload environment variables.
+
+### PM2 Log Management
+
+Logs are stored in the `~/.pm2/logs/` directory:
+
+- `chimpGPT-out.log` - Standard output logs
+- `chimpGPT-error.log` - Error logs
+
+```bash
+# View only error logs
+tail -f ~/.pm2/logs/chimpGPT-error.log
+
+# Search logs for specific error patterns
+grep -i "error" ~/.pm2/logs/chimpGPT-out.log
+```
+
+### Performance Monitoring Dashboard
+
+The built-in performance monitoring dashboard provides insights into bot operations:
+
+1. **Access**: Navigate to `http://localhost:3002/performance.html` (development mode) or `http://localhost:3000/performance.html` (production mode)
+2. **Features**:
+   - API response time charts
+   - Processing time breakdowns
+   - Detailed operation metrics
+   - Recent calls with timing information
+
+This dashboard is particularly useful for identifying which operations are causing slow reactions.
 
    # Save the PM2 configuration
    pm2 save
