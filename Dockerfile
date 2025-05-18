@@ -1,11 +1,12 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Create app directory
 WORKDIR /usr/src/app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+# Skip prepare script which tries to install husky
+RUN npm pkg delete scripts.prepare && npm ci --omit=dev
 
 # Copy app source
 COPY . .
