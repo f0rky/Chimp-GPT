@@ -210,7 +210,7 @@ async function generateResponse(functionResult, conversationLog) {
     async () => {
       try {
         return await openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
+          model: 'gpt-4o-mini',  // Using faster model for better responsiveness
           messages: conversationLog,
           max_completion_tokens: 256,
         });
@@ -241,7 +241,7 @@ async function generateResponse(functionResult, conversationLog) {
  * @returns {string} The model name
  */
 function getOpenAIModel() {
-  return 'gpt-3.5-turbo'; // Using faster model for better responsiveness
+  return 'gpt-4o-mini'; // Using faster model for better responsiveness
 }
 
 // openaiConfig.js
