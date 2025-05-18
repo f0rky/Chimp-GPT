@@ -34,10 +34,11 @@ const url = require('url');
 async function runConversationLogTests() {
   try {
     logger.info('Running conversation log tests');
-    const results = testConversationLog();
+    // Properly await the async testConversationLog function
+    const results = await testConversationLog();
     return {
       success: results.success,
-      details: results.results
+      details: results.tests // Updated to match the new property name in conversationLogTest.js
     };
   } catch (error) {
     logger.error({ error }, 'Error running conversation log tests');
