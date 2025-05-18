@@ -481,9 +481,6 @@ client.on('messageCreate', async message => {
       return;
     }
 
-    // Track conversation for status updates - only for allowed channels
-    statusManager.trackConversation(message.author.username, message.content);
-
     // Check if this is a stats command
     if (isStatsCommand(message)) {
       await handleStatsCommand(message);
@@ -552,6 +549,9 @@ client.on('messageCreate', async message => {
 
     // Await the feedback message after logging
     const feedbackMessage = await feedbackPromise;
+    
+    // Track conversation for status updates AFTER sending the thinking message
+    statusManager.trackConversation(message.author.username, message.content);
 
     // Check if this is a version query
     const versionResponse = processVersionQuery(message.content, config);
