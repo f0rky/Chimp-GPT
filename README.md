@@ -36,6 +36,17 @@ ChimpGPT features a dynamic status system that provides real-time feedback on bo
 - **Rate-Limited Updates**: Optimized update frequency to avoid Discord API rate limits
 - **Owner Privileges**: Special rate limit exemptions for bot owners
 
+### Reply Context Enhancement
+
+ChimpGPT now includes an intelligent reply context feature that makes conversations more natural and contextually aware:
+
+- **Message Reference Resolution**: Automatically detects when users reply to messages and follows the reply chain
+- **Context Extraction**: Extracts conversation context from referenced messages to maintain conversation flow
+- **Configurable Depth**: Control how far back the bot looks for context in message reply chains
+- **Intelligent Pruning**: Maintains conversation length limits while preserving important context
+
+This feature makes the bot more conversationally aware, allowing it to understand ongoing discussions even when they involve multiple messages or users.
+
 ### Error Resilience for External APIs
 
 All external API calls are now protected by a retry mechanism with exponential backoff and a circuit breaker pattern:
@@ -362,6 +373,12 @@ MIT
    IGNORE_MESSAGE_PREFIX = "." # Prefix to ignore messages
    LOADING_EMOJI = <a:loading:1139032461712556062> # say \:emoji: on discord to get this ID
    LOG_LEVEL = "info" # Logging level (fatal, error, warn, info, debug, trace)
+   
+   # Reply Context Feature
+   ENABLE_REPLY_CONTEXT = "true" # Enable/disable reply context feature
+   MAX_REFERENCE_DEPTH = "5" # Maximum depth for message reference chains
+   MAX_REFERENCE_CONTEXT = "5" # Maximum number of reference messages to include in context
+   
    # NODE_ENV = "production" # Uncomment in production to disable pretty printing
    ```
 

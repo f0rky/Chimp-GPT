@@ -2,15 +2,21 @@
  * @typedef {Object} ConversationMessage
  * @property {string} role - The role of the message sender (e.g., 'system', 'user', 'assistant')
  * @property {string} content - The content of the message
+ * @property {string} [author] - The author's username (optional, for reference messages)
+ * @property {string} [id] - The message ID (optional, for reference messages)
+ * @property {number} [timestamp] - The message timestamp (optional, for reference messages)
+ * @property {boolean} [isReference] - Whether this message is from a reference (optional)
  *
  * @typedef {Array<ConversationMessage>} ConversationLog
  *
  * @typedef {Object} ConversationManagerAPI
- * @property {function(string, (ConversationMessage|null)=): ConversationLog} manageConversation
+ * @property {function(string, (ConversationMessage|null)=, import('discord.js').Message=): Promise<ConversationLog>} manageConversation
  * @property {function(string): boolean} clearConversation
  * @property {function(): number} getActiveConversationCount
+ * @property {function(string, Array<ConversationMessage>): void} addReferenceContext
  * @property {Map<string, ConversationLog>} userConversations
  * @property {number} MAX_CONVERSATION_LENGTH
+ * @property {number} MAX_REFERENCE_CONTEXT
  */
 /**
  * Conversation Manager Module
@@ -30,12 +36,19 @@ const config = require('./configValidator');
 const { createLogger } = require('./logger');
 const logger = createLogger('conversationManager');
 const conversationStorage = require('./conversationStorage');
+const referenceResolver = require('./utils/messageReferenceResolver');
 
 /**
  * Maximum number of messages to keep in a conversation
  * @constant {number}
  */
-const MAX_CONVERSATION_LENGTH = 8;
+const MAX_CONVERSATION_LENGTH = config.MAX_CONVERSATION_LENGTH;
+
+/**
+ * Maximum number of reference messages to include as context
+ * @constant {number}
+ */
+const MAX_REFERENCE_CONTEXT = config.MAX_REFERENCE_CONTEXT;
 
 /**
  * Interval for saving conversations to disk (in milliseconds)
@@ -190,14 +203,79 @@ function stopPeriodicSaving() {
   }
 }
 
-function manageConversation(userId, newMessage = null) {
+/**
+ * Add reference context to a user's conversation
+ * 
+ * @param {string} userId - The Discord user ID
+ * @param {Array<ConversationMessage>} referenceMessages - Array of messages from references
+ * @returns {void}
+ */
+function addReferenceContext(userId, referenceMessages) {
+  if (!referenceMessages || referenceMessages.length === 0) {
+    return;
+  }
+  
+  // Ensure the user has a conversation
+  if (!userConversations.has(userId)) {
+    userConversations.set(userId, [
+      { role: 'system', content: config.BOT_PERSONALITY }
+    ]);
+    conversationsDirty = true;
+  }
+  
+  const conversation = userConversations.get(userId);
+  
+  // Limit the number of reference messages to add
+  const messagesToAdd = referenceMessages.slice(0, MAX_REFERENCE_CONTEXT);
+  
+  // Insert reference messages after the system message
+  conversation.splice(1, 0, ...messagesToAdd);
+  conversationsDirty = true;
+  
+  // If we exceed the maximum length, remove oldest non-system, non-reference messages
+  // This ensures we keep the most recent context
+  while (conversation.length > MAX_CONVERSATION_LENGTH) {
+    // Find the oldest non-system, non-reference message to remove
+    let indexToRemove = -1;
+    for (let i = 1; i < conversation.length; i++) { // Start at 1 to skip system message
+      if (!conversation[i].isReference) {
+        indexToRemove = i;
+        break;
+      }
+    }
+    
+    // If we didn't find a non-reference message, remove the oldest reference
+    if (indexToRemove === -1) {
+      indexToRemove = 1; // Remove the oldest reference message
+    }
+    
+    // Remove the identified message
+    conversation.splice(indexToRemove, 1);
+  }
+  
+  logger.info({
+    userId,
+    referencesAdded: messagesToAdd.length,
+    totalConversationLength: conversation.length
+  }, 'Added reference context to conversation');
+}
+
+/**
+ * Manage a user's conversation, optionally adding a new message and reference context
+ * 
+ * @param {string} userId - The Discord user ID
+ * @param {ConversationMessage|null} newMessage - New message to add (optional)
+ * @param {import('discord.js').Message} discordMessage - Original Discord message with potential references
+ * @returns {Promise<ConversationLog>} The updated conversation log
+ */
+async function manageConversation(userId, newMessage = null, discordMessage = null) {
   // Ensure conversations are loaded from storage
   if (!conversationsLoaded) {
-    // We can't await here since this function isn't async,
-    // but we'll load conversations asynchronously
-    loadConversationsFromStorage().catch(error => {
+    try {
+      await loadConversationsFromStorage();
+    } catch (error) {
       logger.error({ error }, 'Error loading conversations in manageConversation');
-    });
+    }
     conversationsLoaded = true; // Mark as loaded to prevent multiple attempts
   }
   
@@ -210,6 +288,35 @@ function manageConversation(userId, newMessage = null) {
 
   const conversation = userConversations.get(userId);
   
+  // Process message references if this is a message from Discord and the feature is enabled
+  if (config.ENABLE_REPLY_CONTEXT && discordMessage?.reference) {
+    try {
+      logger.debug({ userId, messageId: discordMessage.id }, 'Processing message references');
+      
+      // Extract reference context
+      const referenceContext = await referenceResolver.extractReferenceContext(discordMessage, {
+        maxDepth: MAX_REFERENCE_CONTEXT,
+        includeNonBot: true // Include messages from all users
+      });
+      
+      // Add references to the conversation
+      if (referenceContext.length > 0) {
+        logger.info({
+          userId,
+          messageId: discordMessage.id,
+          referenceCount: referenceContext.length
+        }, 'Adding reference context to conversation');
+        
+        addReferenceContext(userId, referenceContext);
+      }
+    } catch (error) {
+      logger.error({ error, userId, messageId: discordMessage.id }, 'Error processing message references');
+    }
+  } else if (discordMessage?.reference && !config.ENABLE_REPLY_CONTEXT) {
+    logger.debug('Reply context feature is disabled, skipping reference processing');
+  }
+  
+  // Add the new message if provided
   if (newMessage) {
     conversation.push(newMessage);
     conversationsDirty = true;
@@ -289,11 +396,13 @@ module.exports = {
   manageConversation,
   clearConversation,
   getActiveConversationCount,
-  getConversationStorageStatus,
   loadConversationsFromStorage,
   saveConversationsToStorage,
   startPeriodicSaving,
   stopPeriodicSaving,
+  getConversationStorageStatus,
+  addReferenceContext,
   userConversations,
-  MAX_CONVERSATION_LENGTH
+  MAX_CONVERSATION_LENGTH,
+  MAX_REFERENCE_CONTEXT,
 };

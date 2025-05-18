@@ -523,7 +523,7 @@ client.on('messageCreate', async message => {
       await feedbackMessage.edit(versionResponse.content);
 
       // Add the response to the conversation log
-      manageConversation(message.author.id, {
+      await manageConversation(message.author.id, {
         role: 'assistant',
         content: versionResponse.content,
       });
@@ -531,11 +531,23 @@ client.on('messageCreate', async message => {
       return;
     }
 
-    // Handle conversation context
-    const conversationLog = manageConversation(message.author.id, {
-      role: 'user',
-      content: message.content,
-    });
+    // Log if this is a reply to another message
+    if (message.reference) {
+      discordLogger.info({
+        originalMessageId: message.id,
+        referencedMessageId: message.reference.messageId
+      }, 'Message is a reply to another message');
+    }
+
+    // Handle conversation context, including any references
+    const conversationLog = await manageConversation(
+      message.author.id, 
+      {
+        role: 'user',
+        content: message.content,
+      },
+      message // Pass the entire Discord message to extract references
+    );
 
     // Process message with OpenAI
     const gptResponse = await processOpenAIMessage(message.content, conversationLog);
@@ -1300,10 +1312,18 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
     return;
   }
 
-  conversationLog.push({
+  // Create a new response message
+  const responseMessage = {
     role: 'assistant',
     content: gptResponse.content,
-  });
+  };
+  
+  // Add to the conversation log
+  conversationLog.push(responseMessage);
+  
+  // Also update the stored conversation
+  // We don't need to pass the Discord message here since we're just adding an assistant response
+  await manageConversation(feedbackMessage.author.id, responseMessage);
 
   const finalResponse =
     gptResponse.content.slice(0, 1997) + (gptResponse.content.length > 1997 ? '...' : '');

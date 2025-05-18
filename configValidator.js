@@ -201,10 +201,43 @@ const CONFIG_SCHEMA = {
     description: 'Whether to deploy slash commands on bot startup',
     default: 'true',
     validate: (value) => {
-      return value === 'true' || value === 'false';
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
     },
     transform: (value) => {
-      return value === 'true';
+      return value.toLowerCase() === 'true';
+    }
+  },
+  ENABLE_REPLY_CONTEXT: {
+    required: false,
+    description: 'Whether to use message replies as context for conversations',
+    default: 'true',
+    validate: (value) => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: (value) => {
+      return value.toLowerCase() === 'true';
+    }
+  },
+  MAX_REFERENCE_DEPTH: {
+    required: false,
+    description: 'Maximum depth for message reference chains',
+    default: '5',
+    validate: (value) => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: (value) => {
+      return Number(value);
+    }
+  },
+  MAX_REFERENCE_CONTEXT: {
+    required: false,
+    description: 'Maximum number of referenced messages to include in conversation context',
+    default: '5',
+    validate: (value) => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: (value) => {
+      return Number(value);
     }
   }
 };
