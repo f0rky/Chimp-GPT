@@ -557,7 +557,7 @@ client.on('messageCreate', async message => {
     
     // Start the conversation storage save operation (but don't await it)
     // This makes it happen in the background without blocking the main processing flow
-    const savePromise = conversationManager.saveConversationsToStorage();
+    const savePromise = saveConversationsToStorage();
 
     // Check if this is a version query
     const versionResponse = processVersionQuery(message.content, config);
