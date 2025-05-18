@@ -551,8 +551,16 @@ function initStatusServer(options = {}) {
      * @route GET /function-results
      * @returns {Array<Object>} Array of function results
      */
+    // Rate limiting for function results logging
+    let lastLoggedTime = 0;
+    const LOG_INTERVAL_MS = 60000; // Log at most once per minute
+    
     app.get('/function-results', async (req, res) => {
-      logger.info('Getting function results');
+      const now = Date.now();
+      if (now - lastLoggedTime > LOG_INTERVAL_MS) {
+        logger.debug('Getting function results');
+        lastLoggedTime = now;
+      }
 
       try {
         const results = await functionResults.getAllResults();
