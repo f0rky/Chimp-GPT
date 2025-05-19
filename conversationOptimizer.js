@@ -9,7 +9,7 @@
  *
  * @module ConversationOptimizer
  * @author Cascade
- * @version 1.0.0
+ * @version 1.2.1
  */
 
 const fs = require('fs').promises;
@@ -22,7 +22,7 @@ const config = require('./configValidator');
 const CONVERSATIONS_FILE = path.join(__dirname, 'data', 'conversations.json');
 
 // Configuration
-const MAX_CONVERSATION_LENGTH = config.MAX_CONVERSATION_LENGTH || 8; // Maximum messages per conversation
+const MAX_CONVERSATION_LENGTH = config.MAX_CONVERSATION_LENGTH || 12; // Increased from 8 to 12 to provide more context
 const MAX_CONVERSATION_AGE_DAYS = 7; // Prune conversations older than 7 days
 const SAVE_INTERVAL_MS = 5 * 60 * 1000; // Save every 5 minutes
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit for conversations file
@@ -402,18 +402,47 @@ function optimizeConversationForApi(conversation) {
     content: config.BOT_PERSONALITY,
   };
 
-  // Get the most recent messages (half of MAX_CONVERSATION_LENGTH)
-  const recentMessages = conversation
-    .filter(msg => msg.role !== 'system')
-    .slice(-Math.floor(MAX_CONVERSATION_LENGTH / 2));
+  // If conversation is small enough, return as is
+  if (conversation.length <= MAX_CONVERSATION_LENGTH) {
+    return conversation;
+  }
 
-  // Build optimized conversation with system message first
-  const optimized = [systemMessage, ...recentMessages];
+  // Keep all function-related messages (both requests and results)
+  const functionMessages = conversation.filter(
+    msg => msg.role === 'function' || msg.function_call
+  );
+
+  // Get the most recent non-function messages (up to 3/4 of MAX_CONVERSATION_LENGTH)
+  const recentNonFunctionMessages = conversation
+    .filter(
+      msg => 
+        msg.role !== 'system' && 
+        msg.role !== 'function' && 
+        !msg.function_call
+    )
+    .slice(-Math.floor((MAX_CONVERSATION_LENGTH * 3) / 4));
+
+  // Combine system message, function messages, and recent non-function messages
+  const optimized = [
+    systemMessage,
+    ...functionMessages,
+    ...recentNonFunctionMessages
+  ];
+
+  // If we still have too many messages, trim from the middle while keeping the most recent
+  if (optimized.length > MAX_CONVERSATION_LENGTH) {
+    const toRemove = optimized.length - MAX_CONVERSATION_LENGTH;
+    // Keep the first (system) and last (most recent) messages
+    // Remove from the middle (after system message but before the most recent messages)
+    optimized.splice(1, toRemove);
+  }
 
   logger.debug(
     {
       originalLength: conversation.length,
       optimizedLength: optimized.length,
+      functionMessages: functionMessages.length,
+      recentNonFunctionMessages: recentNonFunctionMessages.length,
     },
     'Optimized conversation for API'
   );
