@@ -47,26 +47,52 @@ let isOptimizing = false;
  * @param {boolean} forceReload - Force reload from disk even if already initialized
  * @returns {Promise<boolean>} Success status
  */
+let isInitializing = false;
+
 async function init(forceReload = false) {
+  // Prevent re-entrancy
+  if (isInitializing) {
+    return isInitialized;
+  }
+  
   if (isInitialized && !forceReload) {
     return true;
   }
 
+  // Set initializing flag
+  isInitializing = true;
+  
   try {
     const startTime = Date.now();
-    logger.info('Initializing conversation optimizer');
+    
+    // Only log if not already initialized
+    if (!isInitialized) {
+      logger.info('Initializing conversation optimizer');
+    } else {
+      logger.info('Reinitializing conversation optimizer');
+    }
 
     await ensureDirectory(path.dirname(CONVERSATIONS_FILE));
 
     // Load conversations from disk
     await loadFromDisk();
 
+    // Clear existing timer if forcing a reload
+    if (forceReload && saveTimer) {
+      clearInterval(saveTimer);
+      saveTimer = null;
+    }
+
     // Start periodic saving if not already started
     if (!saveTimer) {
       saveTimer = setInterval(async () => {
-        if (isDirty) {
-          await saveToDisk();
-          isDirty = false;
+        try {
+          if (isDirty) {
+            await saveToDisk();
+            isDirty = false;
+          }
+        } catch (error) {
+          logger.error({ error }, 'Error in save interval');
         }
       }, SAVE_INTERVAL_MS);
 
@@ -75,7 +101,9 @@ async function init(forceReload = false) {
     }
 
     // Run initial cleanup
-    await pruneOldConversations();
+    if (!isInitialized || forceReload) {
+      await pruneOldConversations();
+    }
 
     metadataCache.loadTime = Date.now() - startTime;
     isInitialized = true;
@@ -86,8 +114,11 @@ async function init(forceReload = false) {
     );
     return true;
   } catch (error) {
+    isInitialized = false;
     logger.error({ error }, 'Failed to initialize conversation optimizer');
     return false;
+  } finally {
+    isInitializing = false;
   }
 }
 
@@ -315,46 +346,148 @@ async function getConversation(userId, create = true) {
 }
 
 /**
- * Add a message to a conversation
+ * Enhanced message structure with metadata
+ * @typedef {Object} EnhancedMessage
+ * @property {string} role - Message role (user, assistant, system, function)
+ * @property {string} content - Message content
+ * @property {string} [name] - Username or function name
+ * @property {string} timestamp - ISO timestamp
+ * @property {string} [messageId] - Unique message ID
+ * @property {string} [inReplyTo] - Message ID this is in reply to
+ * @property {Object} [metadata] - Additional metadata
+ * @property {string} [metadata.type] - Message type (text, image, command, etc.)
+ * @property {Object} [metadata.image] - Image generation details (if applicable)
+ * @property {string} [metadata.image.prompt] - Original image prompt
+ * @property {string} [metadata.image.url] - Generated image URL
+ * @property {Object} [metadata.references] - Message references
+ */
+
+/**
+ * Add a message to a conversation with enhanced context
  * @param {string} userId - User ID
- * @param {Object} message - Message object
+ * @param {Object} message - Base message object
+ * @param {Object} [options] - Additional options
+ * @param {string} [options.username] - Username of the message sender
+ * @param {string} [options.messageId] - Unique message ID
+ * @param {string} [options.inReplyTo] - Message ID this is in reply to
+ * @param {Object} [metadata] - Additional metadata
  * @returns {Promise<Array>} Updated conversation
  */
-async function addMessage(userId, message) {
+async function addMessage(userId, message, { username, messageId, inReplyTo, ...metadata } = {}) {
   const conversation = await getConversation(userId);
-
-  // Add timestamp to the message for easier pruning
-  const messageWithTimestamp = {
+  const timestamp = new Date().toISOString();
+  
+  // Create enhanced message with metadata
+  const enhancedMessage = {
     ...message,
-    timestamp: new Date().toISOString(),
+    timestamp,
+    ...(username && { name: username }),
+    ...(messageId && { messageId }),
+    ...(inReplyTo && { inReplyTo }),
+    ...(Object.keys(metadata).length > 0 && { metadata })
   };
 
-  conversation.push(messageWithTimestamp);
+  // If this is an image generation result, store the prompt in metadata
+  if (message.role === 'function' && message.name === 'generate_image') {
+    const imagePrompt = message.content;
+    enhancedMessage.metadata = {
+      ...enhancedMessage.metadata,
+      type: 'image',
+      image: {
+        prompt: imagePrompt,
+        url: message.result?.url || null
+      }
+    };
+  }
+
+  // Add to conversation
+  conversation.push(enhancedMessage);
   isDirty = true;
 
-  // If exceeding length limit, remove oldest non-system messages
+  // If exceeding length limit, remove oldest non-system and non-function messages
   while (conversation.length > MAX_CONVERSATION_LENGTH) {
-    // Find oldest non-system message to remove (keep system message)
-    let indexToRemove = 1; // Default to second message (first non-system)
-    for (let i = 1; i < conversation.length; i++) {
-      if (conversation[i].role !== 'system') {
+    // Find oldest non-system, non-function message to remove
+    let indexToRemove = -1;
+    for (let i = 0; i < conversation.length; i++) {
+      if (conversation[i].role !== 'system' && conversation[i].role !== 'function') {
         indexToRemove = i;
         break;
       }
     }
-    conversation.splice(indexToRemove, 1);
+    
+    // If no non-system, non-function messages found, remove the oldest message after system
+    if (indexToRemove === -1 && conversation.length > 1) {
+      indexToRemove = 1;
+    }
+    
+    if (indexToRemove !== -1) {
+      conversation.splice(indexToRemove, 1);
+    } else {
+      break; // Shouldn't happen, but just in case
+    }
   }
 
   // Ensure system message is always at index 0
   if (conversation[0].role !== 'system') {
-    conversation.unshift({ role: 'system', content: config.BOT_PERSONALITY });
-    // Then remove the last message if we're over the limit
-    if (conversation.length > MAX_CONVERSATION_LENGTH) {
-      conversation.pop();
+    const systemMessage = conversation.find(m => m.role === 'system') || 
+                         { role: 'system', content: config.BOT_PERSONALITY };
+    conversation.unshift(systemMessage);
+    
+    // Remove duplicate system messages
+    for (let i = conversation.length - 1; i > 0; i--) {
+      if (conversation[i].role === 'system') {
+        conversation.splice(i, 1);
+      }
     }
   }
 
+  logger.debug({
+    userId,
+    messageId,
+    role: message.role,
+    contentLength: message.content?.length || 0,
+    hasMetadata: !!enhancedMessage.metadata
+  }, 'Added message to conversation');
+
   return conversation;
+}
+
+/**
+ * Get image context for a user
+ * @param {string} userId - User ID
+ * @param {number} [maxImages=3] - Maximum number of recent images to return
+ * @returns {Promise<Array>} Array of recent image contexts
+ */
+async function getImageContext(userId, maxImages = 3) {
+  const conversation = await getConversation(userId, false);
+  if (!conversation) return [];
+  
+  return conversation
+    .filter(msg => msg.metadata?.type === 'image' && msg.metadata?.image?.prompt)
+    .slice(-maxImages)
+    .map(msg => ({
+      prompt: msg.metadata.image.prompt,
+      url: msg.metadata.image.url,
+      timestamp: msg.timestamp
+    }));
+}
+
+/**
+ * Get message context for a specific message
+ * @param {string} userId - User ID
+ * @param {string} messageId - Message ID to get context for
+ * @param {number} [contextWindow=3] - Number of messages to include as context
+ * @returns {Promise<Array>} Array of messages with context
+ */
+async function getMessageContext(userId, messageId, contextWindow = 3) {
+  const conversation = await getConversation(userId, false);
+  if (!conversation) return [];
+  
+  const messageIndex = conversation.findIndex(msg => msg.messageId === messageId);
+  if (messageIndex === -1) return [];
+  
+  const startIndex = Math.max(0, messageIndex - contextWindow);
+  return conversation.slice(startIndex, messageIndex + 1);
 }
 
 /**
@@ -495,6 +628,14 @@ async function getStatus() {
  * @returns {Promise<void>}
  */
 async function shutdown() {
+  // Don't proceed if already shutting down or not initialized
+  if (isInitializing) {
+    logger.warn('Shutdown requested while initializing');
+    return;
+  }
+
+  logger.info('Shutting down conversation optimizer');
+  
   // Clear the save timer
   if (saveTimer) {
     clearInterval(saveTimer);
@@ -503,10 +644,20 @@ async function shutdown() {
 
   // Save one last time if dirty
   if (isDirty) {
-    await saveToDisk();
+    try {
+      await saveToDisk();
+      isDirty = false;
+      logger.info('Successfully saved conversations before shutdown');
+    } catch (error) {
+      logger.error({ error }, 'Failed to save conversations during shutdown');
+    }
   }
 
-  logger.info('Conversation optimizer shut down');
+  // Clear caches
+  conversationsCache.clear();
+  isInitialized = false;
+  
+  logger.info('Conversation optimizer shut down successfully');
 }
 
 module.exports = {
@@ -519,4 +670,6 @@ module.exports = {
   getStatus,
   pruneOldConversations,
   shutdown,
+  getImageContext,
+  getMessageContext,
 };
