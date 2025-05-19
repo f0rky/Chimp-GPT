@@ -13,6 +13,7 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits } = require('discord.js');
 const OpenAI = require('openai');
+const path = require('path');
 const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
 const simplifiedWeather = require('./simplified-weather');
 const lookupTime = require('./timeLookup');
@@ -23,6 +24,7 @@ const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
 const pluginManager = require('./pluginManager');
 const { processVersionQuery } = require('./utils/versionSelfQuery');
 const { sendChannelGreeting } = require('./utils/greetingManager');
+const PFPManager = require('./utils/pfpManager');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -1105,6 +1107,46 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     // Move to uploading phase
     updateProgress('uploading');
 
+    // Save the image to PFP rotation if pfpManager is available
+    if (client.pfpManager) {
+      try {
+        // Generate a unique filename based on timestamp and a random string
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        const filename = `gpt-${timestamp}-${randomStr}.png`;  // Ensure .png extension
+        
+        discordLogger.info('Attempting to save image to PFP rotation', { 
+          filename,
+          bufferSize: buffer.length,
+          hasPfpManager: !!client.pfpManager
+        });
+        
+        // Save the image to the PFP rotation
+        const savedPath = await client.pfpManager.addImage(buffer, filename);
+        discordLogger.info('Image added to PFP rotation', { savedPath });
+        
+        // Trigger an immediate PFP update with the new image
+        try {
+          await client.pfpManager.updateBotAvatar();
+          discordLogger.info('PFP updated with new image');
+        } catch (updateError) {
+          discordLogger.warn({ error: updateError }, 'Failed to immediately update PFP with new image');
+        }
+      } catch (error) {
+        discordLogger.error({ 
+          error: error.message,
+          stack: error.stack,
+          bufferSize: buffer?.length
+        }, 'Failed to add image to PFP rotation');
+      }
+    } else {
+      discordLogger.warn('Skipping PFP save', { 
+        reason: process.env.NODE_ENV === 'test' ? 'test environment' : 
+               process.env.NODE_ENV === 'development' ? 'development environment' : 
+               !client.pfpManager ? 'pfpManager not available' : 'unknown reason'
+      });
+    }
+
     // Create attachment
     const attachment = { attachment: buffer, name: 'gpt-image.png' };
 
@@ -1666,6 +1708,19 @@ client.on('ready', async () => {
     discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed');
   }
 
+  // Initialize PFP Manager
+  const pfpManager = new PFPManager(client, {
+    pfpDir: path.join(__dirname, 'pfp'),
+    maxImages: 50,
+    rotationInterval: 10 * 60 * 1000 // 10 minutes
+  });
+
+  // Start PFP rotation if not in development
+  if (process.env.NODE_ENV !== 'development') {
+    pfpManager.startRotation();
+    discordLogger.info('PFP rotation started');
+  }
+
   // Send greeting messages
   try {
     // Send a greeting to all allowed channels
@@ -1677,6 +1732,9 @@ client.on('ready', async () => {
   } catch (error) {
     discordLogger.error({ error }, 'Error sending startup greetings');
   }
+
+  // Store pfpManager for later use
+  client.pfpManager = pfpManager;
 });
 
 /**
