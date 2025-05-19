@@ -636,6 +636,35 @@ Each component of the application has its own logger instance for better organiz
 - `wolfram` - Wolfram Alpha integration
 - `time` - Time lookup functionality
 
+## Profile Picture (PFP) Management
+
+Chimp-GPT can automatically update its profile picture using AI-generated images. To enable this feature, ensure the following requirements are met:
+
+### Bot Permissions
+1. **OAuth2 Scopes**: The bot must be invited with these scopes:
+   - `bot`
+   - `applications.commands`
+
+2. **Server Permissions**: The bot's role needs:
+   - `Change Nickname` permission
+
+3. **Discord Limitations**:
+   - The bot can only change its avatar if it's in fewer than 100 servers
+   - Avatar changes are rate-limited by Discord (recommended: no more than 1-2 changes per 10 minutes)
+
+### Configuration
+By default, the bot will:
+- Save generated images to the `pfp/` directory (not tracked in git)
+- Rotate the profile picture every 10 minutes
+- Keep a maximum of 50 most recent images
+
+### Troubleshooting
+If the bot doesn't update its avatar:
+1. Check the logs for permission-related errors
+2. Verify the bot has the correct permissions in the server
+3. Ensure the bot is not in more than 100 servers
+4. Check if the `pfp/` directory exists and is writable
+
 ### Quake Server Stats
 
 You can configure the ELO display mode in `quakeLookup.js` by changing the `eloMode` value in the CONFIG object:
