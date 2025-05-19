@@ -9,14 +9,14 @@
  */
 /**
  * Logger configuration for Chimp-GPT
- * 
+ *
  * Provides structured logging with different log levels and formatting options.
  * This module sets up a centralized logging system using Pino, with support for
  * pretty printing in development and structured JSON logging in production.
- * 
+ *
  * Note: This file uses process.env directly instead of the config validator
  * to avoid circular dependencies, as the config validator imports this logger.
- * 
+ *
  * @module Logger
  * @author Brett
  * @version 1.0.0
@@ -27,7 +27,7 @@ require('dotenv').config();
 /**
  * Standard log levels with their numeric values
  * Higher numbers indicate higher severity
- * 
+ *
  * @constant {Object} LOG_LEVELS
  * @property {number} fatal - System is unusable (60)
  * @property {number} error - Error conditions (50)
@@ -55,62 +55,66 @@ const prettyPrint = process.env.NODE_ENV !== 'production';
  */
 const logger = pino({
   level: LOG_LEVEL,
-  transport: prettyPrint ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  } : undefined,
+  transport: prettyPrint
+    ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+        },
+      }
+    : undefined,
   base: {
     pid: process.pid,
-    hostname: process.env.HOSTNAME || 'unknown'
+    hostname: process.env.HOSTNAME || 'unknown',
   },
   timestamp: () => `,"time":"${new Date().toISOString()}"`,
   formatters: {
-    level: (label) => {
+    level: label => {
       return { level: label };
-    }
+    },
   },
   serializers: {
     error: pino.stdSerializers.err,
     /**
      * Custom serializer for Discord.js message objects to prevent circular references
      * Extracts only the necessary properties for logging
-     * 
+     *
      * @param {import('discord.js').Message} message - Discord.js message object
      * @returns {Object} Serialized message with safe properties
      */
-    discordMessage: (message) => {
+    discordMessage: message => {
       if (!message) return message;
       return {
         id: message.id,
         content: message.content,
         channelId: message.channelId,
-        author: message.author ? {
-          id: message.author.id,
-          username: message.author.username
-        } : null
+        author: message.author
+          ? {
+              id: message.author.id,
+              username: message.author.username,
+            }
+          : null,
       };
     },
     /**
      * Custom serializer for OpenAI API responses to prevent circular references
      * Extracts only the necessary properties for logging
-     * 
+     *
      * @param {Object} response - OpenAI API response object
      * @returns {Object} Serialized response with safe properties
      */
-    openaiResponse: (response) => {
+    openaiResponse: response => {
       if (!response) return response;
       // Extract only the necessary information to avoid large logs
       return {
         id: response.id,
         model: response.model,
-        usage: response.usage
+        usage: response.usage,
       };
-    }
-  }
+    },
+  },
 });
 
 /**
@@ -155,5 +159,5 @@ module.exports = {
   wolfram: createChildLogger('wolfram'),
   time: createChildLogger('time'),
   // Helper function to create custom child loggers
-  createLogger: createChildLogger
+  createLogger: createChildLogger,
 };

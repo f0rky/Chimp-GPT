@@ -2,9 +2,23 @@
 
 > **Contributors:** Please keep this checklist updated as you work on the project. Add new features, fixes, and best practices so the team stays aligned!
 
+## 🚀 Current Focus: Dashboard Enhancement
+
+- [ ] **Dashboard Implementation**
+  - [x] Basic dashboard layout and styling
+  - [x] Real-time performance metrics display
+  - [x] API status monitoring
+  - [x] Memory usage visualization
+  - [ ] Connect to actual API endpoints for real data
+  - [ ] Add error handling for API connection failures
+  - [ ] Implement user authentication
+  - [ ] Add historical data storage and analysis
+  - [ ] Create mobile-responsive design
+  - [ ] Add dark/light mode toggle
+
 ## ⚠️ Issues/Items to Fix (from Code Review)
 
-- [ ] **GPT Image-1 integration fixes:**
+- [x] **GPT Image-1 integration fixes:**
 
   - [x] Fix URL extraction from GPT Image-1 API response to handle different response formats
   - [x] Add better error handling and logging for image generation
@@ -12,15 +26,15 @@
   - [x] Complete migration from DALL-E to GPT Image-1 in all references
   - [x] Fix parameter naming: use `output_format` instead of `response_format` for GPT Image-1
   - [x] Add timing and cost details to image generation output
-  - [ ] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
+  - [x] Implement rate limiting for image creation (5 per hour per user, unlimited for owner)
 
-- [ ] **Enhanced status updates:**
+- [x] **Enhanced status updates:**
 
   - [x] Add progress indicators for long-running operations (counters, elapsed time)
-  - [ ] Update loading icon/message for delayed responses
+  - [x] Update loading icon/message for delayed responses
   - [x] Implement contextual status updates for image generation (showing both generating and completed phases)
-  - [ ] Implement contextual status updates that change every 5 seconds for long API calls
-  - [ ] Respect global rate limiter for status updates
+  - [x] Implement contextual status updates that change every 5 seconds for long API calls
+  - [x] Respect global rate limiter for status updates
   - [x] Add more detailed context to status messages for ongoing operations
 
 - [x] **Granular plugin error logging:** Enhanced error logging in pluginManager.js to include detailed context such as plugin name, version, author, argument details (sanitized), timestamp, error type/code, and hook type for easier debugging.
@@ -45,7 +59,7 @@
   - [x] **API key management:** Created a centralized API key management system with usage tracking, error monitoring, and rotation support. Updated all external API integrations to use the secure key manager.
 - [x] **Upgrade undici:** Upgrade undici to version 6.21.2 or later to fix Dependabot security alert in package-lock.json.
 - [x] **Docker/CI/CD:** Added Dockerfile, docker-compose.yml, and GitHub Actions workflows for CI/CD. Created comprehensive deployment documentation and container configuration for easier deployment and automated testing.
-- [ ] **User preference storage:** No system for persistent user preferences (e.g., ELO display, emoji toggles). Consider adding.
+- [x] **User preference storage:** Added persistent user preferences system with support for ELO display modes and emoji toggles.
 - [x] **Command-line run modes:** Added support for different run modes via CLI args (production, development, test, demo) with the runModes.js module and start.sh script. Implemented component-specific startup options (bot-only, status-only) and demo mode with mock data generation.
 - [x] **Debugging configs:** Added VSCode debugging configurations in .vscode/launch.json for the combined app, bot-only, status-only, and test debugging.
 - [x] **Configurable bot name, hostname, port (status page):** Status page now supports BOT_NAME, STATUS_HOSTNAME, and STATUS_PORT environment variables for flexible deployment (done). Fixed issues with app variable reference in statusServer.js to ensure proper startup.

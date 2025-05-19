@@ -1,6 +1,6 @@
 /**
  * Integration between performance monitoring and health check systems
- * 
+ *
  * This module integrates the performance monitoring data with the health check system
  * to make performance metrics available through the status page.
  */
@@ -17,7 +17,7 @@ function initPerformanceMonitoring() {
   addCustomStatsSource('performance', () => {
     // Get all timing statistics
     const allStats = performanceMonitor.getAllTimingStats();
-    
+
     // Organize stats by category for better visualization
     const organizedStats = {
       api: {
@@ -39,10 +39,10 @@ function initPerformanceMonitoring() {
       },
       // Add any custom operation types here
     };
-    
+
     // Add a summary with key metrics for quick overview
     const summary = {};
-    
+
     // Calculate summary metrics for each major operation type
     for (const category in organizedStats) {
       for (const op in organizedStats[category]) {
@@ -56,7 +56,7 @@ function initPerformanceMonitoring() {
         }
       }
     }
-    
+
     // Return both the detailed stats and the summary
     return {
       summary,

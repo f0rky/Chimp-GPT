@@ -18,45 +18,46 @@ async function deployCommands() {
     if (!config.DISCORD_TOKEN) {
       throw new Error('Missing Discord token in configuration');
     }
-    
+
     if (!config.CLIENT_ID) {
       throw new Error('Missing client ID in configuration');
     }
-    
+
     logger.info(`Deploying commands to guild: ${guildId}`);
-    
+
     // Initialize REST API client
     const rest = new REST({ version: '10' }).setToken(config.DISCORD_TOKEN);
-    
+
     // Get command modules directory
     const commandsPath = path.join(__dirname, 'commands', 'modules');
-    
+
     // Check if directory exists
     if (!fs.existsSync(commandsPath)) {
       throw new Error(`Commands directory not found: ${commandsPath}`);
     }
-    
+
     // Load command files
-    const commandFiles = fs.readdirSync(commandsPath)
+    const commandFiles = fs
+      .readdirSync(commandsPath)
       .filter(file => file.endsWith('.js') && !file.startsWith('_'));
-    
+
     // Array to store slash command data
     const slashCommands = [];
-    
+
     // Load each command module
     for (const file of commandFiles) {
       try {
         const filePath = path.join(commandsPath, file);
         // Clear cache to ensure we get the latest version
         delete require.cache[require.resolve(filePath)];
-        
+
         const command = require(filePath);
-        
+
         // Skip commands that don't have slash command data
         if (!command.slashCommand) {
           continue;
         }
-        
+
         slashCommands.push(command.slashCommand.toJSON());
         logger.debug(`Loaded slash command: ${command.name}`);
       } catch (error) {
@@ -64,34 +65,33 @@ async function deployCommands() {
         discordLogger.error({ error, file }, 'Error loading command file');
       }
     }
-    
+
     logger.info(`Deploying ${slashCommands.length} slash commands to guild ${guildId}`);
-    
+
     // Deploy commands to the specific guild
-    const data = await rest.put(
-      Routes.applicationGuildCommands(config.CLIENT_ID, guildId),
-      { body: slashCommands }
-    );
-    
+    const data = await rest.put(Routes.applicationGuildCommands(config.CLIENT_ID, guildId), {
+      body: slashCommands,
+    });
+
     logger.info(`Successfully deployed ${data.length} commands to guild ${guildId}`);
-    
+
     // Print out the deployed commands
     logger.info('Deployed commands:');
     for (const cmd of data) {
       logger.info(`- ${cmd.name}: ${cmd.description}`);
     }
-    
+
     return {
       success: true,
       deployedCommands: data.length,
-      commands: data
+      commands: data,
     };
   } catch (error) {
     const { discord: discordLogger } = require('../logger');
     discordLogger.error({ error }, 'Error deploying commands');
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }

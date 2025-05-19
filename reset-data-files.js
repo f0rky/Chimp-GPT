@@ -166,10 +166,9 @@ function resetDataFiles() {
   if (statsResult && functionResultsResult) {
     logger.info('Successfully reset all data files');
     return true;
-  } else {
-    logger.error('Failed to reset some data files');
-    return false;
   }
+  logger.error('Failed to reset some data files');
+  return false;
 }
 
 // Execute the reset

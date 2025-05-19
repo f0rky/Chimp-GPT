@@ -72,5 +72,5 @@ module.exports = {
   approveRequest,
   setBreakerOpen,
   isBreakerOpen,
-  resetBreaker
+  resetBreaker,
 };

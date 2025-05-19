@@ -81,12 +81,12 @@ let lastError = null;
 // Set up periodic health check
 setInterval(() => {
   const memUsage = process.memoryUsage();
-  
+
   // Check if memory usage is too high (over 80% of 1.5GB)
   if (memUsage.rss > 1200000000) {
     logger.warn({ memoryUsage: memUsage }, 'Memory usage is high, consider restarting server');
   }
-  
+
   serverHealthy = true;
 }, 30000); // Every 30 seconds
 
@@ -111,7 +111,7 @@ function requireOwnerToken(req, res, next) {
   if (token !== OWNER_TOKEN) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  next();
+  return next();
 }
 
 // Export the middleware for use in route definitions
@@ -218,11 +218,12 @@ function initStatusServer(options = {}) {
       }
 
       // Apply rate limiting
-      statusPageRateLimiter
+      return statusPageRateLimiter
         .consume(clientIp)
         .then(() => {
           // Not rate limited, proceed
           next();
+          return null; // Explicit return to satisfy linter
         })
         .catch(rateLimitInfo => {
           // Rate limited
@@ -243,6 +244,7 @@ function initStatusServer(options = {}) {
             message: `Rate limit exceeded. Please try again in ${secondsBeforeNext} seconds.`,
             retryAfter: secondsBeforeNext,
           });
+          return null; // Explicit return to satisfy linter
         });
     });
 
@@ -298,9 +300,12 @@ function initStatusServer(options = {}) {
           try {
             // Make sure it has a protocol
             const originWithProtocol = trimmed.startsWith('http') ? trimmed : `http://${trimmed}`;
-            new URL(originWithProtocol);
-            validOrigins.push(originWithProtocol);
-            logger.info({ origin: originWithProtocol }, 'Added valid CORS origin');
+            // Use URL constructor for validation
+            const url = new URL(originWithProtocol);
+            if (url) {
+              validOrigins.push(originWithProtocol);
+              logger.info({ origin: originWithProtocol }, 'Added valid CORS origin');
+            }
           } catch (e) {
             logger.warn({ origin: trimmed }, 'Invalid origin in CORS_ALLOWED_ORIGINS');
           }
@@ -320,11 +325,11 @@ function initStatusServer(options = {}) {
     const portStartup = process.env.STATUS_PORT || 3000;
 
     // Get version info
-    const versionInfo = getDetailedVersionInfo();
+    const initialVersionInfo = getDetailedVersionInfo();
 
     logger.info(
       {
-        version: versionInfo.version,
+        version: initialVersionInfo.version,
         botName: config.BOT_NAME,
         port: portStartup,
         allowedOrigins: allowedOriginsStartup,
@@ -353,7 +358,7 @@ function initStatusServer(options = {}) {
           {
             status: 'online',
             uptime,
-            version: versionInfo.version,
+            version: initialVersionInfo.version,
             memory: memoryUsage,
             stats: mergedStats,
             botName: config.BOT_NAME,
@@ -376,11 +381,11 @@ function initStatusServer(options = {}) {
      * @returns {Object} { name, status, version }
      */
     app.get('/api', (req, res) => {
-      const versionInfo = getDetailedVersionInfo();
+      const apiVersionInfo = getDetailedVersionInfo();
       res.json({
         name: config.BOT_NAME,
         status: 'online',
-        version: versionInfo.version,
+        version: apiVersionInfo.version,
       });
     });
 
@@ -554,7 +559,7 @@ function initStatusServer(options = {}) {
     // Rate limiting for function results logging
     let lastLoggedTime = 0;
     const LOG_INTERVAL_MS = 60000; // Log at most once per minute
-    
+
     app.get('/function-results', async (req, res) => {
       const now = Date.now();
       if (now - lastLoggedTime > LOG_INTERVAL_MS) {
@@ -592,7 +597,7 @@ function initStatusServer(options = {}) {
           lastError = statsError;
           serverHealthy = false;
         }
-        
+
         // Create a summary object with avg and p95 for each operation
         const summary = {};
         for (const op in metrics) {
@@ -601,7 +606,7 @@ function initStatusServer(options = {}) {
               avg: Math.round(metrics[op].avg) || 0,
               p95: Math.round(metrics[op].p95) || 0,
               count: metrics[op].count || 0,
-              max: Math.round(metrics[op].max) || 0
+              max: Math.round(metrics[op].max) || 0,
             };
           }
         }
@@ -614,7 +619,7 @@ function initStatusServer(options = {}) {
           heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`,
           external: `${Math.round(memUsage.external / 1024 / 1024)} MB`,
         };
-        
+
         res.json({
           success: true,
           summary,
@@ -622,23 +627,23 @@ function initStatusServer(options = {}) {
           serverHealth: {
             status: serverHealthy ? 'healthy' : 'degraded',
             lastError: lastError ? lastError.message : null,
-            memory: memoryInfo
+            memory: memoryInfo,
           },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error({ error }, 'Critical error getting performance metrics');
         lastError = error;
         serverHealthy = false;
-        
+
         // Simplified response in case of critical error
         res.status(500).json({
           success: false,
           error: error.message,
           serverHealth: {
             status: 'critical',
-            message: 'Server encountered a critical error'
-          }
+            message: 'Server encountered a critical error',
+          },
         });
       }
     });
@@ -721,8 +726,8 @@ function initStatusServer(options = {}) {
       logger.info('Manual function results file repair requested');
 
       try {
-        const functionResults = require('./functionResults');
-        const repairResult = await functionResults.repairResultsFile();
+        const functionResultsModule = require('./functionResults');
+        const repairResult = await functionResultsModule.repairResultsFile();
 
         if (repairResult) {
           logger.info('Manual function results file repair completed successfully');

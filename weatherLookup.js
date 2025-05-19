@@ -202,9 +202,8 @@ async function lookupWeather(location) {
       );
 
       return { success: true, data: weatherData };
-    } else {
-      throw new Error(`Unexpected response: ${response.status}`);
     }
+    throw new Error(`Unexpected response: ${response.status}`);
   } catch (error) {
     weatherLogger.error(
       {
@@ -259,7 +258,7 @@ async function lookupExtendedForecast(location, days = 5) {
   }
 
   // Ensure days parameter is a valid number
-  const sanitizedDays = Math.min(Math.max(parseInt(days) || 5, 1), 10);
+  const sanitizedDays = Math.min(Math.max(parseInt(days, 10) || 5, 1), 10);
 
   // Check if API key is missing or empty
   if (!process.env.X_RAPIDAPI_KEY || process.env.X_RAPIDAPI_KEY === 'your_rapidapi_key_here') {
@@ -400,9 +399,8 @@ async function lookupExtendedForecast(location, days = 5) {
       );
 
       return { success: true, data: weatherData };
-    } else {
-      throw new Error(`Unexpected response: ${response.status}`);
     }
+    throw new Error(`Unexpected response: ${response.status}`);
   } catch (error) {
     weatherLogger.error(
       {

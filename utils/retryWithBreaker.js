@@ -4,10 +4,10 @@
  * A retry + circuit breaker utility for async functions with human-in-the-loop approval.
  *
  * Usage:
- *   await retryWithBreaker(() => openaiCall(...), { 
- *     maxRetries: 3, 
- *     breakerLimit: 3, 
- *     breakerTimeoutMs: 120000, 
+ *   await retryWithBreaker(() => openaiCall(...), {
+ *     maxRetries: 3,
+ *     breakerLimit: 3,
+ *     breakerTimeoutMs: 120000,
  *     onBreakerOpen,
  *     requireApproval: true,
  *     approvalDetails: { type: 'api_call', user: 'username', context: 'context' },
@@ -23,7 +23,7 @@ const humanCircuitBreaker = require('./humanCircuitBreaker');
 const breakerState = {
   failures: 0,
   breakerOpen: false,
-  breakerOpenedAt: null
+  breakerOpenedAt: null,
 };
 
 /**
@@ -47,14 +47,16 @@ async function retryWithBreaker(fn, opts = {}) {
     onBreakerOpen = null,
     requireApproval = false,
     approvalDetails = null,
-    client = null
+    client = null,
   } = opts;
 
   // Check if circuit breaker is open
   if (breakerState.breakerOpen || breakerManager.isBreakerOpen()) {
     const elapsed = Date.now() - breakerState.breakerOpenedAt;
     if (breakerState.breakerOpen && elapsed < breakerTimeoutMs) {
-      throw new Error(`Circuit breaker is open. Try again in ${Math.ceil((breakerTimeoutMs - elapsed) / 1000)}s`);
+      throw new Error(
+        `Circuit breaker is open. Try again in ${Math.ceil((breakerTimeoutMs - elapsed) / 1000)}s`
+      );
     } else {
       breakerState.breakerOpen = false;
       breakerState.failures = 0;
@@ -69,11 +71,14 @@ async function retryWithBreaker(fn, opts = {}) {
       throw new Error('Human approval required but no details provided');
     }
 
-    logger.info({ 
-      approvalDetails,
-      requireApproval 
-    }, 'Requesting human approval before execution');
-    
+    logger.info(
+      {
+        approvalDetails,
+        requireApproval,
+      },
+      'Requesting human approval before execution'
+    );
+
     const { approved, result, error } = await humanCircuitBreaker.executeWithApproval(
       approvalDetails,
       fn,
@@ -103,24 +108,27 @@ async function retryWithBreaker(fn, opts = {}) {
       lastError = err;
       attempt++;
       breakerState.failures++;
-      
+
       // Log the failure
-      logger.warn({
-        error: err.message,
-        attempt,
-        maxRetries,
-        breakerFailures: breakerState.failures,
-        breakerLimit
-      }, 'Operation failed, may retry');
-      
+      logger.warn(
+        {
+          error: err.message,
+          attempt,
+          maxRetries,
+          breakerFailures: breakerState.failures,
+          breakerLimit,
+        },
+        'Operation failed, may retry'
+      );
+
       // Check if we need to open the breaker
       if (breakerState.failures >= breakerLimit) {
         breakerState.breakerOpen = true;
         breakerState.breakerOpenedAt = Date.now();
-        
+
         // Set the global breaker state
         breakerManager.setBreakerOpen(true);
-        
+
         // Notify the owner
         if (onBreakerOpen) {
           try {
@@ -129,7 +137,7 @@ async function retryWithBreaker(fn, opts = {}) {
             logger.error({ error: notifyError }, 'Error in onBreakerOpen callback');
           }
         }
-        
+
         // Try to notify via breaker manager
         try {
           breakerManager.notifyOwnerBreakerTriggered(
@@ -138,19 +146,19 @@ async function retryWithBreaker(fn, opts = {}) {
         } catch (notifyError) {
           logger.error({ error: notifyError }, 'Error notifying owner about breaker');
         }
-        
+
         throw new Error(`Circuit breaker opened due to repeated failures: ${lastError.message}`);
       }
-      
+
       if (attempt > maxRetries) break;
-      
+
       // Exponential backoff
       const backoffMs = 200 * Math.pow(2, attempt);
       logger.info({ backoffMs, attempt }, 'Backing off before retry');
       await new Promise(r => setTimeout(r, backoffMs));
     }
   }
-  
+
   throw lastError;
 }
 

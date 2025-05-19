@@ -1,24 +1,61 @@
 # Dependencies
-node_modules
+node_modules/
 package-lock.json
+package.json
 
 # Build artifacts
-dist
-build
-coverage
+/dist/
+/build/
+/coverage/
 
 # Logs
-logs
+/logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Environment variables
 .env
 .env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Backup files
 *.bak
 *.backup
 *~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+/archive/
+/docs/
+/public/dashboard/
+
+# Ignore markdown files
+*.md
+
+# Ignore CSS files
+*.css
+public/*.css
 
 # Data files
 data/

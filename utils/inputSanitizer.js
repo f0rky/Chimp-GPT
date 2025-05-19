@@ -87,7 +87,7 @@ function sanitizeText(input, maxLength = MAX_LENGTHS.MESSAGE) {
  * @returns {string} Sanitized message
  */
 function sanitizeUserMessage(message) {
-  let sanitized = sanitizeText(message, MAX_LENGTHS.MESSAGE);
+  const sanitized = sanitizeText(message, MAX_LENGTHS.MESSAGE);
 
   // Check for dangerous patterns
   const hasDangerousPattern = DANGEROUS_PATTERNS.some(pattern => pattern.test(sanitized));

@@ -1,10 +1,10 @@
 /**
  * Base Error Class for ChimpGPT
- * 
+ *
  * This is the base error class for all custom errors in ChimpGPT.
  * It extends the native Error class and adds additional properties
  * for better error tracking and handling.
- * 
+ *
  * @module ChimpError
  * @author Brett
  * @version 1.0.0
@@ -12,14 +12,14 @@
 
 /**
  * Base error class for all ChimpGPT errors
- * 
+ *
  * @class ChimpError
  * @extends Error
  */
 class ChimpError extends Error {
   /**
    * Create a new ChimpError
-   * 
+   *
    * @param {string} message - Error message
    * @param {Object} options - Additional error options
    * @param {string} [options.code] - Error code
@@ -30,10 +30,10 @@ class ChimpError extends Error {
    */
   constructor(message, options = {}) {
     super(message);
-    
+
     // Set the name to the class name
     this.name = this.constructor.name;
-    
+
     // Add additional properties
     this.code = options.code || 'UNKNOWN_ERROR';
     this.cause = options.cause;
@@ -41,7 +41,7 @@ class ChimpError extends Error {
     this.component = options.component || 'unknown';
     this.operation = options.operation || 'unknown';
     this.timestamp = new Date().toISOString();
-    
+
     // Capture stack trace
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
@@ -50,7 +50,7 @@ class ChimpError extends Error {
 
   /**
    * Get a structured representation of the error for logging
-   * 
+   *
    * @returns {Object} Structured error object
    */
   toJSON() {
@@ -63,13 +63,17 @@ class ChimpError extends Error {
       context: this.context,
       timestamp: this.timestamp,
       stack: this.stack,
-      cause: this.cause ? (this.cause.toJSON ? this.cause.toJSON() : this.cause.message) : undefined
+      cause: this.cause
+        ? this.cause.toJSON
+          ? this.cause.toJSON()
+          : this.cause.message
+        : undefined,
     };
   }
 
   /**
    * Get a string representation of the error
-   * 
+   *
    * @returns {string} String representation
    */
   toString() {

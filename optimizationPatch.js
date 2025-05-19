@@ -30,20 +30,20 @@ function applyPatches() {
     getRecentResults: originalFunctionResults.getRecentResults,
     getAllResults: originalFunctionResults.getAllResults,
     clearResults: originalFunctionResults.clearResults,
-    repairResultsFile: originalFunctionResults.repairResultsFile
+    repairResultsFile: originalFunctionResults.repairResultsFile,
   };
 
   // Override storeResult
-  originalFunctionResults.storeResult = async function(functionType, params, result) {
+  originalFunctionResults.storeResult = async function (functionType, params, result) {
     try {
       // Use the optimizer's version
       await optimizer.storeResult(functionType, params, result);
-      
+
       // Return true for success
       return true;
     } catch (error) {
       logger.error({ error, functionType }, 'Error in patched storeResult');
-      
+
       // Try the original method as fallback
       try {
         return await original.storeResult(functionType, params, result);
@@ -55,13 +55,13 @@ function applyPatches() {
   };
 
   // Override getRecentResults
-  originalFunctionResults.getRecentResults = async function(functionType, limit = 10) {
+  originalFunctionResults.getRecentResults = async function (functionType, limit = 10) {
     try {
       // Use the optimizer's version
       return await optimizer.getRecentResults(functionType, limit);
     } catch (error) {
       logger.error({ error, functionType }, 'Error in patched getRecentResults');
-      
+
       // Try the original method as fallback
       try {
         return await original.getRecentResults(functionType, limit);
@@ -73,13 +73,13 @@ function applyPatches() {
   };
 
   // Override getAllResults
-  originalFunctionResults.getAllResults = async function() {
+  originalFunctionResults.getAllResults = async function () {
     try {
       // Use the optimizer's version
       return await optimizer.getAllResults();
     } catch (error) {
       logger.error({ error }, 'Error in patched getAllResults');
-      
+
       // Try the original method as fallback
       try {
         return await original.getAllResults();
@@ -92,21 +92,21 @@ function applyPatches() {
           quake: [],
           gptimage: [],
           plugins: {},
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
         };
       }
     }
   };
 
   // Override clearResults (passthrough)
-  originalFunctionResults.clearResults = async function() {
+  originalFunctionResults.clearResults = async function () {
     // Just reset the optimizer
     try {
       await optimizer.init();
       return true;
     } catch (error) {
       logger.error({ error }, 'Error in patched clearResults');
-      
+
       // Try the original method as fallback
       try {
         return await original.clearResults();
@@ -118,19 +118,22 @@ function applyPatches() {
   };
 
   // Override repairResultsFile (passthrough)
-  originalFunctionResults.repairResultsFile = async function() {
+  originalFunctionResults.repairResultsFile = async function () {
     // Just reset the optimizer
     try {
       await optimizer.init();
       return true;
     } catch (error) {
       logger.error({ error }, 'Error in patched repairResultsFile');
-      
+
       // Try the original method as fallback
       try {
         return await original.repairResultsFile();
       } catch (fallbackError) {
-        logger.error({ error: fallbackError }, 'Fallback to original repairResultsFile also failed');
+        logger.error(
+          { error: fallbackError },
+          'Fallback to original repairResultsFile also failed'
+        );
         return false;
       }
     }
@@ -160,5 +163,5 @@ const success = applyPatches();
 // Export the success status and methods
 module.exports = {
   success,
-  shutdown
+  shutdown,
 };

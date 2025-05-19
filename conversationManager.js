@@ -20,13 +20,13 @@
  */
 /**
  * Conversation Manager Module
- * 
+ *
  * This module manages conversation context for users interacting with the bot.
  * It maintains a conversation history for each user, adding new messages and
  * ensuring the conversation doesn't exceed the maximum allowed length.
- * 
+ *
  * It also provides persistent storage for conversations across bot restarts.
- * 
+ *
  * @module ConversationManager
  * @author Brett
  * @version 1.1.0
@@ -89,7 +89,7 @@ let saveTimer = null;
 /**
  * Loads conversations from persistent storage.
  * This should be called when the bot starts up.
- * 
+ *
  * @returns {Promise<boolean>} True if successful, false otherwise
  */
 async function loadConversationsFromStorage() {
@@ -98,10 +98,10 @@ async function loadConversationsFromStorage() {
     if (conversationsLoaded) {
       logger.debug('Conversations already loaded, but reloading on explicit call');
     }
-    
+
     logger.info('Loading conversations from storage');
     const loadedConversations = await conversationStorage.loadConversations();
-    
+
     // Prune old conversations (default: keep conversations from last 7 days)
     const MAX_CONVERSATION_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
     logger.info('Pruning old conversations');
@@ -109,31 +109,37 @@ async function loadConversationsFromStorage() {
       loadedConversations,
       MAX_CONVERSATION_AGE_MS
     );
-    
+
     // Log pruning results
-    logger.info({
-      originalCount: loadedConversations.size,
-      prunedCount: prunedConversations.size,
-      removedCount: loadedConversations.size - prunedConversations.size
-    }, 'Pruned old conversations');
-    
+    logger.info(
+      {
+        originalCount: loadedConversations.size,
+        prunedCount: prunedConversations.size,
+        removedCount: loadedConversations.size - prunedConversations.size,
+      },
+      'Pruned old conversations'
+    );
+
     // Replace in-memory conversations with loaded ones
     // First, clear existing conversations
     userConversations.clear();
-    
+
     // Then add all pruned conversations
     for (const [userId, conversation] of prunedConversations.entries()) {
       userConversations.set(userId, conversation);
     }
-    
+
     conversationsLoaded = true;
     conversationsDirty = false; // We just loaded, so not dirty yet
-    
-    logger.info({ 
-      loadedCount: prunedConversations.size,
-      totalCount: userConversations.size 
-    }, 'Conversations loaded from storage');
-    
+
+    logger.info(
+      {
+        loadedCount: prunedConversations.size,
+        totalCount: userConversations.size,
+      },
+      'Conversations loaded from storage'
+    );
+
     return true;
   } catch (error) {
     logger.error({ error }, 'Error loading conversations from storage');
@@ -144,7 +150,7 @@ async function loadConversationsFromStorage() {
 /**
  * Saves conversations to persistent storage.
  * This should be called periodically and before the bot shuts down.
- * 
+ *
  * @param {boolean} [force=false] - Whether to force save even if not dirty
  * @returns {Promise<boolean>} True if successful, false otherwise
  */
@@ -155,15 +161,18 @@ async function saveConversationsToStorage(force = false) {
       logger.debug('No changes to conversations, skipping save');
       return true;
     }
-    
+
     logger.info({ conversationCount: userConversations.size }, 'Saving conversations to storage');
     await conversationStorage.saveConversations(userConversations);
-    
+
     conversationsDirty = false;
     lastSaveTime = Date.now();
-    
-    logger.debug({ lastSaveTime: new Date(lastSaveTime).toISOString() }, 'Updated last save timestamp');
-    
+
+    logger.debug(
+      { lastSaveTime: new Date(lastSaveTime).toISOString() },
+      'Updated last save timestamp'
+    );
+
     return true;
   } catch (error) {
     logger.error({ error }, 'Error saving conversations to storage');
@@ -173,7 +182,7 @@ async function saveConversationsToStorage(force = false) {
 
 /**
  * Starts the periodic saving of conversations.
- * 
+ *
  * @returns {void}
  */
 function startPeriodicSaving() {
@@ -181,18 +190,18 @@ function startPeriodicSaving() {
   if (saveTimer) {
     clearInterval(saveTimer);
   }
-  
+
   // Set up new timer
   saveTimer = setInterval(async () => {
     await saveConversationsToStorage();
   }, SAVE_INTERVAL_MS);
-  
+
   logger.info({ intervalMs: SAVE_INTERVAL_MS }, 'Started periodic conversation saving');
 }
 
 /**
  * Stops the periodic saving of conversations.
- * 
+ *
  * @returns {void}
  */
 function stopPeriodicSaving() {
@@ -205,7 +214,7 @@ function stopPeriodicSaving() {
 
 /**
  * Add reference context to a user's conversation
- * 
+ *
  * @param {string} userId - The Discord user ID
  * @param {Array<ConversationMessage>} referenceMessages - Array of messages from references
  * @returns {void}
@@ -214,55 +223,57 @@ function addReferenceContext(userId, referenceMessages) {
   if (!referenceMessages || referenceMessages.length === 0) {
     return;
   }
-  
+
   // Ensure the user has a conversation
   if (!userConversations.has(userId)) {
-    userConversations.set(userId, [
-      { role: 'system', content: config.BOT_PERSONALITY }
-    ]);
+    userConversations.set(userId, [{ role: 'system', content: config.BOT_PERSONALITY }]);
     conversationsDirty = true;
   }
-  
+
   const conversation = userConversations.get(userId);
-  
+
   // Limit the number of reference messages to add
   const messagesToAdd = referenceMessages.slice(0, MAX_REFERENCE_CONTEXT);
-  
+
   // Insert reference messages after the system message
   conversation.splice(1, 0, ...messagesToAdd);
   conversationsDirty = true;
-  
+
   // If we exceed the maximum length, remove oldest non-system, non-reference messages
   // This ensures we keep the most recent context
   while (conversation.length > MAX_CONVERSATION_LENGTH) {
     // Find the oldest non-system, non-reference message to remove
     let indexToRemove = -1;
-    for (let i = 1; i < conversation.length; i++) { // Start at 1 to skip system message
+    for (let i = 1; i < conversation.length; i++) {
+      // Start at 1 to skip system message
       if (!conversation[i].isReference) {
         indexToRemove = i;
         break;
       }
     }
-    
+
     // If we didn't find a non-reference message, remove the oldest reference
     if (indexToRemove === -1) {
       indexToRemove = 1; // Remove the oldest reference message
     }
-    
+
     // Remove the identified message
     conversation.splice(indexToRemove, 1);
   }
-  
-  logger.info({
-    userId,
-    referencesAdded: messagesToAdd.length,
-    totalConversationLength: conversation.length
-  }, 'Added reference context to conversation');
+
+  logger.info(
+    {
+      userId,
+      referencesAdded: messagesToAdd.length,
+      totalConversationLength: conversation.length,
+    },
+    'Added reference context to conversation'
+  );
 }
 
 /**
  * Manage a user's conversation, optionally adding a new message and reference context
- * 
+ *
  * @param {string} userId - The Discord user ID
  * @param {ConversationMessage|null} newMessage - New message to add (optional)
  * @param {import('discord.js').Message} discordMessage - Original Discord message with potential references
@@ -278,49 +289,53 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     }
     conversationsLoaded = true; // Mark as loaded to prevent multiple attempts
   }
-  
+
   if (!userConversations.has(userId)) {
-    userConversations.set(userId, [
-      { role: 'system', content: config.BOT_PERSONALITY }
-    ]);
+    userConversations.set(userId, [{ role: 'system', content: config.BOT_PERSONALITY }]);
     conversationsDirty = true;
   }
 
   const conversation = userConversations.get(userId);
-  
+
   // Process message references if this is a message from Discord and the feature is enabled
   if (config.ENABLE_REPLY_CONTEXT && discordMessage?.reference) {
     try {
       logger.debug({ userId, messageId: discordMessage.id }, 'Processing message references');
-      
+
       // Extract reference context
       const referenceContext = await referenceResolver.extractReferenceContext(discordMessage, {
         maxDepth: MAX_REFERENCE_CONTEXT,
-        includeNonBot: true // Include messages from all users
+        includeNonBot: true, // Include messages from all users
       });
-      
+
       // Add references to the conversation
       if (referenceContext.length > 0) {
-        logger.info({
-          userId,
-          messageId: discordMessage.id,
-          referenceCount: referenceContext.length
-        }, 'Adding reference context to conversation');
-        
+        logger.info(
+          {
+            userId,
+            messageId: discordMessage.id,
+            referenceCount: referenceContext.length,
+          },
+          'Adding reference context to conversation'
+        );
+
         addReferenceContext(userId, referenceContext);
       }
     } catch (error) {
-      logger.error({ error, userId, messageId: discordMessage.id }, 'Error processing message references');
+      logger.error(
+        { error, userId, messageId: discordMessage.id },
+        'Error processing message references'
+      );
     }
   } else if (discordMessage?.reference && !config.ENABLE_REPLY_CONTEXT) {
     logger.debug('Reply context feature is disabled, skipping reference processing');
   }
-  
+
   // Add the new message if provided
   if (newMessage) {
     conversation.push(newMessage);
     conversationsDirty = true;
-    
+
     // If we exceed the maximum length, remove oldest non-system messages
     while (conversation.length > MAX_CONVERSATION_LENGTH) {
       // Always keep the system message at index 0
@@ -330,7 +345,7 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
         break; // Should never happen, but just in case
       }
     }
-    
+
     // Ensure system message is always preserved at index 0
     if (conversation[0].role !== 'system') {
       // If system message was somehow removed, add it back
@@ -383,7 +398,7 @@ function getConversationStorageStatus() {
     saveIntervalMs: SAVE_INTERVAL_MS,
     maxConversationLength: MAX_CONVERSATION_LENGTH,
     lastSaved: lastSaveTime ? new Date(lastSaveTime).toISOString() : null,
-    storageFile: conversationStorage.getStorageFilePath()
+    storageFile: conversationStorage.getStorageFilePath(),
   };
 }
 

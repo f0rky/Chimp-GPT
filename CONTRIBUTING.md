@@ -29,22 +29,27 @@ Please be respectful and considerate of others when contributing to the project.
 ### Setting Up the Development Environment
 
 1. **Fork the repository**:
+
    - Click the "Fork" button at the top right of the repository page.
 
 2. **Clone your fork**:
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/Chimp-GPT.git
    cd Chimp-GPT
    ```
 
 3. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 4. **Set up environment variables**:
+
    - Copy `.env.example` to `.env`
    - Fill in the required values (Discord token, OpenAI API key, etc.)
+
    ```bash
    cp .env.example .env
    ```
@@ -57,6 +62,7 @@ Please be respectful and considerate of others when contributing to the project.
 ### Project Structure
 
 - **Core Files**:
+
   - `chimpGPT.js` - Main bot file
   - `conversationManager.js` - Manages conversation context
   - `conversationStorage.js` - Handles saving/loading conversations
@@ -64,12 +70,15 @@ Please be respectful and considerate of others when contributing to the project.
   - `statusServer.js` - Status page server
 
 - **Commands**:
+
   - `commands/` - Command implementations
 
 - **Plugins**:
+
   - `plugins/` - Plugin system and plugin implementations
 
 - **Utilities**:
+
   - `utils/` - Utility functions and helpers
   - `logger.js` - Logging system
 
@@ -98,6 +107,7 @@ We follow conventional commit messages:
 - `chore:` - Changes to the build process or auxiliary tools
 
 Example:
+
 ```
 feat: add weather forecast command
 ```
@@ -129,10 +139,11 @@ See [FORMATTING.md](./docs/FORMATTING.md) for detailed formatting guidelines.
 - Document complex logic with inline comments
 
 Example JSDoc:
+
 ```javascript
 /**
  * Processes a message using OpenAI's GPT model
- * 
+ *
  * @param {string} content - The user's message content
  * @param {Array<Object>} conversationLog - The conversation history
  * @returns {Promise<Object>} The response from OpenAI
@@ -156,6 +167,7 @@ ChimpGPT has a plugin system that allows extending functionality without modifyi
 See [plugins/README.md](./plugins/README.md) for detailed plugin development guidelines.
 
 Key plugin hooks:
+
 - `onMessageReceived` - Called when a message is received
 - `onBotStart` - Called when the bot starts
 - `onBotShutdown` - Called when the bot shuts down

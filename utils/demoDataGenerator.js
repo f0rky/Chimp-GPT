@@ -361,6 +361,9 @@ function initDemoMode(stats, functionResults) {
           result: generateImageData(),
         };
         break;
+      default:
+        logger.warn(`Unexpected function type: ${randomType}`);
+        return; // Skip this iteration if the type is unknown
     }
 
     if (mockResult) {

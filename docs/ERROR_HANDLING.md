@@ -46,7 +46,7 @@ const error = createError('api', 'Failed to call OpenAI API', {
   service: 'openai',
   endpoint: '/chat/completions',
   statusCode: 429,
-  operation: 'generateResponse'
+  operation: 'generateResponse',
 });
 ```
 
@@ -59,7 +59,7 @@ const error = new ApiError('Failed to call OpenAI API', {
   service: 'openai',
   endpoint: '/chat/completions',
   statusCode: 429,
-  operation: 'generateResponse'
+  operation: 'generateResponse',
 });
 ```
 
@@ -77,7 +77,7 @@ try {
   // Wrap the error with additional context
   throw wrapError(error, 'Failed during API call', {
     component: 'weather',
-    operation: 'getWeatherData'
+    operation: 'getWeatherData',
   });
 }
 ```
@@ -101,7 +101,7 @@ try {
     component: 'imageGeneration',
     operation: 'generateImage',
     context: { prompt: 'blue sky' },
-    rethrow: true // Will rethrow the error after handling
+    rethrow: true, // Will rethrow the error after handling
   });
 }
 ```
@@ -119,7 +119,7 @@ const weatherData = await tryExec(
   {
     component: 'weather',
     operation: 'getWeatherData',
-    context: { location }
+    context: { location },
   },
   {} // Default value if the function fails
 );
@@ -137,7 +137,7 @@ const safeGetWeatherData = withErrorHandling(
   getWeatherData,
   {
     component: 'weather',
-    operation: 'getWeatherData'
+    operation: 'getWeatherData',
   },
   {} // Default value if the function fails
 );
@@ -169,7 +169,7 @@ async function callOpenAI(prompt) {
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
-      messages: [{ role: 'user', content: prompt }]
+      messages: [{ role: 'user', content: prompt }],
     });
     return response;
   } catch (error) {
@@ -179,7 +179,7 @@ async function callOpenAI(prompt) {
       statusCode: error.status || 500,
       operation: 'generateResponse',
       context: { prompt },
-      cause: error
+      cause: error,
     });
   }
 }
@@ -191,7 +191,7 @@ async function generateResponse(prompt) {
   } catch (error) {
     handleError(error, {
       component: 'openai',
-      operation: 'generateResponse'
+      operation: 'generateResponse',
     });
     return { error: 'Failed to generate response' };
   }
@@ -209,7 +209,7 @@ function executePluginHook(plugin, hookName, ...args) {
     if (!plugin.hooks || !plugin.hooks[hookName]) {
       return null;
     }
-    
+
     return plugin.hooks[hookName](...args);
   } catch (error) {
     throw new PluginError(`Failed to execute hook ${hookName}`, {
@@ -218,7 +218,7 @@ function executePluginHook(plugin, hookName, ...args) {
       pluginVersion: plugin.version,
       hookName,
       operation: 'executeHook',
-      cause: error
+      cause: error,
     });
   }
 }
@@ -226,7 +226,7 @@ function executePluginHook(plugin, hookName, ...args) {
 // Usage with error handling
 async function runPluginHooks(hookName, ...args) {
   const results = [];
-  
+
   for (const plugin of plugins) {
     try {
       const result = await executePluginHook(plugin, hookName, ...args);
@@ -236,12 +236,12 @@ async function runPluginHooks(hookName, ...args) {
     } catch (error) {
       handleError(error, {
         component: 'pluginManager',
-        operation: 'runPluginHooks'
+        operation: 'runPluginHooks',
       });
       // Continue with other plugins
     }
   }
-  
+
   return results;
 }
 ```
@@ -254,19 +254,19 @@ const { handleError } = require('../utils/errorHandler');
 
 function validateConfig(config) {
   const errors = new ValidationError('Configuration validation failed');
-  
+
   if (!config.DISCORD_TOKEN) {
     errors.addError('DISCORD_TOKEN', 'Discord token is required');
   }
-  
+
   if (!config.OPENAI_API_KEY) {
     errors.addError('OPENAI_API_KEY', 'OpenAI API key is required');
   }
-  
+
   if (errors.validationErrors.length > 0) {
     throw errors;
   }
-  
+
   return true;
 }
 
@@ -278,7 +278,7 @@ function initializeBot(config) {
   } catch (error) {
     handleError(error, {
       component: 'initialization',
-      operation: 'validateConfig'
+      operation: 'validateConfig',
     });
     process.exit(1); // Exit if config is invalid
   }

@@ -3,7 +3,7 @@
  *
  * This module provides an efficient conversation management system
  * without any dependencies on the existing conversation manager.
- * 
+ *
  * @module SimpleConversationOptimizer
  * @author Cascade
  * @version 1.0.0
@@ -18,7 +18,7 @@ const logger = createLogger('simpleConvOpt');
 const CONVERSATIONS_FILE = path.join(__dirname, 'data', 'optimized-conversations.json');
 
 // Configuration
-let BOT_PERSONALITY = "I am ChimpGPT, a helpful AI assistant.";
+let BOT_PERSONALITY = 'I am ChimpGPT, a helpful AI assistant.';
 try {
   BOT_PERSONALITY = require('./configValidator').BOT_PERSONALITY;
 } catch (error) {
@@ -32,9 +32,9 @@ const CONTEXT_REDUCTION_THRESHOLD = 4; // If over this many messages, reduce con
 
 // In-memory cache
 let conversationsCache = new Map();
-let metadataCache = {
+const metadataCache = {
   lastUpdated: new Date().toISOString(),
-  version: '1.0'
+  version: '1.0',
 };
 
 let isDirty = false;
@@ -51,17 +51,17 @@ async function init() {
   if (isInitialized) {
     return true;
   }
-  
+
   if (initializationInProgress) {
     logger.debug('Initialization already in progress, skipping duplicate call');
     return false;
   }
-  
+
   initializationInProgress = true;
-  
+
   try {
     logger.debug('Starting conversation optimizer initialization');
-    
+
     // Create data directory if needed
     try {
       await fs.mkdir(path.dirname(CONVERSATIONS_FILE), { recursive: true });
@@ -71,27 +71,27 @@ async function init() {
         logger.warn({ error: err }, 'Error creating data directory');
       }
     }
-    
+
     // Check if file exists
     try {
       await fs.access(CONVERSATIONS_FILE);
-      
+
       // File exists, load it
       const data = await fs.readFile(CONVERSATIONS_FILE, 'utf8');
-      
+
       try {
         const parsed = JSON.parse(data);
-        
+
         if (parsed && parsed.conversations) {
           // Convert conversations object to Map
           conversationsCache = new Map();
-          
+
           for (const [userId, conversation] of Object.entries(parsed.conversations)) {
             if (Array.isArray(conversation) && conversation.length > 0) {
               conversationsCache.set(userId, conversation);
             }
           }
-          
+
           if (parsed.lastUpdated) {
             metadataCache.lastUpdated = parsed.lastUpdated;
           }
@@ -103,7 +103,7 @@ async function init() {
       // File doesn't exist, use empty state
       logger.info('Conversations file does not exist, using empty state');
     }
-    
+
     // Start periodic saving
     if (!saveTimer) {
       saveTimer = setInterval(async () => {
@@ -112,18 +112,21 @@ async function init() {
           isDirty = false;
         }
       }, SAVE_INTERVAL_MS);
-      
+
       // Don't let this timer prevent the process from exiting
       saveTimer.unref();
     }
-    
+
     isInitialized = true;
     initializationInProgress = false;
-    
-    logger.info({ 
-      conversationCount: conversationsCache.size 
-    }, 'Conversation optimizer initialized successfully');
-    
+
+    logger.info(
+      {
+        conversationCount: conversationsCache.size,
+      },
+      'Conversation optimizer initialized successfully'
+    );
+
     return true;
   } catch (error) {
     logger.error({ error }, 'Error initializing conversation optimizer');
@@ -140,25 +143,25 @@ async function saveToDisk() {
   try {
     // Update metadata
     metadataCache.lastUpdated = new Date().toISOString();
-    
+
     // Convert Map to object for JSON serialization
     const conversationsObj = {};
     for (const [userId, conversation] of conversationsCache.entries()) {
       conversationsObj[userId] = conversation;
     }
-    
+
     // Create data structure
     const data = {
       conversations: conversationsObj,
       lastUpdated: metadataCache.lastUpdated,
-      version: metadataCache.version
+      version: metadataCache.version,
     };
-    
+
     // Use atomic write pattern
     const tempFile = `${CONVERSATIONS_FILE}.tmp`;
     await fs.writeFile(tempFile, JSON.stringify(data, null, 2));
     await fs.rename(tempFile, CONVERSATIONS_FILE);
-    
+
     logger.debug({ conversationCount: conversationsCache.size }, 'Saved conversations to disk');
     return true;
   } catch (error) {
@@ -178,28 +181,26 @@ async function manageConversation(userId, newMessage = null) {
   if (!isInitialized) {
     await init();
   }
-  
+
   // Get or create conversation for user
   if (!conversationsCache.has(userId)) {
-    conversationsCache.set(userId, [
-      { role: 'system', content: BOT_PERSONALITY }
-    ]);
+    conversationsCache.set(userId, [{ role: 'system', content: BOT_PERSONALITY }]);
     isDirty = true;
   }
-  
+
   const conversation = conversationsCache.get(userId);
-  
+
   // Add the new message if provided
   if (newMessage) {
     // Add timestamp to the message for easier pruning
     const messageWithTimestamp = {
       ...newMessage,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     conversation.push(messageWithTimestamp);
     isDirty = true;
-    
+
     // If exceeding length limit, remove oldest non-system messages
     while (conversation.length > MAX_CONVERSATION_LENGTH) {
       // Find oldest non-system message to remove (keep system message)
@@ -212,7 +213,7 @@ async function manageConversation(userId, newMessage = null) {
       }
       conversation.splice(indexToRemove, 1);
     }
-    
+
     // Ensure system message is always at index 0
     if (conversation[0].role !== 'system') {
       conversation.unshift({ role: 'system', content: BOT_PERSONALITY });
@@ -222,7 +223,7 @@ async function manageConversation(userId, newMessage = null) {
       }
     }
   }
-  
+
   // Return optimized conversation
   return optimizeConversationForApi(conversation);
 }
@@ -237,28 +238,34 @@ function optimizeConversationForApi(conversation) {
   if (!conversation || !Array.isArray(conversation)) {
     return [{ role: 'system', content: BOT_PERSONALITY }];
   }
-  
+
   // If conversation is small enough, return as is
   if (conversation.length <= CONTEXT_REDUCTION_THRESHOLD) {
     return conversation;
   }
-  
+
   // Extract system message
-  const systemMessage = conversation.find(msg => msg.role === 'system') || 
-                        { role: 'system', content: BOT_PERSONALITY };
-  
+  const systemMessage = conversation.find(msg => msg.role === 'system') || {
+    role: 'system',
+    content: BOT_PERSONALITY,
+  };
+
   // Get the most recent messages (half of MAX_CONVERSATION_LENGTH)
-  const recentMessages = conversation.filter(msg => msg.role !== 'system')
-    .slice(-(Math.floor(MAX_CONVERSATION_LENGTH / 2)));
-  
+  const recentMessages = conversation
+    .filter(msg => msg.role !== 'system')
+    .slice(-Math.floor(MAX_CONVERSATION_LENGTH / 2));
+
   // Build optimized conversation with system message first
   const optimized = [systemMessage, ...recentMessages];
-  
-  logger.debug({ 
-    originalLength: conversation.length, 
-    optimizedLength: optimized.length 
-  }, 'Optimized conversation for API');
-  
+
+  logger.debug(
+    {
+      originalLength: conversation.length,
+      optimizedLength: optimized.length,
+    },
+    'Optimized conversation for API'
+  );
+
   return optimized;
 }
 
@@ -272,7 +279,7 @@ async function clearConversation(userId) {
   if (!isInitialized) {
     await init();
   }
-  
+
   if (conversationsCache.has(userId)) {
     // Keep system message only
     const systemMessage = [{ role: 'system', content: BOT_PERSONALITY }];
@@ -280,7 +287,7 @@ async function clearConversation(userId) {
     isDirty = true;
     return true;
   }
-  
+
   return false;
 }
 
@@ -293,7 +300,7 @@ async function getConversationCount() {
   if (!isInitialized) {
     await init();
   }
-  
+
   return conversationsCache.size;
 }
 
@@ -307,12 +314,12 @@ async function shutdown() {
     clearInterval(saveTimer);
     saveTimer = null;
   }
-  
+
   // Save one last time if dirty
   if (isDirty && isInitialized) {
     await saveToDisk();
   }
-  
+
   logger.info('Conversation optimizer shut down');
 }
 
@@ -322,7 +329,7 @@ async function getStatus() {
   if (!isInitialized) {
     await init();
   }
-  
+
   let fileSize = 0;
   try {
     const stats = await fs.stat(CONVERSATIONS_FILE);
@@ -330,14 +337,14 @@ async function getStatus() {
   } catch (error) {
     // Ignore file access errors
   }
-  
+
   return {
     activeConversations: conversationsCache.size,
     fileSize: fileSize,
     fileSizeMB: (fileSize / (1024 * 1024)).toFixed(2),
     lastUpdated: metadataCache.lastUpdated,
     isDirty: isDirty,
-    version: metadataCache.version
+    version: metadataCache.version,
   };
 }
 
@@ -347,5 +354,5 @@ module.exports = {
   clearConversation,
   getConversationCount,
   getStatus,
-  shutdown
+  shutdown,
 };

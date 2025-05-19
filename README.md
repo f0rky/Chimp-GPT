@@ -409,6 +409,7 @@ MIT
 
    # Or use the ecosystem.config.js file
    pm2 start ecosystem.config.js
+   ```
 
 ## PM2 Management & Performance Monitoring
 
@@ -441,17 +442,20 @@ pm2 monit
 If you experience slow reactions from ChimpGPT, use these steps to diagnose and resolve the issue:
 
 1. **Check Resource Usage**:
+
    ```bash
    # View real-time resource metrics
    pm2 monit
    ```
+
    Look for high CPU or memory usage which may indicate bottlenecks.
 
 2. **Examine Logs for Delays**:
+
    ```bash
    # View error logs
    pm2 logs chimpGPT --err --lines 100
-   
+
    # Search logs for timeout errors
    pm2 logs chimpGPT --lines 1000 | grep -i "timeout"
    ```
@@ -461,6 +465,7 @@ If you experience slow reactions from ChimpGPT, use these steps to diagnose and 
 
 4. **Identify API Bottlenecks**:
    The most common causes of slow reactions are:
+
    - OpenAI API delays (most common)
    - External API timeouts (weather, Wolfram Alpha)
    - Large conversation context sizes
@@ -468,6 +473,7 @@ If you experience slow reactions from ChimpGPT, use these steps to diagnose and 
 
 5. **Adjust Timeouts**:
    You can modify timeouts in `.env`:
+
    ```
    # Add these to your .env file
    OPENAI_TIMEOUT_MS=15000
@@ -509,39 +515,42 @@ The built-in performance monitoring dashboard provides insights into bot operati
 
 This dashboard is particularly useful for identifying which operations are causing slow reactions.
 
-   # Save the PM2 configuration
-   pm2 save
+# Save the PM2 configuration
 
-   # Check status
-   pm2 status
-   ```
+pm2 save
+
+# Check status
+
+pm2 status
+
+````
 
 The bot should now be running and ready to interact in your Discord server.
 
 ## Usage
 
 1. **General Interaction**:
-   Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
+Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
 
 2. **Weather Inquiry**:
-   Ask the bot about the weather, for example: "What's the weather like in New York?"
-   And it will use OpenAI's GPT-3.5 to provide a natural response using the RapidAPI accurate weather information.
+Ask the bot about the weather, for example: "What's the weather like in New York?"
+And it will use OpenAI's GPT-3.5 to provide a natural response using the RapidAPI accurate weather information.
 
 3. **Time Inquiry**:
-   Ask the bot for the current time, like: "Whats the time in New York?"
-   And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
+Ask the bot for the current time, like: "Whats the time in New York?"
+And it will use OpenAI's GPT-3.5 to provide a natural response including the time.
 
 4. **Quake Server Stats**:
-   Use the command `!serverstats` or `/serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
+Use the command `!serverstats` or `/serverstats` or ask about Quake servers to get detailed information about active Quake Live servers, including player counts, maps, and ELO ratings.
 
 5. **Wolfram Alpha Queries**:
-   Ask factual or computational questions, and the bot will use Wolfram Alpha to provide accurate answers.
+Ask factual or computational questions, and the bot will use Wolfram Alpha to provide accurate answers.
 
 6. **Slash Commands**:
-   The bot supports Discord's slash commands. Type `/` to see available commands:
-   - `/help` - Display information about available commands
-   - `/ping` - Check if the bot is responding
-   - `/serverstats` - Display Quake Live server statistics
+The bot supports Discord's slash commands. Type `/` to see available commands:
+- `/help` - Display information about available commands
+- `/ping` - Check if the bot is responding
+- `/serverstats` - Display Quake Live server statistics
 
 ## Recent Updates
 
@@ -600,7 +609,7 @@ LOG_LEVEL="info"
 
 # Environment mode - set to 'production' or 'development'
 NODE_ENV="development"
-```
+````
 
 In development, logs are formatted with colors for better readability. In production (when `NODE_ENV` is set to "production"), logs are output as JSON for better integration with log management systems.
 

@@ -13,7 +13,7 @@ const filesToUpdate = [
   './statusServer.js',
   './reset-data-files.js',
   './utils/demoDataGenerator.js',
-  './chimpGPT.js'
+  './chimpGPT.js',
 ];
 
 // Count of replacements made
@@ -22,24 +22,24 @@ let totalReplacements = 0;
 // Process each file
 filesToUpdate.forEach(filePath => {
   const fullPath = path.resolve(__dirname, filePath);
-  
+
   if (!fs.existsSync(fullPath)) {
     console.error(`File not found: ${fullPath}`);
     return;
   }
-  
+
   try {
     // Read the file content
     let content = fs.readFileSync(fullPath, 'utf8');
-    
+
     // Count occurrences before replacement
     const occurrencesBefore = (content.match(/dalle/g) || []).length;
-    
+
     if (occurrencesBefore === 0) {
       console.log(`No occurrences of 'dalle' found in ${filePath}`);
       return;
     }
-    
+
     // Replace 'dalle' with 'gptimage' in various contexts
     content = content
       // Replace property definitions in JSDoc comments
@@ -60,17 +60,16 @@ filesToUpdate.forEach(filePath => {
       // Replace array references
       .replace(/\['dalle'\]/g, "['gptimage']")
       .replace(/'dalle',/g, "'gptimage',");
-    
+
     // Count occurrences after replacement
     const occurrencesAfter = (content.match(/dalle/g) || []).length;
     const replacementsMade = occurrencesBefore - occurrencesAfter;
-    
+
     // Update the file with new content
     fs.writeFileSync(fullPath, content, 'utf8');
-    
+
     console.log(`Updated ${filePath}: ${replacementsMade} replacements made`);
     totalReplacements += replacementsMade;
-    
   } catch (error) {
     console.error(`Error processing ${filePath}:`, error);
   }
@@ -81,13 +80,13 @@ try {
   const htmlPath = path.resolve(__dirname, './public/index.html');
   if (fs.existsSync(htmlPath)) {
     let htmlContent = fs.readFileSync(htmlPath, 'utf8');
-    
+
     // Replace DALL-E tab button text with GPT Image-1
     htmlContent = htmlContent.replace(
       /<button class="tab-button" data-tab="dalle">DALL-E<\/button>/,
       '<button class="tab-button" data-tab="gptimage">GPT Image-1</button>'
     );
-    
+
     fs.writeFileSync(htmlPath, htmlContent, 'utf8');
     console.log('Updated HTML references from DALL-E to GPT Image-1');
   }

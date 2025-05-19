@@ -17,13 +17,13 @@
  */
 /**
  * Rate Limiter for ChimpGPT
- * 
+ *
  * This module provides rate limiting functionality to prevent abuse and manage API usage.
  * It implements per-user rate limiting to ensure fair usage of the bot's resources.
- * 
+ *
  * The system supports variable costs for different operations, allowing more expensive
  * operations (like API calls) to consume more points than simple operations.
- * 
+ *
  * @module RateLimiter
  * @author Brett
  * @version 1.0.2
@@ -41,12 +41,12 @@ const logger = createLogger('ratelimit');
  * @constant {number} IMAGE_GEN_POINTS - Number of image generations allowed per minute
  * @constant {number} IMAGE_GEN_DURATION - Time period for image generation limit in seconds
  */
-const DEFAULT_POINTS = 300;      // Number of requests allowed
-const DEFAULT_DURATION = 30;   // Time period in seconds (30 seconds)
-const COOLDOWN_TIME = 1;      // Cooldown time in seconds after hitting limit
+const DEFAULT_POINTS = 300; // Number of requests allowed
+const DEFAULT_DURATION = 30; // Time period in seconds (30 seconds)
+const COOLDOWN_TIME = 1; // Cooldown time in seconds after hitting limit
 
 // Specific rate limit for image generation
-const IMAGE_GEN_POINTS = 3;    // Allow 3 image generations
+const IMAGE_GEN_POINTS = 3; // Allow 3 image generations
 const IMAGE_GEN_DURATION = 60; // Per minute
 
 /**
@@ -67,15 +67,18 @@ const userLimiters = new Map();
 function getUserLimiter(userId, options = {}) {
   const points = options.points || DEFAULT_POINTS;
   const duration = options.duration || DEFAULT_DURATION;
-  
+
   if (!userLimiters.has(userId)) {
-    userLimiters.set(userId, new RateLimiterMemory({
-      keyPrefix: `user-${userId}`,
-      points,
-      duration,
-    }));
+    userLimiters.set(
+      userId,
+      new RateLimiterMemory({
+        keyPrefix: `user-${userId}`,
+        points,
+        duration,
+      })
+    );
   }
-  
+
   return userLimiters.get(userId);
 }
 
@@ -93,34 +96,40 @@ async function checkUserRateLimit(userId, cost = 1, options = {}) {
   try {
     const limiter = getUserLimiter(userId, options);
     const rateLimitInfo = await limiter.consume(userId, cost);
-    
-    logger.debug({
-      userId,
-      remainingPoints: rateLimitInfo.remainingPoints,
-      cost
-    }, 'User rate limit check passed');
-    
+
+    logger.debug(
+      {
+        userId,
+        remainingPoints: rateLimitInfo.remainingPoints,
+        cost,
+      },
+      'User rate limit check passed'
+    );
+
     return {
       limited: false,
       remainingPoints: rateLimitInfo.remainingPoints,
-      msBeforeNext: rateLimitInfo.msBeforeNext
+      msBeforeNext: rateLimitInfo.msBeforeNext,
     };
   } catch (rateLimitInfo) {
     // User has exceeded their rate limit
     const secondsBeforeNext = Math.ceil(rateLimitInfo.msBeforeNext / 1000) || COOLDOWN_TIME;
-    
-    logger.info({
-      userId,
-      msBeforeNext: rateLimitInfo.msBeforeNext,
-      cost
-    }, 'User rate limit exceeded');
-    
+
+    logger.info(
+      {
+        userId,
+        msBeforeNext: rateLimitInfo.msBeforeNext,
+        cost,
+      },
+      'User rate limit exceeded'
+    );
+
     return {
       limited: true,
       remainingPoints: 0,
       msBeforeNext: rateLimitInfo.msBeforeNext,
       secondsBeforeNext,
-      message: `You've reached the rate limit. Please wait ${secondsBeforeNext} seconds before trying again.`
+      message: `You've reached the rate limit. Please wait ${secondsBeforeNext} seconds before trying again.`,
     };
   }
 }
@@ -136,7 +145,7 @@ async function checkUserRateLimit(userId, cost = 1, options = {}) {
 function createRateLimiter(options = {}) {
   const points = options.points || DEFAULT_POINTS;
   const duration = options.duration || DEFAULT_DURATION;
-  
+
   return new RateLimiterMemory({
     points,
     duration,
@@ -154,7 +163,7 @@ function createRateLimiter(options = {}) {
 async function checkImageGenerationRateLimit(userId) {
   return checkUserRateLimit(userId, 1, {
     points: IMAGE_GEN_POINTS,
-    duration: IMAGE_GEN_DURATION
+    duration: IMAGE_GEN_DURATION,
   });
 }
 
@@ -174,6 +183,6 @@ module.exports = {
     DEFAULT_DURATION,
     COOLDOWN_TIME,
     IMAGE_GEN_POINTS,
-    IMAGE_GEN_DURATION
-  }
+    IMAGE_GEN_DURATION,
+  },
 };

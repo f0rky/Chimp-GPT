@@ -2,17 +2,27 @@ module.exports = {
   root: true,
   env: {
     browser: true,
-    es6: true
+    es2021: true,
+    node: false, // Disable Node.js globals for this config
   },
-  extends: ["eslint:recommended"],
+  extends: 'eslint:recommended',
   globals: {
-    Chart: "readonly"
+    // Browser globals
+    document: 'readonly',
+    window: 'readonly',
+    fetch: 'readonly',
+    // Chart.js
+    Chart: 'readonly',
+    // CommonJS
+    module: 'readonly',
   },
   parserOptions: {
-    ecmaVersion: 2020,
-    sourceType: "module"
+    ecmaVersion: 'latest',
+    sourceType: 'module',
   },
   rules: {
-    "no-unused-vars": "warn"
-  }
+    'no-unused-vars': ['warn', { args: 'none' }],
+    'no-console': 'off',
+    'no-undef': 'warn',
+  },
 };

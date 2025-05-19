@@ -46,7 +46,7 @@ async function processMessage(userMessage, conversationLog) {
       async () => {
         try {
           return await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',  // Using faster model for better responsiveness
+            model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
             messages: sanitizedLog,
             max_completion_tokens: 512, // Limit token usage (optional)
             functions: [
@@ -177,14 +177,13 @@ async function processMessage(userMessage, conversationLog) {
         functionName: functionName,
         parameters: functionArgs,
       };
-    } else {
-      // Get the GPT response
-      const gptResponse = completion.data.choices[0].message.content;
-      return {
-        type: 'message',
-        content: gptResponse,
-      };
     }
+    // Get the GPT response
+    const gptResponse = completion.data.choices[0].message.content;
+    return {
+      type: 'message',
+      content: gptResponse,
+    };
   } catch (error) {
     openaiLogger.error({ error }, 'Error processing message');
     return {
@@ -210,7 +209,7 @@ async function generateResponse(functionResult, conversationLog) {
     async () => {
       try {
         return await openai.chat.completions.create({
-          model: 'gpt-4o-mini',  // Using faster model for better responsiveness
+          model: 'gpt-4o-mini', // Using faster model for better responsiveness
           messages: conversationLog,
           max_completion_tokens: 256,
         });

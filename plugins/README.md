@@ -21,58 +21,58 @@ module.exports = {
   id: 'unique-plugin-id',
   name: 'My Plugin Name',
   version: '1.0.0',
-  
+
   // Optional metadata
   description: 'Description of what your plugin does',
   author: 'Your Name',
-  
+
   // Discord slash commands (optional)
   commands: [
     {
       name: 'command-name',
       description: 'Command description',
       options: [], // Command options following Discord.js SlashCommandBuilder format
-      execute: async (interaction) => {
+      execute: async interaction => {
         // Command implementation
       },
-      interactionExecute: async (interaction) => {
+      interactionExecute: async interaction => {
         // Implementation for handling slash command interactions
-      }
-    }
+      },
+    },
   ],
-  
+
   // Functions that can be called by the bot (optional)
   functions: {
     functionName: async (arg1, arg2) => {
       // Function implementation
       return result;
-    }
+    },
   },
-  
+
   // Hooks that are triggered at specific points in the bot's execution (optional)
   hooks: {
     // Called when the bot starts
-    onBotStart: async (client) => {
+    onBotStart: async client => {
       // Implementation
     },
-    
+
     // Called when a message is received before processing
-    onMessageReceived: async (message) => {
+    onMessageReceived: async message => {
       // Implementation
       return true; // Return false to prevent further processing
     },
-    
+
     // Called after a response is generated but before it's sent
     onResponseGenerated: async (response, message) => {
       // Modify the response if needed
       return response;
     },
-    
+
     // Called when the bot is shutting down
     onBotShutdown: async () => {
       // Cleanup implementation
-    }
-  }
+    },
+  },
 };
 ```
 
@@ -80,15 +80,15 @@ module.exports = {
 
 The following hooks are available for plugins to use:
 
-| Hook | Description | Parameters | Return Value | Effect |
-|------|-------------|------------|--------------|--------|
-| `onBotStart` | Called when the bot starts | `client` - Discord.js client instance | None | Initialize plugin resources |
-| `onBotShutdown` | Called when the bot is shutting down | None | None | Clean up plugin resources |
-| `onMessageReceived` | Called when a message is received before processing | `message` - Discord.js message object | Boolean | Return `false` to prevent further processing |
-| `onResponseGenerated` | Called after a response is generated but before it's sent | `response` - Generated response text, `message` - Original message | Modified response text | Modify the bot's response |
-| `onCommandRegistered` | Called when a command is registered | `command` - Command object | None | React to command registration |
-| `onFunctionCalled` | Called when a function is called | `functionName` - Name of the function, `args` - Function arguments | None | Monitor function calls |
-| `onError` | Called when an error occurs | `error` - Error object, `context` - Error context | None | Handle or log errors |
+| Hook                  | Description                                               | Parameters                                                         | Return Value           | Effect                                       |
+| --------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------- | -------------------------------------------- |
+| `onBotStart`          | Called when the bot starts                                | `client` - Discord.js client instance                              | None                   | Initialize plugin resources                  |
+| `onBotShutdown`       | Called when the bot is shutting down                      | None                                                               | None                   | Clean up plugin resources                    |
+| `onMessageReceived`   | Called when a message is received before processing       | `message` - Discord.js message object                              | Boolean                | Return `false` to prevent further processing |
+| `onResponseGenerated` | Called after a response is generated but before it's sent | `response` - Generated response text, `message` - Original message | Modified response text | Modify the bot's response                    |
+| `onCommandRegistered` | Called when a command is registered                       | `command` - Command object                                         | None                   | React to command registration                |
+| `onFunctionCalled`    | Called when a function is called                          | `functionName` - Name of the function, `args` - Function arguments | None                   | Monitor function calls                       |
+| `onError`             | Called when an error occurs                               | `error` - Error object, `context` - Error context                  | None                   | Handle or log errors                         |
 
 ### Hook Execution Order
 

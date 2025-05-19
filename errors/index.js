@@ -1,8 +1,8 @@
 /**
  * Error Classes for ChimpGPT
- * 
+ *
  * This module exports all custom error classes for ChimpGPT.
- * 
+ *
  * @module errors
  * @author Brett
  * @version 1.0.0
@@ -17,7 +17,7 @@ const DiscordError = require('./DiscordError');
 
 /**
  * Create an error instance based on the error type
- * 
+ *
  * @param {string} type - Error type
  * @param {string} message - Error message
  * @param {Object} options - Additional error options
@@ -42,7 +42,7 @@ function createError(type, message, options = {}) {
 
 /**
  * Wrap an error in a ChimpError
- * 
+ *
  * @param {Error} error - Original error
  * @param {string} message - Custom message
  * @param {Object} options - Additional error options
@@ -53,11 +53,11 @@ function wrapError(error, message, options = {}) {
   if (error instanceof ChimpError) {
     return error;
   }
-  
+
   // Create a new error with the original as the cause
   return new ChimpError(message || error.message, {
     ...options,
-    cause: error
+    cause: error,
   });
 }
 
@@ -69,5 +69,5 @@ module.exports = {
   ConfigError,
   DiscordError,
   createError,
-  wrapError
+  wrapError,
 };

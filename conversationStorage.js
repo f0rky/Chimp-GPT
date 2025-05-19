@@ -11,10 +11,10 @@
  */
 /**
  * Conversation Storage Module
- * 
+ *
  * This module provides functions to save and load conversation history to/from a file.
  * It enables maintaining conversation context across bot restarts.
- * 
+ *
  * @module ConversationStorage
  * @author Brett
  * @version 1.0.0
@@ -49,12 +49,12 @@ function ensureDataDir() {
 const DEFAULT_CONVERSATIONS = {
   conversations: {},
   timestamps: {},
-  lastUpdated: new Date().toISOString()
+  lastUpdated: new Date().toISOString(),
 };
 
 /**
  * Save conversations to the conversations file.
- * 
+ *
  * @param {Map<string, ConversationLog>} conversationsMap - The conversations map to save
  * @returns {Promise<boolean>} True if successful, false otherwise
  * @throws {Error} If an error occurs while saving
@@ -62,30 +62,30 @@ const DEFAULT_CONVERSATIONS = {
 async function saveConversations(conversationsMap) {
   try {
     ensureDataDir();
-    
+
     // Backup file path
     const BACKUP_FILE = `${CONVERSATIONS_FILE}.backup`;
     const TEMP_FILE = `${CONVERSATIONS_FILE}.temp`;
-    
+
     // Load existing data to preserve timestamps
-    let existingData = DEFAULT_CONVERSATIONS;
-    
+    const existingData = DEFAULT_CONVERSATIONS;
+
     // Convert Map to plain object for JSON serialization
     const conversationsObj = {};
     for (const [userId, conversation] of conversationsMap.entries()) {
       conversationsObj[userId] = conversation;
     }
-    
+
     // Create data object with metadata
     const data = {
       conversations: conversationsObj,
       lastUpdated: new Date().toISOString(),
-      version: '1.0'
+      version: '1.0',
     };
-    
+
     // Serialize the data
     const jsonData = JSON.stringify(data, null, 2);
-    
+
     // First write to a temporary file
     try {
       await fs.promises.writeFile(TEMP_FILE, jsonData, 'utf8');
@@ -94,7 +94,7 @@ async function saveConversations(conversationsMap) {
       logger.error({ error: tempError }, 'Error writing to temporary file');
       throw tempError;
     }
-    
+
     // If the main file exists, create a backup before overwriting
     if (fs.existsSync(CONVERSATIONS_FILE)) {
       try {
@@ -105,26 +105,32 @@ async function saveConversations(conversationsMap) {
         // Continue anyway - we still have the temp file
       }
     }
-    
+
     // Now rename the temp file to the actual file
     try {
       await fs.promises.rename(TEMP_FILE, CONVERSATIONS_FILE);
-      logger.info({
-        userCount: conversationsMap.size,
-        file: CONVERSATIONS_FILE
-      }, 'Saved conversations to file');
+      logger.info(
+        {
+          userCount: conversationsMap.size,
+          file: CONVERSATIONS_FILE,
+        },
+        'Saved conversations to file'
+      );
       return true;
     } catch (renameError) {
       logger.error({ error: renameError }, 'Error renaming temporary file to conversations file');
-      
+
       // Try one more direct write as a last resort
       try {
         await fs.promises.writeFile(CONVERSATIONS_FILE, jsonData, 'utf8');
-        logger.info({
-          userCount: conversationsMap.size,
-          file: CONVERSATIONS_FILE,
-          recovery: true
-        }, 'Saved conversations to file (recovery)');
+        logger.info(
+          {
+            userCount: conversationsMap.size,
+            file: CONVERSATIONS_FILE,
+            recovery: true,
+          },
+          'Saved conversations to file (recovery)'
+        );
         return true;
       } catch (directWriteError) {
         logger.error({ error: directWriteError }, 'Error in direct write recovery attempt');
@@ -139,22 +145,22 @@ async function saveConversations(conversationsMap) {
 
 /**
  * Load conversations from the conversations file.
- * 
+ *
  * @returns {Promise<Map<string, ConversationLog>>} The loaded conversations map
  * @throws {Error} If an error occurs while loading
  */
 async function loadConversations() {
   ensureDataDir();
-  
+
   // Backup file path
   const BACKUP_FILE = `${CONVERSATIONS_FILE}.backup`;
-  
+
   // Check if file exists
   if (!fs.existsSync(CONVERSATIONS_FILE)) {
     logger.info({ file: CONVERSATIONS_FILE }, 'Conversations file does not exist, using defaults');
     return new Map();
   }
-  
+
   try {
     // Create a backup before loading (if not already exists)
     if (!fs.existsSync(BACKUP_FILE)) {
@@ -165,7 +171,7 @@ async function loadConversations() {
         logger.warn({ error: backupError }, 'Failed to create backup of conversations file');
       }
     }
-    
+
     // Read and parse the file
     let fileContent;
     try {
@@ -174,11 +180,11 @@ async function loadConversations() {
       logger.error({ error: readError }, 'Error reading conversations file');
       throw readError; // Let the outer catch handle recovery
     }
-    
+
     let data;
     try {
       data = JSON.parse(fileContent);
-      
+
       // Validate data structure
       if (!data || typeof data !== 'object' || !data.conversations) {
         throw new Error('Invalid data format in conversations file');
@@ -187,7 +193,7 @@ async function loadConversations() {
       logger.error({ error: parseError }, 'Error parsing conversations file');
       throw parseError; // Let the outer catch handle recovery
     }
-    
+
     // Convert to Map
     const conversationsMap = new Map();
     for (const [userId, conversation] of Object.entries(data.conversations || {})) {
@@ -197,29 +203,32 @@ async function loadConversations() {
         logger.warn({ userId }, 'Invalid conversation format for user, skipping');
       }
     }
-    
-    logger.info({
-      userCount: conversationsMap.size,
-      lastUpdated: data.lastUpdated,
-      file: CONVERSATIONS_FILE
-    }, 'Loaded conversations from file');
-    
+
+    logger.info(
+      {
+        userCount: conversationsMap.size,
+        lastUpdated: data.lastUpdated,
+        file: CONVERSATIONS_FILE,
+      },
+      'Loaded conversations from file'
+    );
+
     return conversationsMap;
   } catch (error) {
     logger.error({ error }, 'Error loading conversations file');
-    
+
     // Try to recover from backup if it exists
     if (fs.existsSync(BACKUP_FILE)) {
       try {
         logger.info({ backupFile: BACKUP_FILE }, 'Attempting to recover from backup file');
         const backupContent = await fs.promises.readFile(BACKUP_FILE, 'utf8');
         const backupData = JSON.parse(backupContent);
-        
+
         // Validate backup data structure
         if (!backupData || typeof backupData !== 'object') {
           throw new Error('Invalid backup data format');
         }
-        
+
         // Convert backup data to Map
         const recoveredMap = new Map();
         for (const [userId, conversation] of Object.entries(backupData.conversations || {})) {
@@ -228,56 +237,61 @@ async function loadConversations() {
             recoveredMap.set(userId, conversation);
           }
         }
-        
-        logger.info({
-          userCount: recoveredMap.size,
-          lastUpdated: backupData.lastUpdated,
-          file: BACKUP_FILE
-        }, 'Successfully recovered conversations from backup file');
-        
+
+        logger.info(
+          {
+            userCount: recoveredMap.size,
+            lastUpdated: backupData.lastUpdated,
+            file: BACKUP_FILE,
+          },
+          'Successfully recovered conversations from backup file'
+        );
+
         // If we recovered at least one conversation, return the map
         if (recoveredMap.size > 0) {
           return recoveredMap;
-        } else {
-          logger.warn('Backup file contained no valid conversations');
-          throw new Error('No valid conversations in backup');
         }
+        logger.warn('Backup file contained no valid conversations');
+        throw new Error('No valid conversations in backup');
       } catch (backupError) {
         logger.error({ error: backupError }, 'Failed to recover from backup file, using defaults');
       }
     } else {
       logger.warn('No backup file found, using defaults');
     }
-    
+
     return new Map();
   }
 }
 
 /**
  * Clear all saved conversations.
- * 
+ *
  * @returns {Promise<boolean>} True if successful, false otherwise
  * @throws {Error} If an error occurs while clearing
  */
 async function clearAllConversations() {
   try {
     ensureDataDir();
-    
+
     // Check if the file exists
     if (!fs.existsSync(CONVERSATIONS_FILE)) {
-      logger.info({ file: CONVERSATIONS_FILE }, 'Conversations file does not exist, nothing to clear');
+      logger.info(
+        { file: CONVERSATIONS_FILE },
+        'Conversations file does not exist, nothing to clear'
+      );
       return true;
     }
-    
+
     // Write empty conversations object
     await fs.promises.writeFile(
       CONVERSATIONS_FILE,
       JSON.stringify(DEFAULT_CONVERSATIONS, null, 2),
       'utf8'
     );
-    
+
     logger.info({ file: CONVERSATIONS_FILE }, 'Cleared all conversations');
-    
+
     return true;
   } catch (error) {
     logger.error({ error }, 'Error clearing conversations');
@@ -288,7 +302,7 @@ async function clearAllConversations() {
 /**
  * Prune old conversations to keep the file size manageable.
  * Removes conversations older than the specified age.
- * 
+ *
  * @param {Map<string, ConversationLog>} conversationsMap - The conversations map to prune
  * @param {number} [maxAgeMs=7*24*60*60*1000] - Maximum age in milliseconds (default: 7 days)
  * @returns {Promise<Map<string, ConversationLog>>} The pruned conversations map
@@ -298,54 +312,60 @@ async function pruneOldConversations(conversationsMap, maxAgeMs = 7 * 24 * 60 * 
     const now = Date.now();
     const cutoffTime = now - maxAgeMs;
     let prunedCount = 0;
-    
+
     // Load the current file to get timestamps
     let timestamps = {};
     if (fs.existsSync(CONVERSATIONS_FILE)) {
       try {
-        const data = JSON.parse(
-          await fs.promises.readFile(CONVERSATIONS_FILE, 'utf8')
-        );
+        const data = JSON.parse(await fs.promises.readFile(CONVERSATIONS_FILE, 'utf8'));
         timestamps = data.timestamps || {};
       } catch (error) {
         logger.error({ error }, 'Error reading timestamps, using defaults');
         timestamps = {};
       }
     }
-    
+
     // Create a new map with only recent conversations
     const prunedMap = new Map();
     for (const [userId, conversation] of conversationsMap.entries()) {
       // First check if we have a timestamp in the file
       let lastUpdated = timestamps[userId] ? new Date(timestamps[userId]).getTime() : 0;
-      
+
       // If no timestamp in file, check for timestamps in the messages themselves
       if (lastUpdated === 0 && Array.isArray(conversation)) {
         // Find the most recent message with a timestamp
         for (const message of conversation) {
           if (message && message.timestamp) {
-            const messageTime = typeof message.timestamp === 'number' ? 
-              message.timestamp : new Date(message.timestamp).getTime();
+            const messageTime =
+              typeof message.timestamp === 'number'
+                ? message.timestamp
+                : new Date(message.timestamp).getTime();
             lastUpdated = Math.max(lastUpdated, messageTime);
           }
         }
       }
-      
+
       if (lastUpdated >= cutoffTime) {
         prunedMap.set(userId, conversation);
       } else {
         prunedCount++;
-        logger.debug({ userId, lastUpdated: new Date(lastUpdated).toISOString() }, 'Pruned old conversation');
+        logger.debug(
+          { userId, lastUpdated: new Date(lastUpdated).toISOString() },
+          'Pruned old conversation'
+        );
       }
     }
-    
-    logger.info({
-      originalCount: conversationsMap.size,
-      prunedCount,
-      remainingCount: prunedMap.size,
-      maxAgeDays: maxAgeMs / (24 * 60 * 60 * 1000)
-    }, 'Pruned old conversations');
-    
+
+    logger.info(
+      {
+        originalCount: conversationsMap.size,
+        prunedCount,
+        remainingCount: prunedMap.size,
+        maxAgeDays: maxAgeMs / (24 * 60 * 60 * 1000),
+      },
+      'Pruned old conversations'
+    );
+
     return prunedMap;
   } catch (error) {
     logger.error({ error }, 'Error pruning conversations');
@@ -355,7 +375,7 @@ async function pruneOldConversations(conversationsMap, maxAgeMs = 7 * 24 * 60 * 
 
 /**
  * Get the path to the conversations storage file.
- * 
+ *
  * @returns {string} The path to the conversations file
  */
 function getStorageFilePath() {
@@ -364,10 +384,10 @@ function getStorageFilePath() {
 
 /**
  * Get the current status of conversation storage
- * 
+ *
  * This function returns information about the conversation storage system,
  * including the number of conversations, last save time, and storage size.
- * 
+ *
  * @returns {Object} Object containing storage metrics
  */
 function getConversationStorageStatus() {
@@ -378,17 +398,17 @@ function getConversationStorageStatus() {
         totalConversations: 0,
         lastSave: null,
         storageSize: 0,
-        exists: false
+        exists: false,
       };
     }
-    
+
     // Get file stats
     const stats = fs.statSync(CONVERSATIONS_FILE);
-    
+
     // Try to read the file to get conversation count
     let conversationCount = 0;
     let lastSave = null;
-    
+
     try {
       const data = JSON.parse(fs.readFileSync(CONVERSATIONS_FILE, 'utf8'));
       conversationCount = Object.keys(data.conversations || {}).length;
@@ -396,13 +416,13 @@ function getConversationStorageStatus() {
     } catch (parseError) {
       logger.error({ error: parseError }, 'Error parsing conversation file for status');
     }
-    
+
     return {
       totalConversations: conversationCount,
       lastSave: lastSave,
       storageSize: stats.size,
       exists: true,
-      lastModified: stats.mtime
+      lastModified: stats.mtime,
     };
   } catch (error) {
     logger.error({ error }, 'Error getting conversation storage status');
@@ -411,7 +431,7 @@ function getConversationStorageStatus() {
       lastSave: null,
       storageSize: 0,
       exists: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -422,5 +442,5 @@ module.exports = {
   clearAllConversations,
   pruneOldConversations,
   getStorageFilePath,
-  getConversationStorageStatus
+  getConversationStorageStatus,
 };

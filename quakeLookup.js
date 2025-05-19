@@ -922,10 +922,9 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
         `Game Type: ${firstServer.gameType || 'Unknown'}\n` +
         '```'
       );
-    } else {
-      quakeLogger.warn('No fallback data available, returning error message');
-      return '```\n  ⚠️   Error processing server stats\n```';
     }
+    quakeLogger.warn('No fallback data available, returning error message');
+    return '```\n  ⚠️   Error processing server stats\n```';
   }
 }
 

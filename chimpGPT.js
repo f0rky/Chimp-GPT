@@ -35,7 +35,9 @@ const config = require('./configValidator');
 
 // Import the function results optimization patch
 const optimizationPatch = require('./optimizationPatch');
-logger.info(`Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`);
+logger.info(
+  `Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`
+);
 
 // Note: We're now using a direct replacement for the conversation manager
 // instead of a patch to avoid circular dependency issues
@@ -61,7 +63,7 @@ const {
   trackRateLimit,
   isStatsCommand,
   handleStatsCommand,
-  addCustomStatsSource
+  addCustomStatsSource,
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
@@ -119,11 +121,11 @@ const {
   manageConversation,
   loadConversationsFromStorage,
   saveConversationsToStorage,
-  stopPeriodicSaving,  // Note: startPeriodicSaving is not needed with the optimized version
+  stopPeriodicSaving, // Note: startPeriodicSaving is not needed with the optimized version
   getActiveConversationCount,
   getConversationStorageStatus,
   clearConversation,
-  shutdown: shutdownConversations
+  shutdown: shutdownConversations,
 } = require('./useSimpleOptimizer');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
@@ -146,7 +148,7 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
 async function processOpenAIMessage(content, conversationLog) {
   const timerId = performanceMonitor.startTimer('openai_api_detail', {
     messageLength: content.length,
-    contextLength: JSON.stringify(conversationLog).length
+    contextLength: JSON.stringify(conversationLog).length,
   });
   try {
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
@@ -257,13 +259,13 @@ async function processOpenAIMessage(content, conversationLog) {
         functionName: responseMessage.function_call.name,
         parameters: JSON.parse(responseMessage.function_call.arguments),
       };
-  
+
       performanceMonitor.stopTimer(timerId, {
         responseType: 'functionCall',
         functionName: responseMessage.function_call.name,
-        success: true
+        success: true,
       });
-  
+
       return result;
     }
 
@@ -275,12 +277,12 @@ async function processOpenAIMessage(content, conversationLog) {
       type: 'message',
       content: responseMessage.content,
     };
-  
+
     performanceMonitor.stopTimer(timerId, {
       responseType: 'message',
-      success: true
+      success: true,
     });
-  
+
     return result;
   } catch (error) {
     // Track OpenAI API error
@@ -314,7 +316,7 @@ async function generateNaturalResponse(functionResult, conversationLog, function
       [...conversationLog].reverse().find(msg => msg.role === 'user')?.content || '';
 
     // Create a system message with instructions based on function type
-    let systemMessage = {
+    const systemMessage = {
       role: 'system',
       content: 'Use the function result to provide a helpful and natural response to the user.',
     };
@@ -452,15 +454,15 @@ client.on('messageCreate', async message => {
     userId: message.author.id,
     channelId: message.channelId,
     messageId: message.id,
-    messageLength: message.content.length
+    messageLength: message.content.length,
   });
-  
+
   // Add a debug object to track timing of each step
   const timings = {
     start: Date.now(),
-    steps: []
+    steps: [],
   };
-  
+
   // Helper function to add timing data
   const addTiming = (step, extraData = {}) => {
     const now = Date.now();
@@ -469,13 +471,13 @@ client.on('messageCreate', async message => {
       step,
       time: now,
       elapsed,
-      ...extraData
+      ...extraData,
     });
     return elapsed;
   };
-  
+
   addTiming('start');
-  
+
   try {
     // Basic checks
     if (message.author.bot) {
@@ -483,20 +485,20 @@ client.on('messageCreate', async message => {
       return;
     }
     addTiming('bot_author_check', { result: 'passed' });
-    
+
     // For messages in DMs or with the ignore prefix, we can return early without any processing
     if (message.channel.isDMBased()) {
       addTiming('dm_check', { result: 'ignored' });
       return;
     }
     addTiming('dm_check', { result: 'passed' });
-    
+
     if (message.content.startsWith(config.IGNORE_MESSAGE_PREFIX)) {
       addTiming('ignore_prefix_check', { result: 'ignored' });
       return;
     }
     addTiming('ignore_prefix_check', { result: 'passed' });
-    
+
     // Ignore messages from unauthorized channels - quick check that doesn't need any async operations
     if (!allowedChannelIDs.includes(message.channelId)) {
       addTiming('channel_auth_check', { result: 'unauthorized' });
@@ -512,53 +514,58 @@ client.on('messageCreate', async message => {
     // This ensures users get immediate feedback that their message was received
     addTiming('before_thinking_message');
     const feedbackPromise = message.reply(`${loadingEmoji} Thinking...`);
-    
+
     // Track message for stats - this is fast and helps with metrics
     trackMessage();
     addTiming('after_tracking_message');
-    
+
     // Time how long it takes to get the feedback message
-    feedbackPromise.then(msg => {
-      addTiming('thinking_message_sent', { messageId: msg.id });
-    }).catch(err => {
-      addTiming('thinking_message_error', { error: err.message });
-    });
-    
+    feedbackPromise
+      .then(msg => {
+        addTiming('thinking_message_sent', { messageId: msg.id });
+      })
+      .catch(err => {
+        addTiming('thinking_message_error', { error: err.message });
+      });
+
     // Now that we've sent the initial feedback, we can perform the rest of the checks
     // in parallel with receiving the feedback message
 
     // Start plugin message hooks execution in the background
     // This prevents plugins from blocking the main message processing flow
     addTiming('before_plugin_execution');
-    
+
     // Check if plugins are disabled
     let pluginPromise;
     const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
-      hook: 'onMessageReceived'
+      hook: 'onMessageReceived',
     });
-    
+
     if (DISABLE_PLUGINS) {
       // Skip plugin execution when disabled
       pluginPromise = Promise.resolve([]);
       const pluginDuration = addTiming('plugin_execution_skipped');
-      performanceMonitor.stopTimer(pluginTimerId, { 
+      performanceMonitor.stopTimer(pluginTimerId, {
         success: true,
         pluginCount: 0,
         skipped: true,
-        duration: pluginDuration
+        duration: pluginDuration,
       });
       discordLogger.info('Plugins disabled, skipping execution for better performance');
     } else {
       // Normal plugin execution path
-      pluginPromise = pluginManager.executeHook('onMessageReceived', message)
+      pluginPromise = pluginManager
+        .executeHook('onMessageReceived', message)
         .then(hookResults => {
-          const pluginDuration = addTiming('plugin_execution_complete', { pluginCount: hookResults.length });
-          performanceMonitor.stopTimer(pluginTimerId, { 
+          const pluginDuration = addTiming('plugin_execution_complete', {
+            pluginCount: hookResults.length,
+          });
+          performanceMonitor.stopTimer(pluginTimerId, {
             success: true,
             pluginCount: hookResults.length,
-            duration: pluginDuration
+            duration: pluginDuration,
           });
-          
+
           // Log if any plugin would have stopped processing
           if (hookResults.some(result => result.result === false)) {
             discordLogger.debug(
@@ -609,9 +616,9 @@ client.on('messageCreate', async message => {
       points: 30,
       duration: 30,
     });
-    addTiming('after_rate_limit_check', { 
-      limited: rateLimitResult.limited, 
-      remainingPoints: rateLimitResult.remainingPoints 
+    addTiming('after_rate_limit_check', {
+      limited: rateLimitResult.limited,
+      remainingPoints: rateLimitResult.remainingPoints,
     });
 
     // If user is rate limited, update the feedback message and exit
@@ -634,10 +641,10 @@ client.on('messageCreate', async message => {
       addTiming('rate_limit_message_edited');
       return;
     }
-    
+
     // By this point, we have sent the thinking message and all checks have passed
     addTiming('all_checks_passed');
-    
+
     discordLogger.info(
       {
         message: message.content,
@@ -652,21 +659,23 @@ client.on('messageCreate', async message => {
     // Await the feedback message if we haven't already
     const feedbackMessage = await feedbackPromise;
     addTiming('feedback_message_confirmed');
-    
+
     // Track conversation for status updates AFTER sending the thinking message
     addTiming('before_status_update');
     statusManager.trackConversation(message.author.username, message.content);
     addTiming('after_status_update');
-    
+
     // Start the conversation storage save operation (but don't await it)
     // This makes it happen in the background without blocking the main processing flow
     addTiming('before_conversation_save');
     const savePromise = saveConversationsToStorage();
-    savePromise.then(() => {
-      addTiming('conversation_save_completed');
-    }).catch(error => {
-      addTiming('conversation_save_error', { error: error.message });
-    });
+    savePromise
+      .then(() => {
+        addTiming('conversation_save_completed');
+      })
+      .catch(error => {
+        addTiming('conversation_save_error', { error: error.message });
+      });
 
     // Check if this is a version query
     const versionResponse = processVersionQuery(message.content, config);
@@ -688,16 +697,19 @@ client.on('messageCreate', async message => {
 
     // Log if this is a reply to another message
     if (message.reference) {
-      discordLogger.info({
-        originalMessageId: message.id,
-        referencedMessageId: message.reference.messageId
-      }, 'Message is a reply to another message');
+      discordLogger.info(
+        {
+          originalMessageId: message.id,
+          referencedMessageId: message.reference.messageId,
+        },
+        'Message is a reply to another message'
+      );
     }
 
     // Handle conversation context, including any references
     addTiming('before_conversation_load');
     const conversationLog = await manageConversation(
-      message.author.id, 
+      message.author.id,
       {
         role: 'user',
         content: message.content,
@@ -711,14 +723,14 @@ client.on('messageCreate', async message => {
     const openaiTimerId = performanceMonitor.startTimer('openai_api', {
       userId: message.author.id,
       messageLength: message.content.length,
-      operation: 'processMessage'
+      operation: 'processMessage',
     });
     const gptResponse = await processOpenAIMessage(message.content, conversationLog);
     const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
     performanceMonitor.stopTimer(openaiTimerId, {
       responseType: gptResponse.type,
       success: true,
-      duration: apiDuration
+      duration: apiDuration,
     });
 
     // Handle different response types
@@ -726,7 +738,9 @@ client.on('messageCreate', async message => {
     if (gptResponse.type === 'functionCall') {
       await handleFunctionCall(gptResponse, feedbackMessage, conversationLog);
       // Safe access to function name with fallback to prevent TypeError
-      addTiming('after_function_call_handling', { functionName: gptResponse.function?.name || 'unknown' });
+      addTiming('after_function_call_handling', {
+        functionName: gptResponse.function?.name || 'unknown',
+      });
     } else if (gptResponse.type === 'message') {
       await handleDirectMessage(gptResponse, feedbackMessage, conversationLog);
       addTiming('after_direct_message_handling');
@@ -734,7 +748,7 @@ client.on('messageCreate', async message => {
       await feedbackMessage.edit(gptResponse.content);
       addTiming('after_edit_message');
     }
-    
+
     // Log complete timing data
     const totalDuration = Date.now() - timings.start;
     discordLogger.info(
@@ -748,34 +762,37 @@ client.on('messageCreate', async message => {
           elapsed_ms: step.elapsed,
           ...Object.entries(step)
             .filter(([key]) => !['step', 'time', 'elapsed'].includes(key))
-            .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
+            .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
         })),
-        response_type: gptResponse.type
+        response_type: gptResponse.type,
       },
       `Message processing completed in ${totalDuration}ms with ${timings.steps.length} steps tracked`
     );
   } catch (error) {
     // Add timing for errors
     addTiming('processing_error', { error: error.message });
-    
-    discordLogger.error({ 
-      error,
-      timing_data: timings
-    }, 'Error in message handler');
-    
+
+    discordLogger.error(
+      {
+        error,
+        timing_data: timings,
+      },
+      'Error in message handler'
+    );
+
     await message.reply('Sorry, I encountered an error processing your request.');
-    
+
     // Stop the timer with error information
     performanceMonitor.stopTimer(messageTimerId, {
       success: false,
-      error: error.message
+      error: error.message,
     });
   } finally {
     // Always stop the timer if it hasn't been stopped yet
     const finalTiming = addTiming('processing_complete');
-    performanceMonitor.stopTimer(messageTimerId, { 
-      success: true, 
-      totalDuration: finalTiming 
+    performanceMonitor.stopTimer(messageTimerId, {
+      success: true,
+      totalDuration: finalTiming,
     });
   }
 });
@@ -919,7 +936,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     }
 
     // Start the progress updater
-    let progressUpdater = setInterval(async () => {
+    const progressUpdater = setInterval(async () => {
       try {
         const currentProgress = updateProgress();
         const elapsedFormatted = formatElapsed(currentProgress.totalElapsed);
@@ -966,7 +983,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     } else {
       discordLogger.warn('Status manager not properly initialized, skipping status update');
     }
-    
+
     // IMPORTANT FIX: Move to generating phase BEFORE the OpenAI function call happens
     // This ensures that the time spent waiting for OpenAI is properly attributed
     // to the generating phase, not initializing
@@ -978,7 +995,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       updateProgress('enhancing');
       try {
         const enhancedPrompt = await enhanceImagePrompt(parameters.prompt);
-        
+
         // IMPORTANT FIX: Validate that the enhanced prompt is not empty
         if (enhancedPrompt && enhancedPrompt.trim().length > 0) {
           finalPrompt = enhancedPrompt;
@@ -1000,11 +1017,11 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         discordLogger.error({ error }, 'Error enhancing prompt');
         // Continue with the original prompt
       }
-      
+
       // Return to generating phase after enhancement is complete
       updateProgress('generating');
     }
-    
+
     // No need for another updateProgress here since we've already set it
 
     // Generate the image
@@ -1142,7 +1159,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       try {
         // Just send a simple error message without timing information
         // to avoid linting errors with progress tracking
-        let errorMessage =
+        const errorMessage =
           '❌ An error occurred while generating the image. Please try again later.';
         await message.edit(errorMessage);
       } catch (editError) {
@@ -1173,7 +1190,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
     functionName: gptResponse.functionName,
-    hasParameters: !!gptResponse.parameters
+    hasParameters: !!gptResponse.parameters,
   });
   const loadingMessages = {
     lookupTime: 'Checking watch...',
@@ -1265,7 +1282,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     case 'lookupTime':
       try {
         const timeTimerId = performanceMonitor.startTimer('time_api', {
-          location: gptResponse.parameters.location
+          location: gptResponse.parameters.location,
         });
         functionResult = await lookupTime(gptResponse.parameters.location);
         performanceMonitor.stopTimer(timeTimerId, { success: true });
@@ -1299,7 +1316,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
 
         // Use the simplified implementation to get a natural language response
         performanceMonitor.startTimer('weather_api', {
-          location: gptResponse.parameters.location
+          location: gptResponse.parameters.location,
         });
         const userQuestion =
           conversationLog.find(msg => msg.role === 'user')?.content ||
@@ -1388,7 +1405,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     case 'getWolframShortAnswer':
       try {
         const wolframTimerId = performanceMonitor.startTimer('wolfram_api', {
-          query: gptResponse.parameters.query
+          query: gptResponse.parameters.query,
         });
         functionResult = await lookupWolfram.getWolframShortAnswer(gptResponse.parameters.query);
         performanceMonitor.stopTimer(wolframTimerId, { success: true });
@@ -1566,10 +1583,10 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
     role: 'assistant',
     content: gptResponse.content,
   };
-  
+
   // Add to the conversation log
   conversationLog.push(responseMessage);
-  
+
   // Also update the stored conversation
   // We don't need to pass the Discord message here since we're just adding an assistant response
   await manageConversation(feedbackMessage.author.id, responseMessage);
@@ -1779,7 +1796,7 @@ async function shutdownGracefully(signal, error) {
     } catch (optimizationError) {
       logger.error({ error: optimizationError }, 'Error cleaning up optimization patch resources');
     }
-    
+
     // Note: Conversation optimization resources are now cleaned up in step 3
 
     // 7. Close any open API connections or pending requests

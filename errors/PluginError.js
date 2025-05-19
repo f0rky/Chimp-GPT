@@ -1,8 +1,8 @@
 /**
  * Plugin Error Class for ChimpGPT
- * 
+ *
  * This error class is used for errors related to plugin operations.
- * 
+ *
  * @module PluginError
  * @author Brett
  * @version 1.0.0
@@ -12,14 +12,14 @@ const ChimpError = require('./ChimpError');
 
 /**
  * Error class for plugin-related errors
- * 
+ *
  * @class PluginError
  * @extends ChimpError
  */
 class PluginError extends ChimpError {
   /**
    * Create a new PluginError
-   * 
+   *
    * @param {string} message - Error message
    * @param {Object} options - Additional error options
    * @param {string} [options.pluginId] - ID of the plugin
@@ -33,9 +33,9 @@ class PluginError extends ChimpError {
     super(message, {
       ...options,
       code: options.code || 'PLUGIN_ERROR',
-      component: options.component || 'plugin'
+      component: options.component || 'plugin',
     });
-    
+
     // Add plugin-specific properties
     this.pluginId = options.pluginId || 'unknown';
     this.pluginName = options.pluginName;
@@ -43,7 +43,7 @@ class PluginError extends ChimpError {
     this.hookName = options.hookName;
     this.functionName = options.functionName;
     this.commandName = options.commandName;
-    
+
     // Include plugin details in context
     this.context = {
       ...this.context,
@@ -52,13 +52,13 @@ class PluginError extends ChimpError {
       pluginVersion: this.pluginVersion,
       hookName: this.hookName,
       functionName: this.functionName,
-      commandName: this.commandName
+      commandName: this.commandName,
     };
   }
 
   /**
    * Get a structured representation of the error for logging
-   * 
+   *
    * @returns {Object} Structured error object
    */
   toJSON() {
@@ -70,18 +70,18 @@ class PluginError extends ChimpError {
       pluginVersion: this.pluginVersion,
       hookName: this.hookName,
       functionName: this.functionName,
-      commandName: this.commandName
+      commandName: this.commandName,
     };
   }
 
   /**
    * Get a string representation of the error
-   * 
+   *
    * @returns {string} String representation
    */
   toString() {
     let location = '';
-    
+
     if (this.hookName) {
       location = `hook: ${this.hookName}`;
     } else if (this.functionName) {
@@ -89,7 +89,7 @@ class PluginError extends ChimpError {
     } else if (this.commandName) {
       location = `command: ${this.commandName}`;
     }
-    
+
     return `${this.name} [${this.code}]: ${this.message} (plugin: ${this.pluginId}${location ? ', ' + location : ''})`;
   }
 }

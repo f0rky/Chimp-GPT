@@ -222,14 +222,13 @@ async function generateImage(prompt, options = {}) {
               url: img.url,
               revisedPrompt: img.revised_prompt || prompt,
             };
-          } else {
-            // Fallback for unexpected response format
-            logger.warn({ img }, 'Unexpected image data format in response');
-            return {
-              url: null,
-              revisedPrompt: prompt,
-            };
           }
+          // Fallback for unexpected response format
+          logger.warn({ img }, 'Unexpected image data format in response');
+          return {
+            url: null,
+            revisedPrompt: prompt,
+          };
         });
       }
 
@@ -332,7 +331,7 @@ async function enhanceImagePrompt(basicPrompt) {
       logger.warn('Empty prompt provided to enhanceImagePrompt, cannot enhance');
       return 'A generic image'; // Provide a safe fallback
     }
-    
+
     logger.info({ basicPrompt }, 'Enhancing image prompt');
 
     const response = await openai.chat.completions.create({
@@ -358,10 +357,13 @@ async function enhanceImagePrompt(basicPrompt) {
 
     // Track the API call
     trackApiCall('openai');
-    
+
     // Validate that the enhanced prompt is not empty
     if (!enhancedPrompt || enhancedPrompt.trim().length === 0) {
-      logger.warn({ basicPrompt }, 'OpenAI returned empty enhanced prompt, falling back to original');
+      logger.warn(
+        { basicPrompt },
+        'OpenAI returned empty enhanced prompt, falling back to original'
+      );
       return basicPrompt;
     }
 

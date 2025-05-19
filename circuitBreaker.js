@@ -18,7 +18,7 @@ function requestApproval(details, onApprove, onDeny) {
     status: 'pending',
     onApprove,
     onDeny,
-    requestedAt: Date.now()
+    requestedAt: Date.now(),
   });
   return id;
 }
@@ -51,5 +51,5 @@ function listPendingApprovals() {
 module.exports = {
   requestApproval,
   resolveApproval,
-  listPendingApprovals
+  listPendingApprovals,
 };

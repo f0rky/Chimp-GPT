@@ -139,7 +139,7 @@ function initStatusManager(client) {
   // Track when the bot is having a conversation
   // Flag to control status update frequency
   let statusUpdateDebounceTimeout = null;
-  
+
   function trackConversation(username, summary = null) {
     const now = Date.now();
     const isNewConversation =
@@ -178,7 +178,7 @@ function initStatusManager(client) {
     if (statusUpdateDebounceTimeout) {
       clearTimeout(statusUpdateDebounceTimeout);
     }
-    
+
     statusUpdateDebounceTimeout = setTimeout(() => {
       updateStatus(client);
       statusUpdateDebounceTimeout = null;
@@ -394,12 +394,12 @@ function getConversationStatus(username, phase = 'initial', summary = null) {
           type: ActivityType.Playing,
           name: `with ${username} about ${summary}`,
         };
-      } else {
-        return {
-          type: ActivityType.Playing,
-          name: `with ${username}`,
-        };
       }
+      return {
+        type: ActivityType.Playing,
+        name: `with ${username}`,
+      };
+
     default:
       return getRandomDefaultStatus();
   }
@@ -433,12 +433,12 @@ function getImageGenerationStatus(username, phase = 'generating', data = {}) {
           type: ActivityType.Competing,
           name: `Generated ${data.size} image in ${data.generationTime}s`,
         };
-      } else {
-        return {
-          type: ActivityType.Competing,
-          name: `Created art for ${username}`,
-        };
       }
+      return {
+        type: ActivityType.Competing,
+        name: `Created art for ${username}`,
+      };
+
     default:
       return getRandomDefaultStatus();
   }

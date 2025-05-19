@@ -25,7 +25,7 @@ let originalMethods = {
   getActiveConversationCount: null,
   loadConversationsFromStorage: null,
   saveConversationsToStorage: null,
-  getConversationStorageStatus: null
+  getConversationStorageStatus: null,
 };
 
 /**
@@ -36,16 +36,16 @@ async function initializeOptimizer() {
   if (isInitialized || isInitializing) {
     return true;
   }
-  
+
   isInitializing = true;
-  
+
   try {
     // Safe import of the optimizer
     optimizer = require('./conversationOptimizer');
-    
+
     // Initialize optimizer only after successful import
     await optimizer.init();
-    
+
     isInitialized = true;
     isInitializing = false;
     logger.info('Conversation optimizer initialized successfully');
@@ -64,94 +64,109 @@ function applyPatches() {
   try {
     // Get a reference to the original module
     const originalConvManager = require('./conversationManager');
-    
+
     // Store original methods for fallback
     originalMethods = {
       manageConversation: originalConvManager.manageConversation,
-      clearConversation: originalConvManager.clearConversation, 
+      clearConversation: originalConvManager.clearConversation,
       getActiveConversationCount: originalConvManager.getActiveConversationCount,
       loadConversationsFromStorage: originalConvManager.loadConversationsFromStorage,
       saveConversationsToStorage: originalConvManager.saveConversationsToStorage,
-      getConversationStorageStatus: originalConvManager.getConversationStorageStatus
+      getConversationStorageStatus: originalConvManager.getConversationStorageStatus,
     };
 
     // Override manageConversation - the most critical function
-    originalConvManager.manageConversation = async function(userId, newMessage = null, discordMessage = null) {
+    originalConvManager.manageConversation = async function (
+      userId,
+      newMessage = null,
+      discordMessage = null
+    ) {
       // Ensure optimizer is initialized
       if (!isInitialized) {
         await initializeOptimizer();
-        
+
         // If initialization fails, use original method
         if (!isInitialized) {
           return await originalMethods.manageConversation(userId, newMessage, discordMessage);
         }
       }
-      
+
       try {
         const startTime = Date.now();
-        
+
         // Process references if this is a message from Discord
         let referenceMessages = [];
         const config = require('./configValidator');
-        
+
         if (config.ENABLE_REPLY_CONTEXT && discordMessage?.reference) {
           try {
             const referenceResolver = require('./utils/messageReferenceResolver');
-            
+
             // Extract reference context
             referenceMessages = await referenceResolver.extractReferenceContext(discordMessage, {
               maxDepth: originalConvManager.MAX_REFERENCE_CONTEXT || 3,
-              includeNonBot: true
+              includeNonBot: true,
             });
-            
-            logger.debug({
-              userId,
-              messageId: discordMessage?.id,
-              referenceCount: referenceMessages.length
-            }, 'Processed message references');
+
+            logger.debug(
+              {
+                userId,
+                messageId: discordMessage?.id,
+                referenceCount: referenceMessages.length,
+              },
+              'Processed message references'
+            );
           } catch (refError) {
-            logger.error({ error: refError, userId, messageId: discordMessage?.id }, 
-                        'Error processing message references');
+            logger.error(
+              { error: refError, userId, messageId: discordMessage?.id },
+              'Error processing message references'
+            );
           }
         }
-        
+
         // Get the conversation using the optimizer
-        let conversation = await optimizer.getConversation(userId);
-        
+        const conversation = await optimizer.getConversation(userId);
+
         // Add reference messages if any
         if (referenceMessages.length > 0) {
           for (const refMsg of referenceMessages) {
             await optimizer.addMessage(userId, refMsg);
           }
         }
-        
+
         // Add the new message if provided
         if (newMessage) {
           await optimizer.addMessage(userId, newMessage);
         }
-        
+
         // Get the optimized conversation for API use
         const optimizedConversation = optimizer.optimizeConversationForApi(conversation);
-        
+
         const endTime = Date.now();
-        logger.debug({
-          userId,
-          durationMs: endTime - startTime,
-          originalLength: conversation.length,
-          optimizedLength: optimizedConversation.length
-        }, 'Optimized conversation management complete');
-        
+        logger.debug(
+          {
+            userId,
+            durationMs: endTime - startTime,
+            originalLength: conversation.length,
+            optimizedLength: optimizedConversation.length,
+          },
+          'Optimized conversation management complete'
+        );
+
         // Return the optimized conversation for API use
         return optimizedConversation;
       } catch (error) {
         logger.error({ error, userId }, 'Error in optimized manageConversation');
-        
+
         // Fall back to original implementation
         try {
           return await originalMethods.manageConversation(userId, newMessage, discordMessage);
         } catch (fallbackError) {
-          logger.error({ error: fallbackError }, 'Fallback to original manageConversation also failed');
-          
+          logger.error(
+            { error: fallbackError },
+            'Fallback to original manageConversation also failed'
+          );
+
           // Return a minimal valid conversation as last resort
           return [{ role: 'system', content: require('./configValidator').BOT_PERSONALITY }];
         }
@@ -159,86 +174,95 @@ function applyPatches() {
     };
 
     // Override clearConversation
-    originalConvManager.clearConversation = async function(userId) {
+    originalConvManager.clearConversation = async function (userId) {
       if (!isInitialized) {
         await initializeOptimizer();
         if (!isInitialized) return originalMethods.clearConversation(userId);
       }
-      
+
       try {
         const result = await optimizer.clearConversation(userId);
         return result;
       } catch (error) {
         logger.error({ error, userId }, 'Error in optimized clearConversation');
-        
+
         // Fall back to original implementation
         try {
           return await originalMethods.clearConversation(userId);
         } catch (fallbackError) {
-          logger.error({ error: fallbackError }, 'Fallback to original clearConversation also failed');
+          logger.error(
+            { error: fallbackError },
+            'Fallback to original clearConversation also failed'
+          );
           return false;
         }
       }
     };
 
     // Override getActiveConversationCount
-    originalConvManager.getActiveConversationCount = async function() {
+    originalConvManager.getActiveConversationCount = async function () {
       if (!isInitialized) {
         await initializeOptimizer();
         if (!isInitialized) return originalMethods.getActiveConversationCount();
       }
-      
+
       try {
         return await optimizer.getConversationCount();
       } catch (error) {
         logger.error({ error }, 'Error in optimized getActiveConversationCount');
-        
+
         // Fall back to original implementation
         try {
           return await originalMethods.getActiveConversationCount();
         } catch (fallbackError) {
-          logger.error({ error: fallbackError }, 'Fallback to original getActiveConversationCount also failed');
+          logger.error(
+            { error: fallbackError },
+            'Fallback to original getActiveConversationCount also failed'
+          );
           return 0;
         }
       }
     };
 
     // Override loadConversationsFromStorage - make it a no-op since optimizer handles this
-    originalConvManager.loadConversationsFromStorage = async function() {
+    originalConvManager.loadConversationsFromStorage = async function () {
       if (!isInitialized) {
         await initializeOptimizer();
         if (!isInitialized) return originalMethods.loadConversationsFromStorage();
       }
-      
+
       try {
         await optimizer.init(true); // Force reload
         return true;
       } catch (error) {
         logger.error({ error }, 'Error in optimized loadConversationsFromStorage');
-        
+
         // Fall back to original implementation
         try {
           return await originalMethods.loadConversationsFromStorage();
         } catch (fallbackError) {
-          logger.error({ error: fallbackError }, 'Fallback to original loadConversationsFromStorage also failed');
+          logger.error(
+            { error: fallbackError },
+            'Fallback to original loadConversationsFromStorage also failed'
+          );
           return false;
         }
       }
     };
 
     // Override saveConversationsToStorage - handled by optimizer's auto-save
-    originalConvManager.saveConversationsToStorage = async function() {
+    originalConvManager.saveConversationsToStorage = async function () {
       // No-op - optimizer handles periodic saving
       return true;
     };
 
     // Override getConversationStorageStatus
-    originalConvManager.getConversationStorageStatus = async function() {
+    originalConvManager.getConversationStorageStatus = async function () {
       if (!isInitialized) {
         await initializeOptimizer();
         if (!isInitialized) return originalMethods.getConversationStorageStatus();
       }
-      
+
       try {
         const status = await optimizer.getStatus();
         return {
@@ -247,11 +271,11 @@ function applyPatches() {
           fileSizeMB: status.fileSizeMB,
           lastSave: status.lastUpdated,
           loadTime: status.loadTimeMs + 'ms',
-          optimized: true
+          optimized: true,
         };
       } catch (error) {
         logger.error({ error }, 'Error getting optimized conversation status');
-        
+
         // Return basic info
         return {
           activeConversations: 'Unknown',
@@ -260,7 +284,7 @@ function applyPatches() {
           lastSave: new Date().toISOString(),
           loadTime: 'Unknown',
           optimized: false,
-          error: error.message
+          error: error.message,
         };
       }
     };
@@ -285,7 +309,7 @@ async function shutdown() {
   if (!isInitialized) {
     return true;
   }
-  
+
   try {
     await optimizer.shutdown();
     logger.info('Conversation optimization patch shutdown complete');
@@ -302,5 +326,5 @@ const success = applyPatches();
 // Export the success status and methods
 module.exports = {
   success,
-  shutdown
+  shutdown,
 };

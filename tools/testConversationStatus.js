@@ -1,12 +1,12 @@
 /**
  * Test Conversation Status Tool
- * 
+ *
  * This script tests the conversation storage functionality by:
  * 1. Creating test conversations
  * 2. Saving them to disk
  * 3. Loading them from disk
  * 4. Displaying the conversation storage status
- * 
+ *
  * @module TestConversationStatus
  * @author Brett
  * @version 1.0.0
@@ -16,12 +16,12 @@ require('dotenv').config();
 const { createLogger } = require('../logger');
 const logger = createLogger('testConversationStatus');
 const conversationStorage = require('../conversationStorage');
-const { 
-  manageConversation, 
-  clearConversation, 
+const {
+  manageConversation,
+  clearConversation,
   loadConversationsFromStorage,
   saveConversationsToStorage,
-  getConversationStorageStatus
+  getConversationStorageStatus,
 } = require('../conversationManager');
 
 /**
@@ -30,85 +30,104 @@ const {
 async function testConversationStorage() {
   try {
     logger.info('Starting conversation storage test...');
-    
+
     // First, ensure we have a clean state
     await conversationStorage.clearAllConversations();
     logger.info('Cleared all existing conversations');
-    
+
     // Create test conversations
     const testUserId1 = 'test-user-1';
     const testUserId2 = 'test-user-2';
-    
+
     // Clear any existing conversations for these test users
     clearConversation(testUserId1);
     clearConversation(testUserId2);
-    
+
     // Add test messages to conversations with timestamps
     const now = Date.now();
     logger.info('Creating test conversations...');
-    
-    manageConversation(testUserId1, { role: 'system', content: 'You are a helpful assistant', timestamp: now });
+
+    manageConversation(testUserId1, {
+      role: 'system',
+      content: 'You are a helpful assistant',
+      timestamp: now,
+    });
     manageConversation(testUserId1, { role: 'user', content: 'Hello, bot!', timestamp: now });
-    manageConversation(testUserId1, { role: 'assistant', content: 'Hello, human!', timestamp: now });
-    
-    manageConversation(testUserId2, { role: 'system', content: 'You are a helpful assistant', timestamp: now });
+    manageConversation(testUserId1, {
+      role: 'assistant',
+      content: 'Hello, human!',
+      timestamp: now,
+    });
+
+    manageConversation(testUserId2, {
+      role: 'system',
+      content: 'You are a helpful assistant',
+      timestamp: now,
+    });
     manageConversation(testUserId2, { role: 'user', content: 'How are you?', timestamp: now });
-    manageConversation(testUserId2, { role: 'assistant', content: 'I am fine, thank you!', timestamp: now });
-    
+    manageConversation(testUserId2, {
+      role: 'assistant',
+      content: 'I am fine, thank you!',
+      timestamp: now,
+    });
+
     // Get status before saving
     const statusBeforeSave = getConversationStorageStatus();
     logger.info({ status: statusBeforeSave }, 'Conversation storage status before saving');
-    
+
     // Save conversations to disk
     logger.info('Saving conversations to disk...');
     const saveResult = await saveConversationsToStorage(true);
     logger.info({ saveResult }, 'Conversations saved to disk');
-    
+
     // Clear conversations from memory
     clearConversation(testUserId1);
     clearConversation(testUserId2);
     logger.info('Cleared conversations from memory');
-    
+
     // Get status after clearing
     const statusAfterClear = getConversationStorageStatus();
     logger.info({ status: statusAfterClear }, 'Conversation storage status after clearing');
-    
+
     // Load conversations from disk
     logger.info('Loading conversations from disk...');
     const loadResult = await loadConversationsFromStorage();
     logger.info({ loadResult }, 'Conversations loaded from disk');
-    
+
     // Get status after loading
     const statusAfterLoad = getConversationStorageStatus();
     logger.info({ status: statusAfterLoad }, 'Conversation storage status after loading');
-    
+
     // Check if the loaded conversations match the original ones
     const loadedConversation1 = manageConversation(testUserId1);
     const loadedConversation2 = manageConversation(testUserId2);
-    
-    logger.info({ 
-      user1: testUserId1,
-      conversation1: loadedConversation1,
-      user2: testUserId2,
-      conversation2: loadedConversation2
-    }, 'Loaded conversations');
-    
+
+    logger.info(
+      {
+        user1: testUserId1,
+        conversation1: loadedConversation1,
+        user2: testUserId2,
+        conversation2: loadedConversation2,
+      },
+      'Loaded conversations'
+    );
+
     // Print final status
     const finalStatus = getConversationStorageStatus();
     logger.info({ status: finalStatus }, 'Final conversation storage status');
-    
+
     return {
       success: true,
       statusBeforeSave,
       statusAfterClear,
       statusAfterLoad,
-      finalStatus
+      finalStatus,
     };
   } catch (error) {
     logger.error({ error }, 'Error testing conversation storage');
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }

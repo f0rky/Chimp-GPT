@@ -356,10 +356,10 @@ function scheduleHealthReports(client) {
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
   const memoryUsage = process.memoryUsage();
-  const { getBotVersion } = require('./getBotVersion');
-  const version = getBotVersion();
-  const os = require('os');
-  const hostname = os.hostname();
+  const { getBotVersion: getVersion } = require('./getBotVersion');
+  const botVersion = getVersion();
+  const osModule = require('os');
+  const hostname = osModule.hostname();
   const fs = require('fs');
   const path = require('path');
 
@@ -419,66 +419,62 @@ function generateHealthReport(isStartup = false) {
   let pluginErrorsText = '';
   if (Object.keys(stats.errors.plugins).length > 0) {
     pluginErrorsText = '\n**Plugin Errors:**\n';
-    for (const [pluginId, count] of Object.entries(stats.errors.plugins)) {
-      pluginErrorsText += `• ${pluginId}: ${count}\n`;
+    for (const [pluginId, errorCount] of Object.entries(stats.errors.plugins)) {
+      pluginErrorsText += `• ${pluginId}: ${errorCount.count}\n`;
     }
   }
 
-  const report = `
-${title}
-
-**Status:** ${statusEmoji} ${errorSum > 20 ? 'Warning' : 'Healthy'}
-**Version:** ${version}
-**Uptime:** ${formatDuration(uptime)}
-**Memory:** ${Math.round(memoryUsage.rss / 1024 / 1024)} MB${
-    isStartup
-      ? `
-**Version:** ${version}
-**Hostname:** ${hostname}`
-      : ''
+  // Format the report with proper Markdown
+  let report = `# 🚀 ${config.BOT_NAME} Health Report\n`;
+  report += `**Status:** ${isStartup ? 'Starting Up' : 'Running'}\n`;
+  report += `**Version:** ${botVersion}\n`;
+  report += `**Uptime:** ${formatDuration(uptime)}\n`;
+  report += `**Memory:** ${Math.round(memoryUsage.rss / 1024 / 1024)} MB\n`;
+  if (isStartup) {
+    report += `**Version:** ${botVersion}\n`;
+    report += `**Hostname:** ${hostname}\n`;
   }
 
-**Statistics:**
-• Messages Processed: ${stats.messageCount}
-• OpenAI API Calls: ${stats.apiCalls.openai}
-• Weather API Calls: ${stats.apiCalls.weather}
-• Time Lookups: ${stats.apiCalls.time}
-• Wolfram Alpha Queries: ${stats.apiCalls.wolfram}
-• Quake Server Lookups: ${stats.apiCalls.quake}
-• GPT Image-1 Generations: ${stats.apiCalls.gptimage}
-
-**Plugin System:**
-• Loaded Plugins: ${stats.plugins.loaded}
-• Plugin Commands: ${stats.plugins.commands}
-• Plugin Functions: ${stats.plugins.functions}
-• Plugin Hooks: ${stats.plugins.hooks}${pluginApiCallsText}${
-    isStartup
-      ? `
-• Plugin Details: ${getLoadedPlugins()}`
-      : ''
+  report += `\n**Statistics:**\n`;
+  report += `• Messages Processed: ${stats.messageCount}\n`;
+  report += `• OpenAI API Calls: ${stats.apiCalls.openai}\n`;
+  report += `• Weather API Calls: ${stats.apiCalls.weather}\n`;
+  report += `• Time Lookups: ${stats.apiCalls.time}\n`;
+  report += `• Wolfram Alpha Queries: ${stats.apiCalls.wolfram}\n`;
+  report += `• Quake Server Lookups: ${stats.apiCalls.quake}\n`;
+  report += `• GPT Image-1 Generations: ${stats.apiCalls.gptimage}\n\n`;
+  report += `**Plugin System:**\n`;
+  report += `• Loaded Plugins: ${stats.plugins.loaded}\n`;
+  report += `• Plugin Commands: ${stats.plugins.commands}\n`;
+  report += `• Plugin Functions: ${stats.plugins.functions}\n`;
+  report += `• Plugin Hooks: ${stats.plugins.hooks}`;
+  report += pluginApiCallsText;
+  
+  if (isStartup) {
+    report += `\n• Plugin Details: ${getLoadedPlugins()}`;
   }
-
-**Errors:**
-• Total Errors: ${calculateTotalErrors(stats.errors)}
-• OpenAI Errors: ${stats.errors.openai}
-• Discord Errors: ${stats.errors.discord}
-• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}
-
-**Rate Limiting:**
-• Rate Limits Hit: ${stats.rateLimits.hit}
-• Unique Users Limited: ${stats.rateLimits.users.size}
-
-For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'${
-    isStartup
-      ? `
-
-**Status Page:** http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}
-
-${isStartup ? '**Recent Logs:**\n```\n' + getRecentLogs(15) + '\n```' : ''}`
-      : ''
+  
+  // Add errors section
+  report += `\n**Errors:**\n`;
+  report += `• Total Errors: ${calculateTotalErrors(stats.errors)}\n`;
+  report += `• OpenAI Errors: ${stats.errors.openai}\n`;
+  report += `• Discord Errors: ${stats.errors.discord}\n`;
+  report += `• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}\n\n`;
+  
+  // Add rate limiting section
+  report += `**Rate Limiting:**\n`;
+  report += `• Rate Limits Hit: ${stats.rateLimits.hit}\n`;
+  report += `• Unique Users Limited: ${stats.rateLimits.users.size}\n\n`;
+  
+  // Add footer with commands
+  report += `For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'`;
+  
+  // Add status page and logs if it's a startup report
+  if (isStartup) {
+    report += `\n\n**Status Page:** http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}`;
+    report += `\n\n**Recent Logs:**\n\`\`\`\n${getRecentLogs(15)}\n\`\`\``;
   }
-`;
-
+  
   return report;
 }
 
@@ -763,10 +759,9 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
             },
             result
           );
-        } else {
-          logger.error('Failed to repair function results file');
-          return false;
         }
+        logger.error('Failed to repair function results file');
+        return false;
       }
 
       // Re-throw other errors
@@ -806,10 +801,10 @@ function getHealthStatus() {
 
 /**
  * Add a custom stats source to the health check system
- * 
+ *
  * This allows external modules to contribute statistics that will be included
  * in health reports and exposed via the status API.
- * 
+ *
  * @param {string} name - The name of the stats source
  * @param {Function} dataFn - Function that returns the stats data when called
  * @returns {void}
@@ -818,14 +813,14 @@ function addCustomStatsSource(name, dataFn) {
   if (!name || typeof name !== 'string') {
     throw new Error('Custom stats source name must be a non-empty string');
   }
-  
+
   if (typeof dataFn !== 'function') {
     throw new Error('Custom stats source must provide a data function');
   }
-  
+
   // Store the data provider function
   stats.customStats[name] = dataFn;
-  
+
   // Log the registration
   logger.info({ statSource: name }, 'Custom stats source registered');
 }
@@ -833,13 +828,13 @@ function addCustomStatsSource(name, dataFn) {
 /**
  * Calculate the total error count properly, avoiding "[object Object]" issues
  * by separating numeric error properties from complex objects
- * 
+ *
  * @param {Object} errors - The stats.errors object
  * @returns {number} The total error count
  */
 function calculateTotalErrors(errors) {
   // Initialize with 0 for safety if properties are undefined
-  const basicErrors = 
+  const basicErrors =
     (errors.openai || 0) +
     (errors.discord || 0) +
     (errors.weather || 0) +
@@ -848,7 +843,7 @@ function calculateTotalErrors(errors) {
     (errors.quake || 0) +
     (errors.gptimage || 0) +
     (errors.other || 0);
-  
+
   // Calculate plugin errors separately
   let pluginErrors = 0;
   if (errors.plugins && typeof errors.plugins === 'object') {
@@ -861,7 +856,7 @@ function calculateTotalErrors(errors) {
       }
     });
   }
-  
+
   return basicErrors + pluginErrors;
 }
 

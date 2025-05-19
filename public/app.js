@@ -757,11 +757,11 @@ function updateErrors(errors) {
  */
 function updateMemoryUsage(memory, system) {
   // Parse memory values
-  const heapUsed = parseInt(memory.heapUsed);
-  const heapTotal = parseInt(memory.heapTotal);
-  const rss = parseInt(memory.rss);
-  const systemFree = parseInt(system.freeMemory);
-  const systemTotal = parseInt(system.totalMemory);
+  const heapUsed = parseInt(memory.heapUsed, 10);
+  const heapTotal = parseInt(memory.heapTotal, 10);
+  const rss = parseInt(memory.rss, 10);
+  const systemFree = parseInt(system.freeMemory, 10);
+  const systemTotal = parseInt(system.totalMemory, 10);
 
   // Calculate percentages
   const heapPercent = (heapUsed / heapTotal) * 100;

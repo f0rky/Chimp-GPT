@@ -1,299 +1,306 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title id="page-title">Bot Status</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <div class="logo">
-                <i class="fas fa-robot"></i>
-                <h1 id="bot-name-header">Bot Status</h1>
-            </div>
-            <div id="status-indicator" class="status-indicator">
-                <span class="dot"></span>
-                <span class="status-text">Checking...</span>
-            </div>
-        </header>
+      <header>
+        <div class="logo">
+          <i class="fas fa-robot"></i>
+          <h1 id="bot-name-header">Bot Status</h1>
+        </div>
+        <div id="status-indicator" class="status-indicator">
+          <span class="dot"></span>
+          <span class="status-text">Checking...</span>
+        </div>
+      </header>
 
-        <div class="dashboard">
-            <div class="card overview">
-                <h2>Overview</h2>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">Uptime</span>
-                        <span id="uptime" class="value">--:--:--</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Version</span>
-                        <span id="version" class="value">-.-.-</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Messages</span>
-                        <span id="message-count" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Discord Ping</span>
-                        <span id="discord-ping" class="value">-- ms</span>
-                    </div>
-                </div>
+      <div class="dashboard">
+        <div class="card overview">
+          <h2>Overview</h2>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">Uptime</span>
+              <span id="uptime" class="value">--:--:--</span>
             </div>
-
-            <div class="card memory-usage">
-                <h2>Memory Usage</h2>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">RSS</span>
-                        <span id="memory-rss" class="value">-- MB</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Heap Total</span>
-                        <span id="memory-heap-total" class="value">-- MB</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Heap Used</span>
-                        <span id="memory-heap-used" class="value">-- MB</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">System Memory</span>
-                        <span id="system-memory" class="value">-- / -- MB</span>
-                    </div>
-                </div>
+            <div class="stat">
+              <span class="label">Version</span>
+              <span id="version" class="value">-.-.-</span>
             </div>
-
-            <div class="card plugins">
-                <h2>Plugin System</h2>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">Loaded Plugins</span>
-                        <span id="plugin-count" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Commands</span>
-                        <span id="plugin-commands" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Functions</span>
-                        <span id="plugin-functions" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Hooks</span>
-                        <span id="plugin-hooks" class="value">0</span>
-                    </div>
-                </div>
-                <div class="plugin-details">
-                    <h3>Plugin API Calls</h3>
-                    <div id="plugin-api-calls" class="plugin-list">
-                        <div class="empty-message">No plugin API calls recorded</div>
-                    </div>
-                    
-                    <h3>Plugin Errors</h3>
-                    <div id="plugin-errors" class="plugin-list">
-                        <div class="empty-message">No plugin errors recorded</div>
-                    </div>
-                    
-                    <h3>Detailed Plugin Error Analysis</h3>
-                    <div id="plugin-errors-container" class="detailed-errors">
-                        <p class="text-success">No plugin errors reported.</p>
-                    </div>
-                </div>
+            <div class="stat">
+              <span class="label">Messages</span>
+              <span id="message-count" class="value">0</span>
             </div>
-
-            <div class="card api-calls">
-                <h2>API Calls</h2>
-                <div class="chart-container">
-                    <canvas id="api-chart"></canvas>
-                </div>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">OpenAI</span>
-                        <span id="openai-calls" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Weather</span>
-                        <span id="weather-calls" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Time</span>
-                        <span id="time-calls" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Wolfram</span>
-                        <span id="wolfram-calls" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Quake</span>
-                        <span id="quake-calls" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">DALL-E</span>
-                        <span id="dalle-calls" class="value">0</span>
-                    </div>
-                </div>
+            <div class="stat">
+              <span class="label">Discord Ping</span>
+              <span id="discord-ping" class="value">-- ms</span>
             </div>
-
-            <div class="card errors">
-                <h2>Errors</h2>
-                <div class="chart-container">
-                    <canvas id="error-chart"></canvas>
-                </div>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">OpenAI</span>
-                        <span id="openai-errors" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Discord</span>
-                        <span id="discord-errors" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Weather</span>
-                        <span id="weather-errors" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">DALL-E</span>
-                        <span id="dalle-errors" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Other</span>
-                        <span id="other-errors" class="value">0</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card memory">
-                <h2>Memory Usage</h2>
-                <div class="progress-container">
-                    <div class="progress-label">Heap Used</div>
-                    <div class="progress-bar">
-                        <div id="heap-used-bar" class="progress" style="width: 0%"></div>
-                    </div>
-                    <div id="heap-used" class="progress-value">0 MB</div>
-                </div>
-                <div class="progress-container">
-                    <div class="progress-label">RSS</div>
-                    <div class="progress-bar">
-                        <div id="rss-bar" class="progress" style="width: 0%"></div>
-                    </div>
-                    <div id="rss" class="progress-value">0 MB</div>
-                </div>
-                <div class="progress-container">
-                    <div class="progress-label">System Memory</div>
-                    <div class="progress-bar">
-                        <div id="system-memory-bar" class="progress" style="width: 0%"></div>
-                    </div>
-                    <div id="system-memory" class="progress-value">0 MB</div>
-                </div>
-            </div>
-
-            <div class="card rate-limits">
-                <div class="card-header">
-                    <h2>Rate Limits</h2>
-                    <div class="button-group">
-                        <button id="repair-stats" class="repair-button" title="Repair stats file if corrupted">
-                            <i class="fas fa-wrench"></i> Repair Stats
-                        </button>
-                        <button id="reset-stats" class="reset-button" title="Reset all statistics">
-                            <i class="fas fa-redo-alt"></i> Reset Stats
-                        </button>
-                    </div>
-                </div>
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="label">Total Hits</span>
-                        <span id="rate-limit-hits" class="value">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Unique Users</span>
-                        <span id="rate-limit-users" class="value">0</span>
-                    </div>
-                </div>
-                <div class="rate-limit-details">
-                    <h3>Rate Limited Users</h3>
-                    <div id="rate-limited-users-list" class="user-list">
-                        <div class="no-data">No rate limited users</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card function-results">
-                <div class="card-header">
-                    <h2>Recent Function Calls</h2>
-                    <div class="tab-container">
-                        <button class="tab-button active" data-tab="weather">Weather</button>
-                        <button class="tab-button" data-tab="time">Time</button>
-                        <button class="tab-button" data-tab="wolfram">Wolfram</button>
-                        <button class="tab-button" data-tab="quake">Quake</button>
-                        <button class="tab-button" data-tab="gptimage">GPT Image-1</button>
-                        <button class="tab-button" data-tab="gallery">Image Gallery</button>
-                    </div>
-                </div>
-                <div class="tab-content">
-                    <div class="tab-pane active" id="weather-results">
-                        <div class="no-data">No recent weather lookups</div>
-                    </div>
-                    <div class="tab-pane" id="time-results">
-                        <div class="no-data">No recent time lookups</div>
-                    </div>
-                    <div class="tab-pane" id="wolfram-results">
-                        <div class="no-data">No recent Wolfram Alpha queries</div>
-                    </div>
-                    <div class="tab-pane" id="quake-results">
-                        <div class="no-data">No recent Quake server stats</div>
-                    </div>
-                    <div class="tab-pane" id="dalle-results">
-                        <div class="no-data">No recent DALL-E image generations</div>
-                    </div>
-                    <div class="tab-pane" id="gallery-results">
-                        <div class="gallery-container">
-                            <div class="no-data">No images to display</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card tests">
-                <h2>Test Results</h2>
-                <div id="test-results" class="test-results">
-                    <div class="test-result">
-                        <span class="test-name">Conversation Log Tests</span>
-                        <span class="test-status pending">Pending</span>
-                    </div>
-                    <div class="test-result">
-                        <span class="test-name">OpenAI Integration Tests</span>
-                        <span class="test-status pending">Pending</span>
-                    </div>
-                    <div class="test-result">
-                        <span class="test-name">Quake Server Stats Tests</span>
-                        <span class="test-status pending">Pending</span>
-                    </div>
-                </div>
-                <div class="button-container">
-                    <button id="run-tests" class="button">Run Tests</button>
-                </div>
-            </div>
+          </div>
         </div>
 
-        <footer>
-            <p>Last updated: <span id="last-updated">Never</span></p>
-            <p>ChimpGPT Status Page &copy; 2025</p>
-        </footer>
+        <div class="card memory-usage">
+          <h2>Memory Usage</h2>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">RSS</span>
+              <span id="memory-rss" class="value">-- MB</span>
+            </div>
+            <div class="stat">
+              <span class="label">Heap Total</span>
+              <span id="memory-heap-total" class="value">-- MB</span>
+            </div>
+            <div class="stat">
+              <span class="label">Heap Used</span>
+              <span id="memory-heap-used" class="value">-- MB</span>
+            </div>
+            <div class="stat">
+              <span class="label">System Memory</span>
+              <span id="system-memory" class="value">-- / -- MB</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card plugins">
+          <h2>Plugin System</h2>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">Loaded Plugins</span>
+              <span id="plugin-count" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Commands</span>
+              <span id="plugin-commands" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Functions</span>
+              <span id="plugin-functions" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Hooks</span>
+              <span id="plugin-hooks" class="value">0</span>
+            </div>
+          </div>
+          <div class="plugin-details">
+            <h3>Plugin API Calls</h3>
+            <div id="plugin-api-calls" class="plugin-list">
+              <div class="empty-message">No plugin API calls recorded</div>
+            </div>
+
+            <h3>Plugin Errors</h3>
+            <div id="plugin-errors" class="plugin-list">
+              <div class="empty-message">No plugin errors recorded</div>
+            </div>
+
+            <h3>Detailed Plugin Error Analysis</h3>
+            <div id="plugin-errors-container" class="detailed-errors">
+              <p class="text-success">No plugin errors reported.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card api-calls">
+          <h2>API Calls</h2>
+          <div class="chart-container">
+            <canvas id="api-chart"></canvas>
+          </div>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">OpenAI</span>
+              <span id="openai-calls" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Weather</span>
+              <span id="weather-calls" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Time</span>
+              <span id="time-calls" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Wolfram</span>
+              <span id="wolfram-calls" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Quake</span>
+              <span id="quake-calls" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">DALL-E</span>
+              <span id="dalle-calls" class="value">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card errors">
+          <h2>Errors</h2>
+          <div class="chart-container">
+            <canvas id="error-chart"></canvas>
+          </div>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">OpenAI</span>
+              <span id="openai-errors" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Discord</span>
+              <span id="discord-errors" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Weather</span>
+              <span id="weather-errors" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">DALL-E</span>
+              <span id="dalle-errors" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Other</span>
+              <span id="other-errors" class="value">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card memory">
+          <h2>Memory Usage</h2>
+          <div class="progress-container">
+            <div class="progress-label">Heap Used</div>
+            <div class="progress-bar">
+              <div id="heap-used-bar" class="progress" style="width: 0%"></div>
+            </div>
+            <div id="heap-used" class="progress-value">0 MB</div>
+          </div>
+          <div class="progress-container">
+            <div class="progress-label">RSS</div>
+            <div class="progress-bar">
+              <div id="rss-bar" class="progress" style="width: 0%"></div>
+            </div>
+            <div id="rss" class="progress-value">0 MB</div>
+          </div>
+          <div class="progress-container">
+            <div class="progress-label">System Memory</div>
+            <div class="progress-bar">
+              <div id="system-memory-bar" class="progress" style="width: 0%"></div>
+            </div>
+            <div id="system-memory" class="progress-value">0 MB</div>
+          </div>
+        </div>
+
+        <div class="card rate-limits">
+          <div class="card-header">
+            <h2>Rate Limits</h2>
+            <div class="button-group">
+              <button
+                id="repair-stats"
+                class="repair-button"
+                title="Repair stats file if corrupted"
+              >
+                <i class="fas fa-wrench"></i> Repair Stats
+              </button>
+              <button id="reset-stats" class="reset-button" title="Reset all statistics">
+                <i class="fas fa-redo-alt"></i> Reset Stats
+              </button>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">Total Hits</span>
+              <span id="rate-limit-hits" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Unique Users</span>
+              <span id="rate-limit-users" class="value">0</span>
+            </div>
+          </div>
+          <div class="rate-limit-details">
+            <h3>Rate Limited Users</h3>
+            <div id="rate-limited-users-list" class="user-list">
+              <div class="no-data">No rate limited users</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card function-results">
+          <div class="card-header">
+            <h2>Recent Function Calls</h2>
+            <div class="tab-container">
+              <button class="tab-button active" data-tab="weather">Weather</button>
+              <button class="tab-button" data-tab="time">Time</button>
+              <button class="tab-button" data-tab="wolfram">Wolfram</button>
+              <button class="tab-button" data-tab="quake">Quake</button>
+              <button class="tab-button" data-tab="gptimage">GPT Image-1</button>
+              <button class="tab-button" data-tab="gallery">Image Gallery</button>
+            </div>
+          </div>
+          <div class="tab-content">
+            <div class="tab-pane active" id="weather-results">
+              <div class="no-data">No recent weather lookups</div>
+            </div>
+            <div class="tab-pane" id="time-results">
+              <div class="no-data">No recent time lookups</div>
+            </div>
+            <div class="tab-pane" id="wolfram-results">
+              <div class="no-data">No recent Wolfram Alpha queries</div>
+            </div>
+            <div class="tab-pane" id="quake-results">
+              <div class="no-data">No recent Quake server stats</div>
+            </div>
+            <div class="tab-pane" id="dalle-results">
+              <div class="no-data">No recent DALL-E image generations</div>
+            </div>
+            <div class="tab-pane" id="gallery-results">
+              <div class="gallery-container">
+                <div class="no-data">No images to display</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card tests">
+          <h2>Test Results</h2>
+          <div id="test-results" class="test-results">
+            <div class="test-result">
+              <span class="test-name">Conversation Log Tests</span>
+              <span class="test-status pending">Pending</span>
+            </div>
+            <div class="test-result">
+              <span class="test-name">OpenAI Integration Tests</span>
+              <span class="test-status pending">Pending</span>
+            </div>
+            <div class="test-result">
+              <span class="test-name">Quake Server Stats Tests</span>
+              <span class="test-status pending">Pending</span>
+            </div>
+          </div>
+          <div class="button-container">
+            <button id="run-tests" class="button">Run Tests</button>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>Last updated: <span id="last-updated">Never</span></p>
+        <p>ChimpGPT Status Page &copy; 2025</p>
+      </footer>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Image Gallery Modal -->
     <div class="gallery-modal" id="gallery-modal">
-        <button class="modal-close" id="modal-close">&times;</button>
-        <div class="modal-content">
-            <img id="modal-image" src="" alt="Generated image">
-        </div>
-        <div class="modal-prompt" id="modal-prompt"></div>
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-content">
+        <img id="modal-image" src="" alt="Generated image" />
+      </div>
+      <div class="modal-prompt" id="modal-prompt"></div>
     </div>
-    
+
     <script src="app.js"></script>
-</body>
+  </body>
 </html>

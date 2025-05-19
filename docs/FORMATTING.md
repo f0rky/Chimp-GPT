@@ -63,10 +63,12 @@ Some files and directories are excluded from formatting. See `.prettierignore` f
 For the best development experience, install Prettier and ESLint extensions for your code editor:
 
 - **VS Code**:
+
   - [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
   - [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
 
 - **WebStorm/IntelliJ IDEA**:
+
   - Prettier and ESLint are supported natively
 
 - **Sublime Text**:

@@ -19,12 +19,14 @@ Discord conversations often involve replying to previous messages, creating thre
 The implementation consists of three main components:
 
 1. **Message Reference Resolver** (`utils/messageReferenceResolver.js`)
+
    - Resolves message references in the Discord API
    - Builds context from reply chains
    - Manages caching to avoid redundant API calls
    - Transforms message data into conversation-compatible format
 
 2. **Conversation Manager Enhancement** (`conversationManager.js`)
+
    - Integrates with the message reference resolver
    - Adds reference context to user conversations
    - Ensures proper ordering of messages with references
@@ -52,12 +54,14 @@ These can be set in the `.env` file to customize the behavior of the reply conte
 ### Reference Resolution Process
 
 1. When a user sends a message that is a reply to another message:
+
    - The bot identifies the message as a reply via `message.reference`
    - It resolves the referenced message using Discord's API
    - If the referenced message is itself a reply, it follows the chain up to `MAX_REFERENCE_DEPTH`
    - Messages are cached to avoid redundant API calls
 
 2. Building conversation context:
+
    - Referenced messages are transformed into conversation format (role, content)
    - User messages get role="user", bot messages get role="assistant"
    - The messages are ordered chronologically to maintain conversation flow

@@ -40,7 +40,7 @@ async function init() {
   try {
     // Load existing results into memory
     resultsCache = await loadResultsFromDisk();
-    
+
     // Start periodic saving if not already started
     if (!saveTimer) {
       saveTimer = setInterval(async () => {
@@ -49,14 +49,14 @@ async function init() {
           isDirty = false;
         }
       }, SAVE_INTERVAL_MS);
-      
+
       // Ensure the timer doesn't keep the process alive
       saveTimer.unref();
     }
-    
+
     // Run initial cleanup
     await cleanupOldResults();
-    
+
     logger.info('Function results optimizer initialized');
   } catch (error) {
     logger.error({ error }, 'Failed to initialize function results optimizer');
@@ -70,7 +70,7 @@ async function init() {
 async function loadResultsFromDisk() {
   try {
     const dataDir = path.join(__dirname, 'data');
-    
+
     // Check if data directory exists
     try {
       await fs.access(dataDir);
@@ -78,7 +78,7 @@ async function loadResultsFromDisk() {
       // Create directory if it doesn't exist
       await fs.mkdir(dataDir, { recursive: true });
     }
-    
+
     // Check if results file exists
     try {
       await fs.access(RESULTS_FILE);
@@ -91,16 +91,16 @@ async function loadResultsFromDisk() {
         quake: [],
         gptimage: [],
         plugins: {},
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
-      
+
       await fs.writeFile(RESULTS_FILE, JSON.stringify(defaultResults, null, 2));
       return defaultResults;
     }
-    
+
     // Load existing results
     const data = await fs.readFile(RESULTS_FILE, 'utf8');
-    
+
     try {
       return JSON.parse(data);
     } catch (parseError) {
@@ -112,12 +112,12 @@ async function loadResultsFromDisk() {
         quake: [],
         gptimage: [],
         plugins: {},
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
     }
   } catch (error) {
     logger.error({ error }, 'Error loading function results from disk');
-    
+
     // Return default results if loading fails
     return {
       weather: [],
@@ -126,7 +126,7 @@ async function loadResultsFromDisk() {
       quake: [],
       gptimage: [],
       plugins: {},
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
   }
 }
@@ -141,16 +141,16 @@ async function saveResultsToDisk() {
     logger.debug('Skipping save while optimization is in progress');
     return true;
   }
-  
+
   try {
     // Update last updated timestamp
     resultsCache.lastUpdated = new Date().toISOString();
-    
+
     // Save to disk with atomic write pattern
     const tempFile = `${RESULTS_FILE}.tmp`;
     await fs.writeFile(tempFile, JSON.stringify(resultsCache, null, 2));
     await fs.rename(tempFile, RESULTS_FILE);
-    
+
     logger.debug('Saved function results to disk');
     return true;
   } catch (error) {
@@ -167,58 +167,59 @@ async function cleanupOldResults() {
   if (!resultsCache) {
     await init();
   }
-  
+
   isOptimizing = true;
   try {
     const now = Date.now();
     const maxAgeMs = MAX_RESULTS_AGE_DAYS * 24 * 60 * 60 * 1000;
     let modified = false;
-    
+
     // Clean up standard function types
     const standardTypes = ['weather', 'time', 'wolfram', 'quake', 'gptimage'];
-    
+
     standardTypes.forEach(type => {
       if (Array.isArray(resultsCache[type])) {
         const oldLength = resultsCache[type].length;
-        
+
         // Filter out old results
         resultsCache[type] = resultsCache[type].filter(item => {
           const timestamp = new Date(item.timestamp).getTime();
-          return (now - timestamp) < maxAgeMs;
+          return now - timestamp < maxAgeMs;
         });
-        
+
         // Trim to max size
         if (resultsCache[type].length > MAX_RESULTS_PER_TYPE) {
           resultsCache[type] = resultsCache[type].slice(-MAX_RESULTS_PER_TYPE);
         }
-        
+
         if (resultsCache[type].length !== oldLength) {
           modified = true;
         }
       }
     });
-    
+
     // Clean up plugin results
     if (resultsCache.plugins && typeof resultsCache.plugins === 'object') {
       for (const pluginId in resultsCache.plugins) {
         if (Array.isArray(resultsCache.plugins[pluginId])) {
           const oldLength = resultsCache.plugins[pluginId].length;
-          
+
           // Filter out old results
           resultsCache.plugins[pluginId] = resultsCache.plugins[pluginId].filter(item => {
             const timestamp = new Date(item.timestamp).getTime();
-            return (now - timestamp) < maxAgeMs;
+            return now - timestamp < maxAgeMs;
           });
-          
+
           // Trim to max size
           if (resultsCache.plugins[pluginId].length > MAX_RESULTS_PER_TYPE) {
-            resultsCache.plugins[pluginId] = resultsCache.plugins[pluginId].slice(-MAX_RESULTS_PER_TYPE);
+            resultsCache.plugins[pluginId] =
+              resultsCache.plugins[pluginId].slice(-MAX_RESULTS_PER_TYPE);
           }
-          
+
           if (resultsCache.plugins[pluginId].length !== oldLength) {
             modified = true;
           }
-          
+
           // Remove empty arrays
           if (resultsCache.plugins[pluginId].length === 0) {
             delete resultsCache.plugins[pluginId];
@@ -227,7 +228,7 @@ async function cleanupOldResults() {
         }
       }
     }
-    
+
     // Save if modified
     if (modified) {
       isDirty = true;
@@ -266,57 +267,62 @@ async function storeResult(functionType, params, result) {
   if (!resultsCache) {
     await init();
   }
-  
+
   try {
     // Check file size and run cleanup if needed
     if (await isResultsFileTooLarge()) {
-      logger.warn(`Function results file exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB, cleaning up`);
+      logger.warn(
+        `Function results file exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB, cleaning up`
+      );
       await cleanupOldResults();
     }
-    
+
     const resultEntry = {
       timestamp: new Date().toISOString(),
       params,
-      result
+      result,
     };
-    
+
     // Handle plugin results
     if (functionType.startsWith('plugin.')) {
       const pluginId = functionType.split('.')[1];
-      
+
       if (!resultsCache.plugins) {
         resultsCache.plugins = {};
       }
-      
+
       if (!resultsCache.plugins[pluginId]) {
         resultsCache.plugins[pluginId] = [];
       }
-      
+
       // Add to beginning for most recent first
       resultsCache.plugins[pluginId].unshift(resultEntry);
-      
+
       // Trim if needed
       if (resultsCache.plugins[pluginId].length > MAX_RESULTS_PER_TYPE) {
-        resultsCache.plugins[pluginId] = resultsCache.plugins[pluginId].slice(0, MAX_RESULTS_PER_TYPE);
+        resultsCache.plugins[pluginId] = resultsCache.plugins[pluginId].slice(
+          0,
+          MAX_RESULTS_PER_TYPE
+        );
       }
     } else {
       // Standard function types
       if (!resultsCache[functionType]) {
         resultsCache[functionType] = [];
       }
-      
+
       // Add to beginning for most recent first
       resultsCache[functionType].unshift(resultEntry);
-      
+
       // Trim if needed
       if (resultsCache[functionType].length > MAX_RESULTS_PER_TYPE) {
         resultsCache[functionType] = resultsCache[functionType].slice(0, MAX_RESULTS_PER_TYPE);
       }
     }
-    
+
     // Mark as dirty but don't save immediately
     isDirty = true;
-    
+
     return true;
   } catch (error) {
     logger.error({ error, functionType }, 'Error storing function result');
@@ -334,24 +340,24 @@ async function getRecentResults(functionType, limit = 10) {
   if (!resultsCache) {
     await init();
   }
-  
+
   try {
     // Handle plugin results
     if (functionType.startsWith('plugin.')) {
       const pluginId = functionType.split('.')[1];
-      
+
       if (!resultsCache.plugins || !resultsCache.plugins[pluginId]) {
         return [];
       }
-      
+
       return resultsCache.plugins[pluginId].slice(0, limit);
     }
-    
+
     // Standard function types
     if (!resultsCache[functionType]) {
       return [];
     }
-    
+
     return resultsCache[functionType].slice(0, limit);
   } catch (error) {
     logger.error({ error, functionType }, 'Error getting recent results');
@@ -367,7 +373,7 @@ async function getAllResults() {
   if (!resultsCache) {
     await init();
   }
-  
+
   // Return a copy to prevent direct modification
   return JSON.parse(JSON.stringify(resultsCache));
 }
@@ -382,12 +388,12 @@ async function shutdown() {
     clearInterval(saveTimer);
     saveTimer = null;
   }
-  
+
   // Save one last time if dirty
   if (isDirty && resultsCache) {
     await saveResultsToDisk();
   }
-  
+
   logger.info('Function results optimizer shut down');
 }
 
@@ -397,5 +403,5 @@ module.exports = {
   getRecentResults,
   getAllResults,
   cleanupOldResults,
-  shutdown
+  shutdown,
 };

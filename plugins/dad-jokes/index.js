@@ -178,10 +178,9 @@ module.exports = {
             const jokes = await searchDadJokes(searchQuery);
 
             return message.reply(`Here's a dad joke about "${searchQuery}":\n\n${jokes[0]}`);
-          } else {
-            const joke = await getRandomDadJoke();
-            return message.reply(`Here's a random dad joke:\n\n${joke}`);
           }
+          const joke = await getRandomDadJoke();
+          return message.reply(`Here's a random dad joke:\n\n${joke}`);
         } catch (error) {
           logger.error({ error }, 'Error executing dad joke command');
           return message.reply("Failed to fetch a dad joke. That's not very punny!");
@@ -201,13 +200,12 @@ module.exports = {
             return interaction.editReply({
               content: `Here's a dad joke about "${searchQuery}":\n\n${jokes[0]}`,
             });
-          } else {
-            const joke = await getRandomDadJoke();
-
-            return interaction.editReply({
-              content: `Here's a random dad joke:\n\n${joke}`,
-            });
           }
+          const joke = await getRandomDadJoke();
+
+          return interaction.editReply({
+            content: `Here's a random dad joke:\n\n${joke}`,
+          });
         } catch (error) {
           logger.error({ error }, 'Error executing dad joke slash command');
           return interaction.editReply({
