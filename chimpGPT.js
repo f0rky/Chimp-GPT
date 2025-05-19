@@ -14,6 +14,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const OpenAI = require('openai');
 const path = require('path');
+const fs = require('fs');
 const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
 const simplifiedWeather = require('./simplified-weather');
 const lookupTime = require('./timeLookup');
@@ -1011,6 +1012,61 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
             break;
         }
 
+        // Check if message is a command
+        if (message.content.startsWith('!')) {
+          try {
+            const args = message.content.slice(1).trim().split(/ +/);
+            const command = args.shift().toLowerCase();
+
+            if (command === 'ping') {
+              const sent = await message.channel.send('Pinging...');
+              await sent.edit(`Pong! Latency is ${sent.createdTimestamp - message.createdTimestamp}ms.`);
+              return;
+            }
+
+            if (command === 'stats') {
+              await handleStatsCommand(message);
+              return;
+            }
+
+            if (command === 'pfp') {
+              await handlePFPCommand(message, args);
+              return;
+            }
+
+            if (command === 'status') {
+              const status = args.join(' ');
+              if (!status) {
+                await message.channel.send('Please provide a status message!');
+                return;
+              }
+              client.user.setActivity(status, { type: 'PLAYING' });
+              await message.channel.send(`Status updated to: ${status}`);
+              return;
+            }
+            
+            if (command === 'help') {
+              await message.channel.send(
+                'Available commands:\n' +
+                '`!help` - Show this help message\n' +
+                '`!ping` - Check if the bot is alive\n' +
+                '`!stats` - Show bot statistics\n' +
+                '`!pfp` - Change the bot\'s profile picture\n' +
+                '`!status <message>` - Set the bot\'s status message\n' +
+                '`!clear` - Clear the conversation history for this channel'
+              );
+              return;
+            }
+            
+            // If we get here, the command wasn't recognized
+            return;
+          } catch (error) {
+            discordLogger.error({ error }, 'Error processing command');
+            await message.reply('❌ An error occurred while processing your command.');
+            return;
+          }
+        }
+        
         // Only update every 5 seconds to avoid rate limits
         await feedbackMessage.edit(statusMessage);
       } catch (error) {
@@ -1074,26 +1130,45 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     // No need for another updateProgress here since we've already set it
 
     // Generate the image
-    const result = await generateImage(finalPrompt, {
-      model: parameters.model || 'gpt-image-1',
-      size: parameters.size || '1024x1024',
-    });
+    let result;
+    let generationTime;
+    
+    try {
+      result = await generateImage(finalPrompt, {
+        model: parameters.model || 'gpt-image-1',
+        size: parameters.size || '1024x1024',
+      });
 
-    // Calculate generation time
-    const generationTime = ((Date.now() - progress.startTime) / 1000).toFixed(2);
+      // Calculate generation time
+      generationTime = ((Date.now() - progress.startTime) / 1000).toFixed(2);
 
-    // Update bot status to show image generation is complete
-    if (statusManager && typeof statusManager.trackImageComplete === 'function') {
-      statusManager.trackImageComplete(
-        generationTime,
-        parameters.size || '1024x1024',
-        parameters.quality || 'auto'
-      );
-    }
+      // Update bot status to show image generation is complete
+      if (statusManager && typeof statusManager.trackImageComplete === 'function') {
+        statusManager.trackImageComplete(
+          generationTime,
+          parameters.size || '1024x1024',
+          parameters.quality || 'auto'
+        );
+      }
 
-    if (!result.success) {
-      discordLogger.error({ error: result.error }, 'Image generation failed');
-      await feedbackMessage.edit(`❌ Failed to generate image: ${result.error}`);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      discordLogger.error({ error }, 'Image generation failed');
+      
+      // Handle content policy violations specially
+      if (error.isContentPolicyViolation || (error.status === 400 && error.code === 'moderation_blocked')) {
+        await feedbackMessage.edit(
+          `❌ Your request was rejected due to content policy violations. ` +
+          `Please modify your prompt and try again.`
+        );
+      } else {
+        // For other errors, show a generic error message
+        await feedbackMessage.edit(
+          `❌ Failed to generate image: ${error.message || 'An unknown error occurred'}`
+        );
+      }
       return;
     }
 

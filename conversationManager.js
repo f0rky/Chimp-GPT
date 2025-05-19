@@ -75,6 +75,26 @@ let conversationsLoaded = false;
 let conversationsDirty = false;
 
 /**
+ * Interval ID for periodic saving
+ * @type {NodeJS.Timeout|null}
+ */
+let saveInterval = null;
+
+// Immediately load conversations when the module is required
+(async () => {
+  try {
+    await loadConversationsFromStorage();
+    conversationsLoaded = true;
+    logger.info('Conversations loaded from storage on startup');
+  } catch (error) {
+    logger.error({ error }, 'Failed to load conversations on startup');
+  }
+  
+  // Start periodic saving
+  startPeriodicSaving();
+})();
+
+/**
  * Timestamp of the last successful save
  * @type {number|null}
  */

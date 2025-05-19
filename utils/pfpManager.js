@@ -21,9 +21,13 @@ class PFPManager {
         this.client = client;
         this.pfpDir = options.pfpDir || path.join(__dirname, '../pfp');
         this.maxImages = options.maxImages || 50;
-        this.rotationInterval = options.rotationInterval || 10 * 60 * 1000; // 10 minutes
+        this.rotationInterval = options.rotationInterval || 30 * 60 * 1000; // 30 minutes by default
+        this.minUpdateInterval = options.minUpdateInterval || 30 * 60 * 1000; // 30 minutes minimum between updates
         this.rotationTimer = null;
         this.currentPfp = null;
+        this.lastUpdateTime = 0; // Timestamp of last successful update
+        this.lastAttemptTime = 0; // Timestamp of last attempt (successful or not)
+        this.updateInProgress = false; // Flag to prevent concurrent updates
         
         // Ensure the directory exists
         fs.mkdir(this.pfpDir, { recursive: true }).catch(err => {
@@ -100,56 +104,103 @@ class PFPManager {
      * Update the bot's profile picture to a random image
      * @returns {Promise<boolean>} True if successful, false otherwise
      */
+    /**
+     * Check if enough time has passed since the last PFP update
+     * @returns {boolean} True if enough time has passed, false otherwise
+     */
+    canUpdatePFP() {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - this.lastUpdateTime;
+        const timeSinceLastAttempt = now - this.lastAttemptTime;
+        
+        // Don't update if an update is already in progress
+        if (this.updateInProgress) {
+            logger.debug('Update already in progress');
+            return false;
+        }
+        
+        // Don't update if we've tried too recently
+        if (timeSinceLastAttempt < this.minUpdateInterval) {
+            logger.debug(`Skipping PFP update - last attempt was ${Math.floor(timeSinceLastAttempt / 1000)}s ago`);
+            return false;
+        }
+        
+        // Always allow updates if we haven't updated in a while (2x min interval)
+        if (timeSinceLastUpdate > this.minUpdateInterval * 2) {
+            return true;
+        }
+        
+        // Otherwise, respect the minimum update interval
+        return timeSinceLastUpdate >= this.minUpdateInterval;
+    }
+
+    /**
+     * Update the bot's profile picture to a random image
+     * @returns {Promise<boolean>} True if successful, false otherwise
+     */
     async updateBotAvatar() {
+        // Update the last attempt time
+        this.lastAttemptTime = Date.now();
+        
+        // Check if we can update
+        if (!this.canUpdatePFP()) {
+            logger.debug('Skipping PFP update - rate limited');
+            return false;
+        }
+        
+        // Set the update in progress flag
+        this.updateInProgress = true;
+        
         try {
-            async function updatePFP() {
-                try {
-                    logger.debug('Starting PFP update');
-                    
-                    const imagePath = await this.getRandomImage();
-                    if (!imagePath) {
-                        logger.warn('No images available for PFP rotation');
-                        return;
-                    }
-                    
-                    // Skip if this is the same as the current PFP
-                    if (this.currentPfp === imagePath) {
-                        logger.debug('Skipping PFP update (same as current)');
-                        return;
-                    }
-                    
-                    logger.debug('Reading image file', { imagePath });
-                    const imageBuffer = await fs.readFile(imagePath);
-                    
-                    logger.debug('Setting bot avatar', { 
-                        imageSize: imageBuffer.length,
-                        filename: path.basename(imagePath) 
-                    });
-                    
-                    await this.client.user.setAvatar(imageBuffer);
-                    this.currentPfp = imagePath;
-                    
-                    logger.info(`Updated bot PFP to: ${path.basename(imagePath)}`);
-                    return true;
-                } catch (error) {
-                    logger.error({ 
-                        error: error.message,
-                        stack: error.stack,
-                        currentPFP: this.currentPfp
-                    }, 'Failed to update PFP');
-                    throw error;
-                }
+            const imagePath = await this.getRandomImage();
+            if (!imagePath) {
+                logger.warn('No images available for PFP rotation');
+                return false;
             }
-            return await updatePFP.call(this);
+            
+            // Skip if this is the same as the current PFP
+            if (this.currentPfp === imagePath) {
+                logger.debug('Skipping PFP update (same as current)');
+                return false;
+            }
+            
+            logger.debug('Reading image file', { imagePath });
+            const imageBuffer = await fs.readFile(imagePath);
+            
+            logger.debug('Setting bot avatar', { 
+                imageSize: imageBuffer.length,
+                filename: path.basename(imagePath) 
+            });
+            
+            await this.client.user.setAvatar(imageBuffer);
+            
+            // Update state on success
+            this.currentPfp = imagePath;
+            this.lastUpdateTime = Date.now();
+            
+            logger.info(`Updated bot PFP to: ${path.basename(imagePath)}`);
+            return true;
+            
         } catch (error) {
             if (error.code === 50035) {
                 logger.warn('Cannot update PFP: Bot is in 100+ servers');
-            } else if (error.retryAfter) {
-                logger.warn(`Rate limited. Try again in ${error.retryAfter}ms`);
+            } else if (error.code === 'AVATAR_RATE_LIMIT' || error.retryAfter) {
+                const retryAfter = error.retryAfter || 30 * 60 * 1000; // Default to 30 minutes if no retryAfter provided
+                logger.warn(`Rate limited. Will try again in ${Math.ceil(retryAfter / 60000)} minutes`);
+                // Set the last update time to now - minUpdateInterval + retryAfter
+                // This will prevent updates until the retryAfter period has passed
+                this.lastUpdateTime = Date.now() - this.minUpdateInterval + retryAfter;
             } else {
-                logger.error({ error }, 'Failed to update bot PFP');
+                logger.error({ 
+                    error: error.message,
+                    stack: error.stack,
+                    currentPFP: this.currentPfp
+                }, 'Failed to update PFP');
             }
             return false;
+        } finally {
+            // Always clear the update in progress flag
+            this.updateInProgress = false;
         }
     }
 
@@ -216,16 +267,22 @@ class PFPManager {
     startRotation() {
         if (this.rotationTimer) this.stopRotation();
         
-        // Initial update
-        this.updateBotAvatar().catch(() => {});
+        // Initial update if enough time has passed
+        if (this.canUpdatePFP()) {
+            this.updateBotAvatar().catch(() => {});
+        } else {
+            const nextUpdate = Math.ceil((this.lastUpdateTime + this.minUpdateInterval - Date.now()) / 60000);
+            logger.info(`Next PFP update in ${nextUpdate} minutes`);
+        }
         
         // Set up the rotation interval
-        this.rotationTimer = setInterval(
-            () => this.updateBotAvatar().catch(() => {}),
-            this.rotationInterval
-        );
+        this.rotationTimer = setInterval(() => {
+            if (this.canUpdatePFP()) {
+                this.updateBotAvatar().catch(() => {});
+            }
+        }, Math.max(this.minUpdateInterval, 60000)); // Check at least once per minute
         
-        logger.info(`Started PFP rotation (every ${this.rotationInterval / 60000} minutes)`);
+        logger.info(`Started PFP rotation (checking every minute, updating every ${Math.ceil(this.minUpdateInterval / 60000)}-${Math.ceil(this.rotationInterval / 60000)} minutes)`);
     }
 
     /**

@@ -270,25 +270,56 @@ function optimizeConversationForApi(conversation) {
 }
 
 /**
- * Clear a user's conversation
+ * Clear a user's conversation from both memory and disk
  * @param {string} userId - User ID
  * @returns {Promise<boolean>} Success status
  */
 async function clearConversation(userId) {
-  // Make sure we're initialized
-  if (!isInitialized) {
-    await init();
-  }
+  logger.debug({ userId }, 'clearConversation called');
+  
+  try {
+    // Make sure we're initialized
+    if (!isInitialized) {
+      logger.debug('Initializing before clearing conversation');
+      await init();
+    }
 
-  if (conversationsCache.has(userId)) {
-    // Keep system message only
-    const systemMessage = [{ role: 'system', content: BOT_PERSONALITY }];
-    conversationsCache.set(userId, systemMessage);
-    isDirty = true;
-    return true;
-  }
+    logger.debug({ cacheSize: conversationsCache.size, hasUser: conversationsCache.has(userId) }, 'Current cache state');
+    
+    const hadConversation = conversationsCache.has(userId);
+    if (hadConversation) {
+      logger.debug({ userId, conversation: conversationsCache.get(userId) }, 'Found conversation to clear');
+      
+      // Completely remove the conversation from the cache
+      conversationsCache.delete(userId);
+      isDirty = true;
+      
+      logger.debug('Conversation deleted from cache, saving to disk...');
+      
+      // Force save to disk to persist the removal
+      try {
+        await saveToDisk();
+        logger.info({ userId }, 'Successfully cleared and saved conversation');
+        
+        // Verify the conversation was actually removed
+        if (conversationsCache.has(userId)) {
+          logger.error({ userId }, 'Conversation still exists in cache after deletion!');
+        } else {
+          logger.debug({ userId }, 'Verified conversation removed from cache');
+        }
+      } catch (error) {
+        logger.error({ error, userId }, 'Failed to save after clearing conversation');
+        throw error; // Re-throw to be handled by the caller
+      }
+    } else {
+      logger.warn({ userId }, 'No conversation found to clear');
+    }
 
-  return false;
+    return hadConversation;
+  } catch (error) {
+    logger.error({ error, userId }, 'Unexpected error in clearConversation');
+    throw error; // Re-throw to be handled by the caller
+  }
 }
 
 /**

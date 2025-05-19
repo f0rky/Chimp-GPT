@@ -24,6 +24,81 @@ const openai = new OpenAI({
   apiKey: apiKey,
 });
 
+// Wrapper function to log OpenAI API calls
+async function logOpenAICall(method, params) {
+  const callId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  const startTime = Date.now();
+  
+  try {
+    openaiLogger.debug({
+      callId,
+      method,
+      params: {
+        ...params,
+        // Don't log the full messages array as it can be very large
+        messages: params.messages ? `[${params.messages.length} messages]` : undefined,
+      },
+      timestamp: new Date().toISOString(),
+      status: 'started'
+    }, 'OpenAI API call started');
+    
+    const response = await method.call(openai.chat.completions, params);
+    const duration = Date.now() - startTime;
+    
+    openaiLogger.info({
+      callId,
+      method: 'chat.completions.create',
+      durationMs: duration,
+      model: params.model,
+      promptTokens: response.usage?.prompt_tokens,
+      completionTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
+      timestamp: new Date().toISOString(),
+      status: 'completed'
+    }, 'OpenAI API call completed');
+    
+    return response;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    openaiLogger.error({
+      callId,
+      method: 'chat.completions.create',
+      durationMs: duration,
+      error: error.message,
+      status: 'failed',
+      timestamp: new Date().toISOString()
+    }, 'OpenAI API call failed');
+    throw error;
+  }
+}
+
+// Create a proxy to intercept API calls
+const openaiWithLogging = new Proxy(openai, {
+  get(target, prop) {
+    if (prop === 'chat') {
+      return new Proxy(target.chat, {
+        get(target, prop) {
+          if (prop === 'completions') {
+            return new Proxy(target.completions, {
+              get(target, prop) {
+                if (prop === 'create') {
+                  return (params) => logOpenAICall(
+                    openai.chat.completions.create,
+                    params
+                  );
+                }
+                return target[prop];
+              }
+            });
+          }
+          return target[prop];
+        }
+      });
+    }
+    return target[prop];
+  }
+});
+
 const retryWithBreaker = require('./utils/retryWithBreaker');
 const { sanitizeUserMessage } = require('./utils/inputSanitizer');
 
@@ -45,7 +120,7 @@ async function processMessage(userMessage, conversationLog) {
     const completion = await retryWithBreaker(
       async () => {
         try {
-          return await openai.chat.completions.create({
+          return await openaiWithLogging.chat.completions.create({
             model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
             messages: sanitizedLog,
             max_completion_tokens: 512, // Limit token usage (optional)
@@ -208,7 +283,7 @@ async function generateResponse(functionResult, conversationLog) {
   const completion = await retryWithBreaker(
     async () => {
       try {
-        return await openai.chat.completions.create({
+        return await openaiWithLogging.chat.completions.create({
           model: 'gpt-4o-mini', // Using faster model for better responsiveness
           messages: conversationLog,
           max_completion_tokens: 256,

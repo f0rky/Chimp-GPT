@@ -156,10 +156,30 @@ async function generateImage(prompt, options = {}) {
     }
 
     logger.info({ imageParams }, 'Generating image with GPT Image-1');
-    const response = await openai.images.generate(imageParams);
-
-    // Track the API call
-    trackApiCall('gptimage');
+    
+    let response;
+    try {
+      response = await openai.images.generate(imageParams);
+      // Track the API call
+      trackApiCall('gptimage');
+    } catch (error) {
+      // Check for content policy violation
+      if (error.status === 400 && error.code === 'moderation_blocked') {
+        logger.warn(
+          { prompt, error: error.message },
+          'Image generation blocked by content policy'
+        );
+        // Return a specific error result for content policy violations
+        return {
+          success: false,
+          error: 'This request was rejected due to content policy violations. Please modify your prompt and try again.',
+          isContentPolicyViolation: true,
+          prompt,
+        };
+      }
+      // Re-throw other errors for the retry mechanism
+      throw error;
+    }
 
     // Log the response structure to understand the format
     logger.debug(
@@ -290,10 +310,16 @@ async function generateImage(prompt, options = {}) {
     logger.error({ error, prompt }, 'Error generating image with GPT Image-1');
     trackError('gptimage');
 
+    // Check if this is a content policy violation that wasn't caught earlier
+    const isContentPolicyViolation = error.status === 400 && error.code === 'moderation_blocked';
+
     // Store the error result in the function results storage
     const errorResult = {
       success: false,
-      error: error.message,
+      error: isContentPolicyViolation 
+        ? 'This request was rejected due to content policy violations. Please modify your prompt and try again.'
+        : error.message,
+      isContentPolicyViolation,
       prompt,
     };
 
