@@ -5,6 +5,29 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-05-20
+
+### Added
+- **Rate Limiting for PFP Updates**: Implemented rate limiting for profile picture updates to prevent hitting Discord's rate limits
+  - Minimum 30-minute interval between PFP updates
+  - Better error handling and logging for PFP update failures
+  - Automatic backoff when rate limited by Discord
+
+### Fixed
+- Fixed scope issue with `generationTime` in `handleImageGeneration`
+- Improved error handling for content policy violations in image generation
+- Enhanced logging and state management for PFP updates
+
+### Changed
+- Increased default PFP rotation interval to 30 minutes
+- Improved error messages for content policy violations
+
+## [1.2.1] - 2025-05-19
+
+### Fixed
+- Fixed weather API integration and server count detection
+- Improved rate limiting for API calls
+
 ## [1.1.0] - 2025-05-18
 
 ### Added
