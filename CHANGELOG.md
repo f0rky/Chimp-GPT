@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed scope issue with `generationTime` in `handleImageGeneration`
 - Improved error handling for content policy violations in image generation
+  - Added proper error propagation for content policy violations
+  - Fixed bot hanging on content policy violations
+  - Added better error messages for users when content is blocked
 - Enhanced logging and state management for PFP updates
 
 ### Changed

@@ -1139,6 +1139,16 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         size: parameters.size || '1024x1024',
       });
 
+      // Check for content policy violation in the result
+      if (!result.success) {
+        if (result.isContentPolicyViolation) {
+          const error = new Error(result.error);
+          error.isContentPolicyViolation = true;
+          throw error;
+        }
+        throw new Error(result.error);
+      }
+
       // Calculate generation time
       generationTime = ((Date.now() - progress.startTime) / 1000).toFixed(2);
 
@@ -1150,26 +1160,24 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
           parameters.quality || 'auto'
         );
       }
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
     } catch (error) {
       discordLogger.error({ error }, 'Image generation failed');
       
       // Handle content policy violations specially
       if (error.isContentPolicyViolation || (error.status === 400 && error.code === 'moderation_blocked')) {
-        await feedbackMessage.edit(
-          `❌ Your request was rejected due to content policy violations. ` +
-          `Please modify your prompt and try again.`
-        );
+        const errorMessage = 'This request was rejected due to content policy violations. Please modify your prompt and try again.';
+        await feedbackMessage.edit(`❌ ${errorMessage}`);
+        
+        // Create a new error with a specific type that we can check for
+        const policyError = new Error(errorMessage);
+        policyError.isContentPolicyViolation = true;
+        throw policyError; // Re-throw to be handled by the caller
       } else {
-        // For other errors, show a generic error message
-        await feedbackMessage.edit(
-          `❌ Failed to generate image: ${error.message || 'An unknown error occurred'}`
-        );
+        // For other errors, show a generic error message and re-throw
+        const errorMessage = `Failed to generate image: ${error.message || 'An unknown error occurred'}`;
+        await feedbackMessage.edit(`❌ ${errorMessage}`);
+        throw new Error(errorMessage);
       }
-      return;
     }
 
     // Get the first image result and validate it
@@ -1596,6 +1604,14 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
       } catch (error) {
         trackError('gptimage');
         discordLogger.error({ error }, 'Error in image generation');
+        
+        // If this was a content policy violation, we've already shown the message
+        if (error.isContentPolicyViolation) {
+          discordLogger.info('Content policy violation handled');
+          return;
+        }
+        
+        // For other errors, show a generic error message
         await feedbackMessage.edit(
           '❌ An error occurred while generating the image. Please try again later.'
         );
