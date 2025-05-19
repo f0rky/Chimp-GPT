@@ -48,6 +48,10 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# PFP directories
+/pfp/
+/pfp-test/
+
 # Optional npm cache directory
 .npm
 
