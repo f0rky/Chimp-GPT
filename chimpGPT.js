@@ -153,9 +153,25 @@ async function processOpenAIMessage(content, conversationLog) {
     contextLength: JSON.stringify(conversationLog).length,
   });
   try {
+    // First, check for clear image generation intent in the current message
+    const lowerContent = content.toLowerCase();
+    const imageKeywords = ['draw', 'generate', 'create', 'make', 'show me', 'picture of', 'image of', 'photo of'];
+    const isImageRequest = imageKeywords.some(keyword => lowerContent.includes(keyword));
+    
+    // If it's clearly an image request, bypass the full context
+    if (isImageRequest) {
+      openaiLogger.debug('Detected image generation request, using minimal context');
+      return {
+        type: 'functionCall',
+        functionName: 'generateImage',
+        parameters: { prompt: content }
+      };
+    }
+    
+    // Otherwise, use the full context for other requests
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
+      model: 'gpt-3.5-turbo',
       messages: conversationLog,
       functions: [
         {
@@ -449,8 +465,20 @@ async function generateNaturalResponse(functionResult, conversationLog, function
 // Import the command handler system
 const commandHandler = require('./commands/commandHandler');
 
+// Track in-progress operations
+const inProgressOperations = new Set();
+
 // Handle message creation
 client.on('messageCreate', async message => {
+  // Skip if there's already an operation in progress for this channel
+  if (inProgressOperations.has(message.channelId)) {
+    discordLogger.debug(
+      { channelId: message.channelId, messageId: message.id },
+      'Skipping message - operation already in progress for this channel'
+    );
+    return;
+  }
+
   // Start overall message processing timer
   const messageTimerId = performanceMonitor.startTimer('message_processing', {
     userId: message.author.id,
@@ -708,9 +736,9 @@ client.on('messageCreate', async message => {
       );
     }
 
-    // Handle conversation context, including any references
+    // Get conversation context (last 5 messages for better context)
     addTiming('before_conversation_load');
-    const conversationLog = await manageConversation(
+    const fullConversationLog = await manageConversation(
       message.author.id,
       {
         role: 'user',
@@ -718,7 +746,7 @@ client.on('messageCreate', async message => {
       },
       message // Pass the entire Discord message to extract references
     );
-    addTiming('after_conversation_load', { logLength: conversationLog.length });
+    addTiming('after_conversation_load', { logLength: fullConversationLog.length });
 
     // Process message with OpenAI
     addTiming('before_openai_api_call');
@@ -727,28 +755,47 @@ client.on('messageCreate', async message => {
       messageLength: message.content.length,
       operation: 'processMessage',
     });
-    const gptResponse = await processOpenAIMessage(message.content, conversationLog);
-    const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
-    performanceMonitor.stopTimer(openaiTimerId, {
-      responseType: gptResponse.type,
-      success: true,
-      duration: apiDuration,
-    });
-
-    // Handle different response types
-    addTiming('before_response_handling', { responseType: gptResponse.type });
-    if (gptResponse.type === 'functionCall') {
-      await handleFunctionCall(gptResponse, feedbackMessage, conversationLog);
-      // Safe access to function name with fallback to prevent TypeError
-      addTiming('after_function_call_handling', {
-        functionName: gptResponse.function?.name || 'unknown',
+    
+    // Mark this channel as having an operation in progress
+    inProgressOperations.add(message.channelId);
+    let gptResponse;
+    
+    try {
+      // Process the message with OpenAI
+      gptResponse = await processOpenAIMessage(message.content, fullConversationLog);
+      const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
+      
+      performanceMonitor.stopTimer(openaiTimerId, {
+        responseType: gptResponse.type,
+        success: true,
+        duration: apiDuration,
       });
-    } else if (gptResponse.type === 'message') {
-      await handleDirectMessage(gptResponse, feedbackMessage, conversationLog);
-      addTiming('after_direct_message_handling');
-    } else {
-      await feedbackMessage.edit(gptResponse.content);
-      addTiming('after_edit_message');
+      
+      // Handle different response types
+      addTiming('before_response_handling', { responseType: gptResponse.type });
+      if (gptResponse.type === 'functionCall') {
+        await handleFunctionCall(gptResponse, feedbackMessage, fullConversationLog);
+        // Safe access to function name with fallback to prevent TypeError
+        addTiming('after_function_call_handling', {
+          functionName: gptResponse.function?.name || 'unknown',
+        });
+      } else if (gptResponse.type === 'message') {
+        await handleDirectMessage(gptResponse, feedbackMessage, fullConversationLog);
+        addTiming('after_direct_message_handling');
+      } else {
+        await feedbackMessage.edit(gptResponse.content);
+        addTiming('after_edit_message');
+      }
+    } catch (error) {
+      // Log the error
+      discordLogger.error(
+        { error, messageId: message.id, channelId: message.channelId },
+        'Error processing message'
+      );
+      throw error; // Re-throw to maintain existing error handling
+    } finally {
+      // Always clear the in-progress flag when done, even if there was an error
+      inProgressOperations.delete(message.channelId);
     }
 
     // Log complete timing data
