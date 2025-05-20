@@ -1,6 +1,6 @@
 # Chimp-GPT Discord Bot
 
-**Bot Version:** 3.2.0 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
+**Bot Version:** 1.2.3 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
 
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
@@ -47,6 +47,13 @@ ChimpGPT now includes an intelligent reply context feature that makes conversati
 
 This feature makes the bot more conversationally aware, allowing it to understand ongoing discussions even when they involve multiple messages or users.
 
+### Recent Improvements (v1.2.3)
+
+- **Enhanced Image Generation Handling**: Added graceful fallback to text descriptions when image generation is disabled, providing users with detailed descriptions instead of error messages.
+- **Improved Weather API Integration**: Refactored weather API integration with robust error handling and fallback mechanisms.
+- **Progress Tracking for Image Generation**: Added real-time progress updates with elapsed time reporting and phase tracking.
+- **Centralized Startup Message Coordinator**: Eliminated duplicate startup messages from different components.
+
 ### Error Resilience for External APIs
 
 All external API calls are now protected by a retry mechanism with exponential backoff and a circuit breaker pattern:
@@ -67,6 +74,10 @@ When a circuit breaker opens, it blocks further calls for the specified timeout 
   - Emoji toggles and ELO display modes are fully configurable via environment variables.
   - Supports compact formatting to fit Discord's character limits and improved team/spectator presentation.
 - **Image Generation**: Use GPT Image-1 to generate high-quality images directly from Discord, with a gallery view on the status page.
+  - Graceful fallback to text descriptions when image generation is disabled
+  - Configurable via `ENABLE_IMAGE_GENERATION` environment variable
+  - Real-time progress tracking with elapsed time reporting
+  - Comprehensive error handling for content policy violations
   - Gallery includes modal viewer, prompt context, keyboard/mouse/touch navigation, and robust error handling.
 - **Wolfram Alpha Integration**: Ask factual or computational questions.
 - **Status Page**: Real-time dashboard with stats, error logs, and an image gallery for generated images.
@@ -146,6 +157,7 @@ The bot is configured via environment variables (see `.env.example`). Below is a
 | SHOW_TEAM_EMOJIS         | false        | Show team emojis in Quake stats player names                      |
 | SHOW_SERVER_STATS_EMOJIS | false        | Show emojis in Quake server info headers                          |
 | ELO_DISPLAY_MODE         | 0            | ELO display: 0=off, 1=categorized, 2=actual values                |
+| ENABLE_IMAGE_GENERATION  | true         | Enable/disable image generation (falls back to text descriptions)  |
 | ...                      |              | See .env.example for full list and documentation                  |
 
 - All environment variables are validated at startup.
