@@ -173,6 +173,24 @@ const CONFIG_SCHEMA = {
     validate: value => typeof value === 'string',
     transform: value => value.split(','),
   },
+  DEPLOY_COMMANDS: {
+    required: false,
+    description: 'Whether to deploy slash commands on bot startup',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  ENABLE_IMAGE_GENERATION: {
+    required: false,
+    description: 'Enable or disable image generation feature',
+    default: 'true',
+    validate: value => typeof value === 'string', // Ensure it's a string from .env
+    transform: value => value === 'true', // Convert to boolean
+  },
   STATUS_RATE_LIMIT_POINTS: {
     required: false,
     description: 'Maximum number of requests allowed per client for the status page',
@@ -194,17 +212,6 @@ const CONFIG_SCHEMA = {
     },
     transform: value => {
       return parseInt(value, 10);
-    },
-  },
-  DEPLOY_COMMANDS: {
-    required: false,
-    description: 'Whether to deploy slash commands on bot startup',
-    default: 'true',
-    validate: value => {
-      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
-    },
-    transform: value => {
-      return value.toLowerCase() === 'true';
     },
   },
   ENABLE_REPLY_CONTEXT: {

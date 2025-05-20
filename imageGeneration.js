@@ -36,6 +36,7 @@ const { createLogger } = require('./logger');
 const logger = createLogger('image');
 const { trackApiCall, trackError } = require('./healthCheck');
 const functionResults = require('./functionResults');
+const config = require('./configValidator');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -99,10 +100,19 @@ const BACKGROUND = {
  * Errors are always logged with stack trace and context.
  *
  * @param {string} prompt - The text prompt to generate an image from
- * @param {ImageGenerationOptions} [options={}] - Generation options
- * @returns {Promise<ImageResult|ImageErrorResult>} The generated image result object
+ * @param {Object} options - Additional options for image generation
+ * @returns {Promise<ImageResult | ImageErrorResult>} The generated image or an error
  */
 async function generateImage(prompt, options = {}) {
+  // Check if image generation is enabled
+  if (!config.ENABLE_IMAGE_GENERATION) {
+    logger.warn('Image generation is currently disabled');
+    return {
+      success: false,
+      error: 'Image generation is currently disabled',
+      prompt,
+    };
+  }
   try {
     // Default to GPT Image-1 with medium size for cost effectiveness
     const model = options.model || MODELS.GPT_IMAGE_1;
