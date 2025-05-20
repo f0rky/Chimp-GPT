@@ -533,6 +533,7 @@ async function updateStatus() {
     }
 
     const data = await response.json();
+    console.log('Received data from /health:', JSON.stringify(data, null, 2)); // DEBUGGING LINE
 
     if (!data) {
       console.error('Empty health data received');
@@ -756,6 +757,8 @@ function updateErrors(errors) {
  * @param {Object} system - System information
  */
 function updateMemoryUsage(memory, system) {
+  console.log('updateMemoryUsage received memory:', JSON.stringify(memory));
+  console.log('updateMemoryUsage received system:', JSON.stringify(system));
   // Parse memory values
   const heapUsed = parseInt(memory.heapUsed, 10);
   const heapTotal = parseInt(memory.heapTotal, 10);
@@ -770,13 +773,14 @@ function updateMemoryUsage(memory, system) {
   // Update progress bars
   document.getElementById('heap-used-bar').style.width = `${heapPercent}%`;
   document.getElementById('heap-used').textContent = memory.heapUsed;
+  document.getElementById('heap-total').textContent = memory.heapTotal; // ADDED FOR HEAP TOTAL
 
   document.getElementById('rss-bar').style.width = `${(rss / systemTotal) * 100}%`;
   document.getElementById('rss').textContent = memory.rss;
 
   document.getElementById('system-memory-bar').style.width = `${systemPercent}%`;
   document.getElementById('system-memory').textContent =
-    `${systemTotal - systemFree} / ${systemTotal}`;
+    `${systemTotal - systemFree} MB / ${systemTotal} MB`;
 }
 
 /**
@@ -872,31 +876,26 @@ function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
  *
  * @param {Object} userDetails - User-specific rate limit counts
  */
-function updateRateLimitedUsers(userDetails) {
+function updateRateLimitedUsers(userDetailsArray) {
   const userListElement = document.getElementById('rate-limited-users-list');
 
   // Clear existing content
   userListElement.innerHTML = '';
 
-  // Get user IDs and sort by count (highest first)
-  const userIds = Object.keys(userDetails);
-
-  if (userIds.length === 0) {
+  // Check if userDetailsArray is a valid array and has users
+  if (!Array.isArray(userDetailsArray) || userDetailsArray.length === 0) {
     userListElement.innerHTML = '<div class="no-data">No rate limited users</div>';
     return;
   }
 
-  // Sort users by their rate limit count (highest first)
-  userIds.sort((a, b) => userDetails[b] - userDetails[a]);
-
-  // Add each user to the list
-  userIds.forEach(userId => {
-    const count = userDetails[userId];
+  // Add each user ID to the list
+  // Note: We don't have individual counts here, just the IDs that hit a limit.
+  userDetailsArray.forEach(userId => {
     const userItem = document.createElement('div');
     userItem.className = 'user-item';
     userItem.innerHTML = `
             <span class="user-id">${userId}</span>
-            <span class="user-count">${count}</span>
+            <span class="user-count">N/A</span>
         `;
     userListElement.appendChild(userItem);
   });

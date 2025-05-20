@@ -26,6 +26,7 @@ const pluginManager = require('./pluginManager');
 const { processVersionQuery } = require('./utils/versionSelfQuery');
 const { sendChannelGreeting } = require('./utils/greetingManager');
 const PFPManager = require('./utils/pfpManager');
+const { stats: healthCheckStats } = require('./healthCheck'); // Moved from updateDiscordStats
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -71,6 +72,7 @@ const {
 
 // Import stats storage for graceful shutdown
 const statsStorage = require('./statsStorage');
+const { shouldDeploy, recordSuccessfulDeployment } = require('./utils/deploymentManager');
 
 // Module-level variable for status manager
 let statusManager = null;
@@ -438,7 +440,7 @@ async function generateNaturalResponse(functionResult, conversationLog, function
 
     const response = await Promise.race([
       openai.chat.completions.create({
-        model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
+        model: 'gpt-4o-mini', // Using faster model for better responsiveness
         messages: messages,
       }),
       timeoutPromise,
@@ -775,13 +777,13 @@ client.on('messageCreate', async message => {
       // Handle different response types
       addTiming('before_response_handling', { responseType: gptResponse.type });
       if (gptResponse.type === 'functionCall') {
-        await handleFunctionCall(gptResponse, feedbackMessage, fullConversationLog);
+        await handleFunctionCall(gptResponse, feedbackMessage, fullConversationLog, message.author.id);
         // Safe access to function name with fallback to prevent TypeError
         addTiming('after_function_call_handling', {
           functionName: gptResponse.function?.name || 'unknown',
         });
       } else if (gptResponse.type === 'message') {
-        await handleDirectMessage(gptResponse, feedbackMessage, fullConversationLog);
+        await handleDirectMessage(gptResponse, feedbackMessage, fullConversationLog, message.author.id);
         addTiming('after_direct_message_handling');
       } else {
         await feedbackMessage.edit(gptResponse.content);
@@ -814,7 +816,7 @@ client.on('messageCreate', async message => {
             .filter(([key]) => !['step', 'time', 'elapsed'].includes(key))
             .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
         })),
-        response_type: gptResponse.type,
+        response_type: gptResponse?.type || 'error_or_unknown',
       },
       `Message processing completed in ${totalDuration}ms with ${timings.steps.length} steps tracked`
     );
@@ -1318,14 +1320,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
   } catch (error) {
     discordLogger.error({ error }, 'Error handling image generation');
 
-    // Clean up the progress updater interval if it exists
-    try {
-      // Use a safer approach to clear any intervals that might be running
-      // This avoids the need for a global progressUpdater variable
-      // that could cause linting errors
-    } catch (cleanupError) {
-      discordLogger.warn({ error: cleanupError }, 'Error cleaning up progress updater');
-    }
+
 
     if (message && message.edit) {
       try {
@@ -1358,7 +1353,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
  * @param {Array<Object>} conversationLog - The conversation history
  * @returns {Promise<void>}
  */
-async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog) {
+async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog, userIdFromMessage) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
     functionName: gptResponse.functionName,
@@ -1378,10 +1373,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
     `${loadingEmoji} ${loadingMessages[gptResponse.functionName] || 'Processing...'}`
   );
 
-  // Get the user ID from the conversation log
-  const userId = feedbackMessage.reference?.messageId
-    ? (await feedbackMessage.channel.messages.fetch(feedbackMessage.reference.messageId)).author.id
-    : 'unknown';
+  const userId = userIdFromMessage; // Use the ID passed from messageCreate
 
   // Define rate limit costs for different function calls - reduced to be more permissive
   const functionCosts = {
@@ -1469,6 +1461,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
         // Get the original weather data for status updates
         const weatherData = await lookupWeather(gptResponse.parameters.location);
         trackApiCall('weather');
+        discordLogger.info({ location: gptResponse.parameters.location, weatherData, source: 'lookupWeather_case' }, 'Weather data fetched in handleFunctionCall');
 
         // Update status if we have valid weather data
         if (
@@ -1478,7 +1471,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
           weatherData.current.condition &&
           weatherData.current.condition.text
         ) {
-          // statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
+          statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
         } else {
           discordLogger.warn(
             { weatherData },
@@ -1496,7 +1489,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
 
         const response = await simplifiedWeather.getWeatherResponse(
           gptResponse.parameters.location,
-          userQuestion
+          userQuestion,
+          weatherData // Pass the prefetched data
         );
 
         // Update the feedback message directly with the response
@@ -1527,6 +1521,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
           gptResponse.parameters.days
         );
         trackApiCall('weather');
+        discordLogger.info({ location: gptResponse.parameters.location, days: gptResponse.parameters.days, weatherData, source: 'lookupExtendedForecast_case' }, 'Weather data fetched in handleFunctionCall');
 
         // Update status if we have valid weather data
         if (
@@ -1536,7 +1531,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
           weatherData.current.condition &&
           weatherData.current.condition.text
         ) {
-          // statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
+          statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
         } else {
           discordLogger.warn(
             { weatherData },
@@ -1551,7 +1546,8 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
 
         const response = await simplifiedWeather.getWeatherResponse(
           gptResponse.parameters.location,
-          userQuestion
+          userQuestion,
+          weatherData // Pass the prefetched data
         );
 
         // Update the feedback message directly with the response
@@ -1752,7 +1748,7 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog)
  * @param {Array<Object>} conversationLog - The conversation history to update
  * @returns {Promise<void>}
  */
-async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog) {
+async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog, userIdFromMessage) {
   if (!gptResponse.content?.trim()) {
     await feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
     return;
@@ -1769,7 +1765,7 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
 
   // Also update the stored conversation
   // We don't need to pass the Discord message here since we're just adding an assistant response
-  await manageConversation(feedbackMessage.author.id, responseMessage);
+  await manageConversation(userIdFromMessage, responseMessage);
 
   const finalResponse =
     gptResponse.content.slice(0, 1997) + (gptResponse.content.length > 1997 ? '...' : '');
@@ -1779,14 +1775,13 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
 // Utility to update Discord status in stats and persist it
 async function updateDiscordStats() {
   try {
-    const { stats } = require('./healthCheck');
-    stats.discord = {
+    healthCheckStats.discord = {
       ping: client.ws.ping,
       status: client.ws.status === 0 ? 'ok' : 'offline',
       guilds: client.guilds.cache.size,
       channels: client.channels.cache.size,
     };
-    await statsStorage.saveStats(stats);
+    await statsStorage.saveStats(healthCheckStats);
   } catch (err) {
     discordLogger.error({ err }, 'Failed to update Discord stats');
   }
@@ -1833,17 +1828,25 @@ client.on('ready', async () => {
   commandHandler.setPrefixes(['!', '.']);
   discordLogger.info({ prefixes: commandHandler.prefixes }, 'Command prefixes set');
 
-  // Check if we have a CLIENT_ID for slash commands
+  // Check if we should deploy slash commands
   if (config.CLIENT_ID) {
-    try {
-      // Deploy slash commands
-      const deployResult = await commandHandler.deployCommands(config);
-      discordLogger.info({ deployResult }, 'Slash commands deployed');
-    } catch (error) {
-      discordLogger.error({ error }, 'Error deploying slash commands');
+    if (await shouldDeploy(config)) {
+      try {
+        discordLogger.info('Attempting to deploy slash commands...');
+        const deployResult = await commandHandler.deployCommands(config);
+        discordLogger.info({ deployResult }, 'Slash commands deployment process finished.');
+        // Assuming deployCommands doesn't throw an error for a partial success,
+        // or if it does, we only record on full success.
+        // If deployResult itself indicates success/failure, that logic can be added here.
+        await recordSuccessfulDeployment(); 
+      } catch (error) {
+        discordLogger.error({ error }, 'Error deploying slash commands');
+      }
+    } else {
+      // Log already handled by shouldDeploy
     }
   } else {
-    discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed');
+    discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed or checked.');
   }
 
   // Initialize PFP Manager
@@ -1896,12 +1899,6 @@ async function startBot() {
     const commandCount = await commandHandler.loadCommands();
     discordLogger.info({ commandCount }, 'Commands loaded successfully');
 
-    // Deploy slash commands if enabled
-    if (config.DEPLOY_COMMANDS) {
-      discordLogger.info('Deploying slash commands...');
-      const deployResult = await commandHandler.deployCommands(config);
-      discordLogger.info(deployResult, 'Slash commands deployed');
-    }
 
     // Connect to Discord
     await client.login(config.DISCORD_TOKEN);

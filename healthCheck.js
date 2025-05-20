@@ -65,10 +65,12 @@
  */
 
 const express = require('express');
+const cors = require('cors');
 const { createLogger } = require('./logger');
 const logger = createLogger('health');
 const os = require('os');
 const { version } = require('./package.json');
+const { getLastDeploymentTimestamp } = require('./utils/deploymentManager');
 
 // Import configuration and test runners
 const config = require('./configValidator');
@@ -137,6 +139,41 @@ function initHealthCheck(client) {
   const app = express();
   const path = require('path');
 
+  // Determine port for CORS configuration (must be done before app.use(cors(...)))
+  const nodeEnvForPort = process.env.NODE_ENV || 'development';
+  let currentPort;
+  if (nodeEnvForPort === 'production') {
+    currentPort = config.PROD_PORT || config.HEALTH_PORT || 3000;
+  } else {
+    currentPort = config.DEV_PORT || config.HEALTH_PORT || 3001;
+  }
+
+  const allowedOrigins = [
+    `http://localhost:${currentPort}`,
+    `http://127.0.0.1:${currentPort}`
+  ];
+
+  if (config.STATUS_HOSTNAME) {
+    allowedOrigins.push(`http://${config.STATUS_HOSTNAME}:${currentPort}`);
+  }
+
+  const corsOptions = {
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin, allowedOrigins }, 'CORS: Blocked an origin');
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // If you need to handle cookies or authorization headers
+  };
+
+  app.use(cors(corsOptions));
+  app.use(express.json()); // Middleware to parse JSON bodies
+
   // Serve static files from the public directory
   app.use(express.static(path.join(__dirname, 'public')));
 
@@ -149,8 +186,35 @@ function initHealthCheck(client) {
     });
   });
 
+  // Circuit Breaker API Endpoints (Placeholders)
+  app.get('/api/breaker/status', (req, res) => {
+    // In a real implementation, you'd fetch the actual breaker status
+    res.json({
+      breakerOpen: false, // Example status
+      pendingRequests: [], // Example pending requests
+    });
+  });
+
+  app.post('/api/breaker/reset', (req, res) => {
+    // In a real implementation, you'd handle the owner token and reset logic
+    logger.info({ body: req.body }, 'Received POST to /api/breaker/reset');
+    res.json({ success: true, message: 'Breaker reset request received (placeholder).' });
+  });
+
+  app.post('/api/breaker/approve', (req, res) => {
+    // In a real implementation, you'd handle the owner token and approval/denial logic
+    logger.info({ body: req.body }, 'Received POST to /api/breaker/approve');
+    res.json({ success: true, message: 'Breaker approval/denial request received (placeholder).' });
+  });
+
   // Detailed health check endpoint
-  app.get('/health', (req, res) => {
+  app.get('/function-results', (req, res) => {
+    const functionResults = stats.customStats && stats.customStats.functionResults ? stats.customStats.functionResults : {};
+    res.json(functionResults);
+  });
+
+  app.get('/health', async (req, res) => {
+    try {
     const uptime = Math.floor((new Date() - stats.startTime) / 1000);
     const memoryUsage = process.memoryUsage();
 
@@ -176,17 +240,45 @@ function initHealthCheck(client) {
         apiCalls: stats.apiCalls,
         errors: stats.errors,
         rateLimits: {
-          count: stats.rateLimits.hit,
-          uniqueUsers: stats.rateLimits.users.size,
+          count: (stats.rateLimits && typeof stats.rateLimits.hit === 'number') ? stats.rateLimits.hit : 0,
+          uniqueUsers: (stats.rateLimits && stats.rateLimits.users && typeof stats.rateLimits.users.size === 'number') ? stats.rateLimits.users.size : 0,
+          userDetails: (stats.rateLimits && stats.rateLimits.users) ? Array.from(stats.rateLimits.users) : [],
         },
       },
       discord: {
         ping: client.ws.ping,
-        status: client.ws.status,
+        status: client.ws.status === 0 ? 'online' : 'issues',
         guilds: client.guilds.cache.size,
         channels: client.channels.cache.size,
       },
     };
+
+    // Add slash command deployment info
+    try {
+      const lastDeploymentMs = await getLastDeploymentTimestamp();
+      let nextCheckEstimate = 'N/A';
+      const autoDeployEnabled = config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true';
+
+      if (lastDeploymentMs) {
+        const nextCheckDate = new Date(lastDeploymentMs + (12 * 60 * 60 * 1000));
+        nextCheckEstimate = autoDeployEnabled ? nextCheckDate.toISOString() : 'Disabled by DEPLOY_COMMANDS';
+      }
+
+      health.slashCommands = {
+        lastDeployed: lastDeploymentMs ? new Date(lastDeploymentMs).toISOString() : 'Never or Unknown',
+        nextScheduledCheck: nextCheckEstimate,
+        autoDeployEnabled: autoDeployEnabled,
+      };
+    } catch (err) {
+      logger.error({ err }, 'Error fetching slash command deployment info for /health endpoint');
+      health.slashCommands = {
+        lastDeployed: 'Error fetching',
+        nextScheduledCheck: 'Error fetching',
+        autoDeployEnabled: config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true',
+        error: 'Failed to retrieve deployment timestamps',
+      };
+    }
+
 
     // Check if any error counts are high
     const errorSum = calculateTotalErrors(stats.errors);
@@ -194,7 +286,15 @@ function initHealthCheck(client) {
       health.status = 'warning';
     }
 
-    res.json(health);
+      res.json(health);
+    } catch (err) {
+      logger.error({ err }, 'Critical error in /health endpoint');
+      res.status(500).json({
+        status: 'error',
+        message: 'Server error while fetching health data.',
+        error: err.message
+      });
+    }
   });
 
   // Add test endpoint
@@ -225,18 +325,20 @@ function initHealthCheck(client) {
 
   // Start the server
   // Determine which port to use based on environment
-  let port;
   const nodeEnv = process.env.NODE_ENV || 'development';
+  let PORT;
 
   if (nodeEnv === 'production') {
-    port = config.PROD_PORT || config.HEALTH_PORT || 3000;
+    PORT = config.PROD_PORT || config.HEALTH_PORT || 3000;
   } else {
-    port = config.DEV_PORT || config.HEALTH_PORT || 3001;
+    PORT = config.DEV_PORT || config.HEALTH_PORT || 3001;
   }
 
-  app.listen(port, () => {
-    logger.info(`Health check server running on port ${port} (${nodeEnv} mode)`);
-    logger.info(`Status page available at http://localhost:${port}`);
+  const LISTEN_ADDRESS = '0.0.0.0';
+  const DISPLAY_HOSTNAME = config.STATUS_HOSTNAME || 'localhost';
+
+  app.listen(PORT, LISTEN_ADDRESS, () => {
+    logger.info(`Health check server running at http://${DISPLAY_HOSTNAME}:${PORT}/ (listening on ${LISTEN_ADDRESS}:${PORT} in ${nodeEnv} mode)`);
   });
 
   // Schedule periodic health reports to owner
@@ -471,7 +573,9 @@ function generateHealthReport(isStartup = false) {
   
   // Add status page and logs if it's a startup report
   if (isStartup) {
-    report += `\n\n**Status Page:** http://${process.env.STATUS_HOSTNAME || 'localhost'}:${process.env.STATUS_PORT || 3000}`;
+    const determinedStatusPort = process.env.NODE_ENV === 'development' ? config.DEV_PORT : config.PROD_PORT;
+    const actualHostname = process.env.STATUS_HOSTNAME || 'localhost'; // Fallback just in case, though configValidator should ensure it's set
+    report += `\n\n**Status Page:** http://${actualHostname}:${determinedStatusPort}`;
     report += `\n\n**Recent Logs:**\n\`\`\`\n${getRecentLogs(15)}\n\`\`\``;
   }
   
@@ -487,9 +591,16 @@ function generateHealthReport(isStartup = false) {
  * @returns {boolean} Whether the message is a stats command
  */
 function isStatsCommand(message) {
-  const statsCommands = ['/stats', '!stats', '.stats', 'stats', '/stat', '!stat', '.stat'];
-
-  return statsCommands.includes(message.content.toLowerCase().trim());
+  if (!message || !message.content) return false;
+  const content = message.content.toLowerCase();
+  // Check for various ways to call the stats command, including slash commands
+  // and common prefixes like !, ., /.
+  return (
+    content.startsWith('/stats') ||
+    content.startsWith('!stats') ||
+    content.startsWith('.stats') ||
+    content === 'stats'
+  );
 }
 
 /**

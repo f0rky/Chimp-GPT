@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prestart": "echo 'Starting the app...'",
-    "start": "nodemon chimpGPT.js",
+    "start": "nodemon --ignore data/ --ignore logs/ chimpGPT.js",
     "prepare": "husky install"
   },
   "lint-staged": {

@@ -804,13 +804,11 @@ function initStatusServer(options = {}) {
     let port;
 
     if (nodeEnv === 'production') {
-      // In production, use production port with fallback to secondary deployment port
-      const defaultProdPort = isSecondaryDeployment ? 3005 : 3000;
-      port = config.PROD_PORT || config.STATUS_PORT || defaultProdPort;
+      port = config.PROD_PORT || 3000; // Fallback to 3000 if PROD_PORT is not set
+      logger.info(`Production environment detected. Using port: ${port} (PROD_PORT: ${config.PROD_PORT})`);
     } else {
-      // In development, use development port with fallback to secondary deployment port
-      const defaultDevPort = isSecondaryDeployment ? 3006 : 3001;
-      port = config.DEV_PORT || config.STATUS_PORT || defaultDevPort;
+      port = config.DEV_PORT || 3001; // Fallback to 3001 if DEV_PORT is not set
+      logger.info(`Development environment detected. Using port: ${port} (DEV_PORT: ${config.DEV_PORT})`);
     }
 
     // Get hostname for remote access from config or environment variable
