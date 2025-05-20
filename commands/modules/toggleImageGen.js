@@ -18,11 +18,14 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Path to the .env file
-const envPath = path.join(__dirname, '../../../.env');
+// Path to the .env file - use absolute path from project root
+const envPath = path.resolve(process.cwd(), '.env');
 
 // Get the image generation module
 const imageGenerationModule = require('../../imageGeneration');
+
+// Log the resolved path for debugging
+logger.debug({ envPath }, 'Resolved .env path');
 
 /**
  * Toggle the image generation setting
@@ -147,11 +150,26 @@ const command = {
   adminOnly: true,
   execute: async (message) => {
     try {
+      logger.info({ userId: message.author.id, username: message.author.tag }, 'Executing toggleimage command');
+      
+      // Log current state before toggling
+      logger.debug({ 
+        currentEnvValue: process.env.ENABLE_IMAGE_GENERATION,
+        currentConfigValue: config.ENABLE_IMAGE_GENERATION 
+      }, 'Current image generation state before toggle');
+      
       const { newState, success } = await toggleImageGeneration();
       
       if (success) {
+        // Log the new state after toggling
+        logger.debug({ 
+          newState,
+          newEnvValue: process.env.ENABLE_IMAGE_GENERATION,
+          newConfigValue: config.ENABLE_IMAGE_GENERATION 
+        }, 'New image generation state after toggle');
+        
         await message.reply({
-          content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}.`,
+          content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`,
           allowedMentions: { repliedUser: false }
         });
         logger.info(`Image generation ${newState ? 'enabled' : 'disabled'} via prefix command by ${message.author.tag}`);
@@ -159,9 +177,9 @@ const command = {
         throw new Error('Failed to update configuration');
       }
     } catch (error) {
-      logger.error({ error }, 'Error in toggleimage prefix command');
+      logger.error({ error, envPath }, 'Error in toggleimage prefix command');
       await message.reply({
-        content: '❌ An error occurred while toggling image generation.',
+        content: `❌ An error occurred while toggling image generation: ${error.message}`,
         allowedMentions: { repliedUser: false }
       });
     }
