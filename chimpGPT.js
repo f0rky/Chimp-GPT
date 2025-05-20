@@ -1141,14 +1141,28 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         size: parameters.size || '1024x1024',
       });
 
-      // Check for content policy violation in the result
+      // Check for content policy violation or if generation is disabled
       if (!result.success) {
-        if (result.isContentPolicyViolation) {
-          const error = new Error(result.error);
-          error.isContentPolicyViolation = true;
-          throw error;
+        const errorMessageText = (typeof result.error === 'string') ? result.error : (result.error?.message || 'Unknown error from generateImage');
+        if (errorMessageText === "Image generation is currently disabled") {
+          discordLogger.warn({ 
+            prompt: finalPrompt, 
+            userId: message.author?.id, 
+            guildId: message.guild?.id 
+          }, 'Image generation is disabled; informing user and stopping.');
+          if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
+            await feedbackMessage.edit('❌ Image generation is currently disabled. Please try again later.');
+          }
+          // The main `finally` block of handleImageGeneration will clear the progressUpdater interval.
+          return; // Exit handleImageGeneration gracefully
         }
-        throw new Error(result.error);
+
+        if (result.isContentPolicyViolation) {
+          const error = new Error(errorMessageText);
+          error.isContentPolicyViolation = true;
+          throw error; // This will be caught by the catch block below
+        }
+        throw new Error(errorMessageText); // This will be caught by the catch block below
       }
 
       // Calculate generation time
@@ -1163,22 +1177,46 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         );
       }
     } catch (error) {
-      discordLogger.error({ error }, 'Image generation failed');
+      // Log first, then check for specific conditions
+      discordLogger.error({ 
+        error, 
+        prompt: finalPrompt, 
+        userId: message.author?.id, 
+        guildId: message.guild?.id 
+      }, 'Image generation failed within inner try/catch');
+      
+      if (error.message === "Image generation is currently disabled") {
+        discordLogger.warn({ 
+          prompt: finalPrompt, 
+          userId: message.author?.id, 
+          guildId: message.guild?.id 
+        }, 'Caught "disabled" error explicitly in catch block; informing user and stopping.');
+        if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
+             await feedbackMessage.edit('❌ Image generation is currently disabled. Please try again later.');
+        } else {
+            discordLogger.warn('feedbackMessage not available or not editable for "disabled" error in catch.');
+        }
+        // The main `finally` block of handleImageGeneration will clear the progressUpdater interval.
+        return; // Exit handleImageGeneration gracefully
+      }
       
       // Handle content policy violations specially
       if (error.isContentPolicyViolation || (error.status === 400 && error.code === 'moderation_blocked')) {
-        const errorMessage = 'This request was rejected due to content policy violations. Please modify your prompt and try again.';
-        await feedbackMessage.edit(`❌ ${errorMessage}`);
-        
+        const userMessage = 'This request was rejected due to content policy violations. Please modify your prompt and try again.';
+        if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
+            await feedbackMessage.edit(`❌ ${userMessage}`);
+        }
         // Create a new error with a specific type that we can check for
-        const policyError = new Error(errorMessage);
+        const policyError = new Error(error.message || userMessage); // Use original error message if available
         policyError.isContentPolicyViolation = true;
-        throw policyError; // Re-throw to be handled by the caller
+        throw policyError; // Re-throw to be handled by the outer catch of handleImageGeneration
       } else {
         // For other errors, show a generic error message and re-throw
-        const errorMessage = `Failed to generate image: ${error.message || 'An unknown error occurred'}`;
-        await feedbackMessage.edit(`❌ ${errorMessage}`);
-        throw new Error(errorMessage);
+        const userMessage = `Failed to generate image: ${error.message || 'An unknown error occurred'}`;
+        if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
+            await feedbackMessage.edit(`❌ ${userMessage}`);
+        }
+        throw new Error(userMessage); // Re-throw to be handled by the outer catch of handleImageGeneration
       }
     }
 
@@ -1594,6 +1632,59 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
       }
     case 'generateImage':
       try {
+        // First, check if image generation is disabled by calling the function directly
+        // and checking the result without proceeding to handleImageGeneration
+        const imageGeneration = require('./imageGeneration');
+        const testResult = await imageGeneration.generateImage(gptResponse.parameters.prompt, {
+          model: gptResponse.parameters.model || 'gpt-image-1',
+          size: gptResponse.parameters.size || '1024x1024',
+        });
+        
+        // If image generation is disabled, fall back to a natural language response
+        if (!testResult.success && testResult.error === 'Image generation is currently disabled') {
+          discordLogger.warn(
+            { prompt: gptResponse.parameters.prompt },
+            'Image generation is disabled, falling back to natural language response'
+          );
+          
+          // Inform the user that image generation is disabled but we'll provide a text response
+          await feedbackMessage.edit('❌ Image generation is currently disabled. Let me describe what you are looking for instead...');
+          
+          // Get the original user message from the conversation log
+          const userMessage = conversationLog.find(msg => msg.role === 'user')?.content || 
+                             `Can you describe ${gptResponse.parameters.prompt}?`;
+          
+          // Create a new prompt asking GPT to describe the image instead of generating it
+          const descriptionPrompt = [
+            ...conversationLog.filter(msg => msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1),
+            { role: 'user', content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.` }
+          ];
+          
+          // Create a mock function result for the image description
+          const mockImageResult = {
+            description: `Image description for prompt: ${gptResponse.parameters.prompt}`,
+            prompt: gptResponse.parameters.prompt,
+            disabled: true
+          };
+          // Get a natural language response from GPT
+          const description = await generateNaturalResponse(mockImageResult, descriptionPrompt, 'generateImage');
+          
+          // Update the feedback message with the description
+          await feedbackMessage.edit(description);
+          
+          // Add the response to the conversation log
+          conversationLog.push({
+            role: 'assistant',
+            content: description,
+          });
+          
+          // Track the API call and return
+          trackApiCall('gpt');
+          performanceMonitor.stopTimer(functionCallTimerId, { success: true });
+          return;
+        }
+        
+        // If image generation is enabled, proceed as normal
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
         trackApiCall('gptimage');
         return;
@@ -1604,6 +1695,50 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
         // If this was a content policy violation, we've already shown the message
         if (error.isContentPolicyViolation) {
           discordLogger.info('Content policy violation handled');
+          return;
+        }
+        
+        // Check if the error is about image generation being disabled
+        if (error.message && error.message.includes('Image generation is currently disabled')) {
+          discordLogger.warn(
+            { prompt: gptResponse.parameters.prompt },
+            'Caught disabled error in catch block, falling back to natural language response'
+          );
+          
+          // Inform the user that image generation is disabled but we'll provide a text response
+          await feedbackMessage.edit('❌ Image generation is currently disabled. Let me describe what you are looking for instead...');
+          
+          // Get the original user message from the conversation log
+          const userMessage = conversationLog.find(msg => msg.role === 'user')?.content || 
+                             `Can you describe ${gptResponse.parameters.prompt}?`;
+          
+          // Create a mock function result for the image description
+          const mockImageResult = {
+            description: `Image description for prompt: ${gptResponse.parameters.prompt}`,
+            prompt: gptResponse.parameters.prompt,
+            disabled: true
+          };
+          // Create a new prompt asking GPT to describe the image instead of generating it
+          const descriptionPrompt = [
+            ...conversationLog.filter(msg => msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1),
+            { role: 'user', content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.` }
+          ];
+          
+          // Get a natural language response from GPT
+          const description = await generateNaturalResponse(mockImageResult, descriptionPrompt, 'generateImage');
+          
+          // Update the feedback message with the description
+          await feedbackMessage.edit(description);
+          
+          // Add the response to the conversation log
+          conversationLog.push({
+            role: 'assistant',
+            content: description,
+          });
+          
+          // Track the API call and return
+          trackApiCall('gpt');
+          performanceMonitor.stopTimer(functionCallTimerId, { success: true });
           return;
         }
         
