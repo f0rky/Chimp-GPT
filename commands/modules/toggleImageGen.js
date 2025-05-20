@@ -19,7 +19,10 @@ const path = require('path');
 const dotenv = require('dotenv');
 
 // Path to the .env file
-const envPath = path.join(__dirname, '../../.env');
+const envPath = path.join(__dirname, '../../../.env');
+
+// Get the image generation module
+const imageGenerationModule = require('../../imageGeneration');
 
 /**
  * Toggle the image generation setting
@@ -32,6 +35,10 @@ async function toggleImageGeneration() {
     if (fs.existsSync(envPath)) {
       const envFile = fs.readFileSync(envPath, 'utf8');
       envConfig = dotenv.parse(envFile);
+    } else {
+      logger.warn(`Env file not found at ${envPath}`);
+      // Create a basic env config if it doesn't exist
+      envConfig = { ENABLE_IMAGE_GENERATION: process.env.ENABLE_IMAGE_GENERATION || 'false' };
     }
     
     // Toggle the state
@@ -47,9 +54,35 @@ async function toggleImageGeneration() {
     
     fs.writeFileSync(envPath, envContent);
     
-    // Update in-memory config
+    // Update in-memory config in all relevant places
     process.env.ENABLE_IMAGE_GENERATION = newState.toString();
     config.ENABLE_IMAGE_GENERATION = newState; // Update the live config object
+    
+    // Force reload the config in the imageGeneration module
+    try {
+      // Get the path to the config module
+      const configPath = require.resolve('../../configValidator');
+      
+      // Clear the require cache for the config module
+      delete require.cache[configPath];
+      
+      // Re-require the config module
+      const freshConfig = require('../../configValidator');
+      
+      // Verify the config was updated
+      logger.info(`Config reloaded. Image generation is now ${freshConfig.ENABLE_IMAGE_GENERATION ? 'enabled' : 'disabled'}`);
+    } catch (configError) {
+      logger.error({ error: configError }, 'Error reloading config module');
+    }
+    
+    // Log the change
+    logger.info(`Image generation toggled to ${newState ? 'enabled' : 'disabled'} in config`);
+    logger.debug({ 
+      envPath, 
+      newState, 
+      configValue: config.ENABLE_IMAGE_GENERATION,
+      envValue: process.env.ENABLE_IMAGE_GENERATION 
+    }, 'Updated image generation configuration');
     
     return { newState, success: true };
   } catch (error) {

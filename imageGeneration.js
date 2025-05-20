@@ -104,8 +104,10 @@ const BACKGROUND = {
  * @returns {Promise<ImageResult | ImageErrorResult>} The generated image or an error
  */
 async function generateImage(prompt, options = {}) {
-  // Check if image generation is enabled
-  if (!config.ENABLE_IMAGE_GENERATION) {
+  // Check if image generation is enabled - get the latest value from process.env
+  const isEnabled = process.env.ENABLE_IMAGE_GENERATION === 'true' || config.ENABLE_IMAGE_GENERATION === true;
+  
+  if (!isEnabled) {
     logger.warn('Image generation is currently disabled');
     return {
       success: false,
@@ -113,6 +115,14 @@ async function generateImage(prompt, options = {}) {
       prompt,
     };
   }
+  
+  // Log that we're proceeding with image generation
+  logger.info('Image generation is enabled, proceeding with request');
+  logger.debug({
+    configValue: config.ENABLE_IMAGE_GENERATION,
+    envValue: process.env.ENABLE_IMAGE_GENERATION,
+    isEnabled
+  }, 'Image generation configuration check');
   try {
     // Default to GPT Image-1 with medium size for cost effectiveness
     const model = options.model || MODELS.GPT_IMAGE_1;
