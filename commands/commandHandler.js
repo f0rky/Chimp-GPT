@@ -346,10 +346,15 @@ async function handleCommand(message, config) {
   let args;
 
   try {
+    // Debug: Log all registered commands
+    logger.debug({ registeredCommands: Array.from(commands.keys()) }, 'Registered commands');
+    
     // Parse the command from the message
     const parsedCommand = parseCommand(message.content);
     if (!parsedCommand) return false;
 
+    logger.debug({ parsedCommand }, 'Parsed command');
+    
     commandName = parsedCommand.commandName;
     args = parsedCommand.args;
 

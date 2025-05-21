@@ -9,14 +9,12 @@
  */
 
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { createLogger } = require('../../../logger');
+const { createLogger } = require('../../logger');
 const logger = createLogger('cmd-toggle-img');
-
-// Get config
-const config = require('../../configValidator');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const config = require('../../configValidator');
 
 // Path to the .env file - use absolute path from project root
 const envPath = path.resolve(process.cwd(), '.env');
@@ -143,6 +141,7 @@ async function execute(interaction) {
 const command = {
   name: 'toggleimage',
   description: 'Toggle the image generation feature on/off (Admin only)',
+  aliases: ['toggleimages', 'imagetoggle', 'toggleimg'],
   usage: '!toggleimage',
   category: 'admin',
   permissions: ['Administrator'],
@@ -188,12 +187,6 @@ const command = {
   slashCommand: data,
   interactionExecute: execute
 };
-
-// Register the command with the command handler
-const { registerCommand } = require('../../commandHandler');
-if (!registerCommand(command)) {
-  logger.warn('Failed to register toggleimage command - it may already be registered');
-}
 
 // Export the command for module loading
 module.exports = command;
