@@ -67,6 +67,18 @@
 - [x] **Image gallery modal/mobile/error handling:** Status page image gallery includes modal viewer, mobile support, and robust error handling (done).
 - [x] **Logger standardization (Pino):** All main modules now use Pino-based logger for error handling and debugging. Test/CLI files reviewed for consistency (done; see README for details).
 
+### General Code Review Findings (New)
+- [ ] **Refactor `chimpGPT.js` `messageCreate` Handler:** Break down the main message handler into smaller, manageable functions to improve readability and maintainability.
+- [ ] **Standardize Plugin Error Reporting:** Improve how errors from plugins are propagated and reported to the core system and potentially to the user.
+- [ ] **JSDoc Audit:** Perform a thorough audit of JSDoc comments across the codebase for consistency and completeness.
+- [ ] **Review `process.env` Usage for Config:** Document or refactor instances where `process.env` is used directly (e.g., `logger.js`, `apiKeyManager.js`) to avoid circular dependencies with `configValidator.js`.
+- [ ] **Encourage DRY Principle in Plugins:** Promote refactoring of shared logic within plugins (e.g., avoid duplicating command logic for message vs. slash commands if possible).
+- [ ] **Consistent Adoption of `utils/errorHandler.js`:** Refactor error handling to consistently use the centralized `utils/errorHandler.js` module across core modules and plugins.
+- [ ] **Improve User-Facing Error Messages:** Review and enhance user-facing error messages for clarity and helpfulness, possibly implementing error codes or more specific (but safe) messages.
+- [ ] **Centralize API Key Access via `apiKeyManager.js`:** Refactor all modules and plugins to retrieve API keys exclusively through `utils/apiKeyManager.js`.
+- [ ] **Input Sanitization Audit:** Audit critical user input points to ensure consistent application of `utils/inputSanitizer.js` utilities.
+- [ ] **Clarify Plugin `onMessageReceived` Contract:** Define and document the mechanism for plugins to signal that a message has been fully handled and core processing should stop. Update `pluginManager.js` and `chimpGPT.js` if needed.
+
 ---
 
 ## Targeted Function Enhancement: `greeting`
@@ -110,6 +122,7 @@
 - [ ] Add support for multiple languages
 - [ ] Add image variation and editing capabilities to the DALL-E integration
 - [ ] Support plugin command removal (for deprecated commands)
+- [ ] **Plugin Management Command:** Implement a command for bot administrators to list, enable, or disable plugins at runtime.
 
 ### Testing & Quality Assurance
 
@@ -148,6 +161,8 @@
 
 - [ ] **Enhanced Error Diagnostics and Reporting:**  
        Expand error handling to include detailed diagnostics, structured error classes, and user-facing explanations for failures, making troubleshooting easier for both users and developers.
+- [ ] **(Forward-Looking) Dynamic Configuration Reload:** Explore the feasibility of allowing certain configuration parameters (e.g., rate limits, log levels) to be reloaded without a full bot restart.
+- [ ] **(Forward-Looking) Granular Command Permissions (RBAC):** Design and implement a more detailed role-based access control system for bot commands.
 
 ---
 
