@@ -118,6 +118,20 @@ async function generateImage(prompt, options = {}) {
   
   // Log that we're proceeding with image generation
   logger.info('Image generation is enabled, proceeding with request');
+  
+  // Track timing information if provided
+  if (options._timingInfo) {
+    const now = Date.now();
+    const totalDelay = now - options._timingInfo.requestStartTime;
+    logger.info({
+      initDuration: options._timingInfo.initDuration,
+      totalDelayToApiCall: totalDelay,
+      additionalDelay: totalDelay - options._timingInfo.initDuration,
+      requestStartTime: options._timingInfo.requestStartTime,
+      currentTime: now
+    }, 'Timing information for image generation request');
+  }
+  
   logger.debug({
     configValue: config.ENABLE_IMAGE_GENERATION,
     envValue: process.env.ENABLE_IMAGE_GENERATION,
@@ -129,14 +143,7 @@ async function generateImage(prompt, options = {}) {
     // Set default size to square if not specified
     let size = options.size || SIZES.SQUARE;
 
-    logger.info(
-      {
-        prompt,
-        model,
-        size,
-      },
-      'Generating image with GPT Image-1'
-    );
+    // We'll log all parameters together after building the full imageParams object
 
     // Validate the model and size combination
     // Validate that we're using a supported size
@@ -178,8 +185,20 @@ async function generateImage(prompt, options = {}) {
     logger.info({ imageParams }, 'Generating image with GPT Image-1');
     
     let response;
+    let apiCallStartTime = Date.now();
+    let apiCallDuration;
+    
     try {
+      // Log that we're about to make the API call
+      logger.debug('Making OpenAI API call for image generation');
+      
+      // Make the API call and track the time it takes
       response = await openai.images.generate(imageParams);
+      apiCallDuration = Date.now() - apiCallStartTime;
+      
+      // Log the API call duration
+      logger.info({ apiCallDuration }, 'OpenAI API call completed');
+      
       // Track the API call
       trackApiCall('gptimage');
     } catch (error) {
@@ -216,11 +235,41 @@ async function generateImage(prompt, options = {}) {
       'Successfully generated images'
     );
 
-    // Calculate approximate cost based on size
+    // Calculate more accurate cost based on GPT Image-1 pricing
+    // https://openai.com/pricing
     let estimatedCost = 0;
-    // Approximate costs for GPT Image-1 (these are estimates and may need adjustment)
-    if (size === SIZES.SQUARE) estimatedCost = 0.01;
-    else if (size === SIZES.LANDSCAPE || size === SIZES.PORTRAIT) estimatedCost = 0.015;
+    
+    // Base cost by size (in dollars)
+    const baseCostBySize = {
+      '1024x1024': 0.008,   // Standard square
+      '1792x1024': 0.012,   // Standard landscape
+      '1024x1792': 0.012,   // Standard portrait
+      '512x512': 0.006,     // Lower resolution
+      '256x256': 0.004      // Lowest resolution
+    };
+    
+    // Get the base cost for the selected size
+    const baseCost = baseCostBySize[size] || 0.008; // Default to square if size not found
+    
+    // Factor in prompt length (longer prompts may require more processing)
+    // This is an approximation since OpenAI doesn't specify exact pricing by token for images
+    const promptLength = prompt.length;
+    const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + (promptLength / 1000))); // 1.0-1.5x based on length
+    
+    // Quality factor (HD costs more)
+    const qualityFactor = quality === QUALITY.HD ? 1.5 : 1.0;
+    
+    // Calculate final estimated cost
+    estimatedCost = baseCost * promptFactor * qualityFactor;
+    
+    // Log the cost calculation factors
+    logger.debug({
+      baseCost,
+      promptLength,
+      promptFactor,
+      qualityFactor,
+      finalCost: estimatedCost
+    }, 'Cost estimation factors for GPT Image-1');
 
     // Extract the image URLs based on the response structure
     // GPT Image-1 may have a different structure than DALL-E
@@ -321,10 +370,15 @@ async function generateImage(prompt, options = {}) {
       result
     );
 
+    // Return the successful result with API call timing information
     return {
       success: true,
-      images: images,
-      estimatedCost: estimatedCost,
+      images,
+      prompt,
+      revisedPrompt: images[0].revisedPrompt,
+      estimatedCost,
+      apiCallDuration: apiCallDuration || null, // Time in ms for the API call
+      totalProcessingTime: Date.now() - apiCallStartTime, // Total time including processing
     };
   } catch (error) {
     logger.error({ error, prompt }, 'Error generating image with GPT Image-1');

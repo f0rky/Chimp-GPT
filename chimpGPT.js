@@ -924,8 +924,17 @@ async function handleQuakeStats(feedbackMessage) {
  */
 async function handleImageGeneration(parameters, message, conversationLog = []) {
   try {
-    // Track start time for progress updates
-    const startTime = Date.now();
+    // Use the start time from handleFunctionCall if available, otherwise use current time
+    const startTime = message.imageGenerationStartTime || Date.now();
+    
+    // Calculate how much time has already passed since the initial message
+    const initialDelay = Date.now() - startTime;
+    discordLogger.debug({ 
+      startTime, 
+      currentTime: Date.now(), 
+      initialDelay 
+    }, 'Starting handleImageGeneration with timing information');
+    
     let currentPhase = 'initializing';
 
     // Create a progress tracking object
@@ -941,6 +950,9 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       currentPhase,
       totalElapsed: 0,
     };
+    
+    // Keep track of completed phases for the status message
+    const completedPhases = [];
 
     // Function to update progress
     const updateProgress = (newPhase = null) => {
@@ -951,6 +963,11 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         // End the current phase
         progress.phases[currentPhase].end = now;
         progress.phases[currentPhase].elapsed = now - progress.phases[currentPhase].start;
+        
+        // Add the completed phase to our tracking array if it's not already there
+        if (!completedPhases.includes(currentPhase)) {
+          completedPhases.push(currentPhase);
+        }
 
         // Start the new phase
         progress.phases[newPhase].start = now;
@@ -995,7 +1012,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
 
         let statusMessage = `🎨 Creating your image... (${elapsedFormatted})`;
 
-        // Add phase-specific messages
+        // Add phase-specific messages for current phase
         switch (currentProgress.currentPhase) {
           case 'enhancing':
             statusMessage += '\n⚙️ Enhancing your prompt for better results...';
@@ -1012,6 +1029,23 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
           default:
             // No additional message for other phases
             break;
+        }
+        
+        // Add completed phases with checkmarks
+        if (completedPhases.length > 0) {
+          statusMessage += '\n\n**Completed:**';
+          if (completedPhases.includes('initializing')) {
+            statusMessage += '\n✅ Initialization';
+          }
+          if (completedPhases.includes('enhancing')) {
+            statusMessage += '\n✅ Prompt enhancement';
+          }
+          if (completedPhases.includes('generating')) {
+            statusMessage += '\n✅ Image generation';
+          }
+          if (completedPhases.includes('downloading')) {
+            statusMessage += '\n✅ Image download';
+          }
         }
 
         // Check if message is a command
@@ -1076,6 +1110,10 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       }
     }, UPDATE_INTERVAL);
 
+    // IMPORTANT FIX: Move to generating phase IMMEDIATELY after setup is complete
+    // This ensures that only the minimal setup time is attributed to initialization
+    updateProgress('generating');
+    
     // Update bot status to show we're generating an image
     const username = message.author ? message.author.username : 'unknown';
 
@@ -1090,11 +1128,6 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     } else {
       discordLogger.warn('Status manager not properly initialized, skipping status update');
     }
-
-    // IMPORTANT FIX: Move to generating phase BEFORE the OpenAI function call happens
-    // This ensures that the time spent waiting for OpenAI is properly attributed
-    // to the generating phase, not initializing
-    updateProgress('generating');
 
     // Enhance the prompt if requested
     let finalPrompt = parameters.prompt;
@@ -1331,13 +1364,42 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       .map(([phaseName, timing]) => `${phaseName}: ${formatElapsed(timing.elapsed)}`)
       .join(' | ');
 
+    // Track the image generation for usage statistics
+    try {
+      const imageUsageTracker = require('./imageUsageTracker');
+      const userId = message.author?.id || 'unknown';
+      const username = message.author?.username || 'unknown';
+      
+      // Track this image generation request
+      const usageStats = imageUsageTracker.trackImageGeneration({
+        prompt: finalPrompt,
+        size: parameters.size || '1024x1024',
+        quality: parameters.quality || 'auto',
+        cost: result.estimatedCost || 0,
+        apiCallDuration: result.apiCallDuration || 0,
+        userId,
+        username
+      });
+      
+      discordLogger.info({
+        totalRequests: usageStats.totalRequests,
+        totalCost: usageStats.totalCost
+      }, 'Updated image generation usage statistics');
+    } catch (error) {
+      discordLogger.error({ error }, 'Failed to track image generation usage');
+    }
+    
     // Send the image with information about the prompt, timing, and cost details
+    // Include API call timing information in the footer
+    const apiCallInfo = result.apiCallDuration ? 
+      `\n🔄 API call: ${formatElapsed(result.apiCallDuration)} | Processing: ${formatElapsed(result.totalProcessingTime - result.apiCallDuration)}` : '';
+      
     await feedbackMessage.edit({
       content: `🖼️ Image generated by GPT Image-1
 📝 ${parameters.enhance ? 'Enhanced prompt' : 'Prompt'}: "${revisedPrompt}"
 ⏱️ Total time: ${formatElapsed(progress.totalElapsed)} (${phaseTimings})
 💰 Estimated cost: $${result.estimatedCost ? result.estimatedCost.toFixed(4) : '0.0000'}
-🔢 Size: ${parameters.size || '1024x1024'} | Quality: ${parameters.quality || 'auto'}`,
+🔢 Size: ${parameters.size || '1024x1024'} | Quality: ${parameters.quality || 'auto'}${apiCallInfo}`,
       files: [attachment],
     });
 
@@ -1403,13 +1465,27 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
     lookupExtendedForecast: "Let me ping the cloud, and I don't mean the fluffy ones...",
     getWolframShortAnswer: 'Consulting Wolfram Alpha...',
     quakeLookup: 'Checking server stats...',
-    generateImage: 'Creating your image with GPT Image-1...',
     getVersion: 'Checking my version...',
   };
 
-  await feedbackMessage.edit(
-    `${loadingEmoji} ${loadingMessages[gptResponse.functionName] || 'Processing...'}`
-  );
+  // Special handling for image generation to match the format used in handleImageGeneration
+  if (gptResponse.functionName === 'generateImage') {
+    // Record the time when we start the image generation process
+    const imageStartTime = Date.now();
+    discordLogger.debug({ time: imageStartTime }, 'Starting image generation process in handleFunctionCall');
+    
+    const initialMessage = `🎨 Creating your image... (0s)
+
+🔄 Currently: ⚙️ Initializing...`;
+    await feedbackMessage.edit(initialMessage);
+    
+    // Store the start time in a property on the message object so handleImageGeneration can use it
+    feedbackMessage.imageGenerationStartTime = imageStartTime;
+  } else {
+    await feedbackMessage.edit(
+      `${loadingEmoji} ${loadingMessages[gptResponse.functionName] || 'Processing...'}`
+    );
+  }
 
   const userId = userIdFromMessage; // Use the ID passed from messageCreate
 
@@ -1632,13 +1708,20 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
       }
     case 'generateImage':
       try {
-        // First, check if image generation is disabled by calling the function directly
-        // and checking the result without proceeding to handleImageGeneration
+        // First, check if image generation is disabled WITHOUT actually generating an image
+        // This was causing a double image generation issue
         const imageGeneration = require('./imageGeneration');
-        const testResult = await imageGeneration.generateImage(gptResponse.parameters.prompt, {
-          model: gptResponse.parameters.model || 'gpt-image-1',
-          size: gptResponse.parameters.size || '1024x1024',
-        });
+        
+        // Just check the environment variable directly instead of calling generateImage
+        // Simplified to avoid requiring non-existent config file
+        const isEnabled = process.env.ENABLE_IMAGE_GENERATION === 'true';
+        const testResult = {
+          success: isEnabled,
+          error: isEnabled ? null : 'Image generation is currently disabled',
+          prompt: gptResponse.parameters.prompt
+        };
+        
+        discordLogger.debug({ isEnabled }, 'Checked if image generation is enabled without generating an image');
         
         // If image generation is disabled, fall back to a natural language response
         if (!testResult.success && testResult.error === 'Image generation is currently disabled') {
@@ -1685,6 +1768,11 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
         }
         
         // If image generation is enabled, proceed as normal
+        // IMPORTANT FIX: Update the start time right before calling handleImageGeneration
+        // This ensures we don't count the disabled check as part of initialization
+        feedbackMessage.imageGenerationStartTime = Date.now();
+        discordLogger.debug({ time: feedbackMessage.imageGenerationStartTime }, 'Updated start time before calling handleImageGeneration');
+        
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
         trackApiCall('gptimage');
         return;
