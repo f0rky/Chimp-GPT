@@ -167,20 +167,38 @@ const command = {
           newConfigValue: config.ENABLE_IMAGE_GENERATION 
         }, 'New image generation state after toggle');
         
-        await message.reply({
-          content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`,
-          allowedMentions: { repliedUser: false }
-        });
+        try {
+          // Try to reply to the message
+          await message.reply({
+            content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`,
+            allowedMentions: { repliedUser: false }
+          });
+        } catch (replyError) {
+          // If replying fails (e.g., message was deleted), send a new message instead
+          logger.warn({ error: replyError }, 'Failed to reply to message, sending new message instead');
+          await message.channel.send({
+            content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`
+          });
+        }
         logger.info(`Image generation ${newState ? 'enabled' : 'disabled'} via prefix command by ${message.author.tag}`);
       } else {
         throw new Error('Failed to update configuration');
       }
     } catch (error) {
       logger.error({ error, envPath }, 'Error in toggleimage prefix command');
-      await message.reply({
-        content: `❌ An error occurred while toggling image generation: ${error.message}`,
-        allowedMentions: { repliedUser: false }
-      });
+      try {
+        // Try to reply to the message
+        await message.reply({
+          content: `❌ An error occurred while toggling image generation: ${error.message}`,
+          allowedMentions: { repliedUser: false }
+        });
+      } catch (replyError) {
+        // If replying fails (e.g., message was deleted), send a new message instead
+        logger.warn({ error: replyError }, 'Failed to reply with error message, sending new message instead');
+        await message.channel.send({
+          content: `❌ An error occurred while toggling image generation: ${error.message}`
+        });
+      }
     }
   },
   // Add slash command data
