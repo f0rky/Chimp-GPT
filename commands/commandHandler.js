@@ -394,17 +394,17 @@ async function handleCommand(message, config) {
     }
 
     // Check if the command is admin-only
-    if (command.adminOnly && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (command.adminOnly && message.author.id !== config.OWNER_ID && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
       logger.info(
         {
           commandName,
           userId: message.author.id,
           username: message.author.username,
         },
-        'Admin-only command used by non-admin'
+        'Admin-only command used by non-admin and non-owner'
       );
 
-      await message.reply('This command is restricted to server administrators.');
+      await message.reply('This command is restricted to server administrators or the bot owner.');
       return true; // We handled it by rejecting it
     }
 
