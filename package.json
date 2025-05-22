@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A Discord chatbot leveraging the OpenAI GPT-3.5 API for dynamic and intelligent responses.",
   "main": "chimpGPT.js",
   "private": true,

@@ -136,32 +136,30 @@ class PFPManager {
 
     /**
      * Update the bot's profile picture to a random image
-     * @returns {Promise<boolean>} True if successful, false otherwise
+     * @returns {Promise<{success: boolean, error?: string, ratelimited?: boolean, newAvatarURL?: string}>} Result of the update attempt
      */
     async updateBotAvatar() {
-        // Update the last attempt time
-        this.lastAttemptTime = Date.now();
-        
-        // Check if we can update
+        // Check if we can update FIRST
         if (!this.canUpdatePFP()) {
-            logger.debug('Skipping PFP update - rate limited');
-            return false;
+            logger.debug('Skipping PFP update - rate limited by canUpdatePFP logic.');
+            // The canUpdatePFP method already logs the specific reason (e.g., last attempt too recent)
+            return { success: false, error: 'Update not allowed at this time (check logs for reason).', ratelimited: true };
         }
         
-        // Set the update in progress flag
+        // If canUpdatePFP passed, NOW we mark an attempt and proceed.
+        this.lastAttemptTime = Date.now(); 
         this.updateInProgress = true;
         
         try {
             const imagePath = await this.getRandomImage();
             if (!imagePath) {
                 logger.warn('No images available for PFP rotation');
-                return false;
+                return { success: false, error: 'No images available for rotation.' };
             }
             
-            // Skip if this is the same as the current PFP
             if (this.currentPfp === imagePath) {
-                logger.debug('Skipping PFP update (same as current)');
-                return false;
+                logger.debug('Skipping PFP update (image is same as current)');
+                return { success: false, error: 'Selected image is the same as current PFP.' };
             }
             
             logger.debug('Reading image file', { imagePath });
@@ -174,32 +172,35 @@ class PFPManager {
             
             await this.client.user.setAvatar(imageBuffer);
             
-            // Update state on success
             this.currentPfp = imagePath;
-            this.lastUpdateTime = Date.now();
+            this.lastUpdateTime = Date.now(); // Mark successful update time
             
             logger.info(`Updated bot PFP to: ${path.basename(imagePath)}`);
-            return true;
+            return { success: true, newAvatarURL: imagePath }; // Assuming imagePath can be somewhat representative
             
         } catch (error) {
+            let errorMessage = 'Failed to update PFP.';
+            let ratelimited = false;
             if (error.code === 50035) {
-                logger.warn('Cannot update PFP: Bot is in 100+ servers');
+                errorMessage = 'Cannot update PFP: Bot is in 100+ servers.';
+                logger.warn(errorMessage);
             } else if (error.code === 'AVATAR_RATE_LIMIT' || error.retryAfter) {
-                const retryAfter = error.retryAfter || 30 * 60 * 1000; // Default to 30 minutes if no retryAfter provided
-                logger.warn(`Rate limited. Will try again in ${Math.ceil(retryAfter / 60000)} minutes`);
-                // Set the last update time to now - minUpdateInterval + retryAfter
-                // This will prevent updates until the retryAfter period has passed
+                const retryAfter = error.retryAfter || 30 * 60 * 1000;
+                errorMessage = `Rate limited by Discord. Try again in ${Math.ceil(retryAfter / 60000)} minutes.`;
+                logger.warn(errorMessage);
+                // Adjust lastUpdateTime to effectively block further attempts until retryAfter has passed
                 this.lastUpdateTime = Date.now() - this.minUpdateInterval + retryAfter;
+                ratelimited = true;
             } else {
                 logger.error({ 
                     error: error.message,
                     stack: error.stack,
                     currentPFP: this.currentPfp
                 }, 'Failed to update PFP');
+                errorMessage = `An unexpected error occurred: ${error.message}`;
             }
-            return false;
+            return { success: false, error: errorMessage, ratelimited };
         } finally {
-            // Always clear the update in progress flag
             this.updateInProgress = false;
         }
     }

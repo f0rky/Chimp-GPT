@@ -1065,10 +1065,8 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
               return;
             }
 
-            if (command === 'pfp') {
-              await handlePFPCommand(message, args);
-              return;
-            }
+            // The 'pfp' command is now handled by its own module (commands/modules/pfp.js)
+            // and processed by the main commandHandler. Removing the local check here.
 
             if (command === 'status') {
               const status = args.join(' ');
@@ -2043,7 +2041,33 @@ client.on('ready', async () => {
     discordLogger.error({ error }, 'Error loading conversations from persistent storage');
   }
 
-  // Load command modules
+  // Initialize PFP Manager EARLIER to ensure it's available for commands
+  const pfpManager = new PFPManager(client, {
+    pfpDir: path.join(__dirname, 'pfp'),
+    maxImages: 50,
+    rotationInterval: 10 * 60 * 1000 // 10 minutes
+  });
+  client.pfpManager = pfpManager; // Assign to client immediately
+  discordLogger.info('PFP Manager initialized and attached to client.');
+  // Diagnostic log
+  if (client.pfpManager) {
+    discordLogger.info({ 
+      pfpManagerStatus: 'Assigned to client',
+      typeof: typeof client.pfpManager,
+      constructorName: client.pfpManager.constructor ? client.pfpManager.constructor.name : 'N/A',
+      methods: typeof client.pfpManager === 'object' ? Object.getOwnPropertyNames(client.pfpManager.constructor.prototype) : 'N/A'
+    }, 'PFP Manager diagnostic after assignment in ready event');
+  } else {
+    discordLogger.error('PFP Manager FAILED to attach to client in ready event.');
+  }
+
+  // Start PFP rotation if not in development (can happen after assignment)
+  if (process.env.NODE_ENV !== 'development') {
+    pfpManager.startRotation();
+    discordLogger.info('PFP rotation started');
+  }
+
+  // Load command modules (now pfpManager will be available to them)
   const commandsLoaded = await commandHandler.loadCommands();
   discordLogger.info({ commandsLoaded }, 'Command modules loaded');
 
@@ -2058,9 +2082,6 @@ client.on('ready', async () => {
         discordLogger.info('Attempting to deploy slash commands...');
         const deployResult = await commandHandler.deployCommands(config);
         discordLogger.info({ deployResult }, 'Slash commands deployment process finished.');
-        // Assuming deployCommands doesn't throw an error for a partial success,
-        // or if it does, we only record on full success.
-        // If deployResult itself indicates success/failure, that logic can be added here.
         await recordSuccessfulDeployment(); 
       } catch (error) {
         discordLogger.error({ error }, 'Error deploying slash commands');
@@ -2070,19 +2091,6 @@ client.on('ready', async () => {
     }
   } else {
     discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed or checked.');
-  }
-
-  // Initialize PFP Manager
-  const pfpManager = new PFPManager(client, {
-    pfpDir: path.join(__dirname, 'pfp'),
-    maxImages: 50,
-    rotationInterval: 10 * 60 * 1000 // 10 minutes
-  });
-
-  // Start PFP rotation if not in development
-  if (process.env.NODE_ENV !== 'development') {
-    pfpManager.startRotation();
-    discordLogger.info('PFP rotation started');
   }
 
   // Send greeting messages
@@ -2096,9 +2104,6 @@ client.on('ready', async () => {
   } catch (error) {
     discordLogger.error({ error }, 'Error sending startup greetings');
   }
-
-  // Store pfpManager for later use
-  client.pfpManager = pfpManager;
 });
 
 /**

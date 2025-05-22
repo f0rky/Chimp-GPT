@@ -419,7 +419,7 @@ async function handleCommand(message, config) {
       'Executing command'
     );
 
-    await command.execute(message, args, config);
+    await command.execute(message, args, message.client, config);
     return true;
   } catch (error) {
     // Enhanced granular error logging for plugin/core commands
