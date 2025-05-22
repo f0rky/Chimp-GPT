@@ -11,6 +11,7 @@
  */
 
 const { createLogger } = require('../logger');
+const { PermissionFlagsBits } = require('discord.js');
 const logger = createLogger('commands');
 const fs = require('fs');
 const path = require('path');
@@ -393,7 +394,7 @@ async function handleCommand(message, config) {
     }
 
     // Check if the command is admin-only
-    if (command.adminOnly && !message.member?.permissions.has('ADMINISTRATOR')) {
+    if (command.adminOnly && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
       logger.info(
         {
           commandName,
