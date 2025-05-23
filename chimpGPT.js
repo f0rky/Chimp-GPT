@@ -174,7 +174,7 @@ async function processOpenAIMessage(content, conversationLog) {
     // Otherwise, use the full context for other requests
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: conversationLog,
       functions: [
         {
@@ -1159,8 +1159,6 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       // Return to generating phase after enhancement is complete
       updateProgress('generating');
     }
-
-    // No need for another updateProgress here since we've already set it
 
     // Generate the image
     let result;
