@@ -49,15 +49,9 @@ function getDetailedVersionInfo() {
   // Get OpenAI model information
   let aiModel = 'unknown';
   try {
-    // Try to get the model from openaiConfig.js
-    const openaiConfigPath = path.join(__dirname, 'openaiConfig.js');
-    if (fs.existsSync(openaiConfigPath)) {
-      const openaiConfigContent = fs.readFileSync(openaiConfigPath, 'utf8');
-      const modelMatch = openaiConfigContent.match(/model:\s*["']([^"']+)["']/i);
-      if (modelMatch && modelMatch[1]) {
-        aiModel = modelMatch[1];
-      }
-    }
+    // Import and call getOpenAIModel directly for robustness
+    const { getOpenAIModel } = require('./openaiConfig');
+    aiModel = getOpenAIModel();
   } catch (err) {
     // Ignore errors
   }
