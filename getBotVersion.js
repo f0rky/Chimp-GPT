@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { getOpenAIModel } = require('./openaiConfig');
 
 /**
  * Get the bot's version from package.json
@@ -49,17 +50,11 @@ function getDetailedVersionInfo() {
   // Get OpenAI model information
   let aiModel = 'unknown';
   try {
-    // Try to get the model from openaiConfig.js
-    const openaiConfigPath = path.join(__dirname, 'openaiConfig.js');
-    if (fs.existsSync(openaiConfigPath)) {
-      const openaiConfigContent = fs.readFileSync(openaiConfigPath, 'utf8');
-      const modelMatch = openaiConfigContent.match(/model:\s*["']([^"']+)["']/i);
-      if (modelMatch && modelMatch[1]) {
-        aiModel = modelMatch[1];
-      }
-    }
+    aiModel = getOpenAIModel();
   } catch (err) {
-    // Ignore errors
+    // If getOpenAIModel is not available or errors, default to 'unknown'
+    console.error('Error retrieving AI model:', err); // Optional: log the error
+    aiModel = 'unknown';
   }
 
   return {
