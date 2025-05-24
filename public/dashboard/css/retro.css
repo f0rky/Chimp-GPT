@@ -1,26 +1,35 @@
-/* Modern Base Styles */
+/* Discord Theme Styles - Matching Main Dashboard */
 :root {
-  /* Colors */
-  --bg-color: #f5f7fa;
-  --text-color: #2d3748;
-  --text-secondary: #4a5568;
-  --accent-1: #4299e1;
-  --accent-2: #9f7aea;
-  --success: #48bb78;
-  --warning: #ed8936;
-  --danger: #f56565;
-  --info: #4299e1;
+  /* Colors - Matching main status dashboard */
+  --primary-color: #7289da;
+  --secondary-color: #424549;
+  --background-color: #36393f;
+  --card-color: #2f3136;
+  --text-color: #ffffff;
+  --text-secondary: #b9bbbe;
+  --success-color: #43b581;
+  --warning-color: #faa61a;
+  --error-color: #f04747;
+  --pending-color: #7289da;
+  
+  /* Retro colors for accents */
+  --accent-1: #7289da;
+  --accent-2: #5865f2;
+  --bg-color: #36393f;
+  --success: #43b581;
+  --warning: #faa61a;
+  --danger: #f04747;
+  --info: #7289da;
 
   /* Card Styles */
-  --card-bg: #ffffff;
-  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --card-border: 1px solid #e2e8f0;
+  --card-bg: #2f3136;
+  --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  --card-border: 1px solid rgba(255, 255, 255, 0.1);
   --card-radius: 8px;
 
   /* Typography */
   --font-mono: 'Share Tech Mono', monospace;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -73,7 +82,7 @@
 
 /* Base Styles */
 body {
-  background-color: var(--bg-color);
+  background-color: var(--background-color);
   min-height: 100vh;
   padding: var(--spacing-md);
   position: relative;
@@ -85,38 +94,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Modern subtle background pattern */
-body::after {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(66, 153, 225, 0.05) 10%,
-      transparent 0,
-      transparent 50%,
-      rgba(66, 153, 225, 0.05) 0,
-      rgba(66, 153, 225, 0.05) 60%,
-      transparent 0,
-      transparent
-    ),
-    linear-gradient(
-      45deg,
-      rgba(159, 122, 234, 0.05) 10%,
-      transparent 0,
-      transparent 50%,
-      rgba(159, 122, 234, 0.05) 0,
-      rgba(159, 122, 234, 0.05) 60%,
-      transparent 0,
-      transparent
-    );
-  background-size: 14px 14px;
-  z-index: -1;
-  pointer-events: none;
+/* Remove CRT effect class */
+body.crt {
+  background-color: var(--background-color);
 }
 
 /* Dashboard Layout */
@@ -135,21 +115,22 @@ body::after {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-md) var(--spacing-lg);
-  margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) var(--spacing-lg);
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
-  color: white;
-  border-radius: var(--card-radius) var(--card-radius) 0 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
   position: relative;
   z-index: 10;
 }
 
 .logo {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: 700;
-  color: white;
-  letter-spacing: 1px;
+  color: var(--text-color);
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -160,30 +141,29 @@ body::after {
   display: inline-block;
   width: 12px;
   height: 12px;
-  background-color: #48bb78;
+  background-color: var(--success-color);
   border-radius: 50%;
   margin-right: 8px;
-  box-shadow: 0 0 10px #48bb78;
 }
 
 .cost-tracker {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: 20px;
+  border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 500;
-  backdrop-filter: blur(5px);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  font-family: var(--font-mono);
 }
 
 .time {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.2);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: 20px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 /* Dashboard Grid */
@@ -220,26 +200,17 @@ body::after {
 }
 
 .card h2 {
-  font-size: 0.9rem;
+  font-size: 1.2rem;
   margin: 0 0 var(--spacing-md) 0;
-  color: var(--accent-1);
+  color: var(--text-secondary);
   padding-bottom: var(--spacing-sm);
-  border-bottom: 2px solid #e2e8f0;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: none;
+  letter-spacing: normal;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-}
-
-.card h2::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background-color: var(--accent-1);
-  border-radius: 50%;
 }
 
 /* Status Panel */
@@ -248,18 +219,25 @@ body::after {
 }
 
 .status-indicator {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 1rem;
-  padding: 0.3rem 0.8rem;
-  border-radius: 3px;
-  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
   font-size: 0.9rem;
+  background: rgba(67, 181, 129, 0.1);
+  color: var(--success-color);
 }
 
-.status-indicator.online {
-  color: #00ff00;
-  background-color: rgba(0, 255, 0, 0.1);
-  border: 1px solid #00ff00;
+.status-indicator.online::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background-color: var(--success-color);
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .status-grid {
@@ -271,17 +249,19 @@ body::after {
 .status-item {
   display: flex;
   justify-content: space-between;
-  padding: 0.5rem;
-  background: rgba(0, 20, 0, 0.3);
-  border: 1px solid rgba(0, 255, 0, 0.2);
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
 }
 
 .status-item .label {
-  color: var(--accent-1);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .status-item .value {
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--text-color);
 }
 
 /* Active Request */
@@ -291,9 +271,9 @@ body::after {
 
 .progress-container {
   width: 100%;
-  height: 20px;
-  background-color: rgba(0, 20, 0, 0.5);
-  border: 1px solid var(--accent-1);
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
   margin-bottom: 0.5rem;
   position: relative;
   overflow: hidden;
@@ -302,9 +282,10 @@ body::after {
 .progress-bar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  background: var(--primary-color);
   transition: width 0.3s ease;
   position: relative;
+  border-radius: 4px;
 }
 
 .progress-bar::after {
@@ -346,9 +327,9 @@ body::after {
 
 .memory-gauge {
   width: 100%;
-  height: 20px;
-  background-color: rgba(0, 20, 0, 0.5);
-  border: 1px solid var(--accent-1);
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
   position: relative;
   overflow: hidden;
 }
@@ -356,8 +337,9 @@ body::after {
 .gauge-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  background: var(--primary-color);
   transition: width 0.5s ease;
+  border-radius: 4px;
 }
 
 .gauge-text {
@@ -366,8 +348,9 @@ body::after {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 0.8rem;
-  font-weight: bold;
-  text-shadow: 0 0 5px #000;
+  font-weight: 600;
+  color: var(--text-color);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 /* Latency Graph */
@@ -472,19 +455,9 @@ body::after {
   font-family: var(--font-mono);
 }
 
-/* Scanlines */
+/* Remove scanlines for cleaner look */
 .scanlines {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.1) 50%);
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 1000;
-  opacity: 0.2;
-  animation: scanline 8s linear infinite;
+  display: none;
 }
 
 /* Responsive Adjustments */
@@ -558,4 +531,71 @@ body::after {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-2);
+}
+
+/* Error Messages */
+.api-error {
+  background: rgba(245, 101, 101, 0.9);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--spacing-sm);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  animation: fadeIn 0.3s ease-out;
+  font-size: 0.9rem;
+}
+
+.error-icon {
+  font-size: 1.2rem;
+}
+
+.error-text {
+  flex: 1;
+}
+
+/* Status variations */
+.status-item .value.online {
+  color: var(--success);
+}
+
+.status-item .value.offline {
+  color: var(--danger);
+}
+
+.status-item .value.idle {
+  color: var(--warning);
+}
+
+.status-item .value.error {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+/* Back Link */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--primary-color);
+  color: var(--text-color);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.back-link:hover {
+  background: #5b73bc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.back-link .icon {
+  font-size: 1rem;
 }
