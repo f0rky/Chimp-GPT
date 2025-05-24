@@ -953,12 +953,12 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
     }
 
     // Use the sanitized input for validation
-    // serverFilter = sanitizedServerFilter;
+    // serverFilter is already sanitized at this point
   }
 
   // Validate inputs (these should already be validated by the command module,
   // but we validate again here for safety and to handle direct calls)
-  const serverToValidate = sanitizedServerFilter || serverFilter;
+  const serverToValidate = serverFilter;
   const validatedServer = validateServerInput(serverToValidate);
   const validatedEloMode = validateEloMode(eloMode);
 
