@@ -8,7 +8,7 @@ require('dotenv').config();
  *
  * @module ChimpGPT
  * @author Brett
- * @version 1.0.1
+ * @version 1.6.0
  */
 
 const { Client, GatewayIntentBits } = require('discord.js');
