@@ -1270,24 +1270,33 @@ function setStatusIndicator(status) {
  * @param {Object} apiCalls - API call counts by service
  */
 function updateApiCalls(apiCalls) {
-  // Update individual counters
-  document.getElementById('openai-calls').textContent = apiCalls.openai.toLocaleString();
-  document.getElementById('weather-calls').textContent = apiCalls.weather.toLocaleString();
-  document.getElementById('time-calls').textContent = apiCalls.time.toLocaleString();
-  document.getElementById('wolfram-calls').textContent = apiCalls.wolfram.toLocaleString();
-  document.getElementById('quake-calls').textContent = apiCalls.quake.toLocaleString();
-  document.getElementById('dalle-calls').textContent = (apiCalls.gptimage || apiCalls.dalle || 0).toLocaleString();
+  // Update individual counters with null checks
+  const openaiElement = document.getElementById('openai-calls');
+  const weatherElement = document.getElementById('weather-calls');
+  const timeElement = document.getElementById('time-calls');
+  const wolframElement = document.getElementById('wolfram-calls');
+  const quakeElement = document.getElementById('quake-calls');
+  const dalleElement = document.getElementById('dalle-calls');
 
-  // Update chart
-  apiChart.data.datasets[0].data = [
-    apiCalls.openai,
-    apiCalls.weather,
-    apiCalls.time,
-    apiCalls.wolfram,
-    apiCalls.quake,
-    apiCalls.gptimage || apiCalls.dalle || 0,
-  ];
-  apiChart.update();
+  if (openaiElement) openaiElement.textContent = apiCalls.openai.toLocaleString();
+  if (weatherElement) weatherElement.textContent = apiCalls.weather.toLocaleString();
+  if (timeElement) timeElement.textContent = apiCalls.time.toLocaleString();
+  if (wolframElement) wolframElement.textContent = apiCalls.wolfram.toLocaleString();
+  if (quakeElement) quakeElement.textContent = apiCalls.quake.toLocaleString();
+  if (dalleElement) dalleElement.textContent = (apiCalls.gptimage || apiCalls.dalle || 0).toLocaleString();
+
+  // Update chart if it exists
+  if (apiChart && apiChart.data && apiChart.data.datasets[0]) {
+    apiChart.data.datasets[0].data = [
+      apiCalls.openai,
+      apiCalls.weather,
+      apiCalls.time,
+      apiCalls.wolfram,
+      apiCalls.quake,
+      apiCalls.gptimage || apiCalls.dalle || 0,
+    ];
+    apiChart.update();
+  }
 }
 
 /**
@@ -1295,12 +1304,24 @@ function updateApiCalls(apiCalls) {
  * @param {Object} errors - Error counts by service
  */
 function updateErrors(errors) {
-  // Update individual counters
-  document.getElementById('openai-errors').textContent = errors.openai.toLocaleString();
-  document.getElementById('discord-errors').textContent = errors.discord.toLocaleString();
-  document.getElementById('weather-errors').textContent = errors.weather.toLocaleString();
-  document.getElementById('dalle-errors').textContent = (errors.gptimage || errors.dalle || 0).toLocaleString();
-  document.getElementById('other-errors').textContent = errors.other.toLocaleString();
+  // Update individual counters with null checks
+  const openaiErrorsElement = document.getElementById('openai-errors');
+  const discordErrorsElement = document.getElementById('discord-errors');
+  const weatherErrorsElement = document.getElementById('weather-errors');
+  const timeErrorsElement = document.getElementById('time-errors');
+  const wolframErrorsElement = document.getElementById('wolfram-errors');
+  const quakeErrorsElement = document.getElementById('quake-errors');
+  const dalleErrorsElement = document.getElementById('dalle-errors');
+  const otherErrorsElement = document.getElementById('other-errors');
+
+  if (openaiErrorsElement) openaiErrorsElement.textContent = errors.openai.toLocaleString();
+  if (discordErrorsElement) discordErrorsElement.textContent = errors.discord.toLocaleString();
+  if (weatherErrorsElement) weatherErrorsElement.textContent = errors.weather.toLocaleString();
+  if (timeErrorsElement) timeErrorsElement.textContent = errors.time.toLocaleString();
+  if (wolframErrorsElement) wolframErrorsElement.textContent = errors.wolfram.toLocaleString();
+  if (quakeErrorsElement) quakeErrorsElement.textContent = errors.quake.toLocaleString();
+  if (dalleErrorsElement) dalleErrorsElement.textContent = (errors.gptimage || errors.dalle || 0).toLocaleString();
+  if (otherErrorsElement) otherErrorsElement.textContent = errors.other.toLocaleString();
 
   // Handle plugin errors with the new detailed structure
   const pluginErrorsContainer = document.getElementById('plugin-errors-container');
@@ -1373,18 +1394,20 @@ function updateErrors(errors) {
     }
   }
 
-  // Update chart
-  errorChart.data.datasets[0].data = [
-    errors.openai,
-    errors.discord,
-    errors.weather,
-    errors.time,
-    errors.wolfram,
-    errors.quake,
-    errors.gptimage || errors.dalle || 0,
-    errors.other,
-  ];
-  errorChart.update();
+  // Update chart if it exists
+  if (errorChart && errorChart.data && errorChart.data.datasets[0]) {
+    errorChart.data.datasets[0].data = [
+      errors.openai,
+      errors.discord,
+      errors.weather,
+      errors.time,
+      errors.wolfram,
+      errors.quake,
+      errors.gptimage || errors.dalle || 0,
+      errors.other,
+    ];
+    errorChart.update();
+  }
 }
 
 /**
@@ -1396,15 +1419,8 @@ function updateMemoryUsage(memory, system) {
   console.log('updateMemoryUsage received memory:', JSON.stringify(memory));
   console.log('updateMemoryUsage received system:', JSON.stringify(system));
   // Parse memory values
-  const heapUsed = parseInt(memory.heapUsed, 10);
-  const heapTotal = parseInt(memory.heapTotal, 10);
-  const rss = parseInt(memory.rss, 10);
   const systemFree = parseInt(system.freeMemory, 10);
   const systemTotal = parseInt(system.totalMemory, 10);
-
-  // Calculate percentages
-  const heapPercent = (heapUsed / heapTotal) * 100;
-  const systemPercent = ((systemTotal - systemFree) / systemTotal) * 100;
 
   // Update memory display elements with correct IDs
   const memoryRssElement = document.getElementById('memory-rss');
