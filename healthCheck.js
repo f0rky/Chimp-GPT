@@ -72,6 +72,19 @@ const os = require('os');
 const { version } = require('./package.json');
 const { getLastDeploymentTimestamp } = require('./utils/deploymentManager');
 
+// Track response times for latency calculation
+const responseTimes = [];
+const MAX_RESPONSE_TIMES = 100; // Track last 100 response times
+
+// Track system metrics over time
+const systemMetrics = {
+  memory: [],
+  cpu: [],
+  load: [],
+  timestamps: []
+};
+const MAX_METRICS = 60; // Store last minute of data (assuming 1s interval)
+
 // Import configuration and test runners
 const config = require('./configValidator');
 const { runConversationLogTests, runOpenAITests, runQuakeTests } = require('./tests/testRunner');
@@ -148,10 +161,7 @@ function initHealthCheck(client) {
     currentPort = config.DEV_PORT || config.HEALTH_PORT || 3001;
   }
 
-  const allowedOrigins = [
-    `http://localhost:${currentPort}`,
-    `http://127.0.0.1:${currentPort}`
-  ];
+  const allowedOrigins = [`http://localhost:${currentPort}`, `http://127.0.0.1:${currentPort}`];
 
   if (config.STATUS_HOSTNAME) {
     allowedOrigins.push(`http://${config.STATUS_HOSTNAME}:${currentPort}`);
@@ -159,8 +169,13 @@ function initHealthCheck(client) {
 
   const corsOptions = {
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+      // In development, allow all origins for easier development
+      if (nodeEnvForPort !== 'production') {
+        return callback(null, true);
+      }
+      
+      // In production, only allow specific origins
+      if (!origin) return callback(null, true); // Allow requests with no origin (like mobile apps or curl requests)
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
@@ -209,90 +224,169 @@ function initHealthCheck(client) {
 
   // Detailed health check endpoint
   app.get('/function-results', (req, res) => {
-    const functionResults = stats.customStats && stats.customStats.functionResults ? stats.customStats.functionResults : {};
+    const functionResults =
+      stats.customStats && stats.customStats.functionResults
+        ? stats.customStats.functionResults
+        : {};
     res.json(functionResults);
   });
 
-  app.get('/health', async (req, res) => {
+  app.get('/health', (req, res) => {
+    // Track request start time for latency calculation
+    req._startTime = Date.now();
     try {
-    const uptime = Math.floor((new Date() - stats.startTime) / 1000);
-    const memoryUsage = process.memoryUsage();
+      const uptime = Math.floor((new Date() - stats.startTime) / 1000);
+      const memoryUsage = process.memoryUsage();
 
-    const health = {
-      status: 'ok',
-      uptime: uptime,
-      version: version,
-      memory: {
-        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-      },
-      system: {
-        platform: process.platform,
-        arch: process.arch,
-        cpus: os.cpus().length,
-        loadAvg: os.loadavg(),
-        freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
-        totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
-      },
-      stats: {
-        messageCount: stats.messageCount,
-        apiCalls: stats.apiCalls,
-        errors: stats.errors,
-        rateLimits: {
-          count: (stats.rateLimits && typeof stats.rateLimits.hit === 'number') ? stats.rateLimits.hit : 0,
-          uniqueUsers: (stats.rateLimits && stats.rateLimits.users && typeof stats.rateLimits.users.size === 'number') ? stats.rateLimits.users.size : 0,
-          userDetails: (stats.rateLimits && stats.rateLimits.users) ? Array.from(stats.rateLimits.users) : [],
-        },
-      },
-      discord: {
-        ping: client.ws.ping,
-        status: client.ws.status === 0 ? 'online' : 'issues',
-        guilds: client.guilds.cache.size,
-        channels: client.channels.cache.size,
-      },
-    };
+      // Calculate average response time
+      const avgResponseTime = responseTimes.length > 0 
+        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
+        : 0;
 
-    // Add slash command deployment info
-    try {
-      const lastDeploymentMs = await getLastDeploymentTimestamp();
-      let nextCheckEstimate = 'N/A';
-      const autoDeployEnabled = config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true';
-
-      if (lastDeploymentMs) {
-        const nextCheckDate = new Date(lastDeploymentMs + (12 * 60 * 60 * 1000));
-        nextCheckEstimate = autoDeployEnabled ? nextCheckDate.toISOString() : 'Disabled by DEPLOY_COMMANDS';
+      // Get current timestamp for metrics
+      const now = new Date();
+      
+      // Add current metrics to history
+      systemMetrics.memory.push(process.memoryUsage().heapUsed);
+      systemMetrics.cpu.push(process.cpuUsage().user);
+      systemMetrics.load.push(os.loadavg()[0]);
+      systemMetrics.timestamps.push(now);
+      
+      // Keep only the most recent metrics
+      if (systemMetrics.memory.length > MAX_METRICS) {
+        systemMetrics.memory.shift();
+        systemMetrics.cpu.shift();
+        systemMetrics.load.shift();
+        systemMetrics.timestamps.shift();
       }
 
-      health.slashCommands = {
-        lastDeployed: lastDeploymentMs ? new Date(lastDeploymentMs).toISOString() : 'Never or Unknown',
-        nextScheduledCheck: nextCheckEstimate,
-        autoDeployEnabled: autoDeployEnabled,
+      const health = {
+        status: 'ok',
+        name: client.user?.username || 'ChimpGPT',
+        uptime: uptime,
+        version: version,
+        metrics: {
+          responseTime: {
+            current: Date.now() - req._startTime,
+            average: avgResponseTime,
+            min: responseTimes.length > 0 ? Math.min(...responseTimes) : 0,
+            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0
+          },
+          system: {
+            memory: systemMetrics.memory,
+            cpu: systemMetrics.cpu,
+            load: systemMetrics.load,
+            timestamps: systemMetrics.timestamps.map(t => t.toISOString())
+          }
+        },
+        debug: {
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch,
+          pid: process.pid,
+          uptime: process.uptime(),
+          env: process.env.NODE_ENV || 'development'
+        },
+        memory: {
+          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+          heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+        },
+        system: {
+          platform: process.platform,
+          arch: process.arch,
+          cpus: os.cpus().length,
+          loadAvg: os.loadavg(),
+          freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
+          totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
+        },
+        stats: {
+          messageCount: stats.messageCount,
+          apiCalls: stats.apiCalls,
+          errors: stats.errors,
+          rateLimits: {
+            count:
+              stats.rateLimits && typeof stats.rateLimits.hit === 'number'
+                ? stats.rateLimits.hit
+                : 0,
+            uniqueUsers:
+              stats.rateLimits &&
+              stats.rateLimits.users &&
+              typeof stats.rateLimits.users.size === 'number'
+                ? stats.rateLimits.users.size
+                : 0,
+            userDetails:
+              stats.rateLimits && stats.rateLimits.users ? Array.from(stats.rateLimits.users) : [],
+          },
+        },
+        discord: {
+          ping: client.ws.ping,
+          status: client.ws.status === 0 ? 'online' : 'issues',
+          guilds: client.guilds.cache.size,
+          channels: client.channels.cache.size,
+        },
       };
-    } catch (err) {
-      logger.error({ err }, 'Error fetching slash command deployment info for /health endpoint');
-      health.slashCommands = {
-        lastDeployed: 'Error fetching',
-        nextScheduledCheck: 'Error fetching',
-        autoDeployEnabled: config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true',
-        error: 'Failed to retrieve deployment timestamps',
-      };
-    }
 
+      // Add slash command deployment info
+      try {
+        // Remove async/await since we're not using it here
+        const lastDeploymentMs = getLastDeploymentTimestamp();
+        let nextCheckEstimate = 'N/A';
+        const autoDeployEnabled =
+          config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true';
 
-    // Check if any error counts are high
-    const errorSum = calculateTotalErrors(stats.errors);
-    if (errorSum > 20 || stats.errors.openai > 10) {
-      health.status = 'warning';
-    }
+        if (lastDeploymentMs) {
+          try {
+            const nextCheckDate = new Date(lastDeploymentMs + 12 * 60 * 60 * 1000);
+            nextCheckEstimate = autoDeployEnabled && !isNaN(nextCheckDate.getTime())
+              ? nextCheckDate.toISOString()
+              : 'Disabled or invalid date';
+          } catch (e) {
+            console.error('Error calculating next check date:', e);
+            nextCheckEstimate = 'Error calculating';
+          }
+        }
 
+        health.slashCommands = {
+          lastDeployed: lastDeploymentMs && !isNaN(new Date(lastDeploymentMs).getTime())
+            ? new Date(lastDeploymentMs).toISOString()
+            : 'Never or Unknown',
+          nextScheduledCheck: nextCheckEstimate,
+          autoDeployEnabled: autoDeployEnabled,
+        };
+      } catch (err) {
+        logger.error({ err }, 'Error fetching slash command deployment info for /health endpoint');
+        health.slashCommands = {
+          lastDeployed: 'Error fetching',
+          nextScheduledCheck: 'Error fetching',
+          autoDeployEnabled: config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true',
+          error: 'Failed to retrieve deployment timestamps',
+        };
+      }
+
+      // Check if any error counts are high
+      const errorSum = calculateTotalErrors(stats.errors);
+      if (errorSum > 20 || (stats.errors.openai || 0) > 10) {
+        health.status = 'warning';
+      }
+
+      // Calculate response time and add to history
+      const responseTime = Date.now() - req._startTime;
+      responseTimes.push(responseTime);
+      if (responseTimes.length > MAX_RESPONSE_TIMES) {
+        responseTimes.shift();
+      }
+      
+      // Add current response time to the health object
+      health.metrics.responseTime.current = responseTime;
+      
       res.json(health);
     } catch (err) {
       logger.error({ err }, 'Critical error in /health endpoint');
       res.status(500).json({
         status: 'error',
         message: 'Server error while fetching health data.',
-        error: err.message
+        error: err.message,
       });
     }
   });
@@ -338,7 +432,9 @@ function initHealthCheck(client) {
   const DISPLAY_HOSTNAME = config.STATUS_HOSTNAME || 'localhost';
 
   app.listen(PORT, LISTEN_ADDRESS, () => {
-    logger.info(`Health check server running at http://${DISPLAY_HOSTNAME}:${PORT}/ (listening on ${LISTEN_ADDRESS}:${PORT} in ${nodeEnv} mode)`);
+    logger.info(
+      `Health check server running at http://${DISPLAY_HOSTNAME}:${PORT}/ (listening on ${LISTEN_ADDRESS}:${PORT} in ${nodeEnv} mode)`
+    );
   });
 
   // Schedule periodic health reports to owner
@@ -551,34 +647,35 @@ function generateHealthReport(isStartup = false) {
   report += `• Plugin Functions: ${stats.plugins.functions}\n`;
   report += `• Plugin Hooks: ${stats.plugins.hooks}`;
   report += pluginApiCallsText;
-  
+
   if (isStartup) {
     report += `\n• Plugin Details: ${getLoadedPlugins()}`;
   }
-  
+
   // Add errors section
   report += `\n**Errors:**\n`;
   report += `• Total Errors: ${calculateTotalErrors(stats.errors)}\n`;
   report += `• OpenAI Errors: ${stats.errors.openai}\n`;
   report += `• Discord Errors: ${stats.errors.discord}\n`;
   report += `• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}\n\n`;
-  
+
   // Add rate limiting section
   report += `**Rate Limiting:**\n`;
   report += `• Rate Limits Hit: ${stats.rateLimits.hit}\n`;
   report += `• Unique Users Limited: ${stats.rateLimits.users.size}\n\n`;
-  
+
   // Add footer with commands
   report += `For more details, use one of these commands: 'stats', '!stats', '.stats', or '/stats'`;
-  
+
   // Add status page and logs if it's a startup report
   if (isStartup) {
-    const determinedStatusPort = process.env.NODE_ENV === 'development' ? config.DEV_PORT : config.PROD_PORT;
+    const determinedStatusPort =
+      process.env.NODE_ENV === 'development' ? config.DEV_PORT : config.PROD_PORT;
     const actualHostname = process.env.STATUS_HOSTNAME || 'localhost'; // Fallback just in case, though configValidator should ensure it's set
     report += `\n\n**Status Page:** http://${actualHostname}:${determinedStatusPort}`;
     report += `\n\n**Recent Logs:**\n\`\`\`\n${getRecentLogs(15)}\n\`\`\``;
   }
-  
+
   return report;
 }
 

@@ -14,6 +14,7 @@
 // Charts for visualizing data
 let apiChart = null;
 let errorChart = null;
+let metricsChart = null;
 
 // Update interval in milliseconds
 const UPDATE_INTERVAL = 5000; // 5 seconds
@@ -26,8 +27,303 @@ function closeImageModal() {
   }
 }
 
+// Initialize metrics chart
+function initMetricsChart() {
+  try {
+    const ctx = document.getElementById('metrics-chart');
+    if (!ctx) {
+      console.warn('Metrics chart canvas not found');
+      return;
+    }
+    
+    // Destroy existing chart instance if it exists
+    if (window.metricsChart) {
+      try {
+        window.metricsChart.destroy();
+      } catch (e) {
+        console.warn('Error destroying existing chart:', e);
+      }
+      window.metricsChart = null;
+    }
+
+    // Clear the canvas
+    const context = ctx.getContext('2d');
+    context.clearRect(0, 0, ctx.width, ctx.height);
+
+    window.metricsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Response Time (ms)',
+            data: [],
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.4,
+            yAxisID: 'y',
+            fill: true
+          },
+          {
+            label: 'CPU Usage (%)',
+            data: [],
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.4,
+            yAxisID: 'y1',
+            fill: true
+          },
+          {
+            label: 'Memory Usage (MB)',
+            data: [],
+            borderColor: 'rgba(54, 162, 235, 1)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            tension: 0.4,
+            yAxisID: 'y2',
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Time',
+              color: 'rgba(255, 255, 255, 0.7)'
+            },
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.7)'
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Response Time (ms)',
+              color: 'rgba(75, 192, 192, 1)'
+            },
+            grid: {
+              color: 'rgba(75, 192, 192, 0.1)'
+            },
+            ticks: {
+              color: 'rgba(75, 192, 192, 1)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'CPU Usage (%)',
+              color: 'rgba(255, 99, 132, 1)'
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+            ticks: {
+              color: 'rgba(255, 99, 132, 1)'
+            }
+          },
+          y2: {
+            type: 'linear',
+            display: false,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Memory (MB)',
+              color: 'rgba(54, 162, 235, 1)'
+            },
+            grid: {
+              drawOnChartArea: false,
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: 'rgba(255, 255, 255, 0.7)'
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  label += context.parsed.y.toFixed(2);
+                  if (context.datasetIndex === 0) label += ' ms';
+                  if (context.datasetIndex === 1) label += ' %';
+                  if (context.datasetIndex === 2) label += ' MB';
+                }
+                return label;
+              }
+            }
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.error('Error initializing metrics chart:', e);
+  }
+}
+
+// Update performance metrics display
+function updatePerformanceMetrics(metrics) {
+  // Check if we have a metrics object and required elements exist
+  if (!metrics || !document.getElementById('response-time') || !document.getElementById('cpu-usage')) {
+    return;
+  }
+  if (!metrics) return;
+  
+  // Update response time metrics
+  const responseTimeElement = document.getElementById('response-time');
+  const avgResponseTimeElement = document.getElementById('avg-response-time');
+  const minMaxResponseTimeElement = document.getElementById('minmax-response-time');
+  
+  if (responseTimeElement && metrics.responseTime) {
+    responseTimeElement.textContent = `${Math.round(metrics.responseTime.current)} ms`;
+  }
+  
+  if (avgResponseTimeElement && metrics.responseTime) {
+    avgResponseTimeElement.textContent = `${Math.round(metrics.responseTime.average)} ms`;
+  }
+  
+  if (minMaxResponseTimeElement && metrics.responseTime) {
+    minMaxResponseTimeElement.textContent = 
+      `${Math.round(metrics.responseTime.min)} / ${Math.round(metrics.responseTime.max)} ms`;
+  }
+  
+  // Update CPU and memory metrics
+  const cpuUsageElement = document.getElementById('cpu-usage');
+  const cpuLoadElement = document.getElementById('cpu-load');
+  const memoryUsageElement = document.getElementById('memory-usage');
+  
+  if (cpuUsageElement && metrics.system && metrics.system.cpu && metrics.system.cpu.length > 0) {
+    const cpuUsage = metrics.system.cpu[metrics.system.cpu.length - 1] / 1000; // Convert to ms
+    cpuUsageElement.textContent = `${cpuUsage.toFixed(1)}%`;
+  }
+  
+  if (cpuLoadElement && metrics.system && metrics.system.load && metrics.system.load.length > 0) {
+    const load = metrics.system.load[metrics.system.load.length - 1];
+    cpuLoadElement.textContent = load.toFixed(2);
+  }
+  
+  if (memoryUsageElement && metrics.system && metrics.system.memory && metrics.system.memory.length > 0) {
+    const memUsedMB = Math.round(metrics.system.memory[metrics.system.memory.length - 1] / 1024 / 1024);
+    // Get total memory from system object if available, otherwise use a default value
+    const totalMem = metrics.system.totalMemory || 1024 * 8; // Default to 8GB if not available
+    const totalMemMB = Math.round(totalMem / 1024 / 1024);
+    memoryUsageElement.textContent = `${memUsedMB} / ${totalMemMB} MB`;
+  }
+  
+  // Update chart if we have enough data
+  if (metrics.system && 
+      metrics.system.timestamps && 
+      metrics.system.timestamps.length > 0 && 
+      metrics.system.cpu && 
+      metrics.system.cpu.length > 0 &&
+      metrics.system.memory && 
+      metrics.system.memory.length > 0) {
+    
+    const lastIndex = metrics.system.timestamps.length - 1;
+    updateMetricsChart(
+      metrics.system.timestamps[lastIndex],
+      {
+        responseTime: metrics.responseTime.current,
+        cpu: metrics.system.cpu[lastIndex],
+        memory: metrics.system.memory[lastIndex]
+      }
+    );
+  }
+}
+
+// Update metrics chart with new data
+function updateMetricsChart(timestamp, metrics) {
+  if (!window.metricsChart) return;
+  
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString();
+  
+  try {
+    // Add new data points
+    window.metricsChart.data.labels.push(timeStr);
+    
+    // Response time in ms
+    window.metricsChart.data.datasets[0].data.push(metrics.responseTime);
+    
+    // CPU usage (convert from microseconds to milliseconds and then to percentage)
+    const cpuUsage = metrics.cpu / 1000; // Convert to ms
+    window.metricsChart.data.datasets[1].data.push(cpuUsage);
+    
+    // Memory usage in MB
+    const memoryUsedMB = Math.round(metrics.memory / 1024 / 1024);
+    window.metricsChart.data.datasets[2].data.push(memoryUsedMB);
+    
+    // Keep only the last 20 data points
+    const maxPoints = 20;
+    if (window.metricsChart.data.labels.length > maxPoints) {
+      window.metricsChart.data.labels.shift();
+      window.metricsChart.data.datasets.forEach(dataset => {
+        if (dataset && dataset.data) {
+          dataset.data.shift();
+        }
+      });
+    }
+    
+    window.metricsChart.update('none');
+  } catch (error) {
+    console.error('Error updating metrics chart:', error);
+    // Reinitialize the chart if there's an error
+    initMetricsChart();
+  }
+}
+
+// Clean up chart on page unload
+window.addEventListener('beforeunload', () => {
+  if (window.metricsChart) {
+    try {
+      window.metricsChart.destroy();
+    } catch (e) {
+      console.warn('Error destroying chart on unload:', e);
+    }
+    window.metricsChart = null;
+  }
+});
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
+  // Ensure all required elements exist
+  if (!document.querySelector('.dot') || !document.querySelector('.status-text')) {
+    console.error('Required status indicator elements not found');
+    return;
+  }
+  // Breaker functionality disabled - endpoints not implemented
+  /*
   // Admin Breaker Panel
   const adminPanel = document.createElement('div');
   adminPanel.className = 'card admin-breaker';
@@ -42,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   document.querySelector('.dashboard').appendChild(adminPanel);
   function fetchBreakerStatus() {
-    fetch('/api/breaker/status')
+    fetch('/breaker/status')
       .then(r => r.json())
       .then(data => {
         document.getElementById('breaker-status').innerText = data.breakerOpen
@@ -70,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchBreakerStatus();
   document.getElementById('breaker-reset-btn').onclick = () => {
     const token = document.getElementById('owner-token').value;
-    fetch('/api/breaker/reset', {
+    fetch('/breaker/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-owner-token': token },
       body: JSON.stringify({ token }),
@@ -83,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const idx = Number(e.target.getAttribute('data-idx'));
       const dec = e.target.getAttribute('data-dec');
       const token = document.getElementById('owner-token').value;
-      fetch('/api/breaker/approve', {
+      fetch('/breaker/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-owner-token': token },
         body: JSON.stringify({ index: idx, decision: dec, token }),
@@ -92,14 +388,17 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(fetchBreakerStatus);
     }
   };
+  */
 
   initCharts();
+  initMetricsChart();
   updateStatus();
   updateFunctionResults();
 
   // Set up periodic updates
   setInterval(updateStatus, UPDATE_INTERVAL);
   setInterval(updateFunctionResults, UPDATE_INTERVAL);
+  setInterval(updatePerformanceMetrics, UPDATE_INTERVAL);
 
   // Set up event listeners
   document.getElementById('run-tests').addEventListener('click', runTests);
@@ -245,6 +544,146 @@ function initCharts() {
         },
       },
     },
+  });
+
+  // Performance metrics chart
+  const metricsCtx = document.getElementById('metrics-chart').getContext('2d');
+  metricsChart = new Chart(metricsCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Response Time (ms)',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y',
+          fill: true
+        },
+        {
+          label: 'CPU Usage (%)',
+          data: [],
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y1',
+          fill: true
+        },
+        {
+          label: 'Memory Usage (MB)',
+          data: [],
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y2',
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Time',
+            color: 'rgba(255, 255, 255, 0.7)'
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.7)'
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Response Time (ms)',
+            color: 'rgba(75, 192, 192, 1)'
+          },
+          grid: {
+            color: 'rgba(75, 192, 192, 0.1)'
+          },
+          ticks: {
+            color: 'rgba(75, 192, 192, 1)'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'CPU Usage (%)',
+            color: 'rgba(255, 99, 132, 1)'
+          },
+          grid: {
+            drawOnChartArea: false,
+          },
+          ticks: {
+            color: 'rgba(255, 99, 132, 1)'
+          }
+        },
+        y2: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Memory (MB)',
+            color: 'rgba(54, 162, 235, 1)'
+          },
+          grid: {
+            drawOnChartArea: false,
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: 'rgba(255, 255, 255, 0.7)'
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#fff',
+          bodyColor: '#fff',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          padding: 12,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                label += context.parsed.y.toFixed(2);
+                if (context.datasetIndex === 0) label += ' ms';
+                if (context.datasetIndex === 1) label += ' %';
+                if (context.datasetIndex === 2) label += ' MB';
+              }
+              return label;
+            }
+          }
+        }
+      }
+    }
   });
 }
 
@@ -543,17 +982,25 @@ async function updateStatus() {
 
     // Update bot name in title and header
     const botName = data.name || 'Bot';
-    document.getElementById('page-title').textContent = `${botName} Status`;
-    document.getElementById('bot-name-header').textContent = `${botName} Status`;
+    const pageTitle = document.getElementById('page-title');
+    const botNameHeader = document.getElementById('bot-name-header');
+    
+    if (pageTitle) pageTitle.textContent = `${botName} Status`;
+    if (botNameHeader) botNameHeader.textContent = `${botName} Status`;
 
     // Update status indicator
     setStatusIndicator(data.status);
 
     // Update overview stats
-    document.getElementById('uptime').textContent = formatUptime(data.uptime);
-    document.getElementById('version').textContent = data.version;
-    document.getElementById('message-count').textContent = data.stats.messageCount.toLocaleString();
-    document.getElementById('discord-ping').textContent = `${data.discord.ping} ms`;
+    const uptimeElement = document.getElementById('uptime');
+    const versionElement = document.getElementById('version');
+    const messageCountElement = document.getElementById('message-count');
+    const discordPingElement = document.getElementById('discord-ping');
+    
+    if (uptimeElement) uptimeElement.textContent = formatUptime(data.uptime);
+    if (versionElement) versionElement.textContent = data.version;
+    if (messageCountElement) messageCountElement.textContent = data.stats.messageCount.toLocaleString();
+    if (discordPingElement && data.discord) discordPingElement.textContent = `${data.discord.ping || '--'} ms`;
 
     // Update API calls
     updateApiCalls(data.stats.apiCalls);
@@ -563,21 +1010,34 @@ async function updateStatus() {
 
     // Update memory usage
     updateMemoryUsage(data.memory, data.system);
+    
+    // Update performance metrics if available
+    if (data.metrics) {
+      updatePerformanceMetrics(data.metrics);
+    }
 
     // Update plugin statistics
     updatePluginStats(data.stats.plugins, data.stats.apiCalls.plugins, data.stats.errors.plugins);
 
     // Update rate limits
-    document.getElementById('rate-limit-hits').textContent =
-      data.stats.rateLimits.count.toLocaleString();
-    document.getElementById('rate-limit-users').textContent =
-      data.stats.rateLimits.uniqueUsers.toLocaleString();
+    const rateLimitHitsElement = document.getElementById('rate-limit-hits');
+    const rateLimitUsersElement = document.getElementById('rate-limit-users');
+    
+    if (rateLimitHitsElement && data.stats.rateLimits) {
+      rateLimitHitsElement.textContent = data.stats.rateLimits.count.toLocaleString();
+    }
+    if (rateLimitUsersElement && data.stats.rateLimits) {
+      rateLimitUsersElement.textContent = data.stats.rateLimits.uniqueUsers.toLocaleString();
+    }
 
     // Update rate limited users list
     updateRateLimitedUsers(data.stats.rateLimits.userDetails);
 
     // Update last updated time
-    document.getElementById('last-updated').textContent = new Date().toLocaleString();
+    const lastUpdatedElement = document.getElementById('last-updated');
+    if (lastUpdatedElement) {
+      lastUpdatedElement.textContent = new Date().toLocaleString();
+    }
   } catch (error) {
     console.error('Error fetching health data:', error.message || error);
     setStatusIndicator('error');
@@ -603,6 +1063,11 @@ async function updateStatus() {
 function setStatusIndicator(status) {
   const dot = document.querySelector('.dot');
   const statusText = document.querySelector('.status-text');
+
+  if (!dot || !statusText) {
+    console.error('Status indicator elements not found');
+    return;
+  }
 
   dot.className = 'dot';
 
@@ -770,17 +1235,24 @@ function updateMemoryUsage(memory, system) {
   const heapPercent = (heapUsed / heapTotal) * 100;
   const systemPercent = ((systemTotal - systemFree) / systemTotal) * 100;
 
-  // Update progress bars
-  document.getElementById('heap-used-bar').style.width = `${heapPercent}%`;
-  document.getElementById('heap-used').textContent = memory.heapUsed;
-  document.getElementById('heap-total').textContent = memory.heapTotal; // ADDED FOR HEAP TOTAL
+  // Update memory display elements with correct IDs
+  const memoryRssElement = document.getElementById('memory-rss');
+  const memoryHeapTotalElement = document.getElementById('memory-heap-total');
+  const memoryHeapUsedElement = document.getElementById('memory-heap-used');
+  const systemMemoryElement = document.getElementById('system-memory');
 
-  document.getElementById('rss-bar').style.width = `${(rss / systemTotal) * 100}%`;
-  document.getElementById('rss').textContent = memory.rss;
-
-  document.getElementById('system-memory-bar').style.width = `${systemPercent}%`;
-  document.getElementById('system-memory').textContent =
-    `${systemTotal - systemFree} MB / ${systemTotal} MB`;
+  // Update memory values
+  if (memoryRssElement) memoryRssElement.textContent = memory.rss || 'N/A';
+  if (memoryHeapTotalElement) memoryHeapTotalElement.textContent = memory.heapTotal || 'N/A';
+  if (memoryHeapUsedElement) memoryHeapUsedElement.textContent = memory.heapUsed || 'N/A';
+  
+  // Update system memory
+  if (systemMemoryElement) {
+    systemMemoryElement.textContent = 
+      systemTotal && systemFree 
+        ? `${systemTotal - systemFree} MB / ${systemTotal} MB`
+        : 'N/A';
+  }
 }
 
 /**
@@ -810,6 +1282,12 @@ function formatUptime(seconds) {
  * @param {Object} plugins - Plugin statistics
  * @param {Object} pluginApiCalls - Plugin API call counts
  * @param {Object} pluginErrors - Plugin error counts
+ */
+/**
+ * Update plugin statistics display
+ * @param {Object} plugins - Plugin information
+ * @param {Object} pluginApiCalls - API call counts by plugin
+ * @param {Object} pluginErrors - Error counts by plugin
  */
 function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
   // Update plugin counters
@@ -874,31 +1352,64 @@ function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
 /**
  * Update the rate limited users list
  *
- * @param {Object} userDetails - User-specific rate limit counts
+ * @param {Array} userDetailsArray - Array of user-specific rate limit counts
  */
 function updateRateLimitedUsers(userDetailsArray) {
-  const userListElement = document.getElementById('rate-limited-users-list');
-
-  // Clear existing content
-  userListElement.innerHTML = '';
-
-  // Check if userDetailsArray is a valid array and has users
-  if (!Array.isArray(userDetailsArray) || userDetailsArray.length === 0) {
-    userListElement.innerHTML = '<div class="no-data">No rate limited users</div>';
+  const container = document.getElementById('rate-limited-users');
+  if (!container) {
+    console.warn('Rate limited users container not found');
     return;
   }
 
-  // Add each user ID to the list
-  // Note: We don't have individual counts here, just the IDs that hit a limit.
-  userDetailsArray.forEach(userId => {
-    const userItem = document.createElement('div');
-    userItem.className = 'user-item';
-    userItem.innerHTML = `
-            <span class="user-id">${userId}</span>
-            <span class="user-count">N/A</span>
-        `;
-    userListElement.appendChild(userItem);
-  });
+  // Clear existing content
+  container.innerHTML = '';
+
+  if (!Array.isArray(userDetailsArray) || userDetailsArray.length === 0) {
+    container.innerHTML = '<div class="empty-message">No rate limited users</div>';
+    return;
+  }
+
+  try {
+    // Create a table for better formatting
+    const table = document.createElement('table');
+    table.className = 'rate-limit-table';
+    
+    // Create table header
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr>
+        <th>User ID</th>
+        <th>Count</th>
+        <th>Last Updated</th>
+      </tr>
+    `;
+    
+    // Create table body
+    const tbody = document.createElement('tbody');
+    
+    // Add rows for each rate-limited user
+    userDetailsArray.forEach(user => {
+      if (!user) return;
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${user.userId || 'Unknown'}</td>
+        <td>${typeof user.count !== 'undefined' ? user.count : 0}</td>
+        <td>${user.timestamp ? new Date(user.timestamp).toLocaleString() : 'N/A'}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    // Append header and body to table
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    
+    // Append table to container
+    container.appendChild(table);
+  } catch (error) {
+    console.error('Error updating rate limited users:', error);
+    container.innerHTML = '<div class="error-message">Error loading rate limited users</div>';
+  }
 }
 
 /**
