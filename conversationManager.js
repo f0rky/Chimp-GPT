@@ -76,10 +76,10 @@ let conversationsLoaded = false;
 let conversationsDirty = false;
 
 /**
- * Interval ID for periodic saving
+ * Timer for periodic saving of conversations
  * @type {NodeJS.Timeout|null}
  */
-const saveInterval = null;
+let saveTimer = null;
 
 // Immediately load conversations when the module is required
 (async () => {
@@ -101,11 +101,7 @@ const saveInterval = null;
  */
 let lastSaveTime = null;
 
-/**
- * Timer for periodic saving of conversations
- * @type {NodeJS.Timeout|null}
- */
-let saveTimer = null;
+
 
 /**
  * Loads conversations from persistent storage.
@@ -417,12 +413,28 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
  * @returns {boolean} True if a conversation was cleared, false if none existed
  */
 function clearConversation(userId) {
+  logger.debug('clearConversation called', { 
+    userId, 
+    hasConversation: userConversations.has(userId),
+    userConversationsSize: userConversations.size,
+    userConversationsKeys: Array.from(userConversations.keys())
+  });
+  
   const hadConversation = userConversations.has(userId);
   if (hadConversation) {
     userConversations.delete(userId);
     conversationsDirty = true;
     logger.info({ userId }, 'Cleared conversation for user');
+  } else {
+    logger.debug({ userId }, 'No conversation found to clear for user');
   }
+  
+  logger.debug('After clear attempt', { 
+    hasConversation: userConversations.has(userId),
+    userConversationsSize: userConversations.size,
+    conversationsDirty
+  });
+  
   return hadConversation;
 }
 
