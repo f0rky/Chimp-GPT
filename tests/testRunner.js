@@ -21,7 +21,8 @@ const url = require('url');
 // This delays loading until the functions are actually called
 let testConversationLog, testWeatherApi, testPluginSystem, testConversationStorage;
 let testCircuitBreaker, testConversationPersistence, testImageGeneration, testMessageHandler;
-let testRateLimiter, quakeLookup;
+let testRateLimiter, quakeLookup, testHumanCircuitBreaker, testInputSanitizer;
+let testApiKeyManager, testErrorClasses;
 
 // Function to load modules dynamically to avoid circular dependencies
 function loadTestModules() {
@@ -37,6 +38,12 @@ function loadTestModules() {
     testMessageHandler = require('./messageHandlerTest').testMessageHandler;
     testRateLimiter = require('./rateLimiterTest').testRateLimiter;
     quakeLookup = require('../quakeLookup');
+    
+    // Load new test modules
+    testHumanCircuitBreaker = require('./humanCircuitBreakerTest').testHumanCircuitBreaker;
+    testInputSanitizer = require('./inputSanitizerTest').testInputSanitizer;
+    testApiKeyManager = require('./apiKeyManagerTest').testApiKeyManager;
+    testErrorClasses = require('./errorClassesTest').testErrorClasses;
   }
 }
 
@@ -646,6 +653,106 @@ async function runComprehensiveRateLimiterTests() {
   }
 }
 
+/**
+ * Run human circuit breaker tests
+ *
+ * Tests the human circuit breaker functionality including approval workflows
+ *
+ * @returns {Promise<Object>} Test results
+ */
+async function runHumanCircuitBreakerTests() {
+  try {
+    logger.info('Running human circuit breaker tests');
+    loadTestModules();
+    const results = await testHumanCircuitBreaker();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running human circuit breaker tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Run input sanitizer tests
+ *
+ * Tests the input sanitization functionality for security
+ *
+ * @returns {Promise<Object>} Test results
+ */
+async function runInputSanitizerTests() {
+  try {
+    logger.info('Running input sanitizer tests');
+    loadTestModules();
+    const results = await testInputSanitizer();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running input sanitizer tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Run API key manager tests
+ *
+ * Tests the API key management functionality
+ *
+ * @returns {Promise<Object>} Test results
+ */
+async function runApiKeyManagerTests() {
+  try {
+    logger.info('Running API key manager tests');
+    loadTestModules();
+    const results = await testApiKeyManager();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running API key manager tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Run error classes tests
+ *
+ * Tests the custom error classes functionality
+ *
+ * @returns {Promise<Object>} Test results
+ */
+async function runErrorClassesTests() {
+  try {
+    logger.info('Running error classes tests');
+    loadTestModules();
+    const results = await testErrorClasses();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running error classes tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 // Export all test functions at the end to avoid circular dependencies
 // Make sure this is the absolute last statement in the file
 module.exports = {
@@ -662,4 +769,8 @@ module.exports = {
   runImageGenerationTests,
   runMessageHandlerTests,
   runComprehensiveRateLimiterTests,
+  runHumanCircuitBreakerTests,
+  runInputSanitizerTests,
+  runApiKeyManagerTests,
+  runErrorClassesTests,
 };
