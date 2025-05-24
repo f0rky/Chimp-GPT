@@ -2,19 +2,20 @@
 const CONFIG = {
   updateInterval: 2000, // Update every 2 seconds
   maxDataPoints: 60, // 2 minutes of data at 2s intervals
-  mockData: {
-    endpoints: ['openai', 'weather', 'image'],
-    functions: [
-      { name: 'generateImage', avgTime: 420, trend: 'up' },
-      { name: 'chatComplete', avgTime: 210, trend: 'down' },
-      { name: 'getWeather', avgTime: 156, trend: 'up' },
-      { name: 'getQuakeStats', avgTime: 45, trend: 'down' },
-    ],
+  apiBaseUrl: window.location.origin, // Use absolute URL
+  endpoints: {
+    health: '/health',
+    performance: '/performance',
+    functionResults: '/function-results',
   },
   colors: {
-    openai: 'rgba(0, 255, 0, 0.8)',
-    weather: 'rgba(0, 200, 255, 0.8)',
-    image: 'rgba(255, 100, 0, 0.8)',
+    openai: 'rgba(114, 137, 218, 0.8)', // Discord blue
+    weather: 'rgba(67, 181, 129, 0.8)', // Discord green
+    image: 'rgba(250, 166, 26, 0.8)', // Discord yellow
+    time: 'rgba(149, 165, 166, 0.8)', // Discord gray
+    wolfram: 'rgba(155, 89, 182, 0.8)', // Discord purple
+    quake: 'rgba(52, 152, 219, 0.8)', // Discord light blue
+    gptimage: 'rgba(250, 166, 26, 0.8)', // Discord yellow
   },
   memory: {
     total: 1024, // MB
@@ -28,6 +29,10 @@ let state = {
   activeRequests: [],
   lastUpdate: Date.now(),
   chart: null,
+  healthData: null,
+  performanceData: null,
+  functionResults: [],
+  apiEndpoints: ['openai', 'weather', 'time', 'wolfram', 'quake', 'gptimage'],
 };
 
 // DOM Elements
@@ -48,10 +53,92 @@ const elements = {
   slowFunctions: document.getElementById('slowFunctions'),
 };
 
+// API Functions
+async function fetchData(endpoint) {
+  try {
+    const response = await fetch(CONFIG.apiBaseUrl + endpoint);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching ${endpoint}:`, error);
+    handleAPIError(endpoint, error);
+    return null;
+  }
+}
+
+// Handle API errors gracefully
+function handleAPIError(endpoint, error) {
+  // Add visual indication of error
+  const errorMessage = document.createElement('div');
+  errorMessage.className = 'api-error';
+  errorMessage.innerHTML = `
+    <span class="error-icon">⚠️</span>
+    <span class="error-text">Failed to fetch ${endpoint}: ${error.message}</span>
+  `;
+  
+  // Find or create error container
+  let errorContainer = document.getElementById('errorContainer');
+  if (!errorContainer) {
+    errorContainer = document.createElement('div');
+    errorContainer.id = 'errorContainer';
+    errorContainer.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      max-width: 300px;
+    `;
+    document.body.appendChild(errorContainer);
+  }
+  
+  errorContainer.appendChild(errorMessage);
+  
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    errorMessage.remove();
+  }, 5000);
+  
+  // Update status indicators to show error state
+  if (endpoint.includes('health')) {
+    elements.openaiStatus.textContent = 'ERROR';
+    elements.openaiStatus.className = 'error';
+    elements.weatherStatus.textContent = 'ERROR';
+    elements.weatherStatus.className = 'error';
+    elements.quakeStatus.textContent = 'ERROR';
+    elements.quakeStatus.className = 'error';
+  }
+}
+
+async function fetchHealthData() {
+  const data = await fetchData(CONFIG.endpoints.health);
+  if (data) {
+    state.healthData = data;
+    updateHealthDisplay(data);
+  }
+}
+
+async function fetchPerformanceData() {
+  const data = await fetchData(CONFIG.endpoints.performance);
+  if (data) {
+    state.performanceData = data;
+    updatePerformanceDisplay(data);
+  }
+}
+
+async function fetchFunctionResults() {
+  const data = await fetchData(CONFIG.endpoints.functionResults);
+  if (data) {
+    state.functionResults = data;
+    updateActiveRequests();
+  }
+}
+
 // Initialize the dashboard
 function initDashboard() {
-  // Initialize latency data
-  CONFIG.mockData.endpoints.forEach(endpoint => {
+  // Initialize latency data for all API endpoints
+  state.apiEndpoints.forEach(endpoint => {
     state.latencyData[endpoint] = Array(CONFIG.maxDataPoints).fill(null);
   });
 
@@ -60,14 +147,20 @@ function initDashboard() {
 
   // Start updates
   updateTime();
-  updateMockData();
+  fetchAllData();
 
   // Set up periodic updates
   setInterval(updateTime, 1000);
-  setInterval(updateMockData, CONFIG.updateInterval);
+  setInterval(fetchAllData, CONFIG.updateInterval);
+}
 
-  // Simulate API requests
-  simulateApiRequests();
+// Fetch all data from API endpoints
+async function fetchAllData() {
+  await Promise.all([
+    fetchHealthData(),
+    fetchPerformanceData(),
+    fetchFunctionResults(),
+  ]);
 }
 
 // Initialize the chart
@@ -76,22 +169,24 @@ function initChart() {
 
   // Create gradient for each dataset
   const gradients = {};
-  CONFIG.mockData.endpoints.forEach(endpoint => {
-    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, CONFIG.colors[endpoint].replace('0.8', '0.5'));
-    gradient.addColorStop(1, CONFIG.colors[endpoint].replace('0.8', '0.1'));
-    gradients[endpoint] = gradient;
+  state.apiEndpoints.forEach(endpoint => {
+    if (CONFIG.colors[endpoint]) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, CONFIG.colors[endpoint].replace('0.8', '0.5'));
+      gradient.addColorStop(1, CONFIG.colors[endpoint].replace('0.8', '0.1'));
+      gradients[endpoint] = gradient;
+    }
   });
 
   state.chart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: Array(CONFIG.maxDataPoints).fill(''),
-      datasets: CONFIG.mockData.endpoints.map(endpoint => ({
+      datasets: state.apiEndpoints.map(endpoint => ({
         label: endpoint,
         data: state.latencyData[endpoint],
-        borderColor: CONFIG.colors[endpoint],
-        backgroundColor: gradients[endpoint],
+        borderColor: CONFIG.colors[endpoint] || 'rgba(128, 128, 128, 0.8)',
+        backgroundColor: gradients[endpoint] || 'rgba(128, 128, 128, 0.1)',
         borderWidth: 1.5,
         pointRadius: 0,
         tension: 0.4,
@@ -111,10 +206,10 @@ function initChart() {
         y: {
           beginAtZero: true,
           grid: {
-            color: 'rgba(0, 255, 0, 0.1)',
+            color: 'rgba(255, 255, 255, 0.1)',
           },
           ticks: {
-            color: 'rgba(0, 255, 0, 0.7)',
+            color: '#b9bbbe',
           },
         },
       },
@@ -125,10 +220,10 @@ function initChart() {
         tooltip: {
           mode: 'index',
           intersect: false,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          titleColor: '#00ff00',
-          bodyColor: '#00ff00',
-          borderColor: '#00ff00',
+          backgroundColor: 'rgba(47, 49, 54, 0.95)',
+          titleColor: '#ffffff',
+          bodyColor: '#b9bbbe',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
           borderWidth: 1,
           padding: 10,
           callbacks: {
@@ -158,29 +253,84 @@ function updateTime() {
   });
 }
 
-// Update mock data
-function updateMockData() {
-  const now = Date.now();
-  const timeSinceLastUpdate = (now - state.lastUpdate) / 1000; // in seconds
-  state.lastUpdate = now;
+// Update display with health data
+function updateHealthDisplay(data) {
+  if (!data) return;
 
-  // Update latency data
-  CONFIG.mockData.endpoints.forEach(endpoint => {
+  // Update API status indicators
+  elements.openaiStatus.textContent = data.discord?.status === 'ok' ? 'ONLINE' : 'OFFLINE';
+  elements.openaiStatus.className = data.discord?.status === 'ok' ? 'online' : 'offline';
+  
+  elements.weatherStatus.textContent = data.stats?.apiCalls?.weather > 0 ? 'ONLINE' : 'IDLE';
+  elements.weatherStatus.className = data.stats?.apiCalls?.weather > 0 ? 'online' : 'idle';
+  
+  elements.quakeStatus.textContent = data.stats?.apiCalls?.quake > 0 ? 'ONLINE' : 'IDLE';
+  elements.quakeStatus.className = data.stats?.apiCalls?.quake > 0 ? 'online' : 'idle';
+
+  // Update memory usage
+  if (data.memory) {
+    const heapUsed = parseInt(data.memory.heapUsed);
+    const heapTotal = parseInt(data.memory.heapTotal);
+    if (!isNaN(heapUsed) && !isNaN(heapTotal)) {
+      const percentage = (heapUsed / heapTotal) * 100;
+      elements.memoryGauge.style.width = `${percentage}%`;
+      elements.memoryText.textContent = `${heapUsed}MB / ${heapTotal}MB`;
+      
+      // Update color based on usage
+      if (percentage > 80) {
+        elements.memoryGauge.style.background = 'linear-gradient(90deg, #ff4444, #ff00ff)';
+      } else if (percentage > 60) {
+        elements.memoryGauge.style.background = 'linear-gradient(90deg, #ffaa00, #ff00ff)';
+      } else {
+        elements.memoryGauge.style.background = 'linear-gradient(90deg, var(--accent-1), var(--accent-2))';
+      }
+    }
+  }
+
+  // Update cost tracker based on API calls
+  if (data.stats?.apiCalls) {
+    updateCostTrackerFromStats(data.stats);
+  }
+}
+
+// Update display with performance data
+function updatePerformanceDisplay(data) {
+  if (!data || !data.summary) return;
+
+  // Update latency data for chart
+  state.apiEndpoints.forEach(endpoint => {
     // Shift data left
     state.latencyData[endpoint].shift();
 
-    // Add new data point
-    const baseValue = endpoint === 'openai' ? 100 : endpoint === 'weather' ? 50 : 200;
+    // Get real latency from performance data
+    let newValue = null;
+    
+    // Map endpoint names to performance metric names
+    const perfMapping = {
+      'openai': 'openai_api',
+      'weather': 'weather_api',
+      'time': 'time_api',
+      'wolfram': 'wolfram_api',
+      'quake': 'quake_api',
+      'gptimage': 'gptimage_api',
+    };
 
-    const noise = (Math.random() - 0.5) * 40;
-    const spike = Math.random() > 0.95 ? Math.random() * 500 : 0;
+    const perfKey = perfMapping[endpoint];
+    if (perfKey && data.summary[perfKey]) {
+      newValue = data.summary[perfKey].avg || 0;
+    } else {
+      newValue = 0; // No data for this endpoint
+    }
 
-    const newValue = Math.max(10, baseValue + noise + spike);
     state.latencyData[endpoint].push(newValue);
 
-    // Update latency display
-    if (elements[`${endpoint}Latency`]) {
-      elements[`${endpoint}Latency`].textContent = `${Math.round(newValue)}ms`;
+    // Update latency display for specific endpoints we have elements for
+    if (endpoint === 'openai' && elements.openaiLatency) {
+      elements.openaiLatency.textContent = `${Math.round(newValue)}ms`;
+    } else if (endpoint === 'weather' && elements.weatherLatency) {
+      elements.weatherLatency.textContent = `${Math.round(newValue)}ms`;
+    } else if (endpoint === 'gptimage' && elements.imageLatency) {
+      elements.imageLatency.textContent = `${Math.round(newValue)}ms`;
     }
   });
 
@@ -189,142 +339,112 @@ function updateMockData() {
     state.chart.update('none');
   }
 
-  // Update memory usage
-  updateMemoryUsage();
-
-  // Update cost tracker
-  updateCostTracker();
-
   // Update function performance
-  updateFunctionPerformance();
+  updateFunctionPerformanceFromData(data.summary);
 }
 
-// Update memory usage display
-function updateMemoryUsage() {
-  // Simulate memory usage between 30% and 70% of max
-  const usedMB = Math.floor(CONFIG.memory.max * (0.3 + Math.random() * 0.4));
-  const percentage = (usedMB / CONFIG.memory.max) * 100;
+// Update cost tracker from stats
+function updateCostTrackerFromStats(stats) {
+  if (!stats || !stats.apiCalls) return;
 
-  elements.memoryGauge.style.width = `${percentage}%`;
-  elements.memoryText.textContent = `${usedMB}MB / ${CONFIG.memory.max}MB`;
+  // Calculate estimated costs based on API calls
+  const costs = {
+    openai: (stats.apiCalls.openai || 0) * 0.002, // Estimate $0.002 per call
+    weather: (stats.apiCalls.weather || 0) * 0.0001,
+    time: (stats.apiCalls.time || 0) * 0.00005,
+    wolfram: (stats.apiCalls.wolfram || 0) * 0.001,
+    quake: (stats.apiCalls.quake || 0) * 0.00005,
+    gptimage: (stats.apiCalls.gptimage || 0) * 0.02, // Higher cost for image generation
+  };
 
-  // Update color based on usage
-  if (percentage > 80) {
-    elements.memoryGauge.style.background = 'linear-gradient(90deg, #ff4444, #ff00ff)';
-  } else if (percentage > 60) {
-    elements.memoryGauge.style.background = 'linear-gradient(90deg, #ffaa00, #ff00ff)';
-  } else {
-    elements.memoryGauge.style.background =
-      'linear-gradient(90deg, var(--accent-1), var(--accent-2))';
-  }
-}
-
-// Update cost tracker
-function updateCostTracker() {
-  // Simulate cost changes
-  const baseCost = 1.23;
-  const dailyVariation = Math.sin(Date.now() / 86400000) * 0.2;
-  const hourlyVariation = Math.sin(Date.now() / 3600000) * 0.05;
-  const minuteFluctuation = (Math.random() - 0.5) * 0.01;
-
-  const currentCost = baseCost + dailyVariation + hourlyVariation + minuteFluctuation;
-  const todayCost = currentCost * 0.8 + Math.random() * 0.4;
-  const currentMinuteCost = (Math.random() * 0.02).toFixed(2);
+  const totalCost = Object.values(costs).reduce((sum, cost) => sum + cost, 0);
+  const todayCost = totalCost * 0.3; // Estimate today as 30% of total
+  const currentCost = (Math.random() * 0.001).toFixed(4);
 
   elements.costTracker.textContent =
-    `[API COST TRACKER] 24h: $${currentCost.toFixed(2)} | ` +
+    `[API COST TRACKER] Total: $${totalCost.toFixed(2)} | ` +
     `Today: $${todayCost.toFixed(2)} | ` +
-    `Current: $${currentMinuteCost}`;
+    `Current: $${currentCost}`;
 }
 
-// Update function performance
-function updateFunctionPerformance() {
-  // Sort functions by average time
-  const sortedFunctions = [...CONFIG.mockData.functions].sort((a, b) => b.avgTime - a.avgTime);
+// Update function performance from real data
+function updateFunctionPerformanceFromData(summary) {
+  if (!summary) return;
+
+  // Convert summary data to function list format
+  const functions = [];
+  
+  for (const [key, data] of Object.entries(summary)) {
+    if (data && data.avg) {
+      functions.push({
+        name: key.replace('_api', '').replace('_', ' '),
+        avgTime: Math.round(data.avg),
+        count: data.count || 0,
+      });
+    }
+  }
+
+  // Sort by average time
+  functions.sort((a, b) => b.avgTime - a.avgTime);
 
   // Update the slow functions list
-  elements.slowFunctions.innerHTML = sortedFunctions
+  elements.slowFunctions.innerHTML = functions
     .slice(0, 3)
     .map(
       func => `
             <li class="function-item">
                 <span class="function-name">${func.name}</span>
                 <span class="function-time">${func.avgTime}ms</span>
-                <span class="trend ${func.trend}">${func.trend === 'up' ? '↑' : '↓'}</span>
+                <span class="trend">(${func.count} calls)</span>
             </li>
         `
     )
     .join('');
-
-  // Randomly update function times and trends occasionally
-  if (Math.random() > 0.7) {
-    const funcToUpdate = Math.floor(Math.random() * CONFIG.mockData.functions.length);
-    const change = (Math.random() - 0.5) * 50;
-
-    CONFIG.mockData.functions[funcToUpdate].avgTime = Math.max(
-      10,
-      CONFIG.mockData.functions[funcToUpdate].avgTime + change
-    );
-
-    if (Math.abs(change) > 20) {
-      CONFIG.mockData.functions[funcToUpdate].trend = change > 0 ? 'up' : 'down';
-    }
-  }
-}
-
-// Simulate API requests
-function simulateApiRequests() {
-  const endpoints = [
-    { name: 'OpenAI', key: 'openai', avgTime: 300, maxTime: 2000 },
-    { name: 'Weather API', key: 'weather', avgTime: 150, maxTime: 1000 },
-    { name: 'Image Generation', key: 'image', avgTime: 800, maxTime: 5000 },
-  ];
-
-  function triggerRequest() {
-    const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
-    const duration = Math.min(
-      endpoint.maxTime,
-      Math.max(100, Math.random() * endpoint.avgTime * 2)
-    );
-
-    // Add to active requests
-    const requestId = Date.now();
-    state.activeRequests.push({
-      id: requestId,
-      endpoint: endpoint.key,
-      name: endpoint.name,
-      startTime: Date.now(),
-      duration: duration,
-    });
-
-    // Update UI
-    updateActiveRequests();
-
-    // Simulate request completion
-    setTimeout(() => {
-      state.activeRequests = state.activeRequests.filter(r => r.id !== requestId);
-      updateActiveRequests();
-    }, duration);
-
-    // Schedule next request
-    const nextDelay = 1000 + Math.random() * 4000; // 1-5 seconds
-    setTimeout(triggerRequest, nextDelay);
-  }
-
-  // Start the first request
-  triggerRequest();
 }
 
 // Update active requests display
 function updateActiveRequests() {
-  if (state.activeRequests.length > 0) {
-    const activeRequest = state.activeRequests[0]; // Show most recent
-    const elapsed = Date.now() - activeRequest.startTime;
-    const progress = Math.min(100, (elapsed / activeRequest.duration) * 100);
-
-    elements.requestProgress.style.width = `${progress}%`;
-    elements.currentEndpoint.textContent = activeRequest.name;
-    elements.requestTime.textContent = `${Math.round(elapsed)}ms`;
+  // Use function results to simulate active requests
+  if (state.functionResults && state.functionResults.length > 0) {
+    // Get the most recent function result
+    const recentResults = state.functionResults.slice(-5); // Last 5 results
+    const now = Date.now();
+    
+    // Find any ongoing operations (e.g., image generation which takes longer)
+    let activeRequest = null;
+    
+    for (const result of recentResults) {
+      if (result.timestamp) {
+        const age = now - new Date(result.timestamp).getTime();
+        // Consider requests within last 10 seconds as potentially active
+        if (age < 10000) {
+          const estimatedDuration = result.functionName === 'generateImage' ? 5000 : 
+                                   result.functionName === 'lookupWeather' ? 1500 : 
+                                   result.functionName === 'getWolframShortAnswer' ? 2000 : 1000;
+          
+          if (age < estimatedDuration) {
+            activeRequest = {
+              name: result.functionName || 'Unknown',
+              startTime: new Date(result.timestamp).getTime(),
+              duration: estimatedDuration,
+              elapsed: age,
+            };
+            break;
+          }
+        }
+      }
+    }
+    
+    if (activeRequest) {
+      const progress = Math.min(100, (activeRequest.elapsed / activeRequest.duration) * 100);
+      elements.requestProgress.style.width = `${progress}%`;
+      elements.currentEndpoint.textContent = activeRequest.name;
+      elements.requestTime.textContent = `${Math.round(activeRequest.elapsed)}ms`;
+    } else {
+      elements.requestProgress.style.width = '0%';
+      elements.currentEndpoint.textContent = '-';
+      elements.requestTime.textContent = '0ms';
+    }
   } else {
     elements.requestProgress.style.width = '0%';
     elements.currentEndpoint.textContent = '-';
