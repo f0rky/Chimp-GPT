@@ -151,7 +151,7 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
  * @returns {Promise<Object>} The response from OpenAI
  * @throws {Error} If the API call fails
  */
-async function processOpenAIMessage(content, conversationLog) {
+async function processOpenAIMessage(content, conversationLog, timings = {}) {
   const timerId = performanceMonitor.startTimer('openai_api_detail', {
     messageLength: content.length,
     contextLength: JSON.stringify(conversationLog).length,
@@ -312,6 +312,9 @@ async function processOpenAIMessage(content, conversationLog) {
 
     // Track successful OpenAI API call
     trackApiCall('openai');
+    if (timings.apiCalls) {
+      timings.apiCalls.openai = (timings.apiCalls.openai || 0) + 1;
+    }
 
     openaiLogger.debug({ response: responseMessage }, 'Received response from OpenAI');
     const result = {
@@ -355,7 +358,12 @@ async function processOpenAIMessage(content, conversationLog) {
  * @param {string|null} functionName - The name of the function that was called
  * @returns {Promise<string>} A natural language response explaining the function result
  */
-async function generateNaturalResponse(functionResult, conversationLog, functionName = null) {
+async function generateNaturalResponse(
+  functionResult,
+  conversationLog,
+  functionName = null,
+  timings = null
+) {
   try {
     openaiLogger.debug({ functionName }, 'Generating natural response from function result');
 
@@ -475,6 +483,9 @@ async function generateNaturalResponse(functionResult, conversationLog, function
 
     // Track successful OpenAI API call
     trackApiCall('openai');
+    if (timings?.apiCalls) {
+      timings.apiCalls.openai = (timings.apiCalls.openai || 0) + 1;
+    }
     openaiLogger.info('Successfully received response from OpenAI');
 
     const responseContent = response.choices[0].message.content;
@@ -519,7 +530,16 @@ client.on('messageCreate', async message => {
   // Add a debug object to track timing of each step
   const timings = {
     start: Date.now(),
+    startTime: Date.now(), // Store for easy access
     steps: [],
+    apiCalls: {
+      openai: 0,
+      weather: 0,
+      time: 0,
+      wolfram: 0,
+      quake: 0,
+      gptimage: 0,
+    },
   };
 
   // Helper function to add timing data
@@ -742,8 +762,15 @@ client.on('messageCreate', async message => {
       // Track this as a successful API call for stats
       trackApiCall('version_query', true);
 
-      // Update the feedback message with the version response
-      await feedbackMessage.edit(versionResponse.content);
+      // Update the feedback message with the version response and standardized subtext
+      const subtext = formatSubtext(timings.startTime, {}, {});
+      const maxLength = 2000 - subtext.length - 3;
+      let finalResponse = versionResponse.content;
+      if (finalResponse.length > maxLength) {
+        finalResponse = finalResponse.slice(0, maxLength) + '...';
+      }
+      finalResponse += subtext;
+      await feedbackMessage.edit(finalResponse);
 
       // Add the response to the conversation log
       await manageConversation(message.author.id, {
@@ -791,7 +818,7 @@ client.on('messageCreate', async message => {
 
     try {
       // Process the message with OpenAI
-      gptResponse = await processOpenAIMessage(message.content, fullConversationLog);
+      gptResponse = await processOpenAIMessage(message.content, fullConversationLog, timings);
       const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
 
       performanceMonitor.stopTimer(openaiTimerId, {
@@ -808,7 +835,8 @@ client.on('messageCreate', async message => {
           feedbackMessage,
           fullConversationLog,
           message.author.id,
-          timings.startTime
+          timings.startTime,
+          timings
         );
         // Safe access to function name with fallback to prevent TypeError
         addTiming('after_function_call_handling', {
@@ -821,7 +849,8 @@ client.on('messageCreate', async message => {
           fullConversationLog,
           message.author.id,
           timings.startTime, // Use the original start time from when message was received
-          gptResponse.usage // Pass token usage information
+          gptResponse.usage, // Pass token usage information
+          timings.apiCalls // Pass API call counts
         );
         addTiming('after_direct_message_handling');
       } else {
@@ -1533,7 +1562,8 @@ async function handleFunctionCall(
   feedbackMessage,
   conversationLog,
   userIdFromMessage,
-  startTime = Date.now()
+  startTime = Date.now(),
+  timings = {}
 ) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
@@ -1649,6 +1679,7 @@ async function handleFunctionCall(
         functionResult = await lookupTime(gptResponse.parameters.location);
         performanceMonitor.stopTimer(timeTimerId, { success: true });
         trackApiCall('time');
+        if (timings.apiCalls) timings.apiCalls.time++;
       } catch (error) {
         trackError('time');
         throw error;
@@ -1659,6 +1690,7 @@ async function handleFunctionCall(
         // Get the original weather data for status updates
         const weatherData = await lookupWeather(gptResponse.parameters.location);
         trackApiCall('weather');
+        if (timings.apiCalls) timings.apiCalls.weather++;
         discordLogger.info(
           { location: gptResponse.parameters.location, weatherData, source: 'lookupWeather_case' },
           'Weather data fetched in handleFunctionCall'
@@ -1793,6 +1825,7 @@ async function handleFunctionCall(
         functionResult = await lookupWolfram.getWolframShortAnswer(gptResponse.parameters.query);
         performanceMonitor.stopTimer(wolframTimerId, { success: true });
         trackApiCall('wolfram');
+        if (timings.apiCalls) timings.apiCalls.wolfram++;
       } catch (error) {
         trackError('wolfram');
         throw error;
@@ -1802,6 +1835,7 @@ async function handleFunctionCall(
       try {
         await handleQuakeStats(feedbackMessage);
         trackApiCall('quake');
+        if (timings.apiCalls) timings.apiCalls.quake++;
         return;
       } catch (error) {
         trackError('quake');
@@ -1895,6 +1929,7 @@ async function handleFunctionCall(
 
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
         trackApiCall('gptimage');
+        if (timings.apiCalls) timings.apiCalls.gptimage++;
         return;
       } catch (error) {
         trackError('gptimage');
@@ -2023,7 +2058,8 @@ async function handleFunctionCall(
     const naturalResponse = await generateNaturalResponse(
       functionResult,
       conversationLog,
-      gptResponse.functionName
+      gptResponse.functionName,
+      timings
     );
 
     if (naturalResponse?.trim()) {
@@ -2032,22 +2068,8 @@ async function handleFunctionCall(
         content: naturalResponse,
       });
 
-      // Calculate timing and format with token info
-      const processingTimeMs = Date.now() - startTime;
-      const processingTime = (processingTimeMs / 1000).toFixed(1);
-      let timingDisplay;
-      if (processingTime < 1) {
-        timingDisplay = `${processingTimeMs}ms`;
-      } else {
-        timingDisplay = `${parseFloat(processingTime)}s`;
-      }
-
-      let tokenInfo = '';
-      if (gptResponse.usage?.promptTokens || gptResponse.usage?.completionTokens) {
-        tokenInfo = ` • ${gptResponse.usage.promptTokens || 0}↑ ${gptResponse.usage.completionTokens || 0}↓`;
-      }
-
-      const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
+      // Calculate standardized subtext
+      const subtext = formatSubtext(startTime, gptResponse.usage, timings.apiCalls);
       const maxLength = 2000 - subtext.length - 3;
 
       let finalResponse = naturalResponse;
@@ -2089,21 +2111,8 @@ async function handleFunctionCall(
       }
 
       // Add timing and token info to direct response
-      const processingTimeMs = Date.now() - startTime;
-      const processingTime = (processingTimeMs / 1000).toFixed(1);
-      let timingDisplay;
-      if (processingTime < 1) {
-        timingDisplay = `${processingTimeMs}ms`;
-      } else {
-        timingDisplay = `${parseFloat(processingTime)}s`;
-      }
-
-      let tokenInfo = '';
-      if (gptResponse.usage?.promptTokens || gptResponse.usage?.completionTokens) {
-        tokenInfo = ` • ${gptResponse.usage.promptTokens || 0}↑ ${gptResponse.usage.completionTokens || 0}↓`;
-      }
-
-      const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
+      // Add standardized subtext to direct response
+      const subtext = formatSubtext(startTime, gptResponse.usage, timings.apiCalls);
       const maxLength = 2000 - subtext.length - 3;
 
       if (directResponse.length > maxLength) {
@@ -2141,6 +2150,45 @@ async function handleFunctionCall(
 }
 
 /**
+ * Formats a standardized subtext with timing, token usage, and API call information
+ * @param {number} startTime - The timestamp when processing started
+ * @param {Object} usage - Token usage information {promptTokens, completionTokens}
+ * @param {Object} apiCalls - API calls made {openai: 0, weather: 0, wolfram: 0, etc}
+ * @returns {string} Formatted subtext string
+ */
+function formatSubtext(startTime, usage = {}, apiCalls = {}) {
+  // Calculate processing time
+  const processingTimeMs = Date.now() - startTime;
+  const processingTime = (processingTimeMs / 1000).toFixed(1);
+
+  // Format timing display
+  let timingDisplay;
+  if (processingTime < 1) {
+    timingDisplay = `${processingTimeMs}ms`;
+  } else {
+    timingDisplay = `${parseFloat(processingTime)}s`;
+  }
+
+  // Build token info if available
+  let tokenInfo = '';
+  if (usage.promptTokens || usage.completionTokens) {
+    tokenInfo = ` • ${usage.promptTokens || 0}↑ ${usage.completionTokens || 0}↓`;
+  }
+
+  // Build API calls info if any were made
+  let apiCallsInfo = '';
+  const apiCallEntries = Object.entries(apiCalls).filter(([_, count]) => count > 0);
+  if (apiCallEntries.length > 0) {
+    const callsList = apiCallEntries
+      .map(([api, count]) => (count > 1 ? `${api}×${count}` : api))
+      .join(', ');
+    apiCallsInfo = ` • ${callsList}`;
+  }
+
+  return `\n\n-# ${timingDisplay}${tokenInfo}${apiCallsInfo}`;
+}
+
+/**
  * Handles direct message responses from OpenAI
  *
  * This function processes standard text responses from OpenAI (not function calls)
@@ -2158,7 +2206,8 @@ async function handleDirectMessage(
   conversationLog,
   userIdFromMessage,
   startTime = Date.now(),
-  usage = {}
+  usage = {},
+  apiCalls = {}
 ) {
   if (!gptResponse.content?.trim()) {
     await feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
@@ -2178,29 +2227,9 @@ async function handleDirectMessage(
   // We don't need to pass the Discord message here since we're just adding an assistant response
   await manageConversation(userIdFromMessage, responseMessage);
 
-  // Calculate processing time in seconds
-  const processingTimeMs = Date.now() - startTime;
-  const processingTime = (processingTimeMs / 1000).toFixed(1);
-
-  // Format the timing display more nicely
-  let timingDisplay;
-  if (processingTime < 1) {
-    // Show milliseconds for very fast responses
-    timingDisplay = `${processingTimeMs}ms`;
-  } else {
-    // Show seconds for slower responses, removing unnecessary trailing zeros
-    timingDisplay = `${parseFloat(processingTime)}s`;
-  }
-
-  // Build token info if available
-  let tokenInfo = '';
-  if (usage.promptTokens || usage.completionTokens) {
-    tokenInfo = ` • ${usage.promptTokens || 0}↑ ${usage.completionTokens || 0}↓`;
-  }
-
-  // Prepare the final response with subtext for timing and token info
+  // Prepare the final response with standardized subtext
   let finalResponse = gptResponse.content;
-  const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
+  const subtext = formatSubtext(startTime, usage, apiCalls);
 
   // Ensure the total length doesn't exceed Discord's 2000 character limit
   const maxLength = 2000 - subtext.length - 3; // -3 for potential ellipsis
