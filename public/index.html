@@ -32,9 +32,15 @@
           <i class="fas fa-robot"></i>
           <h1 id="bot-name-header">Bot Status</h1>
         </div>
-        <div id="status-indicator" class="status-indicator">
-          <span class="dot"></span>
-          <span class="status-text">Checking...</span>
+        <div class="header-controls">
+          <a href="/dashboard/" class="dashboard-link" title="Performance Dashboard">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Performance Dashboard</span>
+          </a>
+          <div id="status-indicator" class="status-indicator">
+            <span class="dot"></span>
+            <span class="status-text">Checking...</span>
+          </div>
         </div>
       </header>
 
@@ -87,6 +93,37 @@
           </div>
           <div class="chart-container">
             <canvas id="metrics-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="card performance-history">
+          <h2>Performance History</h2>
+          <div class="history-controls">
+            <button class="history-btn active" data-period="hourly" data-range="24">Last 24 Hours</button>
+            <button class="history-btn" data-period="hourly" data-range="168">Last 7 Days</button>
+            <button class="history-btn" data-period="daily" data-range="30">Last 30 Days</button>
+            <button class="history-btn" data-period="daily" data-range="90">Last 90 Days</button>
+          </div>
+          <div class="chart-container" style="height: 300px;">
+            <canvas id="history-chart"></canvas>
+          </div>
+          <div class="history-stats">
+            <div class="stat">
+              <span class="label">Avg Response Time</span>
+              <span id="history-avg-response" class="value">-- ms</span>
+            </div>
+            <div class="stat">
+              <span class="label">Total Messages</span>
+              <span id="history-total-messages" class="value">--</span>
+            </div>
+            <div class="stat">
+              <span class="label">API Calls</span>
+              <span id="history-api-calls" class="value">--</span>
+            </div>
+            <div class="stat">
+              <span class="label">Avg Memory</span>
+              <span id="history-avg-memory" class="value">-- MB</span>
+            </div>
           </div>
         </div>
 
@@ -177,7 +214,7 @@
               <span id="quake-calls" class="value">0</span>
             </div>
             <div class="stat">
-              <span class="label">DALL-E</span>
+              <span class="label">GPT Image</span>
               <span id="dalle-calls" class="value">0</span>
             </div>
           </div>
@@ -202,7 +239,7 @@
               <span id="weather-errors" class="value">0</span>
             </div>
             <div class="stat">
-              <span class="label">DALL-E</span>
+              <span class="label">GPT Image</span>
               <span id="dalle-errors" class="value">0</span>
             </div>
             <div class="stat">
@@ -296,8 +333,8 @@
             <div class="tab-pane" id="quake-results">
               <div class="no-data">No recent Quake server stats</div>
             </div>
-            <div class="tab-pane" id="dalle-results">
-              <div class="no-data">No recent DALL-E image generations</div>
+            <div class="tab-pane" id="gptimage-results">
+              <div class="no-data">No recent GPT Image-1 generations</div>
             </div>
             <div class="tab-pane" id="gallery-results">
               <div class="gallery-container">

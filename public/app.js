@@ -1,4 +1,4 @@
-/* global Chart openImageModal */
+/* global Chart */
 /**
  * ChimpGPT Status Page
  *
@@ -15,6 +15,7 @@
 let apiChart = null;
 let errorChart = null;
 let metricsChart = null;
+let historyChart = null;
 
 // Update interval in milliseconds
 const UPDATE_INTERVAL = 5000; // 5 seconds
@@ -189,6 +190,237 @@ function initMetricsChart() {
     });
   } catch (e) {
     console.error('Error initializing metrics chart:', e);
+  }
+}
+
+// Initialize history chart
+function initHistoryChart() {
+  const ctx = document.getElementById('history-chart');
+  if (!ctx) {
+    console.warn('History chart canvas not found');
+    return;
+  }
+
+  // Destroy existing chart if it exists
+  if (window.historyChart) {
+    try {
+      window.historyChart.destroy();
+    } catch (e) {
+      console.warn('Error destroying existing history chart:', e);
+    }
+    window.historyChart = null;
+  }
+
+  // Clear the canvas
+  const context = ctx.getContext('2d');
+  context.clearRect(0, 0, ctx.width, ctx.height);
+
+  window.historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Avg Response Time (ms)',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y',
+          fill: true,
+        },
+        {
+          label: 'Messages Processed',
+          data: [],
+          borderColor: 'rgba(255, 206, 86, 1)',
+          backgroundColor: 'rgba(255, 206, 86, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y1',
+          fill: true,
+        },
+        {
+          label: 'Memory Usage (MB)',
+          data: [],
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          tension: 0.4,
+          yAxisID: 'y2',
+          fill: true,
+          hidden: true, // Hidden by default to reduce clutter
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Time',
+            color: 'rgba(255, 255, 255, 0.7)',
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)',
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.7)',
+            maxRotation: 45,
+            minRotation: 45,
+          },
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Response Time (ms)',
+            color: 'rgba(75, 192, 192, 1)',
+          },
+          grid: {
+            color: 'rgba(75, 192, 192, 0.1)',
+          },
+          ticks: {
+            color: 'rgba(75, 192, 192, 1)',
+          },
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Messages',
+            color: 'rgba(255, 206, 86, 1)',
+          },
+          grid: {
+            drawOnChartArea: false,
+          },
+          ticks: {
+            color: 'rgba(255, 206, 86, 1)',
+          },
+        },
+        y2: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Memory (MB)',
+            color: 'rgba(54, 162, 235, 1)',
+          },
+          grid: {
+            drawOnChartArea: false,
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: 'rgba(255, 255, 255, 0.7)',
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                const value = context.parsed.y;
+                if (context.datasetIndex === 0) label += value.toFixed(2) + ' ms';
+                else if (context.datasetIndex === 1) label += Math.round(value);
+                else if (context.datasetIndex === 2) label += value.toFixed(2) + ' MB';
+              }
+              return label;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+// Fetch and update historical performance data
+async function updateHistoryChart(period = 'hourly', range = 24) {
+  try {
+    let endpoint, param;
+    if (period === 'hourly') {
+      endpoint = '/performance/history/hourly';
+      param = `hours=${range}`;
+    } else {
+      endpoint = '/performance/history/daily';
+      param = `days=${range}`;
+    }
+
+    const response = await fetch(`${endpoint}?${param}`);
+    if (!response.ok) {
+      console.error(`Error fetching history data: ${response.status} ${response.statusText}`);
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      console.error('Invalid history data received');
+      return;
+    }
+
+    const data = result.data;
+    
+    // Update chart data
+    if (window.historyChart && data.length > 0) {
+      const labels = data.map(d => {
+        const date = new Date(d.timestamp);
+        if (period === 'hourly') {
+          return date.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: 'numeric',
+            hour12: true 
+          });
+        } else {
+          return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+          });
+        }
+      });
+
+      window.historyChart.data.labels = labels;
+      window.historyChart.data.datasets[0].data = data.map(d => d.responseTimeAvg);
+      window.historyChart.data.datasets[1].data = data.map(d => d.messageCount);
+      window.historyChart.data.datasets[2].data = data.map(d => d.memoryAvg);
+      
+      window.historyChart.update('none');
+    }
+
+    // Update summary statistics
+    if (data.length > 0) {
+      const avgResponse = data.reduce((sum, d) => sum + d.responseTimeAvg, 0) / data.length;
+      const totalMessages = data.reduce((sum, d) => sum + d.messageCount, 0);
+      const totalApiCalls = data.reduce((sum, d) => sum + d.apiCalls + d.functionCalls, 0);
+      const avgMemory = data.reduce((sum, d) => sum + d.memoryAvg, 0) / data.length;
+
+      document.getElementById('history-avg-response').textContent = `${Math.round(avgResponse)} ms`;
+      document.getElementById('history-total-messages').textContent = totalMessages.toLocaleString();
+      document.getElementById('history-api-calls').textContent = totalApiCalls.toLocaleString();
+      document.getElementById('history-avg-memory').textContent = `${Math.round(avgMemory)} MB`;
+    } else {
+      document.getElementById('history-avg-response').textContent = '-- ms';
+      document.getElementById('history-total-messages').textContent = '--';
+      document.getElementById('history-api-calls').textContent = '--';
+      document.getElementById('history-avg-memory').textContent = '-- MB';
+    }
+  } catch (error) {
+    console.error('Error updating history chart:', error);
   }
 }
 
@@ -400,18 +632,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initCharts();
   initMetricsChart();
+  initHistoryChart();
   updateStatus();
   updateFunctionResults();
+  fetchPerformanceData();
+  
+  // Initial history chart update
+  updateHistoryChart('hourly', 24);
 
   // Set up periodic updates
   setInterval(updateStatus, UPDATE_INTERVAL);
   setInterval(updateFunctionResults, UPDATE_INTERVAL);
-  setInterval(updatePerformanceMetrics, UPDATE_INTERVAL);
+  // Performance metrics are updated via updateStatus, no need for separate interval
 
   // Set up event listeners
   document.getElementById('run-tests').addEventListener('click', runTests);
   document.getElementById('reset-stats').addEventListener('click', resetStats);
   document.getElementById('repair-stats').addEventListener('click', repairStats);
+  
+  // Set up history chart button listeners
+  document.querySelectorAll('.history-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      // Remove active class from all history buttons
+      document.querySelectorAll('.history-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Add active class to clicked button
+      button.classList.add('active');
+      
+      // Update chart with selected period and range
+      const period = button.getAttribute('data-period');
+      const range = parseInt(button.getAttribute('data-range'));
+      updateHistoryChart(period, range);
+    });
+  });
 
   // Set up tab buttons
   document.querySelectorAll('.tab-button').forEach(button => {
@@ -481,7 +734,7 @@ function initCharts() {
   apiChart = new Chart(apiCtx, {
     type: 'doughnut',
     data: {
-      labels: ['OpenAI', 'Weather', 'Time', 'Wolfram', 'Quake', 'DALL-E'],
+      labels: ['OpenAI', 'Weather', 'Time', 'Wolfram', 'Quake', 'GPT Image'],
       datasets: [
         {
           data: [0, 0, 0, 0, 0, 0],
@@ -515,7 +768,7 @@ function initCharts() {
   errorChart = new Chart(errorCtx, {
     type: 'bar',
     data: {
-      labels: ['OpenAI', 'Discord', 'Weather', 'Time', 'Wolfram', 'Quake', 'DALL-E', 'Other'],
+      labels: ['OpenAI', 'Discord', 'Weather', 'Time', 'Wolfram', 'Quake', 'GPT Image', 'Other'],
       datasets: [
         {
           label: 'Errors',
@@ -553,146 +806,6 @@ function initCharts() {
       },
     },
   });
-
-  // Performance metrics chart
-  const metricsCtx = document.getElementById('metrics-chart').getContext('2d');
-  metricsChart = new Chart(metricsCtx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: 'Response Time (ms)',
-          data: [],
-          borderColor: 'rgba(75, 192, 192, 1)',
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',
-          tension: 0.4,
-          yAxisID: 'y',
-          fill: true,
-        },
-        {
-          label: 'CPU Usage (%)',
-          data: [],
-          borderColor: 'rgba(255, 99, 132, 1)',
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          tension: 0.4,
-          yAxisID: 'y1',
-          fill: true,
-        },
-        {
-          label: 'Memory Usage (MB)',
-          data: [],
-          borderColor: 'rgba(54, 162, 235, 1)',
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',
-          tension: 0.4,
-          yAxisID: 'y2',
-          fill: true,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
-      scales: {
-        x: {
-          display: true,
-          title: {
-            display: true,
-            text: 'Time',
-            color: 'rgba(255, 255, 255, 0.7)',
-          },
-          grid: {
-            color: 'rgba(255, 255, 255, 0.1)',
-          },
-          ticks: {
-            color: 'rgba(255, 255, 255, 0.7)',
-          },
-        },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: {
-            display: true,
-            text: 'Response Time (ms)',
-            color: 'rgba(75, 192, 192, 1)',
-          },
-          grid: {
-            color: 'rgba(75, 192, 192, 0.1)',
-          },
-          ticks: {
-            color: 'rgba(75, 192, 192, 1)',
-          },
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'CPU Usage (%)',
-            color: 'rgba(255, 99, 132, 1)',
-          },
-          grid: {
-            drawOnChartArea: false,
-          },
-          ticks: {
-            color: 'rgba(255, 99, 132, 1)',
-          },
-        },
-        y2: {
-          type: 'linear',
-          display: false,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'Memory (MB)',
-            color: 'rgba(54, 162, 235, 1)',
-          },
-          grid: {
-            drawOnChartArea: false,
-          },
-        },
-      },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgba(255, 255, 255, 0.7)',
-          },
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleColor: '#fff',
-          bodyColor: '#fff',
-          borderColor: 'rgba(255, 255, 255, 0.1)',
-          borderWidth: 1,
-          padding: 12,
-          callbacks: {
-            label: function (context) {
-              let label = context.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
-              if (context.parsed.y !== null) {
-                label += context.parsed.y.toFixed(2);
-                if (context.datasetIndex === 0) label += ' ms';
-                if (context.datasetIndex === 1) label += ' %';
-                if (context.datasetIndex === 2) label += ' MB';
-              }
-              return label;
-            },
-          },
-        },
-      },
-    },
-  });
 }
 
 /**
@@ -718,8 +831,8 @@ async function updateFunctionResults() {
     updateTimeResults(data.time || []);
     updateWolframResults(data.wolfram || []);
     updateQuakeResults(data.quake || []);
-    updateDalleResults(data.dalle || []);
-    updateGallery(data.dalle || []);
+    updateDalleResults(data.gptimage || data.dalle || []);
+    updateGallery(data.gptimage || data.dalle || []);
   } catch (error) {
     console.error('Error updating function results:', error.message || error);
     // Display a message in each tab indicating there was an error
@@ -874,10 +987,10 @@ function updateQuakeResults(results) {
  * @param {Array} results - DALL-E function results
  */
 function updateDalleResults(results) {
-  const container = document.getElementById('dalle-results');
+  const container = document.getElementById('gptimage-results');
 
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent DALL-E image generations</div>';
+    container.innerHTML = '<div class="no-data">No recent GPT Image-1 generations</div>';
     return;
   }
 
@@ -959,7 +1072,7 @@ function updateGallery(results) {
 
       // Add click event to open modal
       galleryItem.addEventListener('click', () => {
-        openImageModal(image.url, image.revisedPrompt || item.params.prompt);
+        window.openImageModal(image.url, image.revisedPrompt || item.params.prompt);
       });
 
       container.appendChild(galleryItem);
@@ -1021,10 +1134,8 @@ async function updateStatus() {
     // Update memory usage
     updateMemoryUsage(data.memory, data.system);
 
-    // Update performance metrics if available
-    if (data.metrics) {
-      updatePerformanceMetrics(data.metrics);
-    }
+    // Fetch and update performance metrics
+    fetchPerformanceData();
 
     // Update plugin statistics
     updatePluginStats(data.stats.plugins, data.stats.apiCalls.plugins, data.stats.errors.plugins);
@@ -1063,6 +1174,46 @@ async function updateStatus() {
         card.prepend(errorBanner);
       }
     });
+  }
+}
+
+/**
+ * Fetch performance data from the /performance endpoint
+ */
+async function fetchPerformanceData() {
+  try {
+    const response = await fetch('/performance');
+    if (!response.ok) {
+      console.error(`Error fetching performance data: ${response.status} ${response.statusText}`);
+      return;
+    }
+
+    const data = await response.json();
+    if (!data || !data.success) {
+      console.error('Invalid performance data received');
+      return;
+    }
+
+    // Process the performance data into the format expected by updatePerformanceMetrics
+    const metrics = {
+      responseTime: {
+        current: data.summary.message_processing?.avg || 0,
+        average: data.summary.message_processing?.avg || 0,
+        min: data.detailed.message_processing?.min || 0,
+        max: data.detailed.message_processing?.max || 0
+      },
+      system: {
+        cpu: [data.summary.message_processing?.avg || 0], // Using message processing time as a proxy
+        load: [1.0], // Default load value
+        memory: [parseFloat(data.serverHealth?.memory?.heapUsed || '0') * 1024 * 1024], // Convert MB to bytes
+        timestamps: [Date.now()],
+        totalMemory: 8 * 1024 * 1024 * 1024 // Default 8GB
+      }
+    };
+
+    updatePerformanceMetrics(metrics);
+  } catch (error) {
+    console.error('Error fetching performance data:', error);
   }
 }
 
@@ -1111,9 +1262,7 @@ function updateApiCalls(apiCalls) {
   document.getElementById('time-calls').textContent = apiCalls.time.toLocaleString();
   document.getElementById('wolfram-calls').textContent = apiCalls.wolfram.toLocaleString();
   document.getElementById('quake-calls').textContent = apiCalls.quake.toLocaleString();
-  document.getElementById('dalle-calls').textContent = apiCalls.dalle
-    ? apiCalls.dalle.toLocaleString()
-    : '0';
+  document.getElementById('dalle-calls').textContent = (apiCalls.gptimage || apiCalls.dalle || 0).toLocaleString();
 
   // Update chart
   apiChart.data.datasets[0].data = [
@@ -1122,7 +1271,7 @@ function updateApiCalls(apiCalls) {
     apiCalls.time,
     apiCalls.wolfram,
     apiCalls.quake,
-    apiCalls.dalle || 0,
+    apiCalls.gptimage || apiCalls.dalle || 0,
   ];
   apiChart.update();
 }
@@ -1136,9 +1285,7 @@ function updateErrors(errors) {
   document.getElementById('openai-errors').textContent = errors.openai.toLocaleString();
   document.getElementById('discord-errors').textContent = errors.discord.toLocaleString();
   document.getElementById('weather-errors').textContent = errors.weather.toLocaleString();
-  document.getElementById('dalle-errors').textContent = errors.dalle
-    ? errors.dalle.toLocaleString()
-    : '0';
+  document.getElementById('dalle-errors').textContent = (errors.gptimage || errors.dalle || 0).toLocaleString();
   document.getElementById('other-errors').textContent = errors.other.toLocaleString();
 
   // Handle plugin errors with the new detailed structure
@@ -1220,7 +1367,7 @@ function updateErrors(errors) {
     errors.time,
     errors.wolfram,
     errors.quake,
-    errors.dalle || 0,
+    errors.gptimage || errors.dalle || 0,
     errors.other,
   ];
   errorChart.update();
@@ -1364,7 +1511,7 @@ function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
  * @param {Array} userDetailsArray - Array of user-specific rate limit counts
  */
 function updateRateLimitedUsers(userDetailsArray) {
-  const container = document.getElementById('rate-limited-users');
+  const container = document.getElementById('rate-limited-users-list');
   if (!container) {
     console.warn('Rate limited users container not found');
     return;

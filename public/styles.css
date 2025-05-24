@@ -26,7 +26,7 @@ body {
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -38,6 +38,41 @@ header {
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--secondary-color);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-link:hover {
+  background-color: #5b73bc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dashboard-link i {
+  font-size: 1rem;
+}
+
+.dashboard-link span {
+  white-space: nowrap;
 }
 
 .logo {
@@ -83,7 +118,7 @@ h1 {
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 20px;
 }
 
@@ -92,6 +127,20 @@ h1 {
   border-radius: 8px;
   padding: 20px;
   box-shadow: var(--shadow);
+}
+
+/* Make function results and performance history cards wider */
+.function-results,
+.performance-history {
+  grid-column: span 2;
+}
+
+/* On smaller screens, these cards take full width */
+@media (max-width: 1200px) {
+  .function-results,
+  .performance-history {
+    grid-column: span 1;
+  }
 }
 
 h2 {
@@ -320,6 +369,41 @@ footer {
   font-style: italic;
 }
 
+/* Performance history styles */
+.history-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.history-btn {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.history-btn:hover {
+  background-color: var(--primary-color);
+  opacity: 0.8;
+}
+
+.history-btn.active {
+  background-color: var(--primary-color);
+}
+
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
 /* Function results styles */
 .tab-container {
   display: flex;
@@ -346,7 +430,7 @@ footer {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   padding: 10px;
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
 }
 

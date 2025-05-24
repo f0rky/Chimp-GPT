@@ -74,6 +74,9 @@ const statsStorage = require('./statsStorage');
 // Import function results storage
 const functionResults = require('./functionResults');
 
+// Import performance history
+const performanceHistory = require('./performanceHistory');
+
 // Track server health status
 let serverHealthy = true;
 let lastError = null;
@@ -620,7 +623,7 @@ function initStatusServer(options = {}) {
           external: `${Math.round(memUsage.external / 1024 / 1024)} MB`,
         };
 
-        res.json({
+        const responseData = {
           success: true,
           summary,
           detailed: metrics,
@@ -630,7 +633,16 @@ function initStatusServer(options = {}) {
             memory: memoryInfo,
           },
           timestamp: new Date().toISOString(),
-        });
+        };
+        
+        // Store performance data in history
+        try {
+          performanceHistory.addMetric(responseData);
+        } catch (historyError) {
+          logger.error({ error: historyError }, 'Error storing performance history');
+        }
+        
+        res.json(responseData);
       } catch (error) {
         logger.error({ error }, 'Critical error getting performance metrics');
         lastError = error;
@@ -644,6 +656,94 @@ function initStatusServer(options = {}) {
             status: 'critical',
             message: 'Server encountered a critical error',
           },
+        });
+      }
+    });
+
+    /**
+     * GET /performance/history/hourly
+     * Returns hourly aggregated performance data
+     *
+     * @route GET /performance/history/hourly
+     * @query {number} hours - Number of hours to retrieve (default: 24, max: 168)
+     * @returns {Object} Hourly performance data
+     */
+    app.get('/performance/history/hourly', (req, res) => {
+      const hours = Math.min(parseInt(req.query.hours) || 24, 168);
+      logger.info(`Getting hourly performance history for ${hours} hours`);
+      
+      try {
+        const hourlyData = performanceHistory.getHourlyData(hours);
+        res.json({
+          success: true,
+          hours,
+          data: hourlyData,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error getting hourly performance history');
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    /**
+     * GET /performance/history/daily
+     * Returns daily aggregated performance data
+     *
+     * @route GET /performance/history/daily
+     * @query {number} days - Number of days to retrieve (default: 30, max: 90)
+     * @returns {Object} Daily performance data
+     */
+    app.get('/performance/history/daily', (req, res) => {
+      const days = Math.min(parseInt(req.query.days) || 30, 90);
+      logger.info(`Getting daily performance history for ${days} days`);
+      
+      try {
+        const dailyData = performanceHistory.getDailyData(days);
+        res.json({
+          success: true,
+          days,
+          data: dailyData,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error getting daily performance history');
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    /**
+     * GET /performance/history/recent
+     * Returns recent raw performance metrics
+     *
+     * @route GET /performance/history/recent
+     * @query {number} minutes - Number of minutes to retrieve (default: 60, max: 1440)
+     * @returns {Object} Recent performance metrics
+     */
+    app.get('/performance/history/recent', (req, res) => {
+      const minutes = Math.min(parseInt(req.query.minutes) || 60, 1440);
+      logger.info(`Getting recent performance history for ${minutes} minutes`);
+      
+      try {
+        const recentData = performanceHistory.getRecentMetrics(minutes);
+        res.json({
+          success: true,
+          minutes,
+          count: recentData.length,
+          data: recentData,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error getting recent performance history');
+        res.status(500).json({
+          success: false,
+          error: error.message
         });
       }
     });
@@ -833,6 +933,14 @@ function initStatusServer(options = {}) {
           logger.info(`Status page available at http://localhost:${portNumber}`);
           logger.info(`For remote access: http://${hostname}:${portNumber}`);
 
+          // Initialize performance history
+          try {
+            await performanceHistory.initialize();
+            logger.info('Performance history initialized');
+          } catch (error) {
+            logger.error({ error }, 'Error initializing performance history');
+          }
+
           // Run CORS test on startup to verify configuration
           try {
             const baseUrl = `http://localhost:${portNumber}`;
@@ -927,6 +1035,14 @@ async function shutdownGracefully(serverInstance, signal, error) {
 
     // Clear the timeout if we exit normally
     forceExitTimeout.unref();
+
+    // Shutdown performance history
+    try {
+      logger.info('Shutting down performance history');
+      await performanceHistory.shutdown();
+    } catch (historyError) {
+      logger.error({ error: historyError }, 'Error shutting down performance history');
+    }
 
     // Close the server
     if (serverInstance && serverInstance.server) {
