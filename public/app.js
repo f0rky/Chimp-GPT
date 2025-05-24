@@ -28,6 +28,20 @@ function closeImageModal() {
   }
 }
 
+// Toggle collapsible sections
+function toggleCollapsible(sectionId) {
+  const content = document.getElementById(sectionId + '-content');
+  const toggle = document.getElementById(sectionId + '-toggle');
+  
+  if (content && toggle) {
+    content.classList.toggle('collapsed');
+    toggle.classList.toggle('collapsed');
+  }
+}
+
+// Make function globally available
+window.toggleCollapsible = toggleCollapsible;
+
 // Initialize metrics chart
 function initMetricsChart() {
   try {

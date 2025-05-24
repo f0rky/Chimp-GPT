@@ -118,8 +118,100 @@ h1 {
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 15px;
+}
+
+/* Create a more structured layout */
+.dashboard-section {
+  display: contents;
+}
+
+/* Top status bar - always full width */
+.status-bar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 15px;
+  align-items: center;
+  padding: 15px 20px;
+  margin-bottom: 10px;
+}
+
+/* Priority layout for key cards */
+.priority-high {
+  grid-column: span 2;
+}
+
+.priority-medium {
+  grid-column: span 1;
+}
+
+/* Compact stat display for status bar */
+.status-bar .stat {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.status-bar .stat .label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.status-bar .stat .value {
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+/* Status bar action buttons */
+.status-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+}
+
+.btn-secondary:hover {
+  background-color: var(--primary-color);
+}
+
+.btn-warning {
+  background-color: var(--warning-color);
+  color: var(--background-color);
+}
+
+.btn-warning:hover {
+  background-color: #e89611;
+}
+
+/* Error count styling */
+.error-count {
+  color: var(--error-color) !important;
+}
+
+.error-count:not(:contains('0')) {
+  font-weight: bold;
 }
 
 .card {
@@ -129,17 +221,100 @@ h1 {
   box-shadow: var(--shadow);
 }
 
-/* Make function results and performance history cards wider */
+/* Layout priorities for different card types */
 .function-results,
-.performance-history {
+.performance-history,
+.combined-performance {
+  grid-column: span 3;
+}
+
+.api-system-health {
   grid-column: span 2;
 }
 
-/* On smaller screens, these cards take full width */
-@media (max-width: 1200px) {
+.compact-info {
+  grid-column: span 1;
+}
+
+/* Collapsible sections */
+.collapsible-section {
+  grid-column: 1 / -1;
+}
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--secondary-color);
+  margin-bottom: 15px;
+}
+
+.collapsible-content {
+  display: grid;
+  grid-template-columns: subgrid;
+  gap: 15px;
+}
+
+.collapsible-content.collapsed {
+  display: none;
+}
+
+.collapsible-toggle {
+  transition: transform 0.2s ease;
+}
+
+.collapsible-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Combined performance card */
+.performance-overview {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.performance-chart {
+  min-height: 200px;
+}
+
+.performance-stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+/* On smaller screens, stack and reduce spans */
+@media (max-width: 1400px) {
   .function-results,
-  .performance-history {
+  .performance-history,
+  .combined-performance {
+    grid-column: span 2;
+  }
+  
+  .api-system-health {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 1000px) {
+  .function-results,
+  .performance-history,
+  .combined-performance,
+  .api-system-health {
     grid-column: span 1;
+  }
+  
+  .performance-overview {
+    grid-template-columns: 1fr;
+  }
+  
+  .status-bar {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 
@@ -154,6 +329,40 @@ h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 15px;
+}
+
+/* Compact stat grid for better density */
+.stat-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.stat-grid.compact .stat {
+  padding: 8px;
+  font-size: 0.9rem;
+}
+
+/* Dense information layout */
+.info-dense {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.info-dense .stat {
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+/* Mini cards for less important info */
+.mini-card {
+  padding: 12px;
+  font-size: 0.9rem;
+}
+
+.mini-card h2 {
+  font-size: 1rem;
+  margin-bottom: 10px;
 }
 
 .stat {
