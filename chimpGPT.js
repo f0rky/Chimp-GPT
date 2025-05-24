@@ -27,6 +27,7 @@ const { processVersionQuery } = require('./utils/versionSelfQuery');
 const { sendChannelGreeting } = require('./utils/greetingManager');
 const PFPManager = require('./utils/pfpManager');
 const { stats: healthCheckStats } = require('./healthCheck'); // Moved from updateDiscordStats
+const commandHandler = require('./commands/commandHandler');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -474,8 +475,7 @@ async function generateNaturalResponse(functionResult, conversationLog, function
   }
 }
 
-// Import the command handler system
-const commandHandler = require('./commands/commandHandler');
+// Command handler system already imported at top of file
 
 // Track in-progress operations
 const inProgressOperations = new Set();
@@ -1330,7 +1330,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       // Otherwise download from URL
       try {
         // Validate URL format
-        new URL(imageResult.url);
+        const urlObj = new URL(imageResult.url);
 
         // Check if it's a data URL
         if (imageResult.url.startsWith('data:')) {
@@ -1423,7 +1423,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     try {
       const imageUsageTracker = require('./imageUsageTracker');
       const userId = message.author?.id || 'unknown';
-      const username = message.author?.username || 'unknown';
+      const authorUsername = message.author?.username || 'unknown';
 
       // Track this image generation request
       const usageStats = imageUsageTracker.trackImageGeneration({
@@ -1433,7 +1433,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         cost: result.estimatedCost || 0,
         apiCallDuration: result.apiCallDuration || 0,
         userId,
-        username,
+        username: authorUsername,
       });
 
       discordLogger.info(
@@ -1989,6 +1989,9 @@ async function handleFunctionCall(
         );
         return;
       }
+    default:
+      discordLogger.warn({ functionName: gptResponse.functionName }, 'Unknown function name');
+      functionResult = { error: `Unknown function: ${gptResponse.functionName}` };
   }
 
   try {
@@ -2112,20 +2115,20 @@ async function handleDirectMessage(
 
   // Calculate processing time in seconds with 2 decimal places
   const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
-  
+
   // Prepare the final response with subtext for timing info
   let finalResponse = gptResponse.content;
   const subtext = `\n\n(-${processingTime}s)`;
-  
+
   // Ensure the total length doesn't exceed Discord's 2000 character limit
   const maxLength = 2000 - subtext.length - 3; // -3 for potential ellipsis
   if (finalResponse.length > maxLength) {
     finalResponse = finalResponse.slice(0, maxLength) + '...';
   }
-  
+
   // Append the subtext
   finalResponse += subtext;
-  
+
   await feedbackMessage.edit(finalResponse);
 }
 

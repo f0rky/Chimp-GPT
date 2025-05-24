@@ -325,8 +325,8 @@ async function loadPlugins() {
           {
             error,
             folder,
-            pluginId: plugin?.id || 'unknown',
-            pluginVersion: plugin?.version || plugins.metadata?.[plugin?.id]?.version || 'unknown',
+            pluginId: 'unknown',
+            pluginVersion: 'unknown',
           },
           'Error loading plugin'
         );
@@ -472,10 +472,11 @@ async function executeFunction(functionName, ...args) {
  */
 async function executeHook(hookName, ...args) {
   const results = [];
+  let hookHandlers = [];
 
   try {
     // Get all plugins that implement this hook
-    const hookHandlers = plugins.hooks[hookName] || [];
+    hookHandlers = plugins.hooks[hookName] || [];
 
     // Execute each hook handler
     for (const handler of hookHandlers) {

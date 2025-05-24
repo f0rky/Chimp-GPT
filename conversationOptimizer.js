@@ -262,12 +262,13 @@ async function pruneOldConversations(maxAgeMs = MAX_CONVERSATION_AGE_DAYS * 24 *
     let prunedCount = 0;
 
     // Check if file is too large
+    let effectiveMaxAgeMs = maxAgeMs;
     if (await isFileTooLarge()) {
       logger.warn(
         `Conversations file exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB, aggressive pruning`
       );
       // Reduce max age to be more aggressive with pruning
-      maxAgeMs = maxAgeMs / 2;
+      effectiveMaxAgeMs = maxAgeMs / 2;
     }
 
     // Find and remove old conversations
@@ -282,7 +283,7 @@ async function pruneOldConversations(maxAgeMs = MAX_CONVERSATION_AGE_DAYS * 24 *
       const lastMessage = conversation[conversation.length - 1];
       if (lastMessage && lastMessage.timestamp) {
         const messageTime = new Date(lastMessage.timestamp).getTime();
-        if (now - messageTime > maxAgeMs) {
+        if (now - messageTime > effectiveMaxAgeMs) {
           conversationsCache.delete(userId);
           prunedCount++;
         }

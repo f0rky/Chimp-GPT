@@ -32,7 +32,7 @@ module.exports = {
       // Parse days argument if provided
       let days = 30; // Default to 30 days
       if (args.length > 0 && !isNaN(args[0])) {
-        days = parseInt(args[0]);
+        days = parseInt(args[0], 10);
       }
 
       // Calculate the start date based on the number of days

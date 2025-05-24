@@ -14,6 +14,9 @@ const axios = require('axios');
 const { createLogger } = require('../../logger');
 const retryWithBreaker = require('../../utils/retryWithBreaker');
 
+// Create a logger for this plugin
+const logger = createLogger('dad-jokes-plugin');
+
 // Circuit breaker configuration for dad jokes API
 const DAD_JOKES_BREAKER_CONFIG = {
   maxRetries: 2,
@@ -23,9 +26,6 @@ const DAD_JOKES_BREAKER_CONFIG = {
     logger.error({ error }, 'Dad jokes API circuit breaker opened');
   },
 };
-
-// Create a logger for this plugin
-const logger = createLogger('dad-jokes-plugin');
 
 // Dad joke trigger phrases (lowercase)
 const DAD_JOKE_TRIGGERS = [

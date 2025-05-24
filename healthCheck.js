@@ -81,7 +81,7 @@ const systemMetrics = {
   memory: [],
   cpu: [],
   load: [],
-  timestamps: []
+  timestamps: [],
 };
 const MAX_METRICS = 60; // Store last minute of data (assuming 1s interval)
 
@@ -173,14 +173,14 @@ function initHealthCheck(client) {
       if (nodeEnvForPort !== 'production') {
         return callback(null, true);
       }
-      
+
       // In production, only allow specific origins
       if (!origin) return callback(null, true); // Allow requests with no origin (like mobile apps or curl requests)
       if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
+        return callback(null, true);
       } else {
         logger.warn({ origin, allowedOrigins }, 'CORS: Blocked an origin');
-        callback(new Error('Not allowed by CORS'));
+        return callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true, // If you need to handle cookies or authorization headers
@@ -239,19 +239,20 @@ function initHealthCheck(client) {
       const memoryUsage = process.memoryUsage();
 
       // Calculate average response time
-      const avgResponseTime = responseTimes.length > 0 
-        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
-        : 0;
+      const avgResponseTime =
+        responseTimes.length > 0
+          ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+          : 0;
 
       // Get current timestamp for metrics
       const now = new Date();
-      
+
       // Add current metrics to history
       systemMetrics.memory.push(process.memoryUsage().heapUsed);
       systemMetrics.cpu.push(process.cpuUsage().user);
       systemMetrics.load.push(os.loadavg()[0]);
       systemMetrics.timestamps.push(now);
-      
+
       // Keep only the most recent metrics
       if (systemMetrics.memory.length > MAX_METRICS) {
         systemMetrics.memory.shift();
@@ -270,14 +271,14 @@ function initHealthCheck(client) {
             current: Date.now() - req._startTime,
             average: avgResponseTime,
             min: responseTimes.length > 0 ? Math.min(...responseTimes) : 0,
-            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0
+            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0,
           },
           system: {
             memory: systemMetrics.memory,
             cpu: systemMetrics.cpu,
             load: systemMetrics.load,
-            timestamps: systemMetrics.timestamps.map(t => t.toISOString())
-          }
+            timestamps: systemMetrics.timestamps.map(t => t.toISOString()),
+          },
         },
         debug: {
           nodeVersion: process.version,
@@ -285,7 +286,7 @@ function initHealthCheck(client) {
           arch: process.arch,
           pid: process.pid,
           uptime: process.uptime(),
-          env: process.env.NODE_ENV || 'development'
+          env: process.env.NODE_ENV || 'development',
         },
         memory: {
           rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
@@ -338,9 +339,10 @@ function initHealthCheck(client) {
         if (lastDeploymentMs) {
           try {
             const nextCheckDate = new Date(lastDeploymentMs + 12 * 60 * 60 * 1000);
-            nextCheckEstimate = autoDeployEnabled && !isNaN(nextCheckDate.getTime())
-              ? nextCheckDate.toISOString()
-              : 'Disabled or invalid date';
+            nextCheckEstimate =
+              autoDeployEnabled && !isNaN(nextCheckDate.getTime())
+                ? nextCheckDate.toISOString()
+                : 'Disabled or invalid date';
           } catch (e) {
             console.error('Error calculating next check date:', e);
             nextCheckEstimate = 'Error calculating';
@@ -348,9 +350,10 @@ function initHealthCheck(client) {
         }
 
         health.slashCommands = {
-          lastDeployed: lastDeploymentMs && !isNaN(new Date(lastDeploymentMs).getTime())
-            ? new Date(lastDeploymentMs).toISOString()
-            : 'Never or Unknown',
+          lastDeployed:
+            lastDeploymentMs && !isNaN(new Date(lastDeploymentMs).getTime())
+              ? new Date(lastDeploymentMs).toISOString()
+              : 'Never or Unknown',
           nextScheduledCheck: nextCheckEstimate,
           autoDeployEnabled: autoDeployEnabled,
         };
@@ -376,10 +379,10 @@ function initHealthCheck(client) {
       if (responseTimes.length > MAX_RESPONSE_TIMES) {
         responseTimes.shift();
       }
-      
+
       // Add current response time to the health object
       health.metrics.responseTime.current = responseTime;
-      
+
       res.json(health);
     } catch (err) {
       logger.error({ err }, 'Critical error in /health endpoint');
@@ -495,7 +498,7 @@ function scheduleHealthReports(client) {
               // Import the greeting manager to get system information
               const greetingManager = require('./utils/greetingManager');
               const report = generateHealthReport(true);
-              const version = require('./getBotVersion').getBotVersion();
+              const botVersionInfo = require('./getBotVersion').getBotVersion();
 
               // Generate the system information embed
               try {
@@ -730,7 +733,7 @@ async function handleStatsCommand(message) {
 
       // If the coordinator has a message reference, update it
       if (startupCoordinator.hasMessage && startupCoordinator.messageRef) {
-        const version = require('./getBotVersion').getBotVersion();
+        const botVersion = require('./getBotVersion').getBotVersion();
 
         // Update the health check embed with the latest report
         startupCoordinator.addEmbed('healthCheck', {
@@ -739,7 +742,7 @@ async function handleStatsCommand(message) {
           color: 0x00ff00, // Green color for success
           timestamp: new Date(),
           footer: {
-            text: `ChimpGPT v${version} | Updated at ${new Date().toLocaleTimeString()}`,
+            text: `ChimpGPT v${botVersion} | Updated at ${new Date().toLocaleTimeString()}`,
           },
         });
 
@@ -762,18 +765,19 @@ async function handleStatsCommand(message) {
  * @returns {string} Formatted duration string (e.g., "2d 5h 30m 15s")
  */
 function formatDuration(seconds) {
-  const days = Math.floor(seconds / 86400);
-  seconds %= 86400;
-  const hours = Math.floor(seconds / 3600);
-  seconds %= 3600;
-  const minutes = Math.floor(seconds / 60);
-  seconds %= 60;
+  let remainingSeconds = seconds;
+  const days = Math.floor(remainingSeconds / 86400);
+  remainingSeconds %= 86400;
+  const hours = Math.floor(remainingSeconds / 3600);
+  remainingSeconds %= 3600;
+  const minutes = Math.floor(remainingSeconds / 60);
+  remainingSeconds %= 60;
 
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+  if (remainingSeconds > 0 || parts.length === 0) parts.push(`${remainingSeconds}s`);
 
   return parts.join(' ');
 }

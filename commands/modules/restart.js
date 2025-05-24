@@ -19,6 +19,7 @@ module.exports = {
     }
     await message.reply('Restarting the bot...');
     process.exit(0); // Assumes process manager will restart the bot
+    return;
   },
   async executeSlash(interaction) {
     if (interaction.user.id !== config.OWNER_ID) {
@@ -32,5 +33,6 @@ module.exports = {
       ephemeral: true,
     });
     process.exit(0); // Assumes process manager will restart the bot
+    return;
   },
 };

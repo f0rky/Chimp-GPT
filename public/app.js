@@ -1,4 +1,4 @@
-/* global document window Chart alert confirm openImageModal */
+/* global Chart openImageModal */
 /**
  * ChimpGPT Status Page
  *
@@ -35,7 +35,7 @@ function initMetricsChart() {
       console.warn('Metrics chart canvas not found');
       return;
     }
-    
+
     // Destroy existing chart instance if it exists
     if (window.metricsChart) {
       try {
@@ -62,7 +62,7 @@ function initMetricsChart() {
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
             tension: 0.4,
             yAxisID: 'y',
-            fill: true
+            fill: true,
           },
           {
             label: 'CPU Usage (%)',
@@ -71,7 +71,7 @@ function initMetricsChart() {
             backgroundColor: 'rgba(255, 99, 132, 0.2)',
             tension: 0.4,
             yAxisID: 'y1',
-            fill: true
+            fill: true,
           },
           {
             label: 'Memory Usage (MB)',
@@ -80,9 +80,9 @@ function initMetricsChart() {
             backgroundColor: 'rgba(54, 162, 235, 0.2)',
             tension: 0.4,
             yAxisID: 'y2',
-            fill: true
-          }
-        ]
+            fill: true,
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -97,14 +97,14 @@ function initMetricsChart() {
             title: {
               display: true,
               text: 'Time',
-              color: 'rgba(255, 255, 255, 0.7)'
+              color: 'rgba(255, 255, 255, 0.7)',
             },
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
+              color: 'rgba(255, 255, 255, 0.1)',
             },
             ticks: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
+              color: 'rgba(255, 255, 255, 0.7)',
+            },
           },
           y: {
             type: 'linear',
@@ -113,14 +113,14 @@ function initMetricsChart() {
             title: {
               display: true,
               text: 'Response Time (ms)',
-              color: 'rgba(75, 192, 192, 1)'
+              color: 'rgba(75, 192, 192, 1)',
             },
             grid: {
-              color: 'rgba(75, 192, 192, 0.1)'
+              color: 'rgba(75, 192, 192, 0.1)',
             },
             ticks: {
-              color: 'rgba(75, 192, 192, 1)'
-            }
+              color: 'rgba(75, 192, 192, 1)',
+            },
           },
           y1: {
             type: 'linear',
@@ -129,14 +129,14 @@ function initMetricsChart() {
             title: {
               display: true,
               text: 'CPU Usage (%)',
-              color: 'rgba(255, 99, 132, 1)'
+              color: 'rgba(255, 99, 132, 1)',
             },
             grid: {
               drawOnChartArea: false,
             },
             ticks: {
-              color: 'rgba(255, 99, 132, 1)'
-            }
+              color: 'rgba(255, 99, 132, 1)',
+            },
           },
           y2: {
             type: 'linear',
@@ -145,19 +145,19 @@ function initMetricsChart() {
             title: {
               display: true,
               text: 'Memory (MB)',
-              color: 'rgba(54, 162, 235, 1)'
+              color: 'rgba(54, 162, 235, 1)',
             },
             grid: {
               drawOnChartArea: false,
-            }
-          }
+            },
+          },
         },
         plugins: {
           legend: {
             position: 'top',
             labels: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
+              color: 'rgba(255, 255, 255, 0.7)',
+            },
           },
           tooltip: {
             mode: 'index',
@@ -169,23 +169,23 @@ function initMetricsChart() {
             borderWidth: 1,
             padding: 12,
             callbacks: {
-              label: function(context) {
-                let label = context.dataset.label || '';
+              label: function (tooltipContext) {
+                let label = tooltipContext.dataset.label || '';
                 if (label) {
                   label += ': ';
                 }
-                if (context.parsed.y !== null) {
-                  label += context.parsed.y.toFixed(2);
-                  if (context.datasetIndex === 0) label += ' ms';
-                  if (context.datasetIndex === 1) label += ' %';
-                  if (context.datasetIndex === 2) label += ' MB';
+                if (tooltipContext.parsed.y !== null) {
+                  label += tooltipContext.parsed.y.toFixed(2);
+                  if (tooltipContext.datasetIndex === 0) label += ' ms';
+                  if (tooltipContext.datasetIndex === 1) label += ' %';
+                  if (tooltipContext.datasetIndex === 2) label += ' MB';
                 }
                 return label;
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
   } catch (e) {
     console.error('Error initializing metrics chart:', e);
@@ -195,95 +195,103 @@ function initMetricsChart() {
 // Update performance metrics display
 function updatePerformanceMetrics(metrics) {
   // Check if we have a metrics object and required elements exist
-  if (!metrics || !document.getElementById('response-time') || !document.getElementById('cpu-usage')) {
+  if (
+    !metrics ||
+    !document.getElementById('response-time') ||
+    !document.getElementById('cpu-usage')
+  ) {
     return;
   }
   if (!metrics) return;
-  
+
   // Update response time metrics
   const responseTimeElement = document.getElementById('response-time');
   const avgResponseTimeElement = document.getElementById('avg-response-time');
   const minMaxResponseTimeElement = document.getElementById('minmax-response-time');
-  
+
   if (responseTimeElement && metrics.responseTime) {
     responseTimeElement.textContent = `${Math.round(metrics.responseTime.current)} ms`;
   }
-  
+
   if (avgResponseTimeElement && metrics.responseTime) {
     avgResponseTimeElement.textContent = `${Math.round(metrics.responseTime.average)} ms`;
   }
-  
+
   if (minMaxResponseTimeElement && metrics.responseTime) {
-    minMaxResponseTimeElement.textContent = 
-      `${Math.round(metrics.responseTime.min)} / ${Math.round(metrics.responseTime.max)} ms`;
+    minMaxResponseTimeElement.textContent = `${Math.round(metrics.responseTime.min)} / ${Math.round(metrics.responseTime.max)} ms`;
   }
-  
+
   // Update CPU and memory metrics
   const cpuUsageElement = document.getElementById('cpu-usage');
   const cpuLoadElement = document.getElementById('cpu-load');
   const memoryUsageElement = document.getElementById('memory-usage');
-  
+
   if (cpuUsageElement && metrics.system && metrics.system.cpu && metrics.system.cpu.length > 0) {
     const cpuUsage = metrics.system.cpu[metrics.system.cpu.length - 1] / 1000; // Convert to ms
     cpuUsageElement.textContent = `${cpuUsage.toFixed(1)}%`;
   }
-  
+
   if (cpuLoadElement && metrics.system && metrics.system.load && metrics.system.load.length > 0) {
     const load = metrics.system.load[metrics.system.load.length - 1];
     cpuLoadElement.textContent = load.toFixed(2);
   }
-  
-  if (memoryUsageElement && metrics.system && metrics.system.memory && metrics.system.memory.length > 0) {
-    const memUsedMB = Math.round(metrics.system.memory[metrics.system.memory.length - 1] / 1024 / 1024);
+
+  if (
+    memoryUsageElement &&
+    metrics.system &&
+    metrics.system.memory &&
+    metrics.system.memory.length > 0
+  ) {
+    const memUsedMB = Math.round(
+      metrics.system.memory[metrics.system.memory.length - 1] / 1024 / 1024
+    );
     // Get total memory from system object if available, otherwise use a default value
     const totalMem = metrics.system.totalMemory || 1024 * 8; // Default to 8GB if not available
     const totalMemMB = Math.round(totalMem / 1024 / 1024);
     memoryUsageElement.textContent = `${memUsedMB} / ${totalMemMB} MB`;
   }
-  
+
   // Update chart if we have enough data
-  if (metrics.system && 
-      metrics.system.timestamps && 
-      metrics.system.timestamps.length > 0 && 
-      metrics.system.cpu && 
-      metrics.system.cpu.length > 0 &&
-      metrics.system.memory && 
-      metrics.system.memory.length > 0) {
-    
+  if (
+    metrics.system &&
+    metrics.system.timestamps &&
+    metrics.system.timestamps.length > 0 &&
+    metrics.system.cpu &&
+    metrics.system.cpu.length > 0 &&
+    metrics.system.memory &&
+    metrics.system.memory.length > 0
+  ) {
     const lastIndex = metrics.system.timestamps.length - 1;
-    updateMetricsChart(
-      metrics.system.timestamps[lastIndex],
-      {
-        responseTime: metrics.responseTime.current,
-        cpu: metrics.system.cpu[lastIndex],
-        memory: metrics.system.memory[lastIndex]
-      }
-    );
+    updateMetricsChart(metrics.system.timestamps[lastIndex], {
+      responseTime: metrics.responseTime.current,
+      cpu: metrics.system.cpu[lastIndex],
+      memory: metrics.system.memory[lastIndex],
+    });
   }
 }
 
 // Update metrics chart with new data
 function updateMetricsChart(timestamp, metrics) {
   if (!window.metricsChart) return;
-  
+
   const now = new Date();
   const timeStr = now.toLocaleTimeString();
-  
+
   try {
     // Add new data points
     window.metricsChart.data.labels.push(timeStr);
-    
+
     // Response time in ms
     window.metricsChart.data.datasets[0].data.push(metrics.responseTime);
-    
+
     // CPU usage (convert from microseconds to milliseconds and then to percentage)
     const cpuUsage = metrics.cpu / 1000; // Convert to ms
     window.metricsChart.data.datasets[1].data.push(cpuUsage);
-    
+
     // Memory usage in MB
     const memoryUsedMB = Math.round(metrics.memory / 1024 / 1024);
     window.metricsChart.data.datasets[2].data.push(memoryUsedMB);
-    
+
     // Keep only the last 20 data points
     const maxPoints = 20;
     if (window.metricsChart.data.labels.length > maxPoints) {
@@ -294,7 +302,7 @@ function updateMetricsChart(timestamp, metrics) {
         }
       });
     }
-    
+
     window.metricsChart.update('none');
   } catch (error) {
     console.error('Error updating metrics chart:', error);
@@ -442,13 +450,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to open image modal
   window.openImageModal = function (imageUrl, prompt) {
-    const modal = document.getElementById('gallery-modal');
+    const galleryModal = document.getElementById('gallery-modal');
     const modalImage = document.getElementById('modal-image');
     const modalPrompt = document.getElementById('modal-prompt');
 
     modalImage.src = imageUrl;
     modalPrompt.textContent = prompt;
-    modal.classList.add('active');
+    galleryModal.classList.add('active');
 
     // Prevent scrolling on body when modal is open
     document.body.style.overflow = 'hidden';
@@ -456,8 +464,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to close image modal
   window.closeImageModal = function () {
-    const modal = document.getElementById('gallery-modal');
-    modal.classList.remove('active');
+    const galleryModal = document.getElementById('gallery-modal');
+    galleryModal.classList.remove('active');
 
     // Re-enable scrolling
     document.body.style.overflow = 'auto';
@@ -560,7 +568,7 @@ function initCharts() {
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           tension: 0.4,
           yAxisID: 'y',
-          fill: true
+          fill: true,
         },
         {
           label: 'CPU Usage (%)',
@@ -569,7 +577,7 @@ function initCharts() {
           backgroundColor: 'rgba(255, 99, 132, 0.2)',
           tension: 0.4,
           yAxisID: 'y1',
-          fill: true
+          fill: true,
         },
         {
           label: 'Memory Usage (MB)',
@@ -578,9 +586,9 @@ function initCharts() {
           backgroundColor: 'rgba(54, 162, 235, 0.2)',
           tension: 0.4,
           yAxisID: 'y2',
-          fill: true
-        }
-      ]
+          fill: true,
+        },
+      ],
     },
     options: {
       responsive: true,
@@ -595,14 +603,14 @@ function initCharts() {
           title: {
             display: true,
             text: 'Time',
-            color: 'rgba(255, 255, 255, 0.7)'
+            color: 'rgba(255, 255, 255, 0.7)',
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.1)'
+            color: 'rgba(255, 255, 255, 0.1)',
           },
           ticks: {
-            color: 'rgba(255, 255, 255, 0.7)'
-          }
+            color: 'rgba(255, 255, 255, 0.7)',
+          },
         },
         y: {
           type: 'linear',
@@ -611,14 +619,14 @@ function initCharts() {
           title: {
             display: true,
             text: 'Response Time (ms)',
-            color: 'rgba(75, 192, 192, 1)'
+            color: 'rgba(75, 192, 192, 1)',
           },
           grid: {
-            color: 'rgba(75, 192, 192, 0.1)'
+            color: 'rgba(75, 192, 192, 0.1)',
           },
           ticks: {
-            color: 'rgba(75, 192, 192, 1)'
-          }
+            color: 'rgba(75, 192, 192, 1)',
+          },
         },
         y1: {
           type: 'linear',
@@ -627,14 +635,14 @@ function initCharts() {
           title: {
             display: true,
             text: 'CPU Usage (%)',
-            color: 'rgba(255, 99, 132, 1)'
+            color: 'rgba(255, 99, 132, 1)',
           },
           grid: {
             drawOnChartArea: false,
           },
           ticks: {
-            color: 'rgba(255, 99, 132, 1)'
-          }
+            color: 'rgba(255, 99, 132, 1)',
+          },
         },
         y2: {
           type: 'linear',
@@ -643,19 +651,19 @@ function initCharts() {
           title: {
             display: true,
             text: 'Memory (MB)',
-            color: 'rgba(54, 162, 235, 1)'
+            color: 'rgba(54, 162, 235, 1)',
           },
           grid: {
             drawOnChartArea: false,
-          }
-        }
+          },
+        },
       },
       plugins: {
         legend: {
           position: 'top',
           labels: {
-            color: 'rgba(255, 255, 255, 0.7)'
-          }
+            color: 'rgba(255, 255, 255, 0.7)',
+          },
         },
         tooltip: {
           mode: 'index',
@@ -667,7 +675,7 @@ function initCharts() {
           borderWidth: 1,
           padding: 12,
           callbacks: {
-            label: function(context) {
+            label: function (context) {
               let label = context.dataset.label || '';
               if (label) {
                 label += ': ';
@@ -679,11 +687,11 @@ function initCharts() {
                 if (context.datasetIndex === 2) label += ' MB';
               }
               return label;
-            }
-          }
-        }
-      }
-    }
+            },
+          },
+        },
+      },
+    },
   });
 }
 
@@ -984,7 +992,7 @@ async function updateStatus() {
     const botName = data.name || 'Bot';
     const pageTitle = document.getElementById('page-title');
     const botNameHeader = document.getElementById('bot-name-header');
-    
+
     if (pageTitle) pageTitle.textContent = `${botName} Status`;
     if (botNameHeader) botNameHeader.textContent = `${botName} Status`;
 
@@ -996,11 +1004,13 @@ async function updateStatus() {
     const versionElement = document.getElementById('version');
     const messageCountElement = document.getElementById('message-count');
     const discordPingElement = document.getElementById('discord-ping');
-    
+
     if (uptimeElement) uptimeElement.textContent = formatUptime(data.uptime);
     if (versionElement) versionElement.textContent = data.version;
-    if (messageCountElement) messageCountElement.textContent = data.stats.messageCount.toLocaleString();
-    if (discordPingElement && data.discord) discordPingElement.textContent = `${data.discord.ping || '--'} ms`;
+    if (messageCountElement)
+      messageCountElement.textContent = data.stats.messageCount.toLocaleString();
+    if (discordPingElement && data.discord)
+      discordPingElement.textContent = `${data.discord.ping || '--'} ms`;
 
     // Update API calls
     updateApiCalls(data.stats.apiCalls);
@@ -1010,7 +1020,7 @@ async function updateStatus() {
 
     // Update memory usage
     updateMemoryUsage(data.memory, data.system);
-    
+
     // Update performance metrics if available
     if (data.metrics) {
       updatePerformanceMetrics(data.metrics);
@@ -1022,7 +1032,7 @@ async function updateStatus() {
     // Update rate limits
     const rateLimitHitsElement = document.getElementById('rate-limit-hits');
     const rateLimitUsersElement = document.getElementById('rate-limit-users');
-    
+
     if (rateLimitHitsElement && data.stats.rateLimits) {
       rateLimitHitsElement.textContent = data.stats.rateLimits.count.toLocaleString();
     }
@@ -1245,13 +1255,11 @@ function updateMemoryUsage(memory, system) {
   if (memoryRssElement) memoryRssElement.textContent = memory.rss || 'N/A';
   if (memoryHeapTotalElement) memoryHeapTotalElement.textContent = memory.heapTotal || 'N/A';
   if (memoryHeapUsedElement) memoryHeapUsedElement.textContent = memory.heapUsed || 'N/A';
-  
+
   // Update system memory
   if (systemMemoryElement) {
-    systemMemoryElement.textContent = 
-      systemTotal && systemFree 
-        ? `${systemTotal - systemFree} MB / ${systemTotal} MB`
-        : 'N/A';
+    systemMemoryElement.textContent =
+      systemTotal && systemFree ? `${systemTotal - systemFree} MB / ${systemTotal} MB` : 'N/A';
   }
 }
 
@@ -1261,18 +1269,19 @@ function updateMemoryUsage(memory, system) {
  * @returns {string} - Formatted uptime string
  */
 function formatUptime(seconds) {
-  const days = Math.floor(seconds / 86400);
-  seconds %= 86400;
-  const hours = Math.floor(seconds / 3600);
-  seconds %= 3600;
-  const minutes = Math.floor(seconds / 60);
-  seconds %= 60;
+  let remainingSeconds = seconds;
+  const days = Math.floor(remainingSeconds / 86400);
+  remainingSeconds %= 86400;
+  const hours = Math.floor(remainingSeconds / 3600);
+  remainingSeconds %= 3600;
+  const minutes = Math.floor(remainingSeconds / 60);
+  remainingSeconds %= 60;
 
   let result = '';
   if (days > 0) result += `${days}d `;
   if (hours > 0 || days > 0) result += `${hours}h `;
   if (minutes > 0 || hours > 0 || days > 0) result += `${minutes}m `;
-  result += `${seconds}s`;
+  result += `${remainingSeconds}s`;
 
   return result;
 }
@@ -1373,7 +1382,7 @@ function updateRateLimitedUsers(userDetailsArray) {
     // Create a table for better formatting
     const table = document.createElement('table');
     table.className = 'rate-limit-table';
-    
+
     // Create table header
     const thead = document.createElement('thead');
     thead.innerHTML = `
@@ -1383,14 +1392,14 @@ function updateRateLimitedUsers(userDetailsArray) {
         <th>Last Updated</th>
       </tr>
     `;
-    
+
     // Create table body
     const tbody = document.createElement('tbody');
-    
+
     // Add rows for each rate-limited user
     userDetailsArray.forEach(user => {
       if (!user) return;
-      
+
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${user.userId || 'Unknown'}</td>
@@ -1399,11 +1408,11 @@ function updateRateLimitedUsers(userDetailsArray) {
       `;
       tbody.appendChild(row);
     });
-    
+
     // Append header and body to table
     table.appendChild(thead);
     table.appendChild(tbody);
-    
+
     // Append table to container
     container.appendChild(table);
   } catch (error) {
