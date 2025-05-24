@@ -157,27 +157,32 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
     contextLength: JSON.stringify(conversationLog).length,
   });
   try {
-    // First, check for clear image generation intent in the current message
-    const lowerContent = content.toLowerCase();
-    const imageKeywords = [
-      'draw',
-      'generate',
-      'create',
-      'make',
-      'show me',
-      'picture of',
-      'image of',
-      'photo of',
+    // Check for explicit image generation intent in the current message
+    const lowerContent = content.toLowerCase().trim();
+    const imagePhrases = [
+      /^draw (?:me |us |a |an |the )?/i,
+      /^generate (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+      /^create (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+      /^make (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+      /^show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)/i,
+      /^(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)/i,
+      /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i
     ];
-    const isImageRequest = imageKeywords.some(keyword => lowerContent.includes(keyword));
+    
+    const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
 
     // If it's clearly an image request, bypass the full context
     if (isImageRequest) {
-      openaiLogger.debug('Detected image generation request, using minimal context');
+      openaiLogger.debug('Detected image generation request', { content });
+      // Clean up the prompt by removing the command phrases
+      let cleanPrompt = content;
+      for (const phrase of imagePhrases) {
+        cleanPrompt = cleanPrompt.replace(phrase, '').trim();
+      }
       return {
         type: 'functionCall',
         functionName: 'generateImage',
-        parameters: { prompt: content },
+        parameters: { prompt: cleanPrompt },
       };
     }
 

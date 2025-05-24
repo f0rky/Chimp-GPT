@@ -37,6 +37,7 @@ const { createLogger } = require('./logger');
 const logger = createLogger('conversationManager');
 const conversationStorage = require('./conversationStorage');
 const referenceResolver = require('./utils/messageReferenceResolver');
+const { sanitizeMessage, validateMessage } = require('./utils/messageSanitizer');
 
 /**
  * Maximum number of messages to keep in a conversation
@@ -255,9 +256,22 @@ function addReferenceContext(userId, referenceMessages) {
   // Limit the number of reference messages to add
   const messagesToAdd = referenceMessages.slice(0, MAX_REFERENCE_CONTEXT);
 
-  // Insert reference messages after the system message
-  conversation.splice(1, 0, ...messagesToAdd);
-  conversationsDirty = true;
+  // Add reference messages to the conversation
+  for (const refMsg of messagesToAdd) {
+    // Skip if we've already added this reference message
+    if (conversation.find((msg) => msg.id === refMsg.id)) {
+      continue;
+    }
+
+    // Sanitize the reference message content
+    if (refMsg.content) {
+      refMsg.content = sanitizeMessage(refMsg.content, { stripNewlines: false, trim: true });
+    }
+
+    // Add the reference message
+    conversation.push(refMsg);
+    conversationsDirty = true;
+  }
 
   // If we exceed the maximum length, remove oldest non-system, non-reference messages
   // This ensures we keep the most recent context
@@ -353,6 +367,22 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
 
   // Add the new message if provided
   if (newMessage) {
+    // Sanitize and validate the message content
+    if (newMessage.content) {
+      const validation = validateMessage(newMessage.content);
+      if (!validation.valid) {
+        logger.warn(
+          { userId, validationError: validation.reason, contentPreview: String(newMessage.content).substring(0, 50) + '...' },
+          'Message validation failed'
+        );
+        // Instead of failing, we'll sanitize the message and continue
+        newMessage.content = sanitizeMessage(newMessage.content, { stripNewlines: false, trim: true });
+      } else {
+        // Still sanitize even if validation passed (defense in depth)
+        newMessage.content = sanitizeMessage(newMessage.content, { stripNewlines: false, trim: true });
+      }
+    }
+
     conversation.push(newMessage);
     conversationsDirty = true;
 

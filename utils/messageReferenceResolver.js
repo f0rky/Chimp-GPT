@@ -11,6 +11,7 @@
 
 const { createLogger } = require('../logger');
 const logger = createLogger('references');
+const { sanitizeMessage } = require('./messageSanitizer');
 
 // Get config values from the validator
 const config = require('../configValidator');
@@ -167,10 +168,15 @@ function messageToConversationFormat(message) {
   // Determine the role based on whether the message is from the bot
   const role = message.author.bot ? 'assistant' : 'user';
 
+  // Sanitize the message content
+  const sanitizedContent = message.content 
+    ? sanitizeMessage(message.content, { stripNewlines: false, trim: true })
+    : '';
+
   // Create the conversation message
   return {
     role,
-    content: message.content,
+    content: sanitizedContent,
     author: message.author.username,
     id: message.id,
     timestamp: message.createdTimestamp,
