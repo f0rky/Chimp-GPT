@@ -797,13 +797,12 @@ client.on('messageCreate', async message => {
           functionName: gptResponse.function?.name || 'unknown',
         });
       } else if (gptResponse.type === 'message') {
-        const messageStartTime = Date.now();
         await handleDirectMessage(
           gptResponse,
           feedbackMessage,
           fullConversationLog,
           message.author.id,
-          messageStartTime
+          timings.startTime // Use the original start time from when message was received
         );
         addTiming('after_direct_message_handling');
       } else {
@@ -2113,12 +2112,23 @@ async function handleDirectMessage(
   // We don't need to pass the Discord message here since we're just adding an assistant response
   await manageConversation(userIdFromMessage, responseMessage);
 
-  // Calculate processing time in seconds with 2 decimal places
-  const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  // Calculate processing time in seconds
+  const processingTimeMs = Date.now() - startTime;
+  const processingTime = (processingTimeMs / 1000).toFixed(1);
+  
+  // Format the timing display more nicely
+  let timingDisplay;
+  if (processingTime < 1) {
+    // Show milliseconds for very fast responses
+    timingDisplay = `${processingTimeMs}ms`;
+  } else {
+    // Show seconds for slower responses, removing unnecessary trailing zeros
+    timingDisplay = `${parseFloat(processingTime)}s`;
+  }
 
   // Prepare the final response with subtext for timing info
   let finalResponse = gptResponse.content;
-  const subtext = `\n\n(-${processingTime}s)`;
+  const subtext = `\n\n-# ${timingDisplay}`;
 
   // Ensure the total length doesn't exceed Discord's 2000 character limit
   const maxLength = 2000 - subtext.length - 3; // -3 for potential ellipsis
