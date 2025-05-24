@@ -252,7 +252,7 @@ module.exports = {
       logger.error({ error }, 'Error executing image command');
 
       // Handle errors gracefully
-      if (interaction.deferred) {
+      if (interaction.deferred || interaction.replied) {
         await interaction.editReply(
           '❌ An error occurred while generating the image. Please try again later.'
         );

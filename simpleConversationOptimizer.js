@@ -276,7 +276,7 @@ function optimizeConversationForApi(conversation) {
  */
 async function clearConversation(userId) {
   logger.debug({ userId }, 'clearConversation called');
-  
+
   try {
     // Make sure we're initialized
     if (!isInitialized) {
@@ -284,23 +284,29 @@ async function clearConversation(userId) {
       await init();
     }
 
-    logger.debug({ cacheSize: conversationsCache.size, hasUser: conversationsCache.has(userId) }, 'Current cache state');
-    
+    logger.debug(
+      { cacheSize: conversationsCache.size, hasUser: conversationsCache.has(userId) },
+      'Current cache state'
+    );
+
     const hadConversation = conversationsCache.has(userId);
     if (hadConversation) {
-      logger.debug({ userId, conversation: conversationsCache.get(userId) }, 'Found conversation to clear');
-      
+      logger.debug(
+        { userId, conversation: conversationsCache.get(userId) },
+        'Found conversation to clear'
+      );
+
       // Completely remove the conversation from the cache
       conversationsCache.delete(userId);
       isDirty = true;
-      
+
       logger.debug('Conversation deleted from cache, saving to disk...');
-      
+
       // Force save to disk to persist the removal
       try {
         await saveToDisk();
         logger.info({ userId }, 'Successfully cleared and saved conversation');
-        
+
         // Verify the conversation was actually removed
         if (conversationsCache.has(userId)) {
           logger.error({ userId }, 'Conversation still exists in cache after deletion!');

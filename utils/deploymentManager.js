@@ -60,11 +60,15 @@ async function shouldDeploy(config) {
   const timeSinceLastDeployment = currentTime - lastDeploymentTime;
 
   if (timeSinceLastDeployment >= TWELVE_HOURS_MS) {
-    logger.info(`Last deployment was more than 12 hours ago (${(timeSinceLastDeployment / (60 * 60 * 1000)).toFixed(1)} hours). Proceeding with deployment.`);
+    logger.info(
+      `Last deployment was more than 12 hours ago (${(timeSinceLastDeployment / (60 * 60 * 1000)).toFixed(1)} hours). Proceeding with deployment.`
+    );
     return true;
   }
 
-  logger.info(`Skipping slash command deployment. Last deployment was less than 12 hours ago (${(timeSinceLastDeployment / (60 * 60 * 1000)).toFixed(1)} hours).`);
+  logger.info(
+    `Skipping slash command deployment. Last deployment was less than 12 hours ago (${(timeSinceLastDeployment / (60 * 60 * 1000)).toFixed(1)} hours).`
+  );
   return false;
 }
 

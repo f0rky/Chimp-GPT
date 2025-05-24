@@ -54,17 +54,17 @@ async function init(forceReload = false) {
   if (isInitializing) {
     return isInitialized;
   }
-  
+
   if (isInitialized && !forceReload) {
     return true;
   }
 
   // Set initializing flag
   isInitializing = true;
-  
+
   try {
     const startTime = Date.now();
-    
+
     // Only log if not already initialized
     if (!isInitialized) {
       logger.info('Initializing conversation optimizer');
@@ -376,7 +376,7 @@ async function getConversation(userId, create = true) {
 async function addMessage(userId, message, { username, messageId, inReplyTo, ...metadata } = {}) {
   const conversation = await getConversation(userId);
   const timestamp = new Date().toISOString();
-  
+
   // Create enhanced message with metadata
   const enhancedMessage = {
     ...message,
@@ -384,7 +384,7 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
     ...(username && { name: username }),
     ...(messageId && { messageId }),
     ...(inReplyTo && { inReplyTo }),
-    ...(Object.keys(metadata).length > 0 && { metadata })
+    ...(Object.keys(metadata).length > 0 && { metadata }),
   };
 
   // If this is an image generation result, store the prompt in metadata
@@ -395,8 +395,8 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
       type: 'image',
       image: {
         prompt: imagePrompt,
-        url: message.result?.url || null
-      }
+        url: message.result?.url || null,
+      },
     };
   }
 
@@ -414,12 +414,12 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
         break;
       }
     }
-    
+
     // If no non-system, non-function messages found, remove the oldest message after system
     if (indexToRemove === -1 && conversation.length > 1) {
       indexToRemove = 1;
     }
-    
+
     if (indexToRemove !== -1) {
       conversation.splice(indexToRemove, 1);
     } else {
@@ -429,10 +429,12 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
 
   // Ensure system message is always at index 0
   if (conversation[0].role !== 'system') {
-    const systemMessage = conversation.find(m => m.role === 'system') || 
-                         { role: 'system', content: config.BOT_PERSONALITY };
+    const systemMessage = conversation.find(m => m.role === 'system') || {
+      role: 'system',
+      content: config.BOT_PERSONALITY,
+    };
     conversation.unshift(systemMessage);
-    
+
     // Remove duplicate system messages
     for (let i = conversation.length - 1; i > 0; i--) {
       if (conversation[i].role === 'system') {
@@ -441,13 +443,16 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
     }
   }
 
-  logger.debug({
-    userId,
-    messageId,
-    role: message.role,
-    contentLength: message.content?.length || 0,
-    hasMetadata: !!enhancedMessage.metadata
-  }, 'Added message to conversation');
+  logger.debug(
+    {
+      userId,
+      messageId,
+      role: message.role,
+      contentLength: message.content?.length || 0,
+      hasMetadata: !!enhancedMessage.metadata,
+    },
+    'Added message to conversation'
+  );
 
   return conversation;
 }
@@ -461,14 +466,14 @@ async function addMessage(userId, message, { username, messageId, inReplyTo, ...
 async function getImageContext(userId, maxImages = 3) {
   const conversation = await getConversation(userId, false);
   if (!conversation) return [];
-  
+
   return conversation
     .filter(msg => msg.metadata?.type === 'image' && msg.metadata?.image?.prompt)
     .slice(-maxImages)
     .map(msg => ({
       prompt: msg.metadata.image.prompt,
       url: msg.metadata.image.url,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
     }));
 }
 
@@ -482,10 +487,10 @@ async function getImageContext(userId, maxImages = 3) {
 async function getMessageContext(userId, messageId, contextWindow = 3) {
   const conversation = await getConversation(userId, false);
   if (!conversation) return [];
-  
+
   const messageIndex = conversation.findIndex(msg => msg.messageId === messageId);
   if (messageIndex === -1) return [];
-  
+
   const startIndex = Math.max(0, messageIndex - contextWindow);
   return conversation.slice(startIndex, messageIndex + 1);
 }
@@ -541,26 +546,15 @@ function optimizeConversationForApi(conversation) {
   }
 
   // Keep all function-related messages (both requests and results)
-  const functionMessages = conversation.filter(
-    msg => msg.role === 'function' || msg.function_call
-  );
+  const functionMessages = conversation.filter(msg => msg.role === 'function' || msg.function_call);
 
   // Get the most recent non-function messages (up to 3/4 of MAX_CONVERSATION_LENGTH)
   const recentNonFunctionMessages = conversation
-    .filter(
-      msg => 
-        msg.role !== 'system' && 
-        msg.role !== 'function' && 
-        !msg.function_call
-    )
+    .filter(msg => msg.role !== 'system' && msg.role !== 'function' && !msg.function_call)
     .slice(-Math.floor((MAX_CONVERSATION_LENGTH * 3) / 4));
 
   // Combine system message, function messages, and recent non-function messages
-  const optimized = [
-    systemMessage,
-    ...functionMessages,
-    ...recentNonFunctionMessages
-  ];
+  const optimized = [systemMessage, ...functionMessages, ...recentNonFunctionMessages];
 
   // If we still have too many messages, trim from the middle while keeping the most recent
   if (optimized.length > MAX_CONVERSATION_LENGTH) {
@@ -635,7 +629,7 @@ async function shutdown() {
   }
 
   logger.info('Shutting down conversation optimizer');
-  
+
   // Clear the save timer
   if (saveTimer) {
     clearInterval(saveTimer);
@@ -656,7 +650,7 @@ async function shutdown() {
   // Clear caches
   conversationsCache.clear();
   isInitialized = false;
-  
+
   logger.info('Conversation optimizer shut down successfully');
 }
 

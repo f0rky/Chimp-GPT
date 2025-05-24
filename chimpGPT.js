@@ -158,19 +158,28 @@ async function processOpenAIMessage(content, conversationLog) {
   try {
     // First, check for clear image generation intent in the current message
     const lowerContent = content.toLowerCase();
-    const imageKeywords = ['draw', 'generate', 'create', 'make', 'show me', 'picture of', 'image of', 'photo of'];
+    const imageKeywords = [
+      'draw',
+      'generate',
+      'create',
+      'make',
+      'show me',
+      'picture of',
+      'image of',
+      'photo of',
+    ];
     const isImageRequest = imageKeywords.some(keyword => lowerContent.includes(keyword));
-    
+
     // If it's clearly an image request, bypass the full context
     if (isImageRequest) {
       openaiLogger.debug('Detected image generation request, using minimal context');
       return {
         type: 'functionCall',
         functionName: 'generateImage',
-        parameters: { prompt: content }
+        parameters: { prompt: content },
       };
     }
-    
+
     // Otherwise, use the full context for other requests
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
@@ -758,32 +767,44 @@ client.on('messageCreate', async message => {
       messageLength: message.content.length,
       operation: 'processMessage',
     });
-    
+
     // Mark this channel as having an operation in progress
     inProgressOperations.add(message.channelId);
     let gptResponse;
-    
+
     try {
       // Process the message with OpenAI
       gptResponse = await processOpenAIMessage(message.content, fullConversationLog);
       const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
-      
+
       performanceMonitor.stopTimer(openaiTimerId, {
         responseType: gptResponse.type,
         success: true,
         duration: apiDuration,
       });
-      
+
       // Handle different response types
       addTiming('before_response_handling', { responseType: gptResponse.type });
       if (gptResponse.type === 'functionCall') {
-        await handleFunctionCall(gptResponse, feedbackMessage, fullConversationLog, message.author.id);
+        await handleFunctionCall(
+          gptResponse,
+          feedbackMessage,
+          fullConversationLog,
+          message.author.id
+        );
         // Safe access to function name with fallback to prevent TypeError
         addTiming('after_function_call_handling', {
           functionName: gptResponse.function?.name || 'unknown',
         });
       } else if (gptResponse.type === 'message') {
-        await handleDirectMessage(gptResponse, feedbackMessage, fullConversationLog, message.author.id);
+        const messageStartTime = Date.now();
+        await handleDirectMessage(
+          gptResponse,
+          feedbackMessage,
+          fullConversationLog,
+          message.author.id,
+          messageStartTime
+        );
         addTiming('after_direct_message_handling');
       } else {
         await feedbackMessage.edit(gptResponse.content);
@@ -926,15 +947,18 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
   try {
     // Use the start time from handleFunctionCall if available, otherwise use current time
     const startTime = message.imageGenerationStartTime || Date.now();
-    
+
     // Calculate how much time has already passed since the initial message
     const initialDelay = Date.now() - startTime;
-    discordLogger.debug({ 
-      startTime, 
-      currentTime: Date.now(), 
-      initialDelay 
-    }, 'Starting handleImageGeneration with timing information');
-    
+    discordLogger.debug(
+      {
+        startTime,
+        currentTime: Date.now(),
+        initialDelay,
+      },
+      'Starting handleImageGeneration with timing information'
+    );
+
     let currentPhase = 'initializing';
 
     // Create a progress tracking object
@@ -950,7 +974,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       currentPhase,
       totalElapsed: 0,
     };
-    
+
     // Keep track of completed phases for the status message
     const completedPhases = [];
 
@@ -963,7 +987,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         // End the current phase
         progress.phases[currentPhase].end = now;
         progress.phases[currentPhase].elapsed = now - progress.phases[currentPhase].start;
-        
+
         // Add the completed phase to our tracking array if it's not already there
         if (!completedPhases.includes(currentPhase)) {
           completedPhases.push(currentPhase);
@@ -1030,7 +1054,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
             // No additional message for other phases
             break;
         }
-        
+
         // Add completed phases with checkmarks
         if (completedPhases.length > 0) {
           statusMessage += '\n\n**Completed:**';
@@ -1056,7 +1080,9 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
 
             if (command === 'ping') {
               const sent = await message.channel.send('Pinging...');
-              await sent.edit(`Pong! Latency is ${sent.createdTimestamp - message.createdTimestamp}ms.`);
+              await sent.edit(
+                `Pong! Latency is ${sent.createdTimestamp - message.createdTimestamp}ms.`
+              );
               return;
             }
 
@@ -1078,20 +1104,20 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
               await message.channel.send(`Status updated to: ${status}`);
               return;
             }
-            
+
             if (command === 'help') {
               await message.channel.send(
                 'Available commands:\n' +
-                '`!help` - Show this help message\n' +
-                '`!ping` - Check if the bot is alive\n' +
-                '`!stats` - Show bot statistics\n' +
-                '`!pfp` - Change the bot\'s profile picture\n' +
-                '`!status <message>` - Set the bot\'s status message\n' +
-                '`!clear` - Clear the conversation history for this channel'
+                  '`!help` - Show this help message\n' +
+                  '`!ping` - Check if the bot is alive\n' +
+                  '`!stats` - Show bot statistics\n' +
+                  "`!pfp` - Change the bot's profile picture\n" +
+                  "`!status <message>` - Set the bot's status message\n" +
+                  '`!clear` - Clear the conversation history for this channel'
               );
               return;
             }
-            
+
             // If we get here, the command wasn't recognized
             return;
           } catch (error) {
@@ -1100,7 +1126,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
             return;
           }
         }
-        
+
         // Only update every 5 seconds to avoid rate limits
         await feedbackMessage.edit(statusMessage);
       } catch (error) {
@@ -1111,7 +1137,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     // IMPORTANT FIX: Move to generating phase IMMEDIATELY after setup is complete
     // This ensures that only the minimal setup time is attributed to initialization
     updateProgress('generating');
-    
+
     // Update bot status to show we're generating an image
     const username = message.author ? message.author.username : 'unknown';
 
@@ -1163,7 +1189,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     // Generate the image
     let result;
     let generationTime;
-    
+
     try {
       result = await generateImage(finalPrompt, {
         model: parameters.model || 'gpt-image-1',
@@ -1172,15 +1198,23 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
 
       // Check for content policy violation or if generation is disabled
       if (!result.success) {
-        const errorMessageText = (typeof result.error === 'string') ? result.error : (result.error?.message || 'Unknown error from generateImage');
-        if (errorMessageText === "Image generation is currently disabled") {
-          discordLogger.warn({ 
-            prompt: finalPrompt, 
-            userId: message.author?.id, 
-            guildId: message.guild?.id 
-          }, 'Image generation is disabled; informing user and stopping.');
+        const errorMessageText =
+          typeof result.error === 'string'
+            ? result.error
+            : result.error?.message || 'Unknown error from generateImage';
+        if (errorMessageText === 'Image generation is currently disabled') {
+          discordLogger.warn(
+            {
+              prompt: finalPrompt,
+              userId: message.author?.id,
+              guildId: message.guild?.id,
+            },
+            'Image generation is disabled; informing user and stopping.'
+          );
           if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
-            await feedbackMessage.edit('❌ Image generation is currently disabled. Please try again later.');
+            await feedbackMessage.edit(
+              '❌ Image generation is currently disabled. Please try again later.'
+            );
           }
           // The main `finally` block of handleImageGeneration will clear the progressUpdater interval.
           return; // Exit handleImageGeneration gracefully
@@ -1207,33 +1241,47 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       }
     } catch (error) {
       // Log first, then check for specific conditions
-      discordLogger.error({ 
-        error, 
-        prompt: finalPrompt, 
-        userId: message.author?.id, 
-        guildId: message.guild?.id 
-      }, 'Image generation failed within inner try/catch');
-      
-      if (error.message === "Image generation is currently disabled") {
-        discordLogger.warn({ 
-          prompt: finalPrompt, 
-          userId: message.author?.id, 
-          guildId: message.guild?.id 
-        }, 'Caught "disabled" error explicitly in catch block; informing user and stopping.');
+      discordLogger.error(
+        {
+          error,
+          prompt: finalPrompt,
+          userId: message.author?.id,
+          guildId: message.guild?.id,
+        },
+        'Image generation failed within inner try/catch'
+      );
+
+      if (error.message === 'Image generation is currently disabled') {
+        discordLogger.warn(
+          {
+            prompt: finalPrompt,
+            userId: message.author?.id,
+            guildId: message.guild?.id,
+          },
+          'Caught "disabled" error explicitly in catch block; informing user and stopping.'
+        );
         if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
-             await feedbackMessage.edit('❌ Image generation is currently disabled. Please try again later.');
+          await feedbackMessage.edit(
+            '❌ Image generation is currently disabled. Please try again later.'
+          );
         } else {
-            discordLogger.warn('feedbackMessage not available or not editable for "disabled" error in catch.');
+          discordLogger.warn(
+            'feedbackMessage not available or not editable for "disabled" error in catch.'
+          );
         }
         // The main `finally` block of handleImageGeneration will clear the progressUpdater interval.
         return; // Exit handleImageGeneration gracefully
       }
-      
+
       // Handle content policy violations specially
-      if (error.isContentPolicyViolation || (error.status === 400 && error.code === 'moderation_blocked')) {
-        const userMessage = 'This request was rejected due to content policy violations. Please modify your prompt and try again.';
+      if (
+        error.isContentPolicyViolation ||
+        (error.status === 400 && error.code === 'moderation_blocked')
+      ) {
+        const userMessage =
+          'This request was rejected due to content policy violations. Please modify your prompt and try again.';
         if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
-            await feedbackMessage.edit(`❌ ${userMessage}`);
+          await feedbackMessage.edit(`❌ ${userMessage}`);
         }
         // Create a new error with a specific type that we can check for
         const policyError = new Error(error.message || userMessage); // Use original error message if available
@@ -1243,7 +1291,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         // For other errors, show a generic error message and re-throw
         const userMessage = `Failed to generate image: ${error.message || 'An unknown error occurred'}`;
         if (feedbackMessage && typeof feedbackMessage.edit === 'function') {
-            await feedbackMessage.edit(`❌ ${userMessage}`);
+          await feedbackMessage.edit(`❌ ${userMessage}`);
         }
         throw new Error(userMessage); // Re-throw to be handled by the outer catch of handleImageGeneration
       }
@@ -1312,37 +1360,48 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         // Generate a unique filename based on timestamp and a random string
         const timestamp = Date.now();
         const randomStr = Math.random().toString(36).substring(2, 8);
-        const filename = `gpt-${timestamp}-${randomStr}.png`;  // Ensure .png extension
-        
-        discordLogger.info('Attempting to save image to PFP rotation', { 
+        const filename = `gpt-${timestamp}-${randomStr}.png`; // Ensure .png extension
+
+        discordLogger.info('Attempting to save image to PFP rotation', {
           filename,
           bufferSize: buffer.length,
-          hasPfpManager: !!client.pfpManager
+          hasPfpManager: !!client.pfpManager,
         });
-        
+
         // Save the image to the PFP rotation
         const savedPath = await client.pfpManager.addImage(buffer, filename);
         discordLogger.info('Image added to PFP rotation', { savedPath });
-        
+
         // Trigger an immediate PFP update with the new image
         try {
           await client.pfpManager.updateBotAvatar();
           discordLogger.info('PFP updated with new image');
         } catch (updateError) {
-          discordLogger.warn({ error: updateError }, 'Failed to immediately update PFP with new image');
+          discordLogger.warn(
+            { error: updateError },
+            'Failed to immediately update PFP with new image'
+          );
         }
       } catch (error) {
-        discordLogger.error({ 
-          error: error.message,
-          stack: error.stack,
-          bufferSize: buffer?.length
-        }, 'Failed to add image to PFP rotation');
+        discordLogger.error(
+          {
+            error: error.message,
+            stack: error.stack,
+            bufferSize: buffer?.length,
+          },
+          'Failed to add image to PFP rotation'
+        );
       }
     } else {
-      discordLogger.warn('Skipping PFP save', { 
-        reason: process.env.NODE_ENV === 'test' ? 'test environment' : 
-               process.env.NODE_ENV === 'development' ? 'development environment' : 
-               !client.pfpManager ? 'pfpManager not available' : 'unknown reason'
+      discordLogger.warn('Skipping PFP save', {
+        reason:
+          process.env.NODE_ENV === 'test'
+            ? 'test environment'
+            : process.env.NODE_ENV === 'development'
+              ? 'development environment'
+              : !client.pfpManager
+                ? 'pfpManager not available'
+                : 'unknown reason',
       });
     }
 
@@ -1365,7 +1424,7 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
       const imageUsageTracker = require('./imageUsageTracker');
       const userId = message.author?.id || 'unknown';
       const username = message.author?.username || 'unknown';
-      
+
       // Track this image generation request
       const usageStats = imageUsageTracker.trackImageGeneration({
         prompt: finalPrompt,
@@ -1374,22 +1433,26 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
         cost: result.estimatedCost || 0,
         apiCallDuration: result.apiCallDuration || 0,
         userId,
-        username
+        username,
       });
-      
-      discordLogger.info({
-        totalRequests: usageStats.totalRequests,
-        totalCost: usageStats.totalCost
-      }, 'Updated image generation usage statistics');
+
+      discordLogger.info(
+        {
+          totalRequests: usageStats.totalRequests,
+          totalCost: usageStats.totalCost,
+        },
+        'Updated image generation usage statistics'
+      );
     } catch (error) {
       discordLogger.error({ error }, 'Failed to track image generation usage');
     }
-    
+
     // Send the image with information about the prompt, timing, and cost details
     // Include API call timing information in the footer
-    const apiCallInfo = result.apiCallDuration ? 
-      `\n🔄 API call: ${formatElapsed(result.apiCallDuration)} | Processing: ${formatElapsed(result.totalProcessingTime - result.apiCallDuration)}` : '';
-      
+    const apiCallInfo = result.apiCallDuration
+      ? `\n🔄 API call: ${formatElapsed(result.apiCallDuration)} | Processing: ${formatElapsed(result.totalProcessingTime - result.apiCallDuration)}`
+      : '';
+
     await feedbackMessage.edit({
       content: `🖼️ Image generated by GPT Image-1
 📝 ${parameters.enhance ? 'Enhanced prompt' : 'Prompt'}: "${revisedPrompt}"
@@ -1415,8 +1478,6 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
     );
   } catch (error) {
     discordLogger.error({ error }, 'Error handling image generation');
-
-
 
     if (message && message.edit) {
       try {
@@ -1449,7 +1510,12 @@ async function handleImageGeneration(parameters, message, conversationLog = []) 
  * @param {Array<Object>} conversationLog - The conversation history
  * @returns {Promise<void>}
  */
-async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog, userIdFromMessage) {
+async function handleFunctionCall(
+  gptResponse,
+  feedbackMessage,
+  conversationLog,
+  userIdFromMessage
+) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
     functionName: gptResponse.functionName,
@@ -1468,13 +1534,16 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
   if (gptResponse.functionName === 'generateImage') {
     // Record the time when we start the image generation process
     const imageStartTime = Date.now();
-    discordLogger.debug({ time: imageStartTime }, 'Starting image generation process in handleFunctionCall');
-    
+    discordLogger.debug(
+      { time: imageStartTime },
+      'Starting image generation process in handleFunctionCall'
+    );
+
     const initialMessage = `🎨 Creating your image... (0s)
 
 🔄 Currently: ⚙️ Initializing...`;
     await feedbackMessage.edit(initialMessage);
-    
+
     // Store the start time in a property on the message object so handleImageGeneration can use it
     feedbackMessage.imageGenerationStartTime = imageStartTime;
   } else {
@@ -1571,7 +1640,10 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
         // Get the original weather data for status updates
         const weatherData = await lookupWeather(gptResponse.parameters.location);
         trackApiCall('weather');
-        discordLogger.info({ location: gptResponse.parameters.location, weatherData, source: 'lookupWeather_case' }, 'Weather data fetched in handleFunctionCall');
+        discordLogger.info(
+          { location: gptResponse.parameters.location, weatherData, source: 'lookupWeather_case' },
+          'Weather data fetched in handleFunctionCall'
+        );
 
         // Update status if we have valid weather data
         if (
@@ -1581,7 +1653,10 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
           weatherData.current.condition &&
           weatherData.current.condition.text
         ) {
-          statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
+          statusManager.trackWeatherLookup(
+            weatherData.location.name,
+            weatherData.current.condition.text
+          );
         } else {
           discordLogger.warn(
             { weatherData },
@@ -1631,7 +1706,15 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
           gptResponse.parameters.days
         );
         trackApiCall('weather');
-        discordLogger.info({ location: gptResponse.parameters.location, days: gptResponse.parameters.days, weatherData, source: 'lookupExtendedForecast_case' }, 'Weather data fetched in handleFunctionCall');
+        discordLogger.info(
+          {
+            location: gptResponse.parameters.location,
+            days: gptResponse.parameters.days,
+            weatherData,
+            source: 'lookupExtendedForecast_case',
+          },
+          'Weather data fetched in handleFunctionCall'
+        );
 
         // Update status if we have valid weather data
         if (
@@ -1641,7 +1724,10 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
           weatherData.current.condition &&
           weatherData.current.condition.text
         ) {
-          statusManager.trackWeatherLookup(weatherData.location.name, weatherData.current.condition.text);
+          statusManager.trackWeatherLookup(
+            weatherData.location.name,
+            weatherData.current.condition.text
+          );
         } else {
           discordLogger.warn(
             { weatherData },
@@ -1707,125 +1793,157 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
         // First, check if image generation is disabled WITHOUT actually generating an image
         // This was causing a double image generation issue
         const imageGeneration = require('./imageGeneration');
-        
+
         // Just check the environment variable directly instead of calling generateImage
         // Simplified to avoid requiring non-existent config file
         const isEnabled = process.env.ENABLE_IMAGE_GENERATION === 'true';
         const testResult = {
           success: isEnabled,
           error: isEnabled ? null : 'Image generation is currently disabled',
-          prompt: gptResponse.parameters.prompt
+          prompt: gptResponse.parameters.prompt,
         };
-        
-        discordLogger.debug({ isEnabled }, 'Checked if image generation is enabled without generating an image');
-        
+
+        discordLogger.debug(
+          { isEnabled },
+          'Checked if image generation is enabled without generating an image'
+        );
+
         // If image generation is disabled, fall back to a natural language response
         if (!testResult.success && testResult.error === 'Image generation is currently disabled') {
           discordLogger.warn(
             { prompt: gptResponse.parameters.prompt },
             'Image generation is disabled, falling back to natural language response'
           );
-          
+
           // Inform the user that image generation is disabled but we'll provide a text response
-          await feedbackMessage.edit('❌ Image generation is currently disabled. Let me describe what you are looking for instead...');
-          
+          await feedbackMessage.edit(
+            '❌ Image generation is currently disabled. Let me describe what you are looking for instead...'
+          );
+
           // Get the original user message from the conversation log
-          const userMessage = conversationLog.find(msg => msg.role === 'user')?.content || 
-                             `Can you describe ${gptResponse.parameters.prompt}?`;
-          
+          const userMessage =
+            conversationLog.find(msg => msg.role === 'user')?.content ||
+            `Can you describe ${gptResponse.parameters.prompt}?`;
+
           // Create a new prompt asking GPT to describe the image instead of generating it
           const descriptionPrompt = [
-            ...conversationLog.filter(msg => msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1),
-            { role: 'user', content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.` }
+            ...conversationLog.filter(
+              msg =>
+                msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1
+            ),
+            {
+              role: 'user',
+              content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.`,
+            },
           ];
-          
+
           // Create a mock function result for the image description
           const mockImageResult = {
             description: `Image description for prompt: ${gptResponse.parameters.prompt}`,
             prompt: gptResponse.parameters.prompt,
-            disabled: true
+            disabled: true,
           };
           // Get a natural language response from GPT
-          const description = await generateNaturalResponse(mockImageResult, descriptionPrompt, 'generateImage');
-          
+          const description = await generateNaturalResponse(
+            mockImageResult,
+            descriptionPrompt,
+            'generateImage'
+          );
+
           // Update the feedback message with the description
           await feedbackMessage.edit(description);
-          
+
           // Add the response to the conversation log
           conversationLog.push({
             role: 'assistant',
             content: description,
           });
-          
+
           // Track the API call and return
           trackApiCall('gpt');
           performanceMonitor.stopTimer(functionCallTimerId, { success: true });
           return;
         }
-        
+
         // If image generation is enabled, proceed as normal
         // IMPORTANT FIX: Update the start time right before calling handleImageGeneration
         // This ensures we don't count the disabled check as part of initialization
         feedbackMessage.imageGenerationStartTime = Date.now();
-        discordLogger.debug({ time: feedbackMessage.imageGenerationStartTime }, 'Updated start time before calling handleImageGeneration');
-        
+        discordLogger.debug(
+          { time: feedbackMessage.imageGenerationStartTime },
+          'Updated start time before calling handleImageGeneration'
+        );
+
         await handleImageGeneration(gptResponse.parameters, feedbackMessage, conversationLog);
         trackApiCall('gptimage');
         return;
       } catch (error) {
         trackError('gptimage');
         discordLogger.error({ error }, 'Error in image generation');
-        
+
         // If this was a content policy violation, we've already shown the message
         if (error.isContentPolicyViolation) {
           discordLogger.info('Content policy violation handled');
           return;
         }
-        
+
         // Check if the error is about image generation being disabled
         if (error.message && error.message.includes('Image generation is currently disabled')) {
           discordLogger.warn(
             { prompt: gptResponse.parameters.prompt },
             'Caught disabled error in catch block, falling back to natural language response'
           );
-          
+
           // Inform the user that image generation is disabled but we'll provide a text response
-          await feedbackMessage.edit('❌ Image generation is currently disabled. Let me describe what you are looking for instead...');
-          
+          await feedbackMessage.edit(
+            '❌ Image generation is currently disabled. Let me describe what you are looking for instead...'
+          );
+
           // Get the original user message from the conversation log
-          const userMessage = conversationLog.find(msg => msg.role === 'user')?.content || 
-                             `Can you describe ${gptResponse.parameters.prompt}?`;
-          
+          const userMessage =
+            conversationLog.find(msg => msg.role === 'user')?.content ||
+            `Can you describe ${gptResponse.parameters.prompt}?`;
+
           // Create a mock function result for the image description
           const mockImageResult = {
             description: `Image description for prompt: ${gptResponse.parameters.prompt}`,
             prompt: gptResponse.parameters.prompt,
-            disabled: true
+            disabled: true,
           };
           // Create a new prompt asking GPT to describe the image instead of generating it
           const descriptionPrompt = [
-            ...conversationLog.filter(msg => msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1),
-            { role: 'user', content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.` }
+            ...conversationLog.filter(
+              msg =>
+                msg.role !== 'user' || conversationLog.indexOf(msg) !== conversationLog.length - 1
+            ),
+            {
+              role: 'user',
+              content: `Since image generation is disabled, please provide a detailed description of what an image of "${gptResponse.parameters.prompt}" might look like.`,
+            },
           ];
-          
+
           // Get a natural language response from GPT
-          const description = await generateNaturalResponse(mockImageResult, descriptionPrompt, 'generateImage');
-          
+          const description = await generateNaturalResponse(
+            mockImageResult,
+            descriptionPrompt,
+            'generateImage'
+          );
+
           // Update the feedback message with the description
           await feedbackMessage.edit(description);
-          
+
           // Add the response to the conversation log
           conversationLog.push({
             role: 'assistant',
             content: description,
           });
-          
+
           // Track the API call and return
           trackApiCall('gpt');
           performanceMonitor.stopTimer(functionCallTimerId, { success: true });
           return;
         }
-        
+
         // For other errors, show a generic error message
         await feedbackMessage.edit(
           '❌ An error occurred while generating the image. Please try again later.'
@@ -1967,7 +2085,13 @@ async function handleFunctionCall(gptResponse, feedbackMessage, conversationLog,
  * @param {Array<Object>} conversationLog - The conversation history to update
  * @returns {Promise<void>}
  */
-async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog, userIdFromMessage) {
+async function handleDirectMessage(
+  gptResponse,
+  feedbackMessage,
+  conversationLog,
+  userIdFromMessage,
+  startTime = Date.now()
+) {
   if (!gptResponse.content?.trim()) {
     await feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
     return;
@@ -1986,8 +2110,22 @@ async function handleDirectMessage(gptResponse, feedbackMessage, conversationLog
   // We don't need to pass the Discord message here since we're just adding an assistant response
   await manageConversation(userIdFromMessage, responseMessage);
 
-  const finalResponse =
-    gptResponse.content.slice(0, 1997) + (gptResponse.content.length > 1997 ? '...' : '');
+  // Calculate processing time in seconds with 2 decimal places
+  const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  
+  // Prepare the final response with subtext for timing info
+  let finalResponse = gptResponse.content;
+  const subtext = `\n\n(-${processingTime}s)`;
+  
+  // Ensure the total length doesn't exceed Discord's 2000 character limit
+  const maxLength = 2000 - subtext.length - 3; // -3 for potential ellipsis
+  if (finalResponse.length > maxLength) {
+    finalResponse = finalResponse.slice(0, maxLength) + '...';
+  }
+  
+  // Append the subtext
+  finalResponse += subtext;
+  
   await feedbackMessage.edit(finalResponse);
 }
 
@@ -2043,18 +2181,24 @@ client.on('ready', async () => {
   const pfpManager = new PFPManager(client, {
     pfpDir: path.join(__dirname, 'pfp'),
     maxImages: 50,
-    rotationInterval: 10 * 60 * 1000 // 10 minutes
+    rotationInterval: 10 * 60 * 1000, // 10 minutes
   });
   client.pfpManager = pfpManager; // Assign to client immediately
   discordLogger.info('PFP Manager initialized and attached to client.');
   // Diagnostic log
   if (client.pfpManager) {
-    discordLogger.info({ 
-      pfpManagerStatus: 'Assigned to client',
-      typeof: typeof client.pfpManager,
-      constructorName: client.pfpManager.constructor ? client.pfpManager.constructor.name : 'N/A',
-      methods: typeof client.pfpManager === 'object' ? Object.getOwnPropertyNames(client.pfpManager.constructor.prototype) : 'N/A'
-    }, 'PFP Manager diagnostic after assignment in ready event');
+    discordLogger.info(
+      {
+        pfpManagerStatus: 'Assigned to client',
+        typeof: typeof client.pfpManager,
+        constructorName: client.pfpManager.constructor ? client.pfpManager.constructor.name : 'N/A',
+        methods:
+          typeof client.pfpManager === 'object'
+            ? Object.getOwnPropertyNames(client.pfpManager.constructor.prototype)
+            : 'N/A',
+      },
+      'PFP Manager diagnostic after assignment in ready event'
+    );
   } else {
     discordLogger.error('PFP Manager FAILED to attach to client in ready event.');
   }
@@ -2080,7 +2224,7 @@ client.on('ready', async () => {
         discordLogger.info('Attempting to deploy slash commands...');
         const deployResult = await commandHandler.deployCommands(config);
         discordLogger.info({ deployResult }, 'Slash commands deployment process finished.');
-        await recordSuccessfulDeployment(); 
+        await recordSuccessfulDeployment();
       } catch (error) {
         discordLogger.error({ error }, 'Error deploying slash commands');
       }
@@ -2088,7 +2232,9 @@ client.on('ready', async () => {
       // Log already handled by shouldDeploy
     }
   } else {
-    discordLogger.warn('CLIENT_ID not found in config, slash commands will not be deployed or checked.');
+    discordLogger.warn(
+      'CLIENT_ID not found in config, slash commands will not be deployed or checked.'
+    );
   }
 
   // Send greeting messages
@@ -2124,7 +2270,6 @@ async function startBot() {
     discordLogger.info('Loading commands...');
     const commandCount = await commandHandler.loadCommands();
     discordLogger.info({ commandCount }, 'Commands loaded successfully');
-
 
     // Connect to Discord
     await client.login(config.DISCORD_TOKEN);

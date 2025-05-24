@@ -1,6 +1,6 @@
 /**
  * Image Usage Tracker
- * 
+ *
  * Tracks and stores information about image generation requests
  * to help monitor costs and usage patterns over time.
  */
@@ -31,7 +31,7 @@ function ensureDataDirectory() {
 // Load the usage history from file
 function loadUsageHistory() {
   ensureDataDirectory();
-  
+
   try {
     if (fs.existsSync(USAGE_HISTORY_FILE)) {
       const data = fs.readFileSync(USAGE_HISTORY_FILE, 'utf8');
@@ -40,24 +40,24 @@ function loadUsageHistory() {
   } catch (error) {
     logger.error({ error }, 'Error loading usage history');
   }
-  
+
   // Return empty history if file doesn't exist or there's an error
-  return { 
+  return {
     entries: [],
     totalCost: 0,
     totalRequests: 0,
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
   };
 }
 
 // Save the usage history to file
 function saveUsageHistory(history) {
   ensureDataDirectory();
-  
+
   try {
     // Update the lastUpdated timestamp
     history.lastUpdated = new Date().toISOString();
-    
+
     // Write to file
     fs.writeFileSync(USAGE_HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
     logger.debug('Saved image usage history');
@@ -68,7 +68,7 @@ function saveUsageHistory(history) {
 
 /**
  * Track a new image generation request
- * 
+ *
  * @param {Object} usageData - Data about the image generation request
  * @param {string} usageData.prompt - The prompt used for generation
  * @param {string} usageData.size - Image size (e.g., "1024x1024")
@@ -82,7 +82,7 @@ function saveUsageHistory(history) {
 function trackImageGeneration(usageData) {
   // Load the current history
   const history = loadUsageHistory();
-  
+
   // Create a new entry
   const entry = {
     timestamp: new Date().toISOString(),
@@ -92,32 +92,35 @@ function trackImageGeneration(usageData) {
     cost: usageData.cost,
     apiCallDuration: usageData.apiCallDuration,
     userId: usageData.userId,
-    username: usageData.username
+    username: usageData.username,
   };
-  
+
   // Add the entry to history
   history.entries.push(entry);
-  
+
   // Update totals
   history.totalCost += usageData.cost;
   history.totalRequests += 1;
-  
+
   // Save the updated history
   saveUsageHistory(history);
-  
+
   // Log the tracking
-  logger.info({
-    cost: usageData.cost,
-    totalCost: history.totalCost,
-    totalRequests: history.totalRequests
-  }, 'Tracked new image generation');
-  
+  logger.info(
+    {
+      cost: usageData.cost,
+      totalCost: history.totalCost,
+      totalRequests: history.totalRequests,
+    },
+    'Tracked new image generation'
+  );
+
   return history;
 }
 
 /**
  * Get usage statistics for a specific time period
- * 
+ *
  * @param {Object} options - Options for filtering the statistics
  * @param {string} options.userId - Filter by user ID (optional)
  * @param {string} options.startDate - Start date in ISO format (optional)
@@ -126,34 +129,34 @@ function trackImageGeneration(usageData) {
  */
 function getUsageStats(options = {}) {
   const history = loadUsageHistory();
-  
+
   // Filter entries based on options
   let filteredEntries = history.entries;
-  
+
   if (options.userId) {
     filteredEntries = filteredEntries.filter(entry => entry.userId === options.userId);
   }
-  
+
   if (options.startDate) {
     const startDate = new Date(options.startDate);
     filteredEntries = filteredEntries.filter(entry => new Date(entry.timestamp) >= startDate);
   }
-  
+
   if (options.endDate) {
     const endDate = new Date(options.endDate);
     filteredEntries = filteredEntries.filter(entry => new Date(entry.timestamp) <= endDate);
   }
-  
+
   // Calculate statistics
   const totalCost = filteredEntries.reduce((sum, entry) => sum + entry.cost, 0);
   const totalRequests = filteredEntries.length;
   const averageCost = totalRequests > 0 ? totalCost / totalRequests : 0;
-  
+
   // Get the most recent entries (last 10)
   const recentEntries = filteredEntries
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .slice(0, 10);
-  
+
   return {
     totalCost,
     totalRequests,
@@ -161,30 +164,30 @@ function getUsageStats(options = {}) {
     recentEntries,
     period: {
       start: options.startDate || history.entries[0]?.timestamp || new Date().toISOString(),
-      end: options.endDate || new Date().toISOString()
-    }
+      end: options.endDate || new Date().toISOString(),
+    },
   };
 }
 
 /**
  * Get a formatted report of image generation usage
- * 
+ *
  * @param {Object} options - Options for filtering the statistics
  * @returns {string} A formatted report string
  */
 function getUsageReport(options = {}) {
   const stats = getUsageStats(options);
-  
+
   let report = '# Image Generation Usage Report\n\n';
-  
+
   report += `**Period:** ${new Date(stats.period.start).toLocaleDateString()} to ${new Date(stats.period.end).toLocaleDateString()}\n`;
   report += `**Total Requests:** ${stats.totalRequests}\n`;
   report += `**Total Cost:** $${stats.totalCost.toFixed(4)}\n`;
   report += `**Average Cost per Request:** $${stats.averageCost.toFixed(4)}\n\n`;
-  
+
   if (stats.recentEntries.length > 0) {
     report += '## Recent Requests\n\n';
-    
+
     stats.recentEntries.forEach((entry, index) => {
       report += `### ${index + 1}. ${new Date(entry.timestamp).toLocaleString()}\n`;
       report += `**Prompt:** "${entry.prompt}"\n`;
@@ -193,12 +196,12 @@ function getUsageReport(options = {}) {
       report += `**User:** ${entry.username} (${entry.userId})\n\n`;
     });
   }
-  
+
   return report;
 }
 
 module.exports = {
   trackImageGeneration,
   getUsageStats,
-  getUsageReport
+  getUsageReport,
 };

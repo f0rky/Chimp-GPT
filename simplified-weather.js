@@ -76,48 +76,77 @@ const mockWeatherData = {
  * @returns {Promise<string>} Natural language response
  */
 async function getWeatherResponse(location, userQuestion, prefetchedWeatherData = null) {
-  weatherLogger.info({ location, hasPrefetchedData: !!prefetchedWeatherData }, 'Getting weather and generating response');
-  weatherLogger.debug({ location, userQuestion, prefetchedWeatherDataInput: prefetchedWeatherData }, 'getWeatherResponse called with prefetchedWeatherDataInput');
+  weatherLogger.info(
+    { location, hasPrefetchedData: !!prefetchedWeatherData },
+    'Getting weather and generating response'
+  );
+  weatherLogger.debug(
+    { location, userQuestion, prefetchedWeatherDataInput: prefetchedWeatherData },
+    'getWeatherResponse called with prefetchedWeatherDataInput'
+  );
 
   try {
     let weatherData; // Declare weatherData to be used
 
     if (prefetchedWeatherData) {
-      weatherLogger.info({ location }, 'Using prefetched weather data for natural language response');
+      weatherLogger.info(
+        { location },
+        'Using prefetched weather data for natural language response'
+      );
       weatherLogger.debug({ prefetchedWeatherData }, 'Processing with prefetchedWeatherData');
       weatherData = prefetchedWeatherData;
       // The prefetchedWeatherData is assumed to have been stored by the caller if necessary (e.g., by weatherLookup.js)
     } else {
-      weatherLogger.info({ location }, 'No prefetched data, fetching fresh weather data for natural language response');
+      weatherLogger.info(
+        { location },
+        'No prefetched data, fetching fresh weather data for natural language response'
+      );
       weatherLogger.debug('No prefetched data, preparing to fetch fresh data.');
       // getWeatherData handles its own errors and fallbacks, including storing results.
       weatherData = await getWeatherData(location);
     }
 
     // Step 2: Generate natural language response using the determined weatherData
-    weatherLogger.debug({ weatherData, userQuestion, source: 'before_generateResponse' }, 'Data before attempting to generate natural response');
+    weatherLogger.debug(
+      { weatherData, userQuestion, source: 'before_generateResponse' },
+      'Data before attempting to generate natural response'
+    );
     try {
       const naturalResponse = await generateResponse(weatherData, userQuestion);
       weatherLogger.info('Successfully generated natural language response');
       return naturalResponse;
     } catch (nlpError) {
       weatherLogger.error(
-        { error: nlpError, weatherDataSource: prefetchedWeatherData ? 'prefetched' : 'newly_fetched' },
+        {
+          error: nlpError,
+          weatherDataSource: prefetchedWeatherData ? 'prefetched' : 'newly_fetched',
+        },
         'Failed to generate natural language response, using fallback response formatting'
       );
       // Fallback response should also use the determined weatherData
-      weatherLogger.debug({ weatherData, source: 'before_generateFallbackResponse_nlpError' }, 'Data before generating fallback due to NLP error');
+      weatherLogger.debug(
+        { weatherData, source: 'before_generateFallbackResponse_nlpError' },
+        'Data before generating fallback due to NLP error'
+      );
       return generateFallbackResponse(weatherData);
     }
   } catch (fetchOrProcessError) {
     // This catch block handles errors if getWeatherData() was called and failed in a way not handled internally,
     // or if there was an issue processing the prefetchedWeatherData (less likely).
     weatherLogger.error(
-        { error: fetchOrProcessError, location },
-        'Outer catch: Error during weather data retrieval or processing, using mock data for fallback response'
+      { error: fetchOrProcessError, location },
+      'Outer catch: Error during weather data retrieval or processing, using mock data for fallback response'
     );
     // If all else fails, generate mock data here for the fallback response
-    weatherLogger.debug({ error: fetchOrProcessError, location, source: 'before_generateFallbackResponse_fetchOrProcessError', usingMockDataForFallback: true }, 'Error before generating fallback due to fetch/process error; will use mock data.');
+    weatherLogger.debug(
+      {
+        error: fetchOrProcessError,
+        location,
+        source: 'before_generateFallbackResponse_fetchOrProcessError',
+        usingMockDataForFallback: true,
+      },
+      'Error before generating fallback due to fetch/process error; will use mock data.'
+    );
     const mockData = mockWeatherData.getWeatherForLocation(location);
     return generateFallbackResponse(mockData);
   }

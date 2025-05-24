@@ -105,8 +105,9 @@ const BACKGROUND = {
  */
 async function generateImage(prompt, options = {}) {
   // Check if image generation is enabled - get the latest value from process.env
-  const isEnabled = process.env.ENABLE_IMAGE_GENERATION === 'true' || config.ENABLE_IMAGE_GENERATION === true;
-  
+  const isEnabled =
+    process.env.ENABLE_IMAGE_GENERATION === 'true' || config.ENABLE_IMAGE_GENERATION === true;
+
   if (!isEnabled) {
     logger.warn('Image generation is currently disabled');
     return {
@@ -115,28 +116,34 @@ async function generateImage(prompt, options = {}) {
       prompt,
     };
   }
-  
+
   // Log that we're proceeding with image generation
   logger.info('Image generation is enabled, proceeding with request');
-  
+
   // Track timing information if provided
   if (options._timingInfo) {
     const now = Date.now();
     const totalDelay = now - options._timingInfo.requestStartTime;
-    logger.info({
-      initDuration: options._timingInfo.initDuration,
-      totalDelayToApiCall: totalDelay,
-      additionalDelay: totalDelay - options._timingInfo.initDuration,
-      requestStartTime: options._timingInfo.requestStartTime,
-      currentTime: now
-    }, 'Timing information for image generation request');
+    logger.info(
+      {
+        initDuration: options._timingInfo.initDuration,
+        totalDelayToApiCall: totalDelay,
+        additionalDelay: totalDelay - options._timingInfo.initDuration,
+        requestStartTime: options._timingInfo.requestStartTime,
+        currentTime: now,
+      },
+      'Timing information for image generation request'
+    );
   }
-  
-  logger.debug({
-    configValue: config.ENABLE_IMAGE_GENERATION,
-    envValue: process.env.ENABLE_IMAGE_GENERATION,
-    isEnabled
-  }, 'Image generation configuration check');
+
+  logger.debug(
+    {
+      configValue: config.ENABLE_IMAGE_GENERATION,
+      envValue: process.env.ENABLE_IMAGE_GENERATION,
+      isEnabled,
+    },
+    'Image generation configuration check'
+  );
   try {
     // Default to GPT Image-1 with medium size for cost effectiveness
     const model = options.model || MODELS.GPT_IMAGE_1;
@@ -183,35 +190,33 @@ async function generateImage(prompt, options = {}) {
     }
 
     logger.info({ imageParams }, 'Generating image with GPT Image-1');
-    
+
     let response;
-    let apiCallStartTime = Date.now();
+    const apiCallStartTime = Date.now();
     let apiCallDuration;
-    
+
     try {
       // Log that we're about to make the API call
       logger.debug('Making OpenAI API call for image generation');
-      
+
       // Make the API call and track the time it takes
       response = await openai.images.generate(imageParams);
       apiCallDuration = Date.now() - apiCallStartTime;
-      
+
       // Log the API call duration
       logger.info({ apiCallDuration }, 'OpenAI API call completed');
-      
+
       // Track the API call
       trackApiCall('gptimage');
     } catch (error) {
       // Check for content policy violation
       if (error.status === 400 && error.code === 'moderation_blocked') {
-        logger.warn(
-          { prompt, error: error.message },
-          'Image generation blocked by content policy'
-        );
+        logger.warn({ prompt, error: error.message }, 'Image generation blocked by content policy');
         // Return a specific error result for content policy violations
         return {
           success: false,
-          error: 'This request was rejected due to content policy violations. Please modify your prompt and try again.',
+          error:
+            'This request was rejected due to content policy violations. Please modify your prompt and try again.',
           isContentPolicyViolation: true,
           prompt,
         };
@@ -238,38 +243,41 @@ async function generateImage(prompt, options = {}) {
     // Calculate more accurate cost based on GPT Image-1 pricing
     // https://openai.com/pricing
     let estimatedCost = 0;
-    
+
     // Base cost by size (in dollars)
     const baseCostBySize = {
-      '1024x1024': 0.008,   // Standard square
-      '1792x1024': 0.012,   // Standard landscape
-      '1024x1792': 0.012,   // Standard portrait
-      '512x512': 0.006,     // Lower resolution
-      '256x256': 0.004      // Lowest resolution
+      '1024x1024': 0.008, // Standard square
+      '1792x1024': 0.012, // Standard landscape
+      '1024x1792': 0.012, // Standard portrait
+      '512x512': 0.006, // Lower resolution
+      '256x256': 0.004, // Lowest resolution
     };
-    
+
     // Get the base cost for the selected size
     const baseCost = baseCostBySize[size] || 0.008; // Default to square if size not found
-    
+
     // Factor in prompt length (longer prompts may require more processing)
     // This is an approximation since OpenAI doesn't specify exact pricing by token for images
     const promptLength = prompt.length;
-    const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + (promptLength / 1000))); // 1.0-1.5x based on length
-    
+    const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + promptLength / 1000)); // 1.0-1.5x based on length
+
     // Quality factor (HD costs more)
     const qualityFactor = quality === QUALITY.HD ? 1.5 : 1.0;
-    
+
     // Calculate final estimated cost
     estimatedCost = baseCost * promptFactor * qualityFactor;
-    
+
     // Log the cost calculation factors
-    logger.debug({
-      baseCost,
-      promptLength,
-      promptFactor,
-      qualityFactor,
-      finalCost: estimatedCost
-    }, 'Cost estimation factors for GPT Image-1');
+    logger.debug(
+      {
+        baseCost,
+        promptLength,
+        promptFactor,
+        qualityFactor,
+        finalCost: estimatedCost,
+      },
+      'Cost estimation factors for GPT Image-1'
+    );
 
     // Extract the image URLs based on the response structure
     // GPT Image-1 may have a different structure than DALL-E
@@ -390,7 +398,7 @@ async function generateImage(prompt, options = {}) {
     // Store the error result in the function results storage
     const errorResult = {
       success: false,
-      error: isContentPolicyViolation 
+      error: isContentPolicyViolation
         ? 'This request was rejected due to content policy violations. Please modify your prompt and try again.'
         : error.message,
       isContentPolicyViolation,

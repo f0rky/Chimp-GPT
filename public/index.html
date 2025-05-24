@@ -3,12 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1a1a" />
     <title id="page-title">Bot Status</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+    <link rel="manifest" href="/images/site.webmanifest">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bot Status">
+    
+    <!-- Styles -->
     <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
-    />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
   </head>
   <body>
     <div class="container">
@@ -43,6 +55,35 @@
               <span class="label">Discord Ping</span>
               <span id="discord-ping" class="value">-- ms</span>
             </div>
+          </div>
+        </div>
+
+        <div class="card performance-metrics">
+          <h2>Performance Metrics</h2>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="label">Response Time</span>
+              <span id="response-time" class="value">-- ms</span>
+              <span class="subtext">Avg: <span id="avg-response-time">-- ms</span></span>
+            </div>
+            <div class="stat">
+              <span class="label">Min/Max</span>
+              <span id="minmax-response-time" class="value">-- / -- ms</span>
+              <span class="subtext">Last 100 requests</span>
+            </div>
+            <div class="stat">
+              <span class="label">CPU Usage</span>
+              <span id="cpu-usage" class="value">-- %</span>
+              <span class="subtext">Load: <span id="cpu-load">--</span></span>
+            </div>
+            <div class="stat">
+              <span class="label">Memory</span>
+              <span id="memory-usage" class="value">-- MB</span>
+              <span class="subtext">Used / Total</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="metrics-chart"></canvas>
           </div>
         </div>
 

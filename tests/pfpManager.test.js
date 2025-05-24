@@ -6,14 +6,14 @@ const { createCanvas } = require('canvas');
 // Mock Discord client
 const mockClient = {
   user: {
-    setAvatar: async () => {}
-  }
+    setAvatar: async () => {},
+  },
 };
 
 // Import the PFPManager
 const PFPManager = require('../utils/pfpManager');
 
-describe('PFP Manager', function() {
+describe('PFP Manager', function () {
   this.timeout(10000); // Increase timeout for file operations
 
   let pfpManager;
@@ -23,20 +23,20 @@ describe('PFP Manager', function() {
   const createTestImage = async () => {
     const canvas = createCanvas(200, 200);
     const ctx = canvas.getContext('2d');
-    
+
     // Draw a simple gradient
     const gradient = ctx.createLinearGradient(0, 0, 200, 200);
     gradient.addColorStop(0, 'red');
     gradient.addColorStop(1, 'blue');
-    
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 200, 200);
-    
+
     // Add some text
     ctx.fillStyle = 'white';
     ctx.font = '20px Arial';
     ctx.fillText('Test Image', 50, 100);
-    
+
     return canvas.toBuffer('image/png');
   };
 
@@ -47,12 +47,12 @@ describe('PFP Manager', function() {
     } catch (error) {
       // Ignore if directory doesn't exist
     }
-    
+
     // Create a new PFP manager for testing
     pfpManager = new PFPManager(mockClient, {
       pfpDir: testDir,
       maxImages: 3, // Use a small number for testing
-      rotationInterval: 1000 // 1 second for testing
+      rotationInterval: 1000, // 1 second for testing
     });
   });
 
@@ -69,10 +69,10 @@ describe('PFP Manager', function() {
   it('should add an image to the rotation', async () => {
     const imageBuffer = await createTestImage();
     const filename = 'test-image-1';
-    
+
     const result = await pfpManager.addImage(imageBuffer, filename);
     expect(result).to.be.a('string');
-    
+
     // Check if file exists
     const files = await fs.readdir(testDir);
     expect(files).to.have.length(1);
@@ -85,7 +85,7 @@ describe('PFP Manager', function() {
       const imageBuffer = await createTestImage();
       await pfpManager.addImage(imageBuffer, `test-image-${i}`);
     }
-    
+
     // Should only keep the 3 most recent images
     const files = await fs.readdir(testDir);
     expect(files).to.have.length(3);
@@ -95,29 +95,29 @@ describe('PFP Manager', function() {
     const imagePath = await pfpManager.getRandomImage();
     expect(imagePath).to.be.a('string');
     expect(imagePath).to.include(testDir);
-    
+
     // Verify the file exists
     await fs.access(imagePath);
   });
 
   it('should update bot avatar when rotation is active', async () => {
     let avatarUpdated = false;
-    
+
     // Mock the setAvatar method
-    mockClient.user.setAvatar = async (buffer) => {
+    mockClient.user.setAvatar = async buffer => {
       avatarUpdated = true;
       return { id: 'test-avatar' };
     };
-    
+
     // Start rotation with a short interval
     pfpManager.startRotation();
-    
+
     // Wait for the first rotation to complete
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // Stop rotation
     pfpManager.stopRotation();
-    
+
     // Check if avatar was updated
     expect(avatarUpdated).to.be.true;
   });

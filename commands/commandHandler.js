@@ -220,9 +220,10 @@ function parseCommand(content) {
  * @returns {Promise<void>}
  */
 async function handleSlashCommand(interaction, config) {
+  let command;
   try {
     const commandName = interaction.commandName;
-    const command = slashCommands.get(commandName);
+    command = slashCommands.get(commandName);
 
     if (!command) {
       logger.warn({ commandName }, 'Unknown slash command');
@@ -349,13 +350,13 @@ async function handleCommand(message, config) {
   try {
     // Debug: Log all registered commands
     logger.debug({ registeredCommands: Array.from(commands.keys()) }, 'Registered commands');
-    
+
     // Parse the command from the message
     const parsedCommand = parseCommand(message.content);
     if (!parsedCommand) return false;
 
     logger.debug({ parsedCommand }, 'Parsed command');
-    
+
     commandName = parsedCommand.commandName;
     args = parsedCommand.args;
 
@@ -394,7 +395,11 @@ async function handleCommand(message, config) {
     }
 
     // Check if the command is admin-only
-    if (command.adminOnly && message.author.id !== config.OWNER_ID && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (
+      command.adminOnly &&
+      message.author.id !== config.OWNER_ID &&
+      !message.member?.permissions.has(PermissionFlagsBits.Administrator)
+    ) {
       logger.info(
         {
           commandName,

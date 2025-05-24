@@ -78,7 +78,7 @@ let conversationsDirty = false;
  * Interval ID for periodic saving
  * @type {NodeJS.Timeout|null}
  */
-let saveInterval = null;
+const saveInterval = null;
 
 // Immediately load conversations when the module is required
 (async () => {
@@ -89,7 +89,7 @@ let saveInterval = null;
   } catch (error) {
     logger.error({ error }, 'Failed to load conversations on startup');
   }
-  
+
   // Start periodic saving
   startPeriodicSaving();
 })();

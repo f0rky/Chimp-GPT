@@ -21,14 +21,14 @@ module.exports = {
     const userId = message.author.id;
     const channelId = message.channelId;
     const username = message.author.username;
-    
-    logger.info('Clear command executed', { 
-      userId, 
-      username, 
+
+    logger.info('Clear command executed', {
+      userId,
+      username,
       channelId,
-      botReady: message.client.isReady()
+      botReady: message.client.isReady(),
     });
-    
+
     try {
       // Log detailed state before clearing
       const stateBefore = {
@@ -36,23 +36,23 @@ module.exports = {
         userConversationsSize: userConversations.size,
         userConversationsKeys: Array.from(userConversations.keys()),
         userId,
-        userIdType: typeof userId
+        userIdType: typeof userId,
       };
-      
+
       logger.debug('State before clear:', stateBefore);
-      
+
       // Clear the conversation
       const wasCleared = clearConversation(userId);
-      
+
       // Log state after clearing
       const stateAfter = {
         hasUser: userConversations.has(userId),
         userConversationsSize: userConversations.size,
-        wasCleared
+        wasCleared,
       };
-      
+
       logger.debug('State after clear:', stateAfter);
-      
+
       if (wasCleared) {
         logger.info('Successfully cleared conversation', { userId, username });
         await message.reply('✅ Conversation history has been cleared.');
@@ -62,14 +62,14 @@ module.exports = {
       }
     } catch (error) {
       logger.error(
-        { 
-          error: error.message, 
+        {
+          error: error.message,
           stack: error.stack,
-          userId, 
+          userId,
           username,
           channelId,
-          userConversationsSize: conversationManager.userConversations.size,
-          userConversationsKeys: Array.from(conversationManager.userConversations.keys())
+          userConversationsSize: userConversations.size,
+          userConversationsKeys: Array.from(userConversations.keys()),
         },
         'Failed to clear conversation'
       );

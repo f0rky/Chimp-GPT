@@ -28,46 +28,55 @@ const openai = new OpenAI({
 async function logOpenAICall(method, params) {
   const callId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
   const startTime = Date.now();
-  
+
   try {
-    openaiLogger.debug({
-      callId,
-      method,
-      params: {
-        ...params,
-        // Don't log the full messages array as it can be very large
-        messages: params.messages ? `[${params.messages.length} messages]` : undefined,
+    openaiLogger.debug(
+      {
+        callId,
+        method,
+        params: {
+          ...params,
+          // Don't log the full messages array as it can be very large
+          messages: params.messages ? `[${params.messages.length} messages]` : undefined,
+        },
+        timestamp: new Date().toISOString(),
+        status: 'started',
       },
-      timestamp: new Date().toISOString(),
-      status: 'started'
-    }, 'OpenAI API call started');
-    
+      'OpenAI API call started'
+    );
+
     const response = await method.call(openai.chat.completions, params);
     const duration = Date.now() - startTime;
-    
-    openaiLogger.info({
-      callId,
-      method: 'chat.completions.create',
-      durationMs: duration,
-      model: params.model,
-      promptTokens: response.usage?.prompt_tokens,
-      completionTokens: response.usage?.completion_tokens,
-      totalTokens: response.usage?.total_tokens,
-      timestamp: new Date().toISOString(),
-      status: 'completed'
-    }, 'OpenAI API call completed');
-    
+
+    openaiLogger.info(
+      {
+        callId,
+        method: 'chat.completions.create',
+        durationMs: duration,
+        model: params.model,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens,
+        timestamp: new Date().toISOString(),
+        status: 'completed',
+      },
+      'OpenAI API call completed'
+    );
+
     return response;
   } catch (error) {
     const duration = Date.now() - startTime;
-    openaiLogger.error({
-      callId,
-      method: 'chat.completions.create',
-      durationMs: duration,
-      error: error.message,
-      status: 'failed',
-      timestamp: new Date().toISOString()
-    }, 'OpenAI API call failed');
+    openaiLogger.error(
+      {
+        callId,
+        method: 'chat.completions.create',
+        durationMs: duration,
+        error: error.message,
+        status: 'failed',
+        timestamp: new Date().toISOString(),
+      },
+      'OpenAI API call failed'
+    );
     throw error;
   }
 }
@@ -82,21 +91,18 @@ const openaiWithLogging = new Proxy(openai, {
             return new Proxy(target.completions, {
               get(target, prop) {
                 if (prop === 'create') {
-                  return (params) => logOpenAICall(
-                    openai.chat.completions.create,
-                    params
-                  );
+                  return params => logOpenAICall(openai.chat.completions.create, params);
                 }
                 return target[prop];
-              }
+              },
             });
           }
           return target[prop];
-        }
+        },
       });
     }
     return target[prop];
-  }
+  },
 });
 
 const retryWithBreaker = require('./utils/retryWithBreaker');

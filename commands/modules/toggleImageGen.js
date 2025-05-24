@@ -1,8 +1,8 @@
 /**
  * Toggle Image Generation Command
- * 
+ *
  * This command allows administrators to enable or disable the image generation feature.
- * 
+ *
  * @module ToggleImageGenCommand
  * @author Brett
  * @version 1.0.0
@@ -41,50 +41,55 @@ async function toggleImageGeneration() {
       // Create a basic env config if it doesn't exist
       envConfig = { ENABLE_IMAGE_GENERATION: process.env.ENABLE_IMAGE_GENERATION || 'false' };
     }
-    
+
     // Toggle the state
     const currentState = envConfig.ENABLE_IMAGE_GENERATION === 'true';
     const newState = !currentState;
-    
+
     // Update the .env file
     envConfig.ENABLE_IMAGE_GENERATION = newState.toString();
-    
+
     const envContent = Object.entries(envConfig)
       .map(([key, value]) => `${key}=${value}`)
       .join('\n');
-    
+
     fs.writeFileSync(envPath, envContent);
-    
+
     // Update in-memory config in all relevant places
     process.env.ENABLE_IMAGE_GENERATION = newState.toString();
     config.ENABLE_IMAGE_GENERATION = newState; // Update the live config object
-    
+
     // Force reload the config in the imageGeneration module
     try {
       // Get the path to the config module
       const configPath = require.resolve('../../configValidator');
-      
+
       // Clear the require cache for the config module
       delete require.cache[configPath];
-      
+
       // Re-require the config module
       const freshConfig = require('../../configValidator');
-      
+
       // Verify the config was updated
-      logger.info(`Config reloaded. Image generation is now ${freshConfig.ENABLE_IMAGE_GENERATION ? 'enabled' : 'disabled'}`);
+      logger.info(
+        `Config reloaded. Image generation is now ${freshConfig.ENABLE_IMAGE_GENERATION ? 'enabled' : 'disabled'}`
+      );
     } catch (configError) {
       logger.error({ error: configError }, 'Error reloading config module');
     }
-    
+
     // Log the change
     logger.info(`Image generation toggled to ${newState ? 'enabled' : 'disabled'} in config`);
-    logger.debug({ 
-      envPath, 
-      newState, 
-      configValue: config.ENABLE_IMAGE_GENERATION,
-      envValue: process.env.ENABLE_IMAGE_GENERATION 
-    }, 'Updated image generation configuration');
-    
+    logger.debug(
+      {
+        envPath,
+        newState,
+        configValue: config.ENABLE_IMAGE_GENERATION,
+        envValue: process.env.ENABLE_IMAGE_GENERATION,
+      },
+      'Updated image generation configuration'
+    );
+
     return { newState, success: true };
   } catch (error) {
     logger.error({ error }, 'Error toggling image generation');
@@ -104,21 +109,23 @@ const data = new SlashCommandBuilder()
 
 /**
  * Execute the /toggleimage command
- * 
+ *
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - The interaction that triggered the command
  * @returns {Promise<void>}
  */
 async function execute(interaction) {
   try {
     await interaction.deferReply({ ephemeral: true });
-    
+
     const { newState, success } = await toggleImageGeneration();
-    
+
     if (success) {
       await interaction.editReply({
-        content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}.`
+        content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}.`,
       });
-      logger.info(`Image generation ${newState ? 'enabled' : 'disabled'} by ${interaction.user.tag}`);
+      logger.info(
+        `Image generation ${newState ? 'enabled' : 'disabled'} by ${interaction.user.tag}`
+      );
     } else {
       throw new Error('Failed to update configuration');
     }
@@ -127,11 +134,11 @@ async function execute(interaction) {
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: '❌ An error occurred while toggling image generation.',
-        ephemeral: true
+        ephemeral: true,
       });
     } else {
       await interaction.editReply({
-        content: '❌ An error occurred while toggling image generation.'
+        content: '❌ An error occurred while toggling image generation.',
       });
     }
   }
@@ -147,40 +154,54 @@ const command = {
   permissions: ['Administrator'],
   dmAllowed: false,
   adminOnly: true,
-  execute: async (message) => {
+  execute: async message => {
     try {
-      logger.info({ userId: message.author.id, username: message.author.tag }, 'Executing toggleimage command');
-      
+      logger.info(
+        { userId: message.author.id, username: message.author.tag },
+        'Executing toggleimage command'
+      );
+
       // Log current state before toggling
-      logger.debug({ 
-        currentEnvValue: process.env.ENABLE_IMAGE_GENERATION,
-        currentConfigValue: config.ENABLE_IMAGE_GENERATION 
-      }, 'Current image generation state before toggle');
-      
+      logger.debug(
+        {
+          currentEnvValue: process.env.ENABLE_IMAGE_GENERATION,
+          currentConfigValue: config.ENABLE_IMAGE_GENERATION,
+        },
+        'Current image generation state before toggle'
+      );
+
       const { newState, success } = await toggleImageGeneration();
-      
+
       if (success) {
         // Log the new state after toggling
-        logger.debug({ 
-          newState,
-          newEnvValue: process.env.ENABLE_IMAGE_GENERATION,
-          newConfigValue: config.ENABLE_IMAGE_GENERATION 
-        }, 'New image generation state after toggle');
-        
+        logger.debug(
+          {
+            newState,
+            newEnvValue: process.env.ENABLE_IMAGE_GENERATION,
+            newConfigValue: config.ENABLE_IMAGE_GENERATION,
+          },
+          'New image generation state after toggle'
+        );
+
         try {
           // Try to reply to the message
           await message.reply({
             content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`,
-            allowedMentions: { repliedUser: false }
+            allowedMentions: { repliedUser: false },
           });
         } catch (replyError) {
           // If replying fails (e.g., message was deleted), send a new message instead
-          logger.warn({ error: replyError }, 'Failed to reply to message, sending new message instead');
+          logger.warn(
+            { error: replyError },
+            'Failed to reply to message, sending new message instead'
+          );
           await message.channel.send({
-            content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`
+            content: `✅ Image generation has been ${newState ? 'enabled' : 'disabled'}. The change will take effect immediately.`,
           });
         }
-        logger.info(`Image generation ${newState ? 'enabled' : 'disabled'} via prefix command by ${message.author.tag}`);
+        logger.info(
+          `Image generation ${newState ? 'enabled' : 'disabled'} via prefix command by ${message.author.tag}`
+        );
       } else {
         throw new Error('Failed to update configuration');
       }
@@ -190,20 +211,23 @@ const command = {
         // Try to reply to the message
         await message.reply({
           content: `❌ An error occurred while toggling image generation: ${error.message}`,
-          allowedMentions: { repliedUser: false }
+          allowedMentions: { repliedUser: false },
         });
       } catch (replyError) {
         // If replying fails (e.g., message was deleted), send a new message instead
-        logger.warn({ error: replyError }, 'Failed to reply with error message, sending new message instead');
+        logger.warn(
+          { error: replyError },
+          'Failed to reply with error message, sending new message instead'
+        );
         await message.channel.send({
-          content: `❌ An error occurred while toggling image generation: ${error.message}`
+          content: `❌ An error occurred while toggling image generation: ${error.message}`,
         });
       }
     }
   },
   // Add slash command data
   slashCommand: data,
-  interactionExecute: execute
+  interactionExecute: execute,
 };
 
 // Export the command for module loading
