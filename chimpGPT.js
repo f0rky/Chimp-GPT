@@ -284,17 +284,27 @@ async function processOpenAIMessage(content, conversationLog) {
 
     const responseMessage = response.choices[0].message;
 
+    // Extract token usage information
+    const usage = response.usage || {};
+
     if (responseMessage.function_call) {
       const result = {
         type: 'functionCall',
         functionName: responseMessage.function_call.name,
         parameters: JSON.parse(responseMessage.function_call.arguments),
+        usage: {
+          promptTokens: usage.prompt_tokens,
+          completionTokens: usage.completion_tokens,
+          totalTokens: usage.total_tokens,
+        },
       };
 
       performanceMonitor.stopTimer(timerId, {
         responseType: 'functionCall',
         functionName: responseMessage.function_call.name,
         success: true,
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
       });
 
       return result;
@@ -307,11 +317,18 @@ async function processOpenAIMessage(content, conversationLog) {
     const result = {
       type: 'message',
       content: responseMessage.content,
+      usage: {
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
+      },
     };
 
     performanceMonitor.stopTimer(timerId, {
       responseType: 'message',
       success: true,
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
     });
 
     return result;
@@ -790,7 +807,8 @@ client.on('messageCreate', async message => {
           gptResponse,
           feedbackMessage,
           fullConversationLog,
-          message.author.id
+          message.author.id,
+          timings.startTime
         );
         // Safe access to function name with fallback to prevent TypeError
         addTiming('after_function_call_handling', {
@@ -802,7 +820,8 @@ client.on('messageCreate', async message => {
           feedbackMessage,
           fullConversationLog,
           message.author.id,
-          timings.startTime // Use the original start time from when message was received
+          timings.startTime, // Use the original start time from when message was received
+          gptResponse.usage // Pass token usage information
         );
         addTiming('after_direct_message_handling');
       } else {
@@ -1513,7 +1532,8 @@ async function handleFunctionCall(
   gptResponse,
   feedbackMessage,
   conversationLog,
-  userIdFromMessage
+  userIdFromMessage,
+  startTime = Date.now()
 ) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
@@ -2012,9 +2032,31 @@ async function handleFunctionCall(
         content: naturalResponse,
       });
 
-      await feedbackMessage.edit(
-        naturalResponse?.slice(0, 1997) + (naturalResponse?.length > 1997 ? '...' : '')
-      );
+      // Calculate timing and format with token info
+      const processingTimeMs = Date.now() - startTime;
+      const processingTime = (processingTimeMs / 1000).toFixed(1);
+      let timingDisplay;
+      if (processingTime < 1) {
+        timingDisplay = `${processingTimeMs}ms`;
+      } else {
+        timingDisplay = `${parseFloat(processingTime)}s`;
+      }
+
+      let tokenInfo = '';
+      if (gptResponse.usage?.promptTokens || gptResponse.usage?.completionTokens) {
+        tokenInfo = ` • ${gptResponse.usage.promptTokens || 0}↑ ${gptResponse.usage.completionTokens || 0}↓`;
+      }
+
+      const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
+      const maxLength = 2000 - subtext.length - 3;
+
+      let finalResponse = naturalResponse;
+      if (finalResponse.length > maxLength) {
+        finalResponse = finalResponse.slice(0, maxLength) + '...';
+      }
+      finalResponse += subtext;
+
+      await feedbackMessage.edit(finalResponse);
     } else {
       // If no natural response was generated, provide a direct response with the data
       let directResponse = '';
@@ -2045,6 +2087,29 @@ async function handleFunctionCall(
           "I retrieved the information but couldn't generate a natural response. Here's the raw data:\n\n" +
           JSON.stringify(functionResult, null, 2).slice(0, 1500);
       }
+
+      // Add timing and token info to direct response
+      const processingTimeMs = Date.now() - startTime;
+      const processingTime = (processingTimeMs / 1000).toFixed(1);
+      let timingDisplay;
+      if (processingTime < 1) {
+        timingDisplay = `${processingTimeMs}ms`;
+      } else {
+        timingDisplay = `${parseFloat(processingTime)}s`;
+      }
+
+      let tokenInfo = '';
+      if (gptResponse.usage?.promptTokens || gptResponse.usage?.completionTokens) {
+        tokenInfo = ` • ${gptResponse.usage.promptTokens || 0}↑ ${gptResponse.usage.completionTokens || 0}↓`;
+      }
+
+      const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
+      const maxLength = 2000 - subtext.length - 3;
+
+      if (directResponse.length > maxLength) {
+        directResponse = directResponse.slice(0, maxLength) + '...';
+      }
+      directResponse += subtext;
 
       await feedbackMessage.edit(directResponse);
     }
@@ -2092,7 +2157,8 @@ async function handleDirectMessage(
   feedbackMessage,
   conversationLog,
   userIdFromMessage,
-  startTime = Date.now()
+  startTime = Date.now(),
+  usage = {}
 ) {
   if (!gptResponse.content?.trim()) {
     await feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
@@ -2115,7 +2181,7 @@ async function handleDirectMessage(
   // Calculate processing time in seconds
   const processingTimeMs = Date.now() - startTime;
   const processingTime = (processingTimeMs / 1000).toFixed(1);
-  
+
   // Format the timing display more nicely
   let timingDisplay;
   if (processingTime < 1) {
@@ -2126,9 +2192,15 @@ async function handleDirectMessage(
     timingDisplay = `${parseFloat(processingTime)}s`;
   }
 
-  // Prepare the final response with subtext for timing info
+  // Build token info if available
+  let tokenInfo = '';
+  if (usage.promptTokens || usage.completionTokens) {
+    tokenInfo = ` • ${usage.promptTokens || 0}↑ ${usage.completionTokens || 0}↓`;
+  }
+
+  // Prepare the final response with subtext for timing and token info
   let finalResponse = gptResponse.content;
-  const subtext = `\n\n-# ${timingDisplay}`;
+  const subtext = `\n\n-# ${timingDisplay}${tokenInfo}`;
 
   // Ensure the total length doesn't exceed Discord's 2000 character limit
   const maxLength = 2000 - subtext.length - 3; // -3 for potential ellipsis
