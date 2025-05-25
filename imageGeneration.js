@@ -1,10 +1,10 @@
 /**
  * @typedef {Object} ImageGenerationOptions
  * @property {string} [model] - The model to use (gpt-image-1)
- * @property {string} [size] - Image size (1024x1024, 1792x1024, or 1024x1792)
+ * @property {string} [size] - Image size (1024x1024, 1536x1024, 1024x1536, or auto)
  * @property {string} [quality] - Image quality (low, medium, high, auto)
  * @property {string} [format] - Output format (png, jpeg, webp)
- * @property {string} [background] - Background type (opaque, transparent, auto)
+ * @property {string} [background] - Background type (opaque, transparent)
  * @property {number} [compression] - Compression level (0-100) for jpeg and webp
  * @property {boolean} [enhance] - Whether to enhance the prompt using GPT
  *
@@ -56,10 +56,11 @@ const MODELS = {
  * @enum {string}
  */
 const SIZES = {
-  // GPT Image-1 supported sizes (based on API error message)
-  SQUARE: '1024x1024', // Square - GPT Image-1
-  LANDSCAPE: '1792x1024', // Landscape - GPT Image-1
-  PORTRAIT: '1024x1792', // Portrait - GPT Image-1
+  // GPT Image-1 supported sizes (based on official API documentation)
+  SQUARE: '1024x1024', // Square (default)
+  PORTRAIT: '1536x1024', // Portrait orientation
+  LANDSCAPE: '1024x1536', // Landscape orientation
+  AUTO: 'auto', // Let the API choose the best size
 };
 
 /**
@@ -88,9 +89,8 @@ const FORMAT = {
  * @enum {string}
  */
 const BACKGROUND = {
-  DEFAULT: 'opaque',
+  OPAQUE: 'opaque',
   TRANSPARENT: 'transparent',
-  AUTO: 'auto',
 };
 
 /**
@@ -145,18 +145,19 @@ async function generateImage(prompt, options = {}) {
     'Image generation configuration check'
   );
   try {
-    // Default to GPT Image-1 with medium size for cost effectiveness
+    // Default to GPT Image-1 model
     const model = options.model || MODELS.GPT_IMAGE_1;
-    // Set default size to square if not specified
-    let size = options.size || SIZES.SQUARE;
+    // Set default size to auto if not specified (let API choose optimal size)
+    let size = options.size || SIZES.AUTO;
 
     // We'll log all parameters together after building the full imageParams object
 
     // Validate the model and size combination
     // Validate that we're using a supported size
-    if (![SIZES.SQUARE, SIZES.LANDSCAPE, SIZES.PORTRAIT].includes(size)) {
-      logger.warn(`GPT Image-1 does not support ${size} size, falling back to square`);
-      size = SIZES.SQUARE;
+    const validSizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE, SIZES.AUTO];
+    if (!validSizes.includes(size)) {
+      logger.warn(`GPT Image-1 does not support ${size} size, falling back to auto`);
+      size = SIZES.AUTO;
     }
 
     // Set default quality to auto if not specified
@@ -166,7 +167,7 @@ async function generateImage(prompt, options = {}) {
     const format = options.format || FORMAT.PNG;
 
     // Set default background to opaque if not specified
-    const background = options.background || BACKGROUND.DEFAULT;
+    const background = options.background || BACKGROUND.OPAQUE;
 
     // Build the image parameters object according to OpenAI's API
     const imageParams = {
@@ -177,8 +178,8 @@ async function generateImage(prompt, options = {}) {
       output_format: format,
     };
 
-    // Only add background parameter if it's not the default
-    if (background !== BACKGROUND.DEFAULT) {
+    // Only add background parameter if it's transparent (opaque is default)
+    if (background === BACKGROUND.TRANSPARENT) {
       imageParams.background = background;
     }
 
@@ -244,13 +245,12 @@ async function generateImage(prompt, options = {}) {
     // https://openai.com/pricing
     let estimatedCost = 0;
 
-    // Base cost by size (in dollars)
+    // Base cost by size (in dollars) - GPT Image-1 pricing
     const baseCostBySize = {
-      '1024x1024': 0.008, // Standard square
-      '1792x1024': 0.012, // Standard landscape
-      '1024x1792': 0.012, // Standard portrait
-      '512x512': 0.006, // Lower resolution
-      '256x256': 0.004, // Lowest resolution
+      '1024x1024': 0.008, // Square
+      '1536x1024': 0.012, // Portrait
+      '1024x1536': 0.012, // Landscape
+      'auto': 0.010, // Auto (average estimate)
     };
 
     // Get the base cost for the selected size
@@ -261,8 +261,13 @@ async function generateImage(prompt, options = {}) {
     const promptLength = prompt.length;
     const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + promptLength / 1000)); // 1.0-1.5x based on length
 
-    // Quality factor (HD costs more)
-    const qualityFactor = quality === QUALITY.HD ? 1.5 : 1.0;
+    // Quality factor (higher quality costs more)
+    const qualityFactor = {
+      [QUALITY.LOW]: 0.8,
+      [QUALITY.MEDIUM]: 1.0,
+      [QUALITY.HIGH]: 1.5,
+      [QUALITY.AUTO]: 1.0,
+    }[quality] || 1.0;
 
     // Calculate final estimated cost
     estimatedCost = baseCost * promptFactor * qualityFactor;
@@ -451,7 +456,8 @@ async function enhanceImagePrompt(basicPrompt) {
             'You are an expert at creating detailed, vivid prompts for GPT Image-1 image generation. ' +
             'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
             'and other elements that will result in a high-quality, visually appealing image. ' +
-            'Do not include any text that would violate content policies (no violence, adult content, etc.).',
+            'Do not include any text that would violate content policies (no violence, adult content, etc.). ' +
+            'Keep the enhanced prompt concise but descriptive, ideally under 1000 characters.',
         },
         {
           role: 'user',

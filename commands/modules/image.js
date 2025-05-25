@@ -66,9 +66,10 @@ module.exports = {
         .setDescription('Image size')
         .setRequired(false)
         .addChoices(
-          { name: 'Square (1024x1024) - Default', value: SIZES.SQUARE },
-          { name: 'Landscape (1792x1024)', value: SIZES.LANDSCAPE },
-          { name: 'Portrait (1024x1792)', value: SIZES.PORTRAIT }
+          { name: 'Auto (Let AI choose best size)', value: SIZES.AUTO },
+          { name: 'Square (1024x1024)', value: SIZES.SQUARE },
+          { name: 'Portrait (1536x1024)', value: SIZES.PORTRAIT },
+          { name: 'Landscape (1024x1536)', value: SIZES.LANDSCAPE }
         )
     )
     .addStringOption(option =>
@@ -100,9 +101,8 @@ module.exports = {
         .setDescription('Background type (transparent only works with PNG and WebP)')
         .setRequired(false)
         .addChoices(
-          { name: 'Opaque (Default)', value: BACKGROUND.DEFAULT },
-          { name: 'Transparent', value: BACKGROUND.TRANSPARENT },
-          { name: 'Auto', value: BACKGROUND.AUTO }
+          { name: 'Opaque (Default)', value: BACKGROUND.OPAQUE },
+          { name: 'Transparent', value: BACKGROUND.TRANSPARENT }
         )
     )
     .addIntegerOption(option =>
@@ -156,7 +156,7 @@ module.exports = {
       const format = interaction.options.getString('format') || FORMAT.PNG;
 
       // Get background from options or use default
-      const background = interaction.options.getString('background') || BACKGROUND.DEFAULT;
+      const background = interaction.options.getString('background') || BACKGROUND.OPAQUE;
 
       // Get compression from options (if specified)
       const compression = interaction.options.getInteger('compression');

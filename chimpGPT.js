@@ -275,7 +275,7 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
               },
               size: {
                 type: 'string',
-                enum: ['1024x1024', '1792x1024', '1024x1792'],
+                enum: ['1024x1024', '1024x1536', '1536x1024'],
                 description: 'The size of the generated image',
               },
               enhance: {
