@@ -22,7 +22,7 @@ const url = require('url');
 let testConversationLog, testWeatherApi, testPluginSystem, testConversationStorage;
 let testCircuitBreaker, testConversationPersistence, testImageGeneration, testMessageHandler;
 let testRateLimiter, quakeLookup, testHumanCircuitBreaker, testInputSanitizer;
-let testApiKeyManager, testErrorClasses;
+let testApiKeyManager, testErrorClasses, testCommandHandler;
 
 // Function to load modules dynamically to avoid circular dependencies
 function loadTestModules() {
@@ -44,6 +44,7 @@ function loadTestModules() {
     testInputSanitizer = require('./inputSanitizerTest').testInputSanitizer;
     testApiKeyManager = require('./apiKeyManagerTest').testApiKeyManager;
     testErrorClasses = require('./errorClassesTest').testErrorClasses;
+    testCommandHandler = require('./commandHandlerTest').testCommandHandler;
   }
 }
 
@@ -736,21 +737,20 @@ async function runApiKeyManagerTests() {
  * @returns {Promise<Object>} Test results
  */
 async function runErrorClassesTests() {
-  try {
-    logger.info('Running error classes tests');
-    loadTestModules();
-    const results = await testErrorClasses();
-    return {
-      success: results.success,
-      details: results.results,
-    };
-  } catch (error) {
-    logger.error({ error }, 'Error running error classes tests');
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
+  loadTestModules();
+  return testErrorClasses();
+}
+
+/**
+ * Run command handler tests
+ *
+ * Tests the command handler's prefix functionality
+ *
+ * @returns {Promise<Object>} Test results
+ */
+async function runCommandHandlerTests() {
+  loadTestModules();
+  return testCommandHandler();
 }
 
 // Export all test functions at the end to avoid circular dependencies
@@ -773,4 +773,5 @@ module.exports = {
   runInputSanitizerTests,
   runApiKeyManagerTests,
   runErrorClassesTests,
+  runCommandHandlerTests,
 };

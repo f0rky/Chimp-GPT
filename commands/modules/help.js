@@ -9,7 +9,12 @@
  * @version 1.0.0
  */
 
-const { getCommands, getCommand, prefixes } = require('../commandHandler');
+const { getCommands, getCommand, getPrefixes } = require('../commandHandler');
+
+// Function to get the current prefixes
+function getCurrentPrefixes() {
+  return getPrefixes();
+}
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:help');
 
@@ -72,6 +77,11 @@ module.exports = {
     try {
       // Get all commands from the command handler
       const allCommands = getCommands();
+      const isOwner = message.author.id === config.ownerId;
+      const isAdmin = message.member?.permissions.has('ADMINISTRATOR') || false;
+      
+      // Get the first prefix for help messages
+      const primaryPrefix = getCurrentPrefixes()[0];
 
       // Check if we're looking for help on a specific command
       if (args.length > 0) {
@@ -79,24 +89,111 @@ module.exports = {
         const command = getCommand(commandName);
 
         if (command) {
-          // Format specific command help
-          const commandHelp = this.formatCommandHelp(command, config);
-          await message.reply(commandHelp);
+          // Show specific command help
+          await this.showCommandHelp(message, commandName, isOwner, isAdmin);
         } else {
           await message.reply(
-            `Command \`${commandName}\` not found. Use \`${prefixes[0]}help\` to see all available commands.`
+            `Command \`${commandName}\` not found. Use \`${primaryPrefix}help\` to see all available commands.`
           );
         }
         return;
       }
 
-      // Format general help message
-      const helpMessage = this.formatHelpMessage(allCommands, config);
-      await message.reply(helpMessage);
+      // Show general help
+      await this.showGeneralHelp(message, isOwner, isAdmin);
     } catch (error) {
       logger.error({ error, stack: error && error.stack }, 'Error executing help command');
       await message.reply('An error occurred while retrieving help information.');
     }
+  },
+
+  /**
+   * Format a command's help message
+   * 
+   * @param {Object} command - The command to format help for
+   * @param {Object} config - Bot configuration
+   * @returns {string} Formatted help message
+   */
+  formatCommandHelp(command, config) {
+    const primaryPrefix = getCurrentPrefixes()[0];
+    let helpText = `**Command:** ${primaryPrefix}${command.name}\n`;
+    helpText += `**Description:** ${command.description || 'No description'}\n\n`;
+    
+    if (command.aliases && command.aliases.length > 0) {
+      helpText += `**Aliases:** ${command.aliases.map(a => `\`${a}\``).join(', ')}\n`;
+    }
+    
+    if (command.usage) {
+      helpText += `\n**Usage:** \`${primaryPrefix}${command.usage}\`\n`;
+    }
+    
+    if (command.examples && command.examples.length > 0) {
+      helpText += '\n**Examples:**\n';
+      command.examples.forEach(example => {
+        helpText += `- \`${primaryPrefix}${example}\`\n`;
+      });
+    }
+    
+    // Add permissions info
+    const permissions = [];
+    if (command.ownerOnly) permissions.push('Bot Owner Only');
+    if (command.adminOnly) permissions.push('Server Admin Only');
+    if (!command.dmAllowed) permissions.push('Not available in DMs');
+    
+    if (permissions.length > 0) {
+      helpText += `\n**Permissions:** ${permissions.join(', ')}`;
+    }
+    
+    return helpText;
+  },
+
+  /**
+   * Format the general help message
+   * 
+   * @param {Array} commands - List of all commands
+   * @param {Object} config - Bot configuration
+   * @returns {string} Formatted help message
+   */
+  formatHelpMessage(commands, config) {
+    const primaryPrefix = getCurrentPrefixes()[0];
+    // Group commands by category
+    const categories = {};
+    
+    // Filter commands by permissions (simplified for this example)
+    const availableCommands = commands.filter(cmd => {
+      // Skip hidden commands
+      if (cmd.hidden) return false;
+      
+      // For this basic implementation, we'll show all commands
+      // In a real implementation, you'd check user permissions here
+      return true;
+    });
+    
+    // Group by category
+    availableCommands.forEach(cmd => {
+      const category = cmd.category || 'General';
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(cmd);
+    });
+    
+    // Build the help message
+    let helpText = '**ChimpGPT Bot Help**\n\n';
+    helpText += `Use \`${primaryPrefix}help <command>\` for more info on a command.\n\n`;
+    
+    // Add commands by category
+    Object.entries(categories).forEach(([category, cmds]) => {
+      helpText += `**${category}**\n`;
+      cmds.forEach(cmd => {
+        helpText += `- \`${primaryPrefix}${cmd.name}\`: ${cmd.description || 'No description'}\n`;
+      });
+      helpText += '\n';
+    });
+    
+    helpText += `\n*Type \`${primaryPrefix}help <command>\` for more details on a specific command.*`;
+    
+    return helpText;
   },
 
   /**
@@ -107,6 +204,7 @@ module.exports = {
    * @returns {Promise<void>}
    */
   async showCommandHelp(message, commandName, isOwner, isAdmin) {
+    const primaryPrefix = getCurrentPrefixes()[0];
     const command = getCommand(commandName);
 
     if (!command) {
@@ -125,7 +223,7 @@ module.exports = {
     }
 
     const helpEmbed = {
-      title: `Command: ${prefixes[0]}${command.name}`,
+      title: `Command: ${primaryPrefix}${command.name}`,
       color: 0x3498db,
       description: command.description || 'No description available',
       fields: [],
@@ -135,7 +233,7 @@ module.exports = {
     if (command.aliases && command.aliases.length > 0) {
       helpEmbed.fields.push({
         name: 'Aliases',
-        value: command.aliases.map(alias => `\`${prefixes[0]}${alias}\``).join(', '),
+        value: command.aliases.map(alias => `\`${primaryPrefix}${alias}\``).join(', '),
       });
     }
 
@@ -157,7 +255,7 @@ module.exports = {
       helpEmbed.fields.push({
         name: 'Examples',
         value: command.examples
-          .map(example => `\`${prefixes[0]}${command.name} ${example}\``)
+          .map(example => `\`${primaryPrefix}${command.name} ${example}\``)
           .join('\n'),
       });
     }
@@ -174,6 +272,7 @@ module.exports = {
    * @returns {Promise<void>}
    */
   async showGeneralHelp(message, isOwner, isAdmin) {
+    const primaryPrefix = getCurrentPrefixes()[0];
     const commands = getCommands(true); // Get unique commands only
 
     // Filter commands based on user permissions
@@ -198,7 +297,7 @@ module.exports = {
     const helpEmbed = {
       title: 'ChimpGPT Help',
       color: 0x3498db,
-      description: `Here are the commands you can use. Type \`${prefixes[0]}help <command>\` for detailed information about a specific command.`,
+      description: `Here are the commands you can use. Type \`${primaryPrefix}help <command>\` for detailed information about a specific command.`,
       fields: [],
     };
 
@@ -209,16 +308,17 @@ module.exports = {
         value: cmds
           .map(
             cmd =>
-              `\`${prefixes[0]}${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`
+              `\`${primaryPrefix}${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`
           )
           .join('\n'),
       });
     }
 
     // Add note about prefixes
+    const currentPrefixes = getCurrentPrefixes();
     helpEmbed.fields.push({
       name: 'Command Prefixes',
-      value: `You can use any of these prefixes: ${prefixes.map(p => `\`${p}\``).join(', ')}`,
+      value: `You can use any of these prefixes: ${currentPrefixes.map(p => `\`${p}\``).join(', ')}`,
     });
 
     await message.reply({ embeds: [helpEmbed] });

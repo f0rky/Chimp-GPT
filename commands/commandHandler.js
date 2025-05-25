@@ -491,6 +491,11 @@ async function deployCommands(config, guildIds = []) {
   return await deploySlashCommands(config, guildIds);
 }
 
+// Get the current prefixes array
+function getPrefixes() {
+  return [...prefixes];
+}
+
 module.exports = {
   registerCommand,
   loadCommands,
@@ -501,6 +506,7 @@ module.exports = {
   getCommands,
   getCommand,
   deployCommands,
-  prefixes,
+  getPrefixes,
+  prefixes: getPrefixes(), // For backward compatibility
   slashCommands,
 };
