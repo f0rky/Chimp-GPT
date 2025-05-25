@@ -95,6 +95,8 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages, // Add intent for DMs
+    GatewayIntentBits.GuildMessageReactions, // Required for reaction collectors
+    GatewayIntentBits.DirectMessageReactions, // Required for DM reaction collectors
   ],
 });
 

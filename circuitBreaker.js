@@ -48,8 +48,28 @@ function listPendingApprovals() {
   return Array.from(pendingApprovals.entries()).map(([id, data]) => ({ id, ...data }));
 }
 
+/**
+ * Approve a pending request by ID.
+ * @param {string} id
+ * @returns {boolean} success
+ */
+function approveRequest(id) {
+  return resolveApproval(id, 'approve');
+}
+
+/**
+ * Deny a pending request by ID.
+ * @param {string} id
+ * @returns {boolean} success
+ */
+function denyRequest(id) {
+  return resolveApproval(id, 'deny');
+}
+
 module.exports = {
   requestApproval,
   resolveApproval,
+  approveRequest,
+  denyRequest,
   listPendingApprovals,
 };

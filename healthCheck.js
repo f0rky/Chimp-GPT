@@ -119,6 +119,7 @@ const stats = {
   errors: {
     openai: 0,
     discord: 0,
+    discordHooks: {}, // Track command-specific Discord errors
     weather: 0,
     time: 0,
     wolfram: 0,
@@ -620,8 +621,25 @@ function generateHealthReport(isStartup = false) {
   let pluginErrorsText = '';
   if (Object.keys(stats.errors.plugins).length > 0) {
     pluginErrorsText = '\n**Plugin Errors:**\n';
-    for (const [pluginId, errorCount] of Object.entries(stats.errors.plugins)) {
-      pluginErrorsText += `• ${pluginId}: ${errorCount.count}\n`;
+    for (const [pluginId, errorInfo] of Object.entries(stats.errors.plugins)) {
+      // Add the total count for the plugin
+      pluginErrorsText += `• **${pluginId}**: ${errorInfo.count} error(s)\n`;
+      
+      // Add detailed command/hook errors if available
+      if (errorInfo.hooks && Object.keys(errorInfo.hooks).length > 0) {
+        for (const [hookName, count] of Object.entries(errorInfo.hooks)) {
+          // Format command/hook names to be more readable
+          let displayName = hookName;
+          if (hookName.startsWith('command:')) {
+            displayName = `Command: ${hookName.replace('command:', '')}`;
+          } else if (hookName.startsWith('slash:')) {
+            displayName = `Slash Command: ${hookName.replace('slash:', '')}`;
+          } else if (hookName.startsWith('hook:')) {
+            displayName = `Hook: ${hookName.replace('hook:', '')}`;
+          }
+          pluginErrorsText += `  ↳ ${displayName}: ${count} error(s)\n`;
+        }
+      }
     }
   }
 
@@ -659,7 +677,32 @@ function generateHealthReport(isStartup = false) {
   report += `\n**Errors:**\n`;
   report += `• Total Errors: ${calculateTotalErrors(stats.errors)}\n`;
   report += `• OpenAI Errors: ${stats.errors.openai}\n`;
-  report += `• Discord Errors: ${stats.errors.discord}\n`;
+  
+  // Add detailed Discord command errors if any
+  let discordCommandErrors = '';
+  if (stats.errors.discordHooks) {
+    const commandErrors = [];
+    const slashCommandErrors = [];
+    
+    // Categorize the hooks
+    for (const [hookName, count] of Object.entries(stats.errors.discordHooks)) {
+      if (hookName.startsWith('command:')) {
+        commandErrors.push(`${hookName.replace('command:', '')}: ${count}`);
+      } else if (hookName.startsWith('slash:')) {
+        slashCommandErrors.push(`/${hookName.replace('slash:', '')}: ${count}`);
+      }
+    }
+    
+    // Format the command errors if any exist
+    if (commandErrors.length > 0) {
+      discordCommandErrors += `  ↳ Commands: ${commandErrors.join(', ')}\n`;
+    }
+    if (slashCommandErrors.length > 0) {
+      discordCommandErrors += `  ↳ Slash Commands: ${slashCommandErrors.join(', ')}\n`;
+    }
+  }
+  
+  report += `• Discord Errors: ${stats.errors.discord}${discordCommandErrors ? '\n' + discordCommandErrors : ''}\n`;
   report += `• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}\n\n`;
 
   // Add rate limiting section
@@ -826,41 +869,65 @@ function trackApiCall(type, pluginId) {
  * @returns {void}
  */
 function trackError(type, pluginId, hookName) {
-  if (pluginId) {
-    // Track plugin error
-    if (!stats.errors.plugins[pluginId]) {
-      stats.errors.plugins[pluginId] = {
-        count: 0,
-        hooks: {},
-      };
-    }
-
-    // Increment the plugin error count
-    stats.errors.plugins[pluginId].count++;
-
-    // Track specific hook errors if provided
-    if (hookName) {
-      if (!stats.errors.plugins[pluginId].hooks[hookName]) {
-        stats.errors.plugins[pluginId].hooks[hookName] = 0;
+  try {
+    if (pluginId) {
+      // Track plugin error
+      if (!stats.errors.plugins[pluginId]) {
+        stats.errors.plugins[pluginId] = {
+          count: 0,
+          hooks: {},
+        };
       }
-      stats.errors.plugins[pluginId].hooks[hookName]++;
 
-      // Store in persistent storage with hook information
-      statsStorage.incrementStat(`errors.plugins.${pluginId}.hooks.${hookName}`);
+      // Increment the plugin error count
+      stats.errors.plugins[pluginId].count++;
+
+      // Track specific hook errors if provided
+      if (hookName) {
+        if (!stats.errors.plugins[pluginId].hooks[hookName]) {
+          stats.errors.plugins[pluginId].hooks[hookName] = 0;
+        }
+        stats.errors.plugins[pluginId].hooks[hookName]++;
+
+        // Store in persistent storage with hook information
+        statsStorage.incrementStat(`errors.plugins.${pluginId}.hooks.${hookName}`);
+      }
+
+      // Also store the overall plugin error count in persistent storage
+      statsStorage.incrementStat(`errors.plugins.${pluginId}.count`);
+    } else if (type === 'discord' && hookName) {
+      // Track Discord command/hook errors separately
+      if (!stats.errors.discordHooks) {
+        stats.errors.discordHooks = {};
+      }
+      
+      // Initialize the hook counter if it doesn't exist
+      if (!stats.errors.discordHooks[hookName]) {
+        stats.errors.discordHooks[hookName] = 0;
+      }
+      
+      // Increment the hook counter
+      stats.errors.discordHooks[hookName]++;
+      
+      // Also increment the general Discord error counter
+      stats.errors.discord++;
+      
+      // Store in persistent storage
+      statsStorage.incrementStat(`errors.discordHooks.${hookName}`);
+      statsStorage.incrementStat('errors.discord');
+    } else if (stats.errors[type] !== undefined) {
+      // Track regular error
+      stats.errors[type]++;
+      // Also store in persistent storage
+      statsStorage.incrementStat(`errors.${type}`);
+    } else {
+      // Track other error
+      stats.errors.other++;
+      // Also store in persistent storage
+      statsStorage.incrementStat('errors.other');
     }
-
-    // Also store the overall plugin error count in persistent storage
-    statsStorage.incrementStat(`errors.plugins.${pluginId}.count`);
-  } else if (stats.errors[type] !== undefined) {
-    // Track regular error
-    stats.errors[type]++;
-    // Also store in persistent storage
-    statsStorage.incrementStat(`errors.${type}`);
-  } else {
-    // Track other error
-    stats.errors.other++;
-    // Also store in persistent storage
-    statsStorage.incrementStat('errors.other');
+  } catch (error) {
+    logger.error({ error, type, pluginId, hookName }, 'Error in trackError');
   }
 }
 

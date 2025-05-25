@@ -659,26 +659,33 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateFunctionResults, UPDATE_INTERVAL);
   // Performance metrics are updated via updateStatus, no need for separate interval
 
-  // Set up event listeners
-  document.getElementById('run-tests').addEventListener('click', runTests);
-  document.getElementById('reset-stats').addEventListener('click', resetStats);
-  document.getElementById('repair-stats').addEventListener('click', repairStats);
+  // Set up event listeners with null checks
+  const runTestsBtn = document.getElementById('run-tests');
+  const resetStatsBtn = document.getElementById('reset-stats');
+  const repairStatsBtn = document.getElementById('repair-stats');
+  
+  if (runTestsBtn) runTestsBtn.addEventListener('click', runTests);
+  if (resetStatsBtn) resetStatsBtn.addEventListener('click', resetStats);
+  if (repairStatsBtn) repairStatsBtn.addEventListener('click', repairStats);
   
   // Set up history chart button listeners
-  document.querySelectorAll('.history-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      // Remove active class from all history buttons
-      document.querySelectorAll('.history-btn').forEach(btn => btn.classList.remove('active'));
-      
-      // Add active class to clicked button
-      button.classList.add('active');
-      
-      // Update chart with selected period and range
-      const period = button.getAttribute('data-period');
-      const range = parseInt(button.getAttribute('data-range'));
-      updateHistoryChart(period, range);
+  const historyButtons = document.querySelectorAll('.history-btn');
+  if (historyButtons.length > 0) {
+    historyButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        // Remove active class from all history buttons
+        document.querySelectorAll('.history-btn').forEach(btn => btn.classList.remove('active'));
+        
+        // Add active class to clicked button
+        button.classList.add('active');
+        
+        // Update chart with selected period and range
+        const period = button.getAttribute('data-period');
+        const range = button.getAttribute('data-range') || 24;
+        updateHistoryChart(period, range);
+      });
     });
-  });
+  }
 
   // Set up tab buttons
   document.querySelectorAll('.tab-button').forEach(button => {
@@ -1095,19 +1102,43 @@ function updateGallery(results) {
 }
 
 /**
+ * Safely updates text content of an element if it exists
+ * @param {string} elementId - The ID of the element to update
+ * @param {string} text - The text to set
+ * @param {string} [defaultText='-'] - Default text if text is empty
+ */
+function safeUpdateText(elementId, text, defaultText = '-') {
+  try {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = text !== undefined && text !== null ? text : defaultText;
+    } else {
+      console.warn(`Element with ID '${elementId}' not found`);
+    }
+  } catch (error) {
+    console.error(`Error updating ${elementId}:`, error);
+  }
+}
+
+/**
  * Update the status page with the latest data
  */
 async function updateStatus() {
   try {
+    console.log('Fetching health data...');
     const response = await fetch('/health');
+    
     if (!response.ok) {
-      console.error(`Error fetching health data: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error fetching health data: ${response.status} ${response.statusText}`, errorText);
       setStatusIndicator('offline');
       return;
     }
 
-    const data = await response.json();
-    console.log('Received data from /health:', JSON.stringify(data, null, 2)); // DEBUGGING LINE
+    const data = await response.json().catch(error => {
+      console.error('Error parsing JSON response:', error);
+      throw new Error('Invalid JSON response from server');
+    });
 
     if (!data) {
       console.error('Empty health data received');
@@ -1115,79 +1146,99 @@ async function updateStatus() {
       return;
     }
 
+    console.log('Health data received:', { 
+      status: data.status, 
+      name: data.name,
+      hasStats: !!data.stats,
+      hasMemory: !!data.memory,
+      hasSystem: !!data.system
+    });
+
     // Update bot name in title and header
     const botName = data.name || 'Bot';
-    const pageTitle = document.getElementById('page-title');
-    const botNameHeader = document.getElementById('bot-name-header');
-
-    if (pageTitle) pageTitle.textContent = `${botName} Status`;
-    if (botNameHeader) botNameHeader.textContent = `${botName} Status`;
+    safeUpdateText('page-title', `${botName} Status`);
+    safeUpdateText('bot-name-header', `${botName} Status`);
 
     // Update status indicator
-    setStatusIndicator(data.status);
+    setStatusIndicator(data.status || 'unknown');
 
     // Update overview stats
-    const uptimeElement = document.getElementById('uptime');
-    const versionElement = document.getElementById('version');
-    const messageCountElement = document.getElementById('message-count');
-    const discordPingElement = document.getElementById('discord-ping');
+    safeUpdateText('uptime', data.uptime !== undefined ? formatUptime(data.uptime) : '-');
+    safeUpdateText('version', data.version || '-');
+    
+    if (data.stats) {
+      safeUpdateText('message-count', 
+        data.stats.messageCount !== undefined ? data.stats.messageCount.toLocaleString() : '0');
+      
+      if (data.stats.discord && data.stats.discord.ping !== undefined) {
+        safeUpdateText('discord-ping', `${data.stats.discord.ping} ms`);
+      } else {
+        safeUpdateText('discord-ping', '-- ms');
+      }
 
-    if (uptimeElement) uptimeElement.textContent = formatUptime(data.uptime);
-    if (versionElement) versionElement.textContent = data.version;
-    if (messageCountElement)
-      messageCountElement.textContent = data.stats.messageCount.toLocaleString();
-    if (discordPingElement && data.discord)
-      discordPingElement.textContent = `${data.discord.ping || '--'} ms`;
+      // Update API calls
+      if (data.stats.apiCalls) {
+        updateApiCalls(data.stats.apiCalls);
+      }
 
-    // Update API calls
-    updateApiCalls(data.stats.apiCalls);
+      // Update errors
+      if (data.stats.errors) {
+        updateErrors(data.stats.errors);
+      }
 
-    // Update errors
-    updateErrors(data.stats.errors);
+      // Update plugin statistics
+      if (data.stats.plugins && data.stats.apiCalls?.plugins && data.stats.errors?.plugins) {
+        updatePluginStats(
+          data.stats.plugins, 
+          data.stats.apiCalls.plugins, 
+          data.stats.errors.plugins
+        );
+      }
 
-    // Update memory usage
-    updateMemoryUsage(data.memory, data.system);
+      // Update rate limits
+      if (data.stats.rateLimits) {
+        safeUpdateText('rate-limit-hits', 
+          data.stats.rateLimits.count !== undefined ? data.stats.rateLimits.count.toLocaleString() : '0');
+        
+        safeUpdateText('rate-limit-users',
+          data.stats.rateLimits.uniqueUsers !== undefined ? data.stats.rateLimits.uniqueUsers.toLocaleString() : '0');
 
-    // Fetch and update performance metrics
-    fetchPerformanceData();
-
-    // Update plugin statistics
-    updatePluginStats(data.stats.plugins, data.stats.apiCalls.plugins, data.stats.errors.plugins);
-
-    // Update rate limits
-    const rateLimitHitsElement = document.getElementById('rate-limit-hits');
-    const rateLimitUsersElement = document.getElementById('rate-limit-users');
-
-    if (rateLimitHitsElement && data.stats.rateLimits) {
-      rateLimitHitsElement.textContent = data.stats.rateLimits.count.toLocaleString();
+        if (Array.isArray(data.stats.rateLimits.userDetails)) {
+          updateRateLimitedUsers(data.stats.rateLimits.userDetails);
+        }
+      }
     }
-    if (rateLimitUsersElement && data.stats.rateLimits) {
-      rateLimitUsersElement.textContent = data.stats.rateLimits.uniqueUsers.toLocaleString();
-    }
 
-    // Update rate limited users list
-    updateRateLimitedUsers(data.stats.rateLimits.userDetails);
+    // Update memory usage if data is available
+    if (data.memory && data.system) {
+      updateMemoryUsage(data.memory, data.system);
+    }
 
     // Update last updated time
-    const lastUpdatedElement = document.getElementById('last-updated');
-    if (lastUpdatedElement) {
-      lastUpdatedElement.textContent = new Date().toLocaleString();
-    }
+    safeUpdateText('last-updated', new Date().toLocaleString());
+
+    // Fetch and update performance metrics
+    fetchPerformanceData().catch(error => {
+      console.error('Error fetching performance data:', error);
+    });
+
   } catch (error) {
-    console.error('Error fetching health data:', error.message || error);
+    console.error('Error in updateStatus:', error);
     setStatusIndicator('error');
 
     // Display an error message on the page
-    document.querySelectorAll('.card').forEach(card => {
-      const errorBanner = document.createElement('div');
-      errorBanner.className = 'error-banner';
-      errorBanner.textContent = 'Error connecting to server. Please check your connection.';
-
-      // Only add the error banner if it doesn't already exist
-      if (!card.querySelector('.error-banner')) {
-        card.prepend(errorBanner);
-      }
-    });
+    try {
+      document.querySelectorAll('.card').forEach(card => {
+        if (!card.querySelector('.error-banner')) {
+          const errorBanner = document.createElement('div');
+          errorBanner.className = 'error-banner';
+          errorBanner.textContent = 'Error connecting to server. Please check your connection.';
+          card.prepend(errorBanner);
+        }
+      });
+    } catch (domError) {
+      console.error('Error displaying error banner:', domError);
+    }
   }
 }
 
@@ -1233,35 +1284,60 @@ async function fetchPerformanceData() {
 
 /**
  * Set the status indicator based on the current status
- * @param {string} status - Current status (ok, warning, error)
+ * @param {string} status - Current status (ok, warning, error, offline)
  */
 function setStatusIndicator(status) {
-  const dot = document.querySelector('.dot');
-  const statusText = document.querySelector('.status-text');
+  try {
+    const dot = document.querySelector('.dot');
+    const statusText = document.querySelector('.status-text');
 
-  if (!dot || !statusText) {
-    console.error('Status indicator elements not found');
-    return;
-  }
+    // If elements don't exist, log a warning and return early
+    if (!dot && !statusText) {
+      console.warn('Status indicator elements (.dot, .status-text) not found in the DOM');
+      return;
+    }
 
-  dot.className = 'dot';
+    // Update dot class if it exists
+    if (dot) {
+      // Remove all status classes
+      dot.className = 'dot';
+      
+      // Add the appropriate status class
+      switch (status) {
+        case 'ok':
+          dot.classList.add('online');
+          break;
+        case 'warning':
+          dot.classList.add('warning');
+          break;
+        case 'error':
+        case 'offline':
+          dot.classList.add('offline');
+          break;
+      }
+    }
 
-  switch (status) {
-    case 'ok':
-      dot.classList.add('online');
-      statusText.textContent = 'Online';
-      break;
-    case 'warning':
-      dot.classList.add('warning');
-      statusText.textContent = 'Warning';
-      break;
-    case 'error':
-    case 'offline':
-      dot.classList.add('offline');
-      statusText.textContent = 'Offline';
-      break;
-    default:
-      statusText.textContent = 'Unknown';
+    // Update status text if it exists
+    if (statusText) {
+      let statusMessage = 'Unknown';
+      
+      switch (status) {
+        case 'ok':
+          statusMessage = 'Online';
+          break;
+        case 'warning':
+          statusMessage = 'Warning';
+          break;
+        case 'error':
+        case 'offline':
+          statusMessage = 'Offline';
+          break;
+      }
+      
+      statusText.textContent = statusMessage;
+    }
+  } catch (error) {
+    console.error('Error in setStatusIndicator:', error);
   }
 }
 

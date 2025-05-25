@@ -16,6 +16,8 @@ const logger = createLogger('commands');
 const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');
+const { trackError } = require('../healthCheck');
+const { executeWithApproval, SENSITIVE_OPERATIONS } = require('../utils/humanCircuitBreaker');
 
 // Import slash command deployment function
 const deploySlashCommands = require('./deploySlashCommands');
@@ -306,30 +308,49 @@ async function handleSlashCommand(interaction, config) {
   } catch (error) {
     // Enhanced granular error logging for plugin/core slash commands
     const isPluginCommand = !!command.pluginId;
-    logger.error(
-      {
-        error: error.message,
+    const commandName = interaction.commandName;
+    const errorContext = {
+      error: {
+        name: error.name,
+        message: error.message,
         stack: error.stack,
-        commandName: interaction.commandName,
-        userId: interaction.user.id,
-        username: interaction.user.username,
-        channelId: interaction.channelId,
-        pluginId: isPluginCommand ? command.pluginId : undefined,
-        pluginVersion: isPluginCommand ? command.pluginVersion || 'unknown' : undefined,
-        source: isPluginCommand ? 'plugin' : 'core',
-        args: interaction.options?.data || [],
       },
-      'Error handling slash command'
-    );
+      commandName,
+      userId: interaction.user.id,
+      username: interaction.user.username,
+      channelId: interaction.channelId,
+      pluginId: isPluginCommand ? command.pluginId : undefined,
+      pluginVersion: isPluginCommand ? command.pluginVersion || 'unknown' : undefined,
+      source: isPluginCommand ? 'plugin' : 'core',
+      args: interaction.options?.data || [],
+    };
+
+    // Log the error with detailed context
+    logger.error(errorContext, 'Error handling slash command');
+
+    // Track the error in the health check system
+    if (isPluginCommand && command.pluginId) {
+      // Track plugin slash command errors with plugin ID and command name as hook
+      trackError('plugins', command.pluginId, `slash:${commandName}`);
+    } else {
+      // Track core slash command errors
+      trackError('discord', undefined, `slash:${commandName}`);
+    }
+
+    // Prepare error message
+    const errorMessage =
+      isPluginCommand && command.pluginId
+        ? `An error occurred while executing the /${commandName} command. The plugin developer has been notified.`
+        : 'An error occurred while executing that command. The bot administrator has been notified.';
 
     // Reply with error if we haven't replied yet
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
-        content: 'An error occurred while executing that command.',
+        content: errorMessage,
         ephemeral: true,
       });
     } else if (!interaction.replied) {
-      await interaction.editReply({ content: 'An error occurred while executing that command.' });
+      await interaction.editReply({ content: errorMessage });
     }
   }
 }
@@ -413,40 +434,107 @@ async function handleCommand(message, config) {
       return true; // We handled it by rejecting it
     }
 
-    // Execute the command
-    logger.info(
-      {
-        commandName,
-        args,
-        userId: message.author.id,
-        username: message.author.username,
-        channelId: message.channelId,
-      },
-      'Executing command'
-    );
+    // Check if command requires approval
+    if (command.requiresApproval) {
+      logger.info(
+        {
+          commandName,
+          args,
+          userId: message.author.id,
+          username: message.author.username,
+          requiresApproval: true,
+        },
+        'Command requires human approval'
+      );
 
-    await command.execute(message, args, message.client, config);
-    return true;
+      const approvalDetails = {
+        type: SENSITIVE_OPERATIONS.COMMAND_EXECUTION,
+        user: `${message.author.username} (${message.author.id})`,
+        context: `Command: ${commandName} ${args.join(' ')}`.trim(),
+        metadata: {
+          command: commandName,
+          args: args.join(' '),
+          channel: message.channel.name || 'DM',
+          channelId: message.channelId,
+          messageId: message.id,
+        },
+      };
+
+      const result = await executeWithApproval(
+        approvalDetails,
+        async () => {
+          return await command.execute(message, args, message.client, config);
+        },
+        message.client
+      );
+
+      if (!result.approved) {
+        await message.reply(
+          '❌ This command requires approval from the bot owner. Request denied.'
+        );
+        return true;
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      return true;
+    } else {
+      // Execute the command normally
+      logger.info(
+        {
+          commandName,
+          args,
+          userId: message.author.id,
+          username: message.author.username,
+          channelId: message.channelId,
+        },
+        'Executing command'
+      );
+
+      await command.execute(message, args, message.client, config);
+      return true;
+    }
   } catch (error) {
     // Enhanced granular error logging for plugin/core commands
-    // Check if command exists before accessing its properties
     const isPluginCommand = command && !!command.pluginId;
-    logger.error(
-      {
-        error,
-        commandName,
-        args,
-        userId: message.author.id,
-        username: message.author.username,
-        channelId: message.channelId,
-        pluginId: isPluginCommand ? command.pluginId : undefined,
-        pluginVersion: isPluginCommand ? command.pluginVersion || 'unknown' : undefined,
-        source: isPluginCommand ? 'plugin' : 'core',
-        content: message.content,
+    const errorContext = {
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
       },
-      'Error handling command'
-    );
-    await message.reply('An error occurred while executing that command.');
+      commandName,
+      args,
+      userId: message.author.id,
+      username: message.author.username,
+      channelId: message.channelId,
+      pluginId: isPluginCommand ? command.pluginId : undefined,
+      pluginVersion: isPluginCommand ? command.pluginVersion || 'unknown' : undefined,
+      source: isPluginCommand ? 'plugin' : 'core',
+      content: message.content,
+    };
+
+    // Log the error with detailed context
+    logger.error(errorContext, 'Error handling command');
+
+    // Track the error in the health check system
+    if (isPluginCommand && command.pluginId) {
+      // Track plugin command errors with plugin ID and command name as hook
+      trackError('plugins', command.pluginId, `command:${commandName}`);
+    } else {
+      // Track core command errors
+      trackError('discord', undefined, `command:${commandName}`);
+    }
+
+    // Provide a user-friendly error message
+    const errorMessage =
+      isPluginCommand && command.pluginId
+        ? `An error occurred while executing the ${commandName} command. The plugin developer has been notified.`
+        : 'An error occurred while executing that command. The bot administrator has been notified.';
+
+    await message.reply(errorMessage);
     return true; // We attempted to handle it
   }
 }

@@ -64,16 +64,27 @@ async function requestHumanApproval(details, onApprove, onDeny, client) {
         const ownerUser = await client.users.fetch(process.env.OWNER_ID.replace(/"/g, ''));
         if (ownerUser) {
           const message = createApprovalMessage(approvalId, details);
-          await ownerUser.send(message).catch(err => {
+          const sentMessage = await ownerUser.send(message).catch(err => {
             logger.error({ err }, 'Failed to send approval request to owner via DM');
-            notifyThroughChannel(client, approvalId, details);
+            return notifyThroughChannel(client, approvalId, details);
           });
+
+          // Add reactions for approval/denial if message was sent
+          if (sentMessage) {
+            await setupReactionCollector(sentMessage, approvalId, client);
+          }
         } else {
-          notifyThroughChannel(client, approvalId, details);
+          const sentMessage = await notifyThroughChannel(client, approvalId, details);
+          if (sentMessage) {
+            await setupReactionCollector(sentMessage, approvalId, client);
+          }
         }
       } catch (err) {
         logger.error({ err }, 'Failed to notify owner about approval request');
-        notifyThroughChannel(client, approvalId, details);
+        const sentMessage = await notifyThroughChannel(client, approvalId, details);
+        if (sentMessage) {
+          await setupReactionCollector(sentMessage, approvalId, client);
+        }
       }
     }
 
@@ -125,9 +136,12 @@ function createApprovalMessage(approvalId, details) {
     logger.error({ error }, 'Error getting version info for approval message');
   }
 
-  message += `**Approve:** \`/circuitbreaker approve id:${approvalId}\`\n`;
-  message += `**Deny:** \`/circuitbreaker deny id:${approvalId}\`\n`;
-  message += `**View All:** \`/circuitbreaker list\``;
+  message += `\n**React with:**\n`;
+  message += `✅ to **Approve**\n`;
+  message += `❌ to **Deny**\n\n`;
+  message += `*Or use commands:*\n`;
+  message += `\`/circuitbreaker approve id:${approvalId}\`\n`;
+  message += `\`/circuitbreaker deny id:${approvalId}\``;
 
   return message;
 }
@@ -140,7 +154,7 @@ function createApprovalMessage(approvalId, details) {
  * @param {Object} details - Details about the operation
  */
 async function notifyThroughChannel(client, approvalId, details) {
-  if (!client || !process.env.CHANNEL_ID) return;
+  if (!client || !process.env.CHANNEL_ID) return null;
 
   try {
     // Try to use the first available channel from CHANNEL_ID
@@ -149,12 +163,13 @@ async function notifyThroughChannel(client, approvalId, details) {
       const channel = await client.channels.fetch(channelIds[0]);
       if (channel) {
         const message = `<@${process.env.OWNER_ID.replace(/"/g, '')}> ${createApprovalMessage(approvalId, details)}`;
-        await channel.send(message);
+        return await channel.send(message);
       }
     }
   } catch (err) {
     logger.error({ err }, 'Failed to notify through channel');
   }
+  return null;
 }
 
 /**
@@ -258,6 +273,101 @@ function requiresHumanApproval(operationType, context = {}) {
   // Add additional logic here based on context
 
   return false;
+}
+
+/**
+ * Setup reaction collector for approval/denial
+ *
+ * @param {import('discord.js').Message} message - The approval message
+ * @param {string} approvalId - The approval ID
+ * @param {Client} client - Discord client
+ */
+async function setupReactionCollector(message, approvalId, client) {
+  try {
+    // Add approval and denial reactions
+    await message.react('✅');
+    await message.react('❌');
+    
+    logger.info({
+      approvalId,
+      messageId: message.id,
+      channelId: message.channel.id,
+      ownerId: process.env.OWNER_ID.replace(/"/g, '')
+    }, 'Reaction collector setup started');
+
+    // Create reaction collector
+    const filter = (reaction, user) => {
+      const isValid = ['✅', '❌'].includes(reaction.emoji.name) &&
+        user.id === process.env.OWNER_ID.replace(/"/g, '');
+      
+      logger.debug({
+        reactionName: reaction.emoji.name,
+        userId: user.id,
+        expectedUserId: process.env.OWNER_ID.replace(/"/g, ''),
+        isValid
+      }, 'Reaction filter check');
+      
+      return isValid;
+    };
+
+    const collector = message.createReactionCollector({
+      filter,
+      max: 1,
+      time: 3600000, // 1 hour timeout
+    });
+    
+    logger.info({
+      approvalId,
+      collectorCreated: true
+    }, 'Reaction collector created successfully');
+
+    collector.on('collect', async (reaction, user) => {
+      logger.info(
+        {
+          approvalId,
+          reaction: reaction.emoji.name,
+          userId: user.id,
+          username: user.username,
+        },
+        'Approval reaction collected'
+      );
+
+      if (reaction.emoji.name === '✅') {
+        // Approve
+        const approved = circuitBreaker.approveRequest(approvalId);
+        if (approved) {
+          await message.edit(message.content + '\n\n✅ **APPROVED**');
+        } else {
+          await message.edit(
+            message.content + '\n\n⚠️ **Approval failed - request may have expired**'
+          );
+        }
+      } else if (reaction.emoji.name === '❌') {
+        // Deny
+        const denied = circuitBreaker.denyRequest(approvalId);
+        if (denied) {
+          await message.edit(message.content + '\n\n❌ **DENIED**');
+        } else {
+          await message.edit(
+            message.content + '\n\n⚠️ **Denial failed - request may have expired**'
+          );
+        }
+      }
+    });
+
+    collector.on('end', collected => {
+      if (collected.size === 0) {
+        logger.warn({ approvalId }, 'Approval request timed out');
+        // Auto-deny on timeout
+        circuitBreaker.denyRequest(approvalId);
+        message.edit(message.content + '\n\n⏱️ **TIMED OUT - Auto-denied**').catch(err => {
+          logger.error({ err }, 'Failed to update timed out message');
+        });
+      }
+    });
+  } catch (err) {
+    logger.error({ err, approvalId }, 'Error setting up reaction collector');
+  }
 }
 
 /**

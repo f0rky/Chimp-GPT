@@ -154,6 +154,7 @@ const command = {
   permissions: ['Administrator'],
   dmAllowed: false,
   adminOnly: true,
+  requiresApproval: true,
   execute: async message => {
     try {
       logger.info(

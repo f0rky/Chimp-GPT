@@ -13,6 +13,7 @@ module.exports = {
   aliases: ['reboot', 'reset-bot'],
   dmAllowed: true,
   ownerOnly: true,
+  requiresApproval: true,
   async execute(message) {
     if (message.author.id !== config.OWNER_ID) {
       return message.reply('Sorry, only the bot owner can use this command.');

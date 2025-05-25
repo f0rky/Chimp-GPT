@@ -148,6 +148,14 @@ const circuitBreakerCommand = {
       }
     }
   },
+  
+  /**
+   * Handle slash command interactions
+   * This is the method that Discord.js expects for slash commands
+   */
+  interactionExecute: async function(interaction, config) {
+    return this.execute(interaction, config);
+  },
 };
 
 /**
@@ -160,16 +168,16 @@ async function handleApprove(interaction) {
   const id = interaction.options.getString('id');
 
   try {
-    const result = await circuitBreaker.approve(id);
+    const success = circuitBreaker.approveRequest(id);
 
-    if (result.success) {
+    if (success) {
       await interaction.reply({
         content: `✅ Approved operation with ID: ${id}`,
         ephemeral: true,
       });
     } else {
       await interaction.reply({
-        content: `❌ Failed to approve operation: ${result.message || 'Unknown error'}`,
+        content: `❌ Failed to approve operation: Request not found or already resolved`,
         ephemeral: true,
       });
     }
@@ -190,12 +198,12 @@ async function handleApprove(interaction) {
  */
 async function handleApproveText(message, id) {
   try {
-    const result = await circuitBreaker.approve(id);
+    const success = circuitBreaker.approveRequest(id);
 
-    if (result.success) {
+    if (success) {
       await message.reply(`✅ Approved operation with ID: ${id}`);
     } else {
-      await message.reply(`❌ Failed to approve operation: ${result.message || 'Unknown error'}`);
+      await message.reply(`❌ Failed to approve operation: Request not found or already resolved`);
     }
   } catch (error) {
     await message.reply(`❌ Error approving operation: ${error.message}`);
@@ -212,16 +220,16 @@ async function handleDeny(interaction) {
   const id = interaction.options.getString('id');
 
   try {
-    const result = await circuitBreaker.deny(id);
+    const success = circuitBreaker.denyRequest(id);
 
-    if (result.success) {
+    if (success) {
       await interaction.reply({
         content: `🚫 Denied operation with ID: ${id}`,
         ephemeral: true,
       });
     } else {
       await interaction.reply({
-        content: `❌ Failed to deny operation: ${result.message || 'Unknown error'}`,
+        content: `❌ Failed to deny operation: Request not found or already resolved`,
         ephemeral: true,
       });
     }
@@ -242,12 +250,12 @@ async function handleDeny(interaction) {
  */
 async function handleDenyText(message, id) {
   try {
-    const result = await circuitBreaker.deny(id);
+    const success = circuitBreaker.denyRequest(id);
 
-    if (result.success) {
+    if (success) {
       await message.reply(`🚫 Denied operation with ID: ${id}`);
     } else {
-      await message.reply(`❌ Failed to deny operation: ${result.message || 'Unknown error'}`);
+      await message.reply(`❌ Failed to deny operation: Request not found or already resolved`);
     }
   } catch (error) {
     await message.reply(`❌ Error denying operation: ${error.message}`);
@@ -262,7 +270,7 @@ async function handleDenyText(message, id) {
  */
 async function handleList(interaction) {
   try {
-    const pendingApprovals = circuitBreaker.getPendingApprovals();
+    const pendingApprovals = circuitBreaker.listPendingApprovals();
 
     if (!pendingApprovals || pendingApprovals.length === 0) {
       await interaction.reply({
@@ -304,7 +312,7 @@ async function handleList(interaction) {
  */
 async function handleListText(message) {
   try {
-    const pendingApprovals = circuitBreaker.getPendingApprovals();
+    const pendingApprovals = circuitBreaker.listPendingApprovals();
 
     if (!pendingApprovals || pendingApprovals.length === 0) {
       await message.reply('📋 No pending approval requests');
@@ -339,7 +347,7 @@ async function handleListText(message) {
 async function handleStatus(interaction, config) {
   try {
     const isOpen = breakerManager.isBreakerOpen();
-    const pendingCount = circuitBreaker.getPendingApprovals().length;
+    const pendingCount = circuitBreaker.listPendingApprovals().length;
     const botName = config.BOT_NAME || process.env.BOT_NAME || 'ChimpGPT';
     const versionInfo = getVersionInfo();
 
@@ -374,7 +382,7 @@ async function handleStatus(interaction, config) {
 async function handleStatusText(message, config) {
   try {
     const isOpen = breakerManager.isBreakerOpen();
-    const pendingCount = circuitBreaker.getPendingApprovals().length;
+    const pendingCount = circuitBreaker.listPendingApprovals().length;
     const botName = config.BOT_NAME || process.env.BOT_NAME || 'ChimpGPT';
     const versionInfo = getVersionInfo();
 

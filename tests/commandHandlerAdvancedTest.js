@@ -1,8 +1,40 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 
+// Reduce logging level during tests
+process.env.LOG_LEVEL = 'error';
+
 // We'll import commandHandler inside the test suites to get a fresh instance each time
 let commandHandler;
+
+// Store original console methods
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn,
+  info: console.info,
+  debug: console.debug
+};
+
+// Override console methods to reduce noise during tests
+console.log = (...args) => {
+  if (process.env.DEBUG_TESTS) {
+    originalConsole.log(...args);
+  }
+};
+
+console.info = (...args) => {
+  if (process.env.DEBUG_TESTS) {
+    originalConsole.info(...args);
+  }
+};
+
+console.debug = () => {}; // Completely disable debug logs during tests
+
+// Only show errors and warnings
+console.error = console.warn = (...args) => {
+  originalConsole.error(...args);
+};
 
 // Simple test runner
 class TestRunner {
@@ -45,63 +77,86 @@ class TestRunner {
   }
 
   async run() {
-    console.log('\n🚀 Starting test runner...');
-    console.log(`Found ${this._tests.length} tests to run`);
-    
-    // Run beforeAll hooks
-    if (this._beforeAll) {
-      console.log('Running beforeAll hooks...');
-      for (const hook of this._beforeAll) {
-        await hook();
+    try {
+      // Redirect console.log to process.stdout to ensure output is flushed
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        process.stdout.write(args.join(' ') + '\n');
+      };
+      
+      console.log('\n🚀 Starting test runner...');
+      console.log(`Found ${this._tests.length} tests to run`);
+      
+      // Run beforeAll hooks
+      if (this._beforeAll && this._beforeAll.length > 0) {
+        console.log('\n=== Running Before All Hooks ===');
+        for (const hook of this._beforeAll) {
+          await hook();
+        }
       }
-    }
 
-    // Run tests
-    console.log('\n=== Running Tests ===');
-    for (const test of this._tests) {
-      this._currentTest = test;
-      console.log(`\nRunning test: ${test.suite} - ${test.name}`);
-      
-      // Run beforeEach hooks
-      for (const hook of this._beforeEach) {
-        await hook();
+      // Run tests
+      console.log('\n=== Running Tests ===');
+      for (const test of this._tests) {
+        this._currentTest = test;
+        
+        // Run beforeEach hooks
+        if (this._beforeEach && this._beforeEach.length > 0) {
+          for (const hook of this._beforeEach) {
+            await hook();
+          }
+        }
+        
+        const startTime = Date.now();
+        try {
+          await test.fn();
+          const duration = Date.now() - startTime;
+          this._passed++;
+          console.log(`  ✓ ${test.suite} - ${test.name} (${duration}ms)`);
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          this._failed++;
+          console.error(`  ✖ ${test.suite} - ${test.name} (${duration}ms)\n     Error: ${error.message}`);
+          if (error.stack) {
+            console.error(`     ${error.stack.split('\n').slice(1).join('\n     ')}`);
+          }
+        }
+        
+        // Force output to be flushed
+        await new Promise(resolve => process.nextTick(resolve));
       }
       
-      try {
-        await test.fn();
-        this._passed++;
-        console.log(`  ✓ ${test.name}`);
-      } catch (error) {
-        this._failed++;
-        console.error(`  ✖ ${test.name}: ${error.message}`);
-        console.error(error.stack);
+      // Run afterAll hooks
+      if (this._afterAll && this._afterAll.length > 0) {
+        console.log('\n=== Running After All Hooks ===');
+        for (const hook of this._afterAll) {
+          try {
+            await hook();
+          } catch (error) {
+            console.error('Error in afterAll hook:', error);
+          }
+        }
       }
-    }
-    
-    // Run afterAll hooks
-    console.log('\n=== Running After All Hooks ===');
-    for (const hook of this._afterAll) {
-      console.log('Running afterAll hook...');
-      await hook();
-    }
-    
-    console.log('\n=== Test Summary ===');
-    console.log(`✅ ${this._passed} passed`);
-    console.log(`❌ ${this._failed} failed`);
-    
-    if (this._failed > 0) {
-      process.exit(1);
-    }
-    
-    // Print summary
-    console.log('\n📊 Test Summary:');
-    console.log(`🏁 ${this._passed + this._failed} tests completed`);
-    
-    if (this._failed > 0) {
-      console.log(`❌ ${this._failed} tests failed`);
-      process.exit(1);
-    } else {
-      console.log('🎉 All tests passed!');
+      
+      // Print summary
+      console.log('\n📊 Test Summary:');
+      console.log(`🏁 ${this._passed + this._failed} tests completed`);
+      console.log(`✅ ${this._passed} passed`);
+      
+      if (this._failed > 0) {
+        console.log(`❌ ${this._failed} tests failed`);
+        console.log('\n🔥 Test run failed');
+        // Use setTimeout to ensure all output is flushed before exiting
+        setTimeout(() => process.exit(1), 100);
+      } else {
+        console.log('\n🎉 All tests passed!');
+        // Use setTimeout to ensure all output is flushed before exiting
+        setTimeout(() => process.exit(0), 100);
+      }
+    } catch (error) {
+      console.error('\n🔥 Unhandled error in test runner:', error);
+      // Use setTimeout to ensure all output is flushed before exiting
+      setTimeout(() => process.exit(1), 100);
     }
   }
 }
