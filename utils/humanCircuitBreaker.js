@@ -287,26 +287,33 @@ async function setupReactionCollector(message, approvalId, client) {
     // Add approval and denial reactions
     await message.react('✅');
     await message.react('❌');
-    
-    logger.info({
-      approvalId,
-      messageId: message.id,
-      channelId: message.channel.id,
-      ownerId: process.env.OWNER_ID.replace(/"/g, '')
-    }, 'Reaction collector setup started');
+
+    logger.info(
+      {
+        approvalId,
+        messageId: message.id,
+        channelId: message.channel.id,
+        ownerId: process.env.OWNER_ID.replace(/"/g, ''),
+      },
+      'Reaction collector setup started'
+    );
 
     // Create reaction collector
     const filter = (reaction, user) => {
-      const isValid = ['✅', '❌'].includes(reaction.emoji.name) &&
+      const isValid =
+        ['✅', '❌'].includes(reaction.emoji.name) &&
         user.id === process.env.OWNER_ID.replace(/"/g, '');
-      
-      logger.debug({
-        reactionName: reaction.emoji.name,
-        userId: user.id,
-        expectedUserId: process.env.OWNER_ID.replace(/"/g, ''),
-        isValid
-      }, 'Reaction filter check');
-      
+
+      logger.debug(
+        {
+          reactionName: reaction.emoji.name,
+          userId: user.id,
+          expectedUserId: process.env.OWNER_ID.replace(/"/g, ''),
+          isValid,
+        },
+        'Reaction filter check'
+      );
+
       return isValid;
     };
 
@@ -315,11 +322,14 @@ async function setupReactionCollector(message, approvalId, client) {
       max: 1,
       time: 3600000, // 1 hour timeout
     });
-    
-    logger.info({
-      approvalId,
-      collectorCreated: true
-    }, 'Reaction collector created successfully');
+
+    logger.info(
+      {
+        approvalId,
+        collectorCreated: true,
+      },
+      'Reaction collector created successfully'
+    );
 
     collector.on('collect', async (reaction, user) => {
       logger.info(

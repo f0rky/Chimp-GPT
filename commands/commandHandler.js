@@ -480,22 +480,21 @@ async function handleCommand(message, config) {
       }
 
       return true;
-    } else {
-      // Execute the command normally
-      logger.info(
-        {
-          commandName,
-          args,
-          userId: message.author.id,
-          username: message.author.username,
-          channelId: message.channelId,
-        },
-        'Executing command'
-      );
-
-      await command.execute(message, args, message.client, config);
-      return true;
     }
+    // Execute the command normally
+    logger.info(
+      {
+        commandName,
+        args,
+        userId: message.author.id,
+        username: message.author.username,
+        channelId: message.channelId,
+      },
+      'Executing command'
+    );
+
+    await command.execute(message, args, message.client, config);
+    return true;
   } catch (error) {
     // Enhanced granular error logging for plugin/core commands
     const isPluginCommand = command && !!command.pluginId;

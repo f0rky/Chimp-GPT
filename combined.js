@@ -19,6 +19,8 @@
  */
 
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const { createLogger } = require('./logger');
 const { parseRunMode } = require('./runModes');
 
@@ -35,10 +37,28 @@ const bot = require('./chimpGPT');
 const { initStatusServer } = require('./statusServer');
 
 /**
+ * Ensure required directories exist
+ */
+function ensureDirectories() {
+  const directories = ['logs', 'data', 'data/conversations', 'data/pfp'];
+
+  directories.forEach(dir => {
+    const dirPath = path.join(__dirname, dir);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+      logger.info(`Created directory: ${dir}`);
+    }
+  });
+}
+
+/**
  * Start the combined application based on run configuration
  */
 async function startCombinedApp() {
   try {
+    // Ensure required directories exist
+    ensureDirectories();
+
     logger.info(`Starting ChimpGPT in ${runConfig.mode} mode`);
 
     // Start components based on configuration

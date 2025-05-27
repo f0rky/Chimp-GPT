@@ -157,9 +157,9 @@ function initHealthCheck(client) {
   const nodeEnvForPort = process.env.NODE_ENV || 'development';
   let currentPort;
   if (nodeEnvForPort === 'production') {
-    currentPort = config.PROD_PORT || config.HEALTH_PORT || 3000;
+    currentPort = config.PORT || 3001;
   } else {
-    currentPort = config.DEV_PORT || config.HEALTH_PORT || 3001;
+    currentPort = config.PORT || 3001;
   }
 
   const allowedOrigins = [`http://localhost:${currentPort}`, `http://127.0.0.1:${currentPort}`];
@@ -179,10 +179,9 @@ function initHealthCheck(client) {
       if (!origin) return callback(null, true); // Allow requests with no origin (like mobile apps or curl requests)
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
-      } else {
-        logger.warn({ origin, allowedOrigins }, 'CORS: Blocked an origin');
-        return callback(new Error('Not allowed by CORS'));
       }
+      logger.warn({ origin, allowedOrigins }, 'CORS: Blocked an origin');
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true, // If you need to handle cookies or authorization headers
   };
@@ -427,9 +426,9 @@ function initHealthCheck(client) {
   let PORT;
 
   if (nodeEnv === 'production') {
-    PORT = config.PROD_PORT || config.HEALTH_PORT || 3000;
+    PORT = config.PORT || 3001;
   } else {
-    PORT = config.DEV_PORT || config.HEALTH_PORT || 3001;
+    PORT = config.PORT || 3001;
   }
 
   const LISTEN_ADDRESS = '0.0.0.0';
@@ -624,7 +623,7 @@ function generateHealthReport(isStartup = false) {
     for (const [pluginId, errorInfo] of Object.entries(stats.errors.plugins)) {
       // Add the total count for the plugin
       pluginErrorsText += `• **${pluginId}**: ${errorInfo.count} error(s)\n`;
-      
+
       // Add detailed command/hook errors if available
       if (errorInfo.hooks && Object.keys(errorInfo.hooks).length > 0) {
         for (const [hookName, count] of Object.entries(errorInfo.hooks)) {
@@ -677,13 +676,13 @@ function generateHealthReport(isStartup = false) {
   report += `\n**Errors:**\n`;
   report += `• Total Errors: ${calculateTotalErrors(stats.errors)}\n`;
   report += `• OpenAI Errors: ${stats.errors.openai}\n`;
-  
+
   // Add detailed Discord command errors if any
   let discordCommandErrors = '';
   if (stats.errors.discordHooks) {
     const commandErrors = [];
     const slashCommandErrors = [];
-    
+
     // Categorize the hooks
     for (const [hookName, count] of Object.entries(stats.errors.discordHooks)) {
       if (hookName.startsWith('command:')) {
@@ -692,7 +691,7 @@ function generateHealthReport(isStartup = false) {
         slashCommandErrors.push(`/${hookName.replace('slash:', '')}: ${count}`);
       }
     }
-    
+
     // Format the command errors if any exist
     if (commandErrors.length > 0) {
       discordCommandErrors += `  ↳ Commands: ${commandErrors.join(', ')}\n`;
@@ -701,7 +700,7 @@ function generateHealthReport(isStartup = false) {
       discordCommandErrors += `  ↳ Slash Commands: ${slashCommandErrors.join(', ')}\n`;
     }
   }
-  
+
   report += `• Discord Errors: ${stats.errors.discord}${discordCommandErrors ? '\n' + discordCommandErrors : ''}\n`;
   report += `• Other API Errors: ${stats.errors.weather + stats.errors.time + stats.errors.wolfram + stats.errors.quake + stats.errors.gptimage}${pluginErrorsText}\n\n`;
 
@@ -715,8 +714,7 @@ function generateHealthReport(isStartup = false) {
 
   // Add status page and logs if it's a startup report
   if (isStartup) {
-    const determinedStatusPort =
-      process.env.NODE_ENV === 'development' ? config.DEV_PORT : config.PROD_PORT;
+    const determinedStatusPort = config.PORT || 3001;
     const actualHostname = process.env.STATUS_HOSTNAME || 'localhost'; // Fallback just in case, though configValidator should ensure it's set
     report += `\n\n**Status Page:** http://${actualHostname}:${determinedStatusPort}`;
     report += `\n\n**Recent Logs:**\n\`\`\`\n${getRecentLogs(15)}\n\`\`\``;
@@ -900,18 +898,18 @@ function trackError(type, pluginId, hookName) {
       if (!stats.errors.discordHooks) {
         stats.errors.discordHooks = {};
       }
-      
+
       // Initialize the hook counter if it doesn't exist
       if (!stats.errors.discordHooks[hookName]) {
         stats.errors.discordHooks[hookName] = 0;
       }
-      
+
       // Increment the hook counter
       stats.errors.discordHooks[hookName]++;
-      
+
       // Also increment the general Discord error counter
       stats.errors.discord++;
-      
+
       // Store in persistent storage
       statsStorage.incrementStat(`errors.discordHooks.${hookName}`);
       statsStorage.incrementStat('errors.discord');

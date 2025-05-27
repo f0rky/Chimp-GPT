@@ -86,18 +86,18 @@ const openaiWithLogging = new Proxy(openai, {
   get(target, prop) {
     if (prop === 'chat') {
       return new Proxy(target.chat, {
-        get(target, prop) {
-          if (prop === 'completions') {
-            return new Proxy(target.completions, {
-              get(target, prop) {
-                if (prop === 'create') {
+        get(chatTarget, chatProp) {
+          if (chatProp === 'completions') {
+            return new Proxy(chatTarget.completions, {
+              get(completionsTarget, completionsProp) {
+                if (completionsProp === 'create') {
                   return params => logOpenAICall(openai.chat.completions.create, params);
                 }
-                return target[prop];
+                return completionsTarget[completionsProp];
               },
             });
           }
-          return target[prop];
+          return chatTarget[chatProp];
         },
       });
     }

@@ -20,6 +20,7 @@ module.exports = {
     }
     await message.reply('Restarting the bot...');
     process.exit(0); // Assumes process manager will restart the bot
+    // eslint-disable-next-line no-unreachable
     return;
   },
   async executeSlash(interaction) {
@@ -34,6 +35,7 @@ module.exports = {
       ephemeral: true,
     });
     process.exit(0); // Assumes process manager will restart the bot
+    // eslint-disable-next-line no-unreachable
     return;
   },
 };

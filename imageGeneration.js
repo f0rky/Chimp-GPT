@@ -250,7 +250,7 @@ async function generateImage(prompt, options = {}) {
       '1024x1024': 0.008, // Square
       '1536x1024': 0.012, // Portrait
       '1024x1536': 0.012, // Landscape
-      'auto': 0.010, // Auto (average estimate)
+      auto: 0.01, // Auto (average estimate)
     };
 
     // Get the base cost for the selected size
@@ -262,12 +262,13 @@ async function generateImage(prompt, options = {}) {
     const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + promptLength / 1000)); // 1.0-1.5x based on length
 
     // Quality factor (higher quality costs more)
-    const qualityFactor = {
-      [QUALITY.LOW]: 0.8,
-      [QUALITY.MEDIUM]: 1.0,
-      [QUALITY.HIGH]: 1.5,
-      [QUALITY.AUTO]: 1.0,
-    }[quality] || 1.0;
+    const qualityFactor =
+      {
+        [QUALITY.LOW]: 0.8,
+        [QUALITY.MEDIUM]: 1.0,
+        [QUALITY.HIGH]: 1.5,
+        [QUALITY.AUTO]: 1.0,
+      }[quality] || 1.0;
 
     // Calculate final estimated cost
     estimatedCost = baseCost * promptFactor * qualityFactor;

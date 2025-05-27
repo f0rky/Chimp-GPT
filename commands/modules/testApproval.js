@@ -19,27 +19,33 @@ module.exports = {
   dmAllowed: true,
   ownerOnly: false, // Allow anyone to test, but only owner can approve
   requiresApproval: true,
-  
+
   async execute(message, args) {
-    logger.info({
-      userId: message.author.id,
-      username: message.author.username,
-      args: args,
-    }, 'Test approval command triggered');
+    logger.info(
+      {
+        userId: message.author.id,
+        username: message.author.username,
+        args: args,
+      },
+      'Test approval command triggered'
+    );
 
     // This will only execute if approved
     await message.reply(`✅ Approval test successful! The command was approved and executed.`);
-    
+
     // Log some test data
-    logger.info({
-      testData: {
-        timestamp: new Date().toISOString(),
-        userId: message.author.id,
-        username: message.author.username,
-        channelId: message.channelId,
-        guildId: message.guild?.id || 'DM',
-        args: args.join(' ') || 'none',
-      }
-    }, 'Test approval command completed');
+    logger.info(
+      {
+        testData: {
+          timestamp: new Date().toISOString(),
+          userId: message.author.id,
+          username: message.author.username,
+          channelId: message.channelId,
+          guildId: message.guild?.id || 'DM',
+          args: args.join(' ') || 'none',
+        },
+      },
+      'Test approval command completed'
+    );
   },
 };

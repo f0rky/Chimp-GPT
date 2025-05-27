@@ -1,10 +1,10 @@
 const { createLogger } = require('../../logger');
 const logger = createLogger('commands:clear');
-const { 
-  userConversations, 
-  clearConversation, 
+const {
+  userConversations,
+  clearConversation,
   getConversationStorageStatus,
-  loadConversationsFromStorage
+  loadConversationsFromStorage,
 } = require('../../conversationManager');
 const fs = require('fs').promises;
 const path = require('path');
@@ -41,7 +41,7 @@ module.exports = {
       try {
         // Get conversation storage status
         const storageStatus = getConversationStorageStatus();
-        
+
         // Get in-memory conversation status
         const inMemoryStatus = {
           hasConversation: userConversations.has(userId),
@@ -62,9 +62,9 @@ module.exports = {
             exists: true,
             size: formatBytes(stats.size),
             modified: stats.mtime.toISOString(),
-            path: filePath
+            path: filePath,
           };
-          
+
           // Try to read the file to check if the user's conversation exists
           const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
           fileStats.userInFile = userId in (data.conversations || {});
@@ -72,7 +72,7 @@ module.exports = {
         } catch (fileError) {
           fileStats = {
             exists: false,
-            error: fileError.message
+            error: fileError.message,
           };
         }
 
@@ -93,8 +93,10 @@ module.exports = {
           '',
           `**Action:** ${wasCleared ? '✅ Cleared conversation' : 'ℹ️ No conversation found to clear'}`,
           '',
-          'Use `!clear --force` to force reload conversations from disk.'
-        ].filter(Boolean).join('\n');
+          'Use `!clear --force` to force reload conversations from disk.',
+        ]
+          .filter(Boolean)
+          .join('\n');
 
         logger.info('Clear command executed', {
           userId,
@@ -102,11 +104,11 @@ module.exports = {
           wasCleared,
           inMemoryStatus,
           fileStats,
-          storageStatus
+          storageStatus,
         });
 
         await message.reply(statusMessage);
-        
+
         // If user used --force flag, reload conversations from disk
         if (args.includes('--force')) {
           try {

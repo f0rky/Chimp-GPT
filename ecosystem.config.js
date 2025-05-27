@@ -15,7 +15,7 @@ module.exports = {
         // Use production port
         PROD_PORT: 3000,
       },
-      max_memory_restart: '500M',
+      max_memory_restart: '1G',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       error_file: './logs/chimpGPT-error.log',
       out_file: './logs/chimpGPT-out.log',

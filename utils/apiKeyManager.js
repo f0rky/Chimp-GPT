@@ -15,8 +15,8 @@ const path = require('path');
 const { createLogger } = require('../logger');
 const logger = createLogger('apiKeyManager');
 
-// Get config without directly importing it to avoid circular dependencies
-const config = process.env;
+// Import validated config instead of using process.env directly
+const config = require('../configValidator');
 
 /**
  * @typedef {Object} ApiKeyUsage

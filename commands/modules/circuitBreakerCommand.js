@@ -148,12 +148,12 @@ const circuitBreakerCommand = {
       }
     }
   },
-  
+
   /**
    * Handle slash command interactions
    * This is the method that Discord.js expects for slash commands
    */
-  interactionExecute: async function(interaction, config) {
+  interactionExecute: async function (interaction, config) {
     return this.execute(interaction, config);
   },
 };

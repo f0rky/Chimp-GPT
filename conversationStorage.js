@@ -304,10 +304,10 @@ async function clearAllConversations() {
  * Removes conversations older than the specified age.
  *
  * @param {Map<string, ConversationLog>} conversationsMap - The conversations map to prune
- * @param {number} [maxAgeMs=7*24*60*60*1000] - Maximum age in milliseconds (default: 7 days)
+ * @param {number} [maxAgeMs=3*24*60*60*1000] - Maximum age in milliseconds (default: 3 days)
  * @returns {Promise<Map<string, ConversationLog>>} The pruned conversations map
  */
-async function pruneOldConversations(conversationsMap, maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
+async function pruneOldConversations(conversationsMap, maxAgeMs = 3 * 24 * 60 * 60 * 1000) {
   try {
     const now = Date.now();
     const cutoffTime = now - maxAgeMs;

@@ -248,6 +248,7 @@ module.exports = {
         },
         'Image generated and sent successfully'
       );
+      return;
     } catch (error) {
       logger.error({ error }, 'Error executing image command');
 

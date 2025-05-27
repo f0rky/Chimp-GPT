@@ -32,7 +32,7 @@ function closeImageModal() {
 function toggleCollapsible(sectionId) {
   const content = document.getElementById(sectionId + '-content');
   const toggle = document.getElementById(sectionId + '-toggle');
-  
+
   if (content && toggle) {
     content.classList.toggle('collapsed');
     toggle.classList.toggle('collapsed');
@@ -388,31 +388,30 @@ async function updateHistoryChart(period = 'hourly', range = 24) {
     }
 
     const data = result.data;
-    
+
     // Update chart data
     if (window.historyChart && data.length > 0) {
       const labels = data.map(d => {
         const date = new Date(d.timestamp);
         if (period === 'hourly') {
-          return date.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
+          return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
             hour: 'numeric',
-            hour12: true 
-          });
-        } else {
-          return date.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric' 
+            hour12: true,
           });
         }
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        });
       });
 
       window.historyChart.data.labels = labels;
       window.historyChart.data.datasets[0].data = data.map(d => d.responseTimeAvg);
       window.historyChart.data.datasets[1].data = data.map(d => d.messageCount);
       window.historyChart.data.datasets[2].data = data.map(d => d.memoryAvg);
-      
+
       window.historyChart.update('none');
     }
 
@@ -424,7 +423,8 @@ async function updateHistoryChart(period = 'hourly', range = 24) {
       const avgMemory = data.reduce((sum, d) => sum + d.memoryAvg, 0) / data.length;
 
       document.getElementById('history-avg-response').textContent = `${Math.round(avgResponse)} ms`;
-      document.getElementById('history-total-messages').textContent = totalMessages.toLocaleString();
+      document.getElementById('history-total-messages').textContent =
+        totalMessages.toLocaleString();
       document.getElementById('history-api-calls').textContent = totalApiCalls.toLocaleString();
       document.getElementById('history-avg-memory').textContent = `${Math.round(avgMemory)} MB`;
     } else {
@@ -650,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateStatus();
   updateFunctionResults();
   fetchPerformanceData();
-  
+
   // Initial history chart update
   updateHistoryChart('hourly', 24);
 
@@ -663,11 +663,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const runTestsBtn = document.getElementById('run-tests');
   const resetStatsBtn = document.getElementById('reset-stats');
   const repairStatsBtn = document.getElementById('repair-stats');
-  
+
   if (runTestsBtn) runTestsBtn.addEventListener('click', runTests);
   if (resetStatsBtn) resetStatsBtn.addEventListener('click', resetStats);
   if (repairStatsBtn) repairStatsBtn.addEventListener('click', repairStats);
-  
+
   // Set up history chart button listeners
   const historyButtons = document.querySelectorAll('.history-btn');
   if (historyButtons.length > 0) {
@@ -675,10 +675,10 @@ document.addEventListener('DOMContentLoaded', () => {
       button.addEventListener('click', () => {
         // Remove active class from all history buttons
         document.querySelectorAll('.history-btn').forEach(btn => btn.classList.remove('active'));
-        
+
         // Add active class to clicked button
         button.classList.add('active');
-        
+
         // Update chart with selected period and range
         const period = button.getAttribute('data-period');
         const range = button.getAttribute('data-range') || 24;
@@ -1127,10 +1127,13 @@ async function updateStatus() {
   try {
     console.log('Fetching health data...');
     const response = await fetch('/health');
-    
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error fetching health data: ${response.status} ${response.statusText}`, errorText);
+      console.error(
+        `Error fetching health data: ${response.status} ${response.statusText}`,
+        errorText
+      );
       setStatusIndicator('offline');
       return;
     }
@@ -1146,12 +1149,12 @@ async function updateStatus() {
       return;
     }
 
-    console.log('Health data received:', { 
-      status: data.status, 
+    console.log('Health data received:', {
+      status: data.status,
       name: data.name,
       hasStats: !!data.stats,
       hasMemory: !!data.memory,
-      hasSystem: !!data.system
+      hasSystem: !!data.system,
     });
 
     // Update bot name in title and header
@@ -1165,11 +1168,13 @@ async function updateStatus() {
     // Update overview stats
     safeUpdateText('uptime', data.uptime !== undefined ? formatUptime(data.uptime) : '-');
     safeUpdateText('version', data.version || '-');
-    
+
     if (data.stats) {
-      safeUpdateText('message-count', 
-        data.stats.messageCount !== undefined ? data.stats.messageCount.toLocaleString() : '0');
-      
+      safeUpdateText(
+        'message-count',
+        data.stats.messageCount !== undefined ? data.stats.messageCount.toLocaleString() : '0'
+      );
+
       if (data.stats.discord && data.stats.discord.ping !== undefined) {
         safeUpdateText('discord-ping', `${data.stats.discord.ping} ms`);
       } else {
@@ -1189,19 +1194,27 @@ async function updateStatus() {
       // Update plugin statistics
       if (data.stats.plugins && data.stats.apiCalls?.plugins && data.stats.errors?.plugins) {
         updatePluginStats(
-          data.stats.plugins, 
-          data.stats.apiCalls.plugins, 
+          data.stats.plugins,
+          data.stats.apiCalls.plugins,
           data.stats.errors.plugins
         );
       }
 
       // Update rate limits
       if (data.stats.rateLimits) {
-        safeUpdateText('rate-limit-hits', 
-          data.stats.rateLimits.count !== undefined ? data.stats.rateLimits.count.toLocaleString() : '0');
-        
-        safeUpdateText('rate-limit-users',
-          data.stats.rateLimits.uniqueUsers !== undefined ? data.stats.rateLimits.uniqueUsers.toLocaleString() : '0');
+        safeUpdateText(
+          'rate-limit-hits',
+          data.stats.rateLimits.count !== undefined
+            ? data.stats.rateLimits.count.toLocaleString()
+            : '0'
+        );
+
+        safeUpdateText(
+          'rate-limit-users',
+          data.stats.rateLimits.uniqueUsers !== undefined
+            ? data.stats.rateLimits.uniqueUsers.toLocaleString()
+            : '0'
+        );
 
         if (Array.isArray(data.stats.rateLimits.userDetails)) {
           updateRateLimitedUsers(data.stats.rateLimits.userDetails);
@@ -1221,7 +1234,6 @@ async function updateStatus() {
     fetchPerformanceData().catch(error => {
       console.error('Error fetching performance data:', error);
     });
-
   } catch (error) {
     console.error('Error in updateStatus:', error);
     setStatusIndicator('error');
@@ -1265,15 +1277,15 @@ async function fetchPerformanceData() {
         current: data.summary.message_processing?.avg || 0,
         average: data.summary.message_processing?.avg || 0,
         min: data.detailed.message_processing?.min || 0,
-        max: data.detailed.message_processing?.max || 0
+        max: data.detailed.message_processing?.max || 0,
       },
       system: {
         cpu: [data.summary.message_processing?.avg || 0], // Using message processing time as a proxy
         load: [1.0], // Default load value
         memory: [parseFloat(data.serverHealth?.memory?.heapUsed || '0') * 1024 * 1024], // Convert MB to bytes
         timestamps: [Date.now()],
-        totalMemory: 8 * 1024 * 1024 * 1024 // Default 8GB
-      }
+        totalMemory: 8 * 1024 * 1024 * 1024, // Default 8GB
+      },
     };
 
     updatePerformanceMetrics(metrics);
@@ -1301,7 +1313,7 @@ function setStatusIndicator(status) {
     if (dot) {
       // Remove all status classes
       dot.className = 'dot';
-      
+
       // Add the appropriate status class
       switch (status) {
         case 'ok':
@@ -1320,7 +1332,7 @@ function setStatusIndicator(status) {
     // Update status text if it exists
     if (statusText) {
       let statusMessage = 'Unknown';
-      
+
       switch (status) {
         case 'ok':
           statusMessage = 'Online';
@@ -1333,7 +1345,7 @@ function setStatusIndicator(status) {
           statusMessage = 'Offline';
           break;
       }
-      
+
       statusText.textContent = statusMessage;
     }
   } catch (error) {
@@ -1359,7 +1371,8 @@ function updateApiCalls(apiCalls) {
   if (timeElement) timeElement.textContent = apiCalls.time.toLocaleString();
   if (wolframElement) wolframElement.textContent = apiCalls.wolfram.toLocaleString();
   if (quakeElement) quakeElement.textContent = apiCalls.quake.toLocaleString();
-  if (dalleElement) dalleElement.textContent = (apiCalls.gptimage || apiCalls.dalle || 0).toLocaleString();
+  if (dalleElement)
+    dalleElement.textContent = (apiCalls.gptimage || apiCalls.dalle || 0).toLocaleString();
 
   // Update chart if it exists
   if (apiChart && apiChart.data && apiChart.data.datasets[0]) {
@@ -1396,7 +1409,8 @@ function updateErrors(errors) {
   if (timeErrorsElement) timeErrorsElement.textContent = errors.time.toLocaleString();
   if (wolframErrorsElement) wolframErrorsElement.textContent = errors.wolfram.toLocaleString();
   if (quakeErrorsElement) quakeErrorsElement.textContent = errors.quake.toLocaleString();
-  if (dalleErrorsElement) dalleErrorsElement.textContent = (errors.gptimage || errors.dalle || 0).toLocaleString();
+  if (dalleErrorsElement)
+    dalleErrorsElement.textContent = (errors.gptimage || errors.dalle || 0).toLocaleString();
   if (otherErrorsElement) otherErrorsElement.textContent = errors.other.toLocaleString();
 
   // Handle plugin errors with the new detailed structure

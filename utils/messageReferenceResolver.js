@@ -169,7 +169,7 @@ function messageToConversationFormat(message) {
   const role = message.author.bot ? 'assistant' : 'user';
 
   // Sanitize the message content
-  const sanitizedContent = message.content 
+  const sanitizedContent = message.content
     ? sanitizeMessage(message.content, { stripNewlines: false, trim: true })
     : '';
 

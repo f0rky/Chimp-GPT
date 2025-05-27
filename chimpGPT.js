@@ -168,9 +168,9 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
       /^make (?:me |us |a |an |the )?(?:image|picture|photo)/i,
       /^show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)/i,
       /^(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)/i,
-      /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i
+      /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i,
     ];
-    
+
     const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
 
     // If it's clearly an image request, bypass the full context

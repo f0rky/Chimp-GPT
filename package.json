@@ -2,7 +2,7 @@
   "name": "chimp-gpt",
   "version": "1.6.1",
   "description": "A Discord chatbot leveraging the OpenAI GPT-3.5 API for dynamic and intelligent responses.",
-  "main": "chimpGPT.js",
+  "main": "combined.js",
   "private": true,
   "scripts": {
     "test": "node tests/testRunner.js",
@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prestart": "echo 'Starting the app...'",
-    "start": "nodemon --ignore data/ --ignore logs/ chimpGPT.js",
+    "start": "nodemon --ignore data/ --ignore logs/ combined.js",
     "prepare": "husky install"
   },
   "lint-staged": {

@@ -325,7 +325,7 @@ function initStatusServer(options = {}) {
     }
     const hostnameStartup = process.env.STATUS_HOSTNAME || 'localhost';
     allowedOriginsStartup.push(`http://${hostnameStartup}`);
-    const portStartup = process.env.STATUS_PORT || 3000;
+    const portStartup = config.PORT || 3001;
 
     // Get version info
     const initialVersionInfo = getDetailedVersionInfo();
@@ -634,14 +634,14 @@ function initStatusServer(options = {}) {
           },
           timestamp: new Date().toISOString(),
         };
-        
+
         // Store performance data in history
         try {
           performanceHistory.addMetric(responseData);
         } catch (historyError) {
           logger.error({ error: historyError }, 'Error storing performance history');
         }
-        
+
         res.json(responseData);
       } catch (error) {
         logger.error({ error }, 'Critical error getting performance metrics');
@@ -669,22 +669,22 @@ function initStatusServer(options = {}) {
      * @returns {Object} Hourly performance data
      */
     app.get('/performance/history/hourly', (req, res) => {
-      const hours = Math.min(parseInt(req.query.hours) || 24, 168);
+      const hours = Math.min(parseInt(req.query.hours, 10) || 24, 168);
       logger.info(`Getting hourly performance history for ${hours} hours`);
-      
+
       try {
         const hourlyData = performanceHistory.getHourlyData(hours);
         res.json({
           success: true,
           hours,
           data: hourlyData,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error({ error }, 'Error getting hourly performance history');
         res.status(500).json({
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     });
@@ -698,22 +698,22 @@ function initStatusServer(options = {}) {
      * @returns {Object} Daily performance data
      */
     app.get('/performance/history/daily', (req, res) => {
-      const days = Math.min(parseInt(req.query.days) || 30, 90);
+      const days = Math.min(parseInt(req.query.days, 10) || 30, 90);
       logger.info(`Getting daily performance history for ${days} days`);
-      
+
       try {
         const dailyData = performanceHistory.getDailyData(days);
         res.json({
           success: true,
           days,
           data: dailyData,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error({ error }, 'Error getting daily performance history');
         res.status(500).json({
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     });
@@ -727,9 +727,9 @@ function initStatusServer(options = {}) {
      * @returns {Object} Recent performance metrics
      */
     app.get('/performance/history/recent', (req, res) => {
-      const minutes = Math.min(parseInt(req.query.minutes) || 60, 1440);
+      const minutes = Math.min(parseInt(req.query.minutes, 10) || 60, 1440);
       logger.info(`Getting recent performance history for ${minutes} minutes`);
-      
+
       try {
         const recentData = performanceHistory.getRecentMetrics(minutes);
         res.json({
@@ -737,13 +737,13 @@ function initStatusServer(options = {}) {
           minutes,
           count: recentData.length,
           data: recentData,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error({ error }, 'Error getting recent performance history');
         res.status(500).json({
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     });
@@ -899,21 +899,9 @@ function initStatusServer(options = {}) {
     // Check if this is a secondary deployment
     const isSecondaryDeployment = process.env.SECONDARY_DEPLOYMENT === 'true';
 
-    // Determine which port to use based on environment and deployment type
-    const nodeEnv = process.env.NODE_ENV || 'development';
-    let port;
-
-    if (nodeEnv === 'production') {
-      port = config.PROD_PORT || 3000; // Fallback to 3000 if PROD_PORT is not set
-      logger.info(
-        `Production environment detected. Using port: ${port} (PROD_PORT: ${config.PROD_PORT})`
-      );
-    } else {
-      port = config.DEV_PORT || 3001; // Fallback to 3001 if DEV_PORT is not set
-      logger.info(
-        `Development environment detected. Using port: ${port} (DEV_PORT: ${config.DEV_PORT})`
-      );
-    }
+    // Use unified port configuration
+    const port = config.PORT || 3001;
+    logger.info(`Using port: ${port}`);
 
     // Get hostname for remote access from config or environment variable
     const hostname = process.env.STATUS_HOSTNAME || config.STATUS_HOSTNAME || 'localhost';

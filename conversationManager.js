@@ -101,8 +101,6 @@ let saveTimer = null;
  */
 let lastSaveTime = null;
 
-
-
 /**
  * Loads conversations from persistent storage.
  * This should be called when the bot starts up.
@@ -119,8 +117,8 @@ async function loadConversationsFromStorage() {
     logger.info('Loading conversations from storage');
     const loadedConversations = await conversationStorage.loadConversations();
 
-    // Prune old conversations (default: keep conversations from last 7 days)
-    const MAX_CONVERSATION_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+    // Prune old conversations (default: keep conversations from last 3 days)
+    const MAX_CONVERSATION_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
     logger.info('Pruning old conversations');
     const prunedConversations = await conversationStorage.pruneOldConversations(
       loadedConversations,
@@ -255,7 +253,7 @@ function addReferenceContext(userId, referenceMessages) {
   // Add reference messages to the conversation
   for (const refMsg of messagesToAdd) {
     // Skip if we've already added this reference message
-    if (conversation.find((msg) => msg.id === refMsg.id)) {
+    if (conversation.find(msg => msg.id === refMsg.id)) {
       continue;
     }
 
@@ -368,14 +366,24 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
       const validation = validateMessage(newMessage.content);
       if (!validation.valid) {
         logger.warn(
-          { userId, validationError: validation.reason, contentPreview: String(newMessage.content).substring(0, 50) + '...' },
+          {
+            userId,
+            validationError: validation.reason,
+            contentPreview: String(newMessage.content).substring(0, 50) + '...',
+          },
           'Message validation failed'
         );
         // Instead of failing, we'll sanitize the message and continue
-        newMessage.content = sanitizeMessage(newMessage.content, { stripNewlines: false, trim: true });
+        newMessage.content = sanitizeMessage(newMessage.content, {
+          stripNewlines: false,
+          trim: true,
+        });
       } else {
         // Still sanitize even if validation passed (defense in depth)
-        newMessage.content = sanitizeMessage(newMessage.content, { stripNewlines: false, trim: true });
+        newMessage.content = sanitizeMessage(newMessage.content, {
+          stripNewlines: false,
+          trim: true,
+        });
       }
     }
 
@@ -413,13 +421,13 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
  * @returns {boolean} True if a conversation was cleared, false if none existed
  */
 function clearConversation(userId) {
-  logger.debug('clearConversation called', { 
-    userId, 
+  logger.debug('clearConversation called', {
+    userId,
     hasConversation: userConversations.has(userId),
     userConversationsSize: userConversations.size,
-    userConversationsKeys: Array.from(userConversations.keys())
+    userConversationsKeys: Array.from(userConversations.keys()),
   });
-  
+
   const hadConversation = userConversations.has(userId);
   if (hadConversation) {
     userConversations.delete(userId);
@@ -428,13 +436,13 @@ function clearConversation(userId) {
   } else {
     logger.debug({ userId }, 'No conversation found to clear for user');
   }
-  
-  logger.debug('After clear attempt', { 
+
+  logger.debug('After clear attempt', {
     hasConversation: userConversations.has(userId),
     userConversationsSize: userConversations.size,
-    conversationsDirty
+    conversationsDirty,
   });
-  
+
   return hadConversation;
 }
 

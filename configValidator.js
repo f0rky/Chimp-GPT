@@ -107,44 +107,10 @@ const CONFIG_SCHEMA = {
     validate: value => ['development', 'production', 'test'].includes(value),
     transform: value => value.toLowerCase(),
   },
-  PROD_PORT: {
+  PORT: {
     required: false,
-    description: 'Port for all services when running in production mode',
-    default: '3000',
-    validate(value) {
-      return /^\d+$/.test(value);
-    },
-    transform(value) {
-      return parseInt(value, 10);
-    },
-  },
-  DEV_PORT: {
-    required: false,
-    description: 'Port for all services when running in development mode',
+    description: 'Port for all services',
     default: '3001',
-    validate(value) {
-      return /^\d+$/.test(value);
-    },
-    transform(value) {
-      return parseInt(value, 10);
-    },
-  },
-  // Legacy port variables - kept for backward compatibility
-  HEALTH_PORT: {
-    required: false,
-    description: 'Legacy port for health check server (deprecated)',
-    default: '3000',
-    validate(value) {
-      return /^\d+$/.test(value);
-    },
-    transform(value) {
-      return parseInt(value, 10);
-    },
-  },
-  STATUS_PORT: {
-    required: false,
-    description: 'Legacy port for status page server (deprecated)',
-    default: '3000',
     validate(value) {
       return /^\d+$/.test(value);
     },
