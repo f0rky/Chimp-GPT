@@ -599,7 +599,7 @@ client.on('messageCreate', async message => {
     // HIGHEST PRIORITY: Send initial feedback IMMEDIATELY before any other processing
     // This ensures users get immediate feedback that their message was received
     addTiming('before_thinking_message');
-    const feedbackPromise = message.reply(`${loadingEmoji} Thinking...`);
+    const feedbackPromise = message.channel.send(`${loadingEmoji} Thinking...`);
 
     // Track message for stats - this is fast and helps with metrics
     trackMessage();
@@ -907,7 +907,7 @@ client.on('messageCreate', async message => {
       'Error in message handler'
     );
 
-    await message.reply('Sorry, I encountered an error processing your request.');
+    await message.channel.send('Sorry, I encountered an error processing your request.');
 
     // Stop the timer with error information
     performanceMonitor.stopTimer(messageTimerId, {
@@ -1081,9 +1081,9 @@ async function handleImageGeneration(
 
     // Send initial response or update existing message
     let feedbackMessage = message;
-    if (message.reply && typeof message.reply === 'function') {
-      // This is a regular message, not an interaction response
-      feedbackMessage = await message.edit('🎨 Creating your image...');
+    if (message.channel && typeof message.channel.send === 'function') {
+      // This is a regular message, send to channel instead of replying
+      feedbackMessage = await message.channel.send('🎨 Creating your image...');
     } else if (message.edit && typeof message.edit === 'function') {
       // This is already a message we can edit
       feedbackMessage = await message.edit('🎨 Creating your image...');
@@ -1183,7 +1183,7 @@ async function handleImageGeneration(
             return;
           } catch (error) {
             discordLogger.error({ error }, 'Error processing command');
-            await message.reply('❌ An error occurred while processing your command.');
+            await message.channel.send('❌ An error occurred while processing your command.');
             return;
           }
         }
