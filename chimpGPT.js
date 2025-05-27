@@ -144,23 +144,37 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
  *
  * Processes a message using OpenAI's GPT model
  *
- * This function sends the user's message along with conversation context
- * to OpenAI's API and handles the response. It includes function calling
- * capabilities for weather, time, Quake server stats, and Wolfram Alpha queries.
+ * This function sends the conversation context to OpenAI's API and handles the response.
+ * It uses the latest user message from the conversation log for processing.
+ * It includes function calling capabilities for weather, time, Quake server stats, 
+ * and Wolfram Alpha queries.
  *
- * @param {string} content - The user's message content
+ * @param {string} content - The user's message content (fallback if conversation log is empty)
  * @param {Array<Object>} conversationLog - The conversation history
  * @returns {Promise<Object>} The response from OpenAI
  * @throws {Error} If the API call fails
  */
 async function processOpenAIMessage(content, conversationLog, timings = {}) {
+  // Get the latest user message from the conversation log
+  const latestUserMessage = [...conversationLog].reverse().find(msg => msg.role === 'user');
+  const currentContent = latestUserMessage ? latestUserMessage.content : content;
+  
+  // Debug logging to help track conversation flow issues
+  if (currentContent !== content) {
+    openaiLogger.debug('Using conversation log content instead of passed content', {
+      passedContent: content,
+      conversationLogContent: currentContent,
+      conversationLength: conversationLog.length
+    });
+  }
+  
   const timerId = performanceMonitor.startTimer('openai_api_detail', {
-    messageLength: content.length,
+    messageLength: currentContent.length,
     contextLength: JSON.stringify(conversationLog).length,
   });
   try {
     // Check for explicit image generation intent in the current message
-    const lowerContent = content.toLowerCase().trim();
+    const lowerContent = currentContent.toLowerCase().trim();
     const imagePhrases = [
       /^draw (?:me |us |a |an |the )?/i,
       /^generate (?:me |us |a |an |the )?(?:image|picture|photo)/i,
@@ -175,9 +189,9 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
 
     // If it's clearly an image request, bypass the full context
     if (isImageRequest) {
-      openaiLogger.debug('Detected image generation request', { content });
+      openaiLogger.debug('Detected image generation request', { content: currentContent });
       // Clean up the prompt by removing the command phrases
-      let cleanPrompt = content;
+      let cleanPrompt = currentContent;
       for (const phrase of imagePhrases) {
         cleanPrompt = cleanPrompt.replace(phrase, '').trim();
       }
