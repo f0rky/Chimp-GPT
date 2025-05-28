@@ -10,6 +10,7 @@
  */
 
 const { getCommands, getCommand, getPrefixes } = require('../commandHandler');
+const { PermissionsBitField } = require('discord.js');
 
 // Function to get the current prefixes
 function getCurrentPrefixes() {
@@ -78,7 +79,7 @@ module.exports = {
       // Get all commands from the command handler
       const allCommands = getCommands();
       const isOwner = message.author.id === config.ownerId;
-      const isAdmin = message.member?.permissions.has('ADMINISTRATOR') || false;
+      const isAdmin = message.member?.permissions.has(PermissionsBitField.Flags.Administrator) || false;
 
       // Get the first prefix for help messages
       const primaryPrefix = getCurrentPrefixes()[0];
