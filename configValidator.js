@@ -213,6 +213,28 @@ const CONFIG_SCHEMA = {
       return Number(value);
     },
   },
+  USE_BLENDED_CONVERSATIONS: {
+    required: false,
+    description: 'Whether to use blended conversations (combines messages from multiple users)',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  MAX_MESSAGES_PER_USER_BLENDED: {
+    required: false,
+    description: 'Maximum messages to keep per user in blended mode',
+    default: '5',
+    validate: value => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: value => {
+      return Number(value);
+    },
+  },
 };
 
 /**

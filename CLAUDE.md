@@ -52,6 +52,14 @@ All external services use the circuit breaker pattern for resilience:
 - Stats stored in `data/stats.json`
 - Circuit breaker states in `data/circuitBreakerStates.json`
 
+### Conversation Modes
+- **Blended Mode** (default): Combines messages from all users in a channel into shared context
+  - Limits each user to last 5 messages to prevent context dominance
+  - Chronological ordering maintained across all users
+  - DMs remain individual conversations
+- **Individual Mode**: Each user maintains separate conversation context
+  - Toggle with `USE_BLENDED_CONVERSATIONS=false` in `.env`
+
 ### Error Handling
 Custom error classes in `errors/`:
 - ApiError, ChimpError, ConfigError, DiscordError, PluginError, ValidationError
@@ -89,6 +97,10 @@ WEATHER_API_KEY=
 WOLFRAM_APP_ID=
 NODE_ENV=production
 BOT_PREFIX=!
+
+# Optional conversation settings
+USE_BLENDED_CONVERSATIONS=true  # Blend conversations from multiple users
+MAX_MESSAGES_PER_USER_BLENDED=5  # Max messages per user in blended mode
 ```
 
 ## Testing Approach

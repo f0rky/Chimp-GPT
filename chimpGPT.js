@@ -123,8 +123,8 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Import conversation manager - using simple optimized version
-// IMPORTANT: We're using the simple version to avoid the circular dependency issues
+// Import conversation manager - dynamically selected based on configuration
+// This will use either blended or individual conversation mode based on USE_BLENDED_CONVERSATIONS setting
 const {
   manageConversation,
   loadConversationsFromStorage,
@@ -134,7 +134,7 @@ const {
   getConversationStorageStatus,
   clearConversation,
   shutdown: shutdownConversations,
-} = require('./useSimpleOptimizer');
+} = require('./conversationManagerSelector');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
