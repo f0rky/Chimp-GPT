@@ -47,6 +47,18 @@ ChimpGPT now includes an intelligent reply context feature that makes conversati
 
 This feature makes the bot more conversationally aware, allowing it to understand ongoing discussions even when they involve multiple messages or users.
 
+### Blended Conversation Mode
+
+ChimpGPT supports a unique blended conversation mode that enhances group interactions:
+
+- **Multi-User Context**: Combines messages from multiple users in a channel into a shared conversation context
+- **Per-User Message Limits**: Each user's last 5 messages are retained to prevent any single user from dominating the conversation
+- **Chronological Ordering**: Messages are organized chronologically across all users for natural conversation flow
+- **Individual DMs**: Direct messages remain private and maintain individual conversation contexts
+- **Configurable**: Toggle between blended and individual modes via environment variables
+
+This feature creates a more natural group conversation experience where the bot can understand context from multiple users interacting together in the same channel.
+
 ### Recent Improvements (v1.2.3)
 
 - **Enhanced Image Generation Handling**: Added graceful fallback to text descriptions when image generation is disabled, providing users with detailed descriptions instead of error messages.
@@ -158,6 +170,8 @@ The bot is configured via environment variables (see `.env.example`). Below is a
 | SHOW_SERVER_STATS_EMOJIS | false        | Show emojis in Quake server info headers                          |
 | ELO_DISPLAY_MODE         | 0            | ELO display: 0=off, 1=categorized, 2=actual values                |
 | ENABLE_IMAGE_GENERATION  | true         | Enable/disable image generation (falls back to text descriptions)  |
+| USE_BLENDED_CONVERSATIONS| true         | Enable blended conversation mode for group chats                   |
+| MAX_MESSAGES_PER_USER_BLENDED | 5      | Maximum messages per user in blended conversation mode             |
 | ...                      |              | See .env.example for full list and documentation                  |
 
 - All environment variables are validated at startup.
@@ -399,6 +413,10 @@ MIT
    ENABLE_REPLY_CONTEXT = "true" # Enable/disable reply context feature
    MAX_REFERENCE_DEPTH = "5" # Maximum depth for message reference chains
    MAX_REFERENCE_CONTEXT = "5" # Maximum number of reference messages to include in context
+
+   # Blended Conversation Mode
+   USE_BLENDED_CONVERSATIONS = "true" # Enable blended conversation mode (default: true)
+   MAX_MESSAGES_PER_USER_BLENDED = "5" # Max messages per user in blended mode (default: 5)
 
    # NODE_ENV = "production" # Uncomment in production to disable pretty printing
    ```
