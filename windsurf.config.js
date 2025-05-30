@@ -31,8 +31,7 @@ module.exports = {
       'OPENAI_API_KEY',
       'X_RAPIDAPI_KEY',
       'BOT_PERSONALITY',
-      'STATUS_HOSTNAME',
-      'STATUS_PORT',
+      'PORT',
     ],
   },
   plugins: {

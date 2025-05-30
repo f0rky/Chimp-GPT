@@ -7,13 +7,11 @@ module.exports = {
       node_args: '--no-deprecation', // Suppress deprecation warnings including util.isArray
       env: {
         NODE_ENV: 'development',
-        // Use development port
-        DEV_PORT: 3001,
+        PORT: 3006,
       },
       env_production: {
         NODE_ENV: 'production',
-        // Use production port
-        PROD_PORT: 3000,
+        PORT: 3005,
       },
       max_memory_restart: '1G',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',

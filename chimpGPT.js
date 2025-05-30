@@ -75,6 +75,9 @@ const {
 const statsStorage = require('./statsStorage');
 const { shouldDeploy, recordSuccessfulDeployment } = require('./utils/deploymentManager');
 
+// Import malicious user manager for tracking suspicious behavior
+const maliciousUserManager = require('./utils/maliciousUserManager');
+
 // Module-level variable for status manager
 let statusManager = null;
 
@@ -133,6 +136,8 @@ const {
   getActiveConversationCount,
   getConversationStorageStatus,
   clearConversation,
+  removeMessageById,
+  updateMessageById,
   shutdown: shutdownConversations,
 } = require('./conversationManagerSelector');
 
@@ -529,6 +534,143 @@ async function generateNaturalResponse(
 // Track in-progress operations
 const inProgressOperations = new Set();
 
+// Handle message deletion
+client.on('messageDelete', async message => {
+  try {
+    // Only process messages from allowed channels
+    if (!allowedChannelIDs.includes(message.channelId)) {
+      return;
+    }
+
+    // Skip if no message ID (shouldn't happen but safety check)
+    if (!message.id) {
+      return;
+    }
+
+    // Skip bot messages - they don't count for malicious behavior tracking
+    if (message.author?.bot) {
+      return;
+    }
+
+    // Calculate time since message creation for malicious behavior detection
+    const timeSinceCreation = message.createdAt ? Date.now() - message.createdAt.getTime() : 0;
+
+    discordLogger.info(
+      {
+        messageId: message.id,
+        channelId: message.channelId,
+        authorId: message.author?.id,
+        content: message.content?.substring(0, 100), // Log first 100 chars for context
+        timeSinceCreation
+      },
+      'Message deleted, removing from conversation history'
+    );
+
+    // Track deletion for malicious behavior detection
+    if (message.author?.id) {
+      try {
+        await maliciousUserManager.recordDeletion(
+          message.author.id,
+          message.id,
+          message.channelId,
+          message.content,
+          timeSinceCreation
+        );
+        
+        // Check for suspicious behavior and potentially trigger human approval
+        await maliciousUserManager.checkForSuspiciousBehavior(message.author.id, client);
+      } catch (error) {
+        discordLogger.error({ error, userId: message.author.id }, 'Error tracking message deletion');
+      }
+    }
+
+    // Determine if this is a DM
+    const isDM = message.channel?.isDMBased() || false;
+    
+    // Remove from conversation history
+    if (isDM) {
+      // For DMs, try to remove using the author's user ID as the key
+      const removed = await removeMessageById(message.author?.id, message.id);
+      if (removed) {
+        discordLogger.debug({ messageId: message.id }, 'Removed deleted message from DM conversation');
+      }
+    } else {
+      // For channels, remove using channel ID
+      const removed = await removeMessageById(message.channelId, message.id, isDM);
+      if (removed) {
+        discordLogger.debug({ messageId: message.id }, 'Removed deleted message from channel conversation');
+      }
+    }
+
+    // Save conversations after removal
+    await saveConversationsToStorage();
+    
+  } catch (error) {
+    discordLogger.error(
+      { error, messageId: message.id },
+      'Error handling message deletion'
+    );
+  }
+});
+
+// Handle message updates (edits)
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  try {
+    // Only process messages from allowed channels
+    if (!allowedChannelIDs.includes(newMessage.channelId)) {
+      return;
+    }
+
+    // Skip if no message ID or content
+    if (!newMessage.id || !newMessage.content) {
+      return;
+    }
+
+    // Skip bot messages (we don't store them in conversations anyway)
+    if (newMessage.author?.bot) {
+      return;
+    }
+
+    discordLogger.info(
+      {
+        messageId: newMessage.id,
+        channelId: newMessage.channelId,
+        authorId: newMessage.author?.id,
+        oldContent: oldMessage.content?.substring(0, 50),
+        newContent: newMessage.content?.substring(0, 50)
+      },
+      'Message edited, updating conversation history'
+    );
+
+    // Determine if this is a DM
+    const isDM = newMessage.channel?.isDMBased() || false;
+    
+    // Update in conversation history
+    if (isDM) {
+      // For DMs, update using the author's user ID as the key
+      const updated = await updateMessageById(newMessage.author?.id, newMessage.id, newMessage.content);
+      if (updated) {
+        discordLogger.debug({ messageId: newMessage.id }, 'Updated edited message in DM conversation');
+      }
+    } else {
+      // For channels, update using channel ID
+      const updated = await updateMessageById(newMessage.channelId, newMessage.id, newMessage.content, isDM);
+      if (updated) {
+        discordLogger.debug({ messageId: newMessage.id }, 'Updated edited message in channel conversation');
+      }
+    }
+
+    // Save conversations after update
+    await saveConversationsToStorage();
+    
+  } catch (error) {
+    discordLogger.error(
+      { error, messageId: newMessage.id },
+      'Error handling message update'
+    );
+  }
+});
+
 // Handle message creation
 client.on('messageCreate', async message => {
   // Skip if there's already an operation in progress for this channel
@@ -609,6 +751,21 @@ client.on('messageCreate', async message => {
       return;
     }
     addTiming('channel_auth_check', { result: 'authorized' });
+
+    // Check if user is blocked for malicious behavior
+    if (maliciousUserManager.isUserBlocked(message.author.id)) {
+      addTiming('malicious_user_check', { result: 'blocked' });
+      discordLogger.info(
+        { 
+          userId: message.author.id, 
+          channelId: message.channelId,
+          messageId: message.id 
+        }, 
+        'Ignoring message from blocked user'
+      );
+      return;
+    }
+    addTiming('malicious_user_check', { result: 'allowed' });
 
     // HIGHEST PRIORITY: Send initial feedback IMMEDIATELY before any other processing
     // This ensures users get immediate feedback that their message was received
@@ -2324,6 +2481,14 @@ client.on('ready', async () => {
   // Initialize status manager
   statusManager = initStatusManager(client);
   discordLogger.info('Status manager initialized');
+
+  // Initialize malicious user manager
+  try {
+    await maliciousUserManager.init();
+    discordLogger.info('Malicious user manager initialized');
+  } catch (error) {
+    discordLogger.error({ error }, 'Error initializing malicious user manager');
+  }
 
   // Load conversations from persistent storage
   try {

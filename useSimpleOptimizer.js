@@ -19,10 +19,10 @@ const initPromise = simpleOptimizer.init();
 // Export optimized conversation management functions
 module.exports = {
   // Main function to manage conversations
-  manageConversation: async function (userId, newMessage = null) {
+  manageConversation: async function (userId, newMessage = null, discordMessage = null) {
     try {
       await initPromise;
-      return await simpleOptimizer.manageConversation(userId, newMessage);
+      return await simpleOptimizer.manageConversation(userId, newMessage, discordMessage);
     } catch (error) {
       logger.error({ error, userId }, 'Error in manageConversation');
       // Return a minimal valid conversation as fallback
@@ -85,6 +85,28 @@ module.exports = {
         simple: true,
         error: error.message,
       };
+    }
+  },
+
+  // Remove message by ID
+  removeMessageById: async function (userId, messageId) {
+    try {
+      await initPromise;
+      return await simpleOptimizer.removeMessageById(userId, messageId);
+    } catch (error) {
+      logger.error({ error, userId, messageId }, 'Error in removeMessageById');
+      return false;
+    }
+  },
+
+  // Update message by ID
+  updateMessageById: async function (userId, messageId, newContent) {
+    try {
+      await initPromise;
+      return await simpleOptimizer.updateMessageById(userId, messageId, newContent);
+    } catch (error) {
+      logger.error({ error, userId, messageId }, 'Error in updateMessageById');
+      return false;
     }
   },
 

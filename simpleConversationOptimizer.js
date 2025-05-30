@@ -174,9 +174,10 @@ async function saveToDisk() {
  * Manage a conversation - the main interface for using this module
  * @param {string} userId - User ID
  * @param {Object} newMessage - New message to add (optional)
+ * @param {import('discord.js').Message} discordMessage - Discord message object (optional)
  * @returns {Promise<Array>} Conversation for the user
  */
-async function manageConversation(userId, newMessage = null) {
+async function manageConversation(userId, newMessage = null, discordMessage = null) {
   // Make sure we're initialized
   if (!isInitialized) {
     await init();
@@ -192,10 +193,11 @@ async function manageConversation(userId, newMessage = null) {
 
   // Add the new message if provided
   if (newMessage) {
-    // Add timestamp to the message for easier pruning
+    // Add timestamp and message ID to the message for easier pruning and tracking
     const messageWithTimestamp = {
       ...newMessage,
       timestamp: new Date().toISOString(),
+      messageId: discordMessage?.id || null,
     };
 
     conversation.push(messageWithTimestamp);
@@ -385,10 +387,78 @@ async function getStatus() {
   };
 }
 
+/**
+ * Remove a message from conversation by Discord message ID
+ * @param {string} userId - The user ID
+ * @param {string} messageId - The Discord message ID
+ * @returns {Promise<boolean>} True if message was removed
+ */
+async function removeMessageById(userId, messageId) {
+  if (!messageId) return false;
+  
+  // Make sure we're initialized
+  if (!isInitialized) {
+    await init();
+  }
+  
+  const conversation = conversationsCache.get(userId);
+  if (!conversation) return false;
+  
+  const index = conversation.findIndex(msg => msg.messageId === messageId);
+  if (index !== -1) {
+    conversation.splice(index, 1);
+    isDirty = true;
+    logger.info({
+      userId,
+      messageId,
+      remainingMessages: conversation.length
+    }, 'Removed message from individual conversation');
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Update a message in conversation by Discord message ID
+ * @param {string} userId - The user ID
+ * @param {string} messageId - The Discord message ID
+ * @param {string} newContent - The new content
+ * @returns {Promise<boolean>} True if message was updated
+ */
+async function updateMessageById(userId, messageId, newContent) {
+  if (!messageId || !newContent) return false;
+  
+  // Make sure we're initialized
+  if (!isInitialized) {
+    await init();
+  }
+  
+  const conversation = conversationsCache.get(userId);
+  if (!conversation) return false;
+  
+  const message = conversation.find(msg => msg.messageId === messageId);
+  if (message) {
+    message.content = newContent;
+    message.edited = true;
+    message.editedTimestamp = new Date().toISOString();
+    isDirty = true;
+    logger.info({
+      userId,
+      messageId
+    }, 'Updated message in individual conversation');
+    return true;
+  }
+  
+  return false;
+}
+
 module.exports = {
   init,
   manageConversation,
   clearConversation,
+  removeMessageById,
+  updateMessageById,
   getConversationCount,
   getStatus,
   shutdown,

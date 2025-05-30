@@ -58,9 +58,10 @@ function getChannelConversation(channelId) {
  * @param {string} userId - The user ID
  * @param {Object} message - The message object with role and content
  * @param {boolean} isDM - Whether this is a direct message
+ * @param {string} [messageId] - Optional Discord message ID for tracking
  * @returns {Array<Object>} The blended conversation array
  */
-function addMessageToBlended(channelId, userId, message, isDM = false) {
+function addMessageToBlended(channelId, userId, message, isDM = false, messageId = null) {
   // Sanitize message content
   if (message.content) {
     const validation = validateMessage(message.content);
@@ -110,7 +111,8 @@ function addMessageToBlended(channelId, userId, message, isDM = false) {
     ...message,
     userId,
     timestamp: Date.now(),
-    username: message.username || 'User'
+    username: message.username || 'User',
+    messageId: messageId // Track Discord message ID if provided
   };
   
   userMessages.push(messageWithMeta);
@@ -290,6 +292,119 @@ function getConversationStatus() {
   };
 }
 
+/**
+ * Remove a message from the conversation by Discord message ID
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The Discord message ID to remove
+ * @param {boolean} isDM - Whether this is a direct message
+ * @returns {boolean} True if message was found and removed
+ */
+function removeMessageById(channelId, messageId, isDM = false) {
+  if (!messageId) return false;
+  
+  // Handle DMs
+  if (isDM) {
+    // For DMs, we need to find which user's conversation contains this message
+    for (const [userId, conversation] of dmConversations.entries()) {
+      const index = conversation.findIndex(msg => msg.messageId === messageId);
+      if (index !== -1) {
+        conversation.splice(index, 1);
+        logger.info({
+          userId,
+          messageId,
+          remainingMessages: conversation.length
+        }, 'Removed message from DM conversation');
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Handle channel conversations
+  const channelConvo = channelConversations.get(channelId);
+  if (!channelConvo) return false;
+  
+  // Search through all users' messages in the channel
+  for (const [userId, userMessages] of channelConvo.entries()) {
+    const index = userMessages.findIndex(msg => msg.messageId === messageId);
+    if (index !== -1) {
+      userMessages.splice(index, 1);
+      logger.info({
+        channelId,
+        userId,
+        messageId,
+        remainingMessages: userMessages.length
+      }, 'Removed message from channel conversation');
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Update a message in the conversation by Discord message ID
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The Discord message ID to update
+ * @param {string} newContent - The new content for the message
+ * @param {boolean} isDM - Whether this is a direct message
+ * @returns {boolean} True if message was found and updated
+ */
+function updateMessageById(channelId, messageId, newContent, isDM = false) {
+  if (!messageId || !newContent) return false;
+  
+  // Sanitize the new content
+  const sanitizedContent = sanitizeMessage(newContent, {
+    stripNewlines: false,
+    trim: true
+  });
+  
+  // Handle DMs
+  if (isDM) {
+    for (const [userId, conversation] of dmConversations.entries()) {
+      const message = conversation.find(msg => msg.messageId === messageId);
+      if (message) {
+        message.content = sanitizedContent;
+        message.edited = true;
+        message.editedTimestamp = Date.now();
+        logger.info({
+          userId,
+          messageId
+        }, 'Updated message in DM conversation');
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Handle channel conversations
+  const channelConvo = channelConversations.get(channelId);
+  if (!channelConvo) return false;
+  
+  // Search through all users' messages in the channel
+  for (const [userId, userMessages] of channelConvo.entries()) {
+    const message = userMessages.find(msg => msg.messageId === messageId);
+    if (message) {
+      // Update content preserving username prefix for user messages
+      if (message.role === 'user' && message.username) {
+        message.content = `${message.username}: ${sanitizedContent}`;
+      } else {
+        message.content = sanitizedContent;
+      }
+      message.edited = true;
+      message.editedTimestamp = Date.now();
+      logger.info({
+        channelId,
+        userId,
+        messageId
+      }, 'Updated message in channel conversation');
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 module.exports = {
   addMessageToBlended,
   buildBlendedConversation,
@@ -298,5 +413,7 @@ module.exports = {
   saveConversationsToStorage,
   loadConversationsFromStorage,
   getConversationStatus,
+  removeMessageById,
+  updateMessageById,
   MAX_MESSAGES_PER_USER
 };

@@ -23,18 +23,20 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     // Determine if this is a DM
     const isDM = discordMessage?.channel?.isDMBased() || false;
     const channelId = isDM ? 'DM' : (discordMessage?.channelId || 'unknown');
+    const messageId = discordMessage?.id || null;
     
     // Add username to the message for context
     if (newMessage && discordMessage) {
       newMessage.username = discordMessage.author.username || discordMessage.author.tag || 'User';
     }
     
-    // Use blended conversation manager
+    // Use blended conversation manager with message ID
     const conversation = blendedManager.addMessageToBlended(
       channelId,
       userId,
       newMessage,
-      isDM
+      isDM,
+      messageId
     );
     
     logger.debug({
@@ -53,14 +55,35 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
 
 /**
  * Clear a conversation
- * @param {string} userId - The user ID
+ * @param {string} userId - The user ID or channel ID
+ * @param {boolean} isDM - Whether this is a DM conversation
  * @returns {boolean} True if cleared
  */
-function clearConversation(userId) {
-  // In blended mode, we need to clear channel conversations
-  // For now, we'll just return false as we don't have channel info
-  logger.warn({ userId }, 'Clear conversation called in blended mode - not fully implemented');
-  return false;
+function clearConversation(userId, isDM = false) {
+  return blendedManager.clearConversation(userId, isDM);
+}
+
+/**
+ * Remove a message from conversation by Discord message ID
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The Discord message ID
+ * @param {boolean} isDM - Whether this is a DM
+ * @returns {boolean} True if message was removed
+ */
+function removeMessageById(channelId, messageId, isDM = false) {
+  return blendedManager.removeMessageById(channelId, messageId, isDM);
+}
+
+/**
+ * Update a message in conversation by Discord message ID
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The Discord message ID
+ * @param {string} newContent - The new content
+ * @param {boolean} isDM - Whether this is a DM
+ * @returns {boolean} True if message was updated
+ */
+function updateMessageById(channelId, messageId, newContent, isDM = false) {
+  return blendedManager.updateMessageById(channelId, messageId, newContent, isDM);
 }
 
 /**
@@ -126,6 +149,8 @@ async function shutdown() {
 module.exports = {
   manageConversation,
   clearConversation,
+  removeMessageById,
+  updateMessageById,
   getActiveConversationCount,
   getConversationStorageStatus,
   loadConversationsFromStorage,
