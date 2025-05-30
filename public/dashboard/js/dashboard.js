@@ -51,6 +51,8 @@ const elements = {
   weatherLatency: document.getElementById('weatherLatency'),
   imageLatency: document.getElementById('imageLatency'),
   slowFunctions: document.getElementById('slowFunctions'),
+  themeToggle: document.getElementById('themeToggle'),
+  themeIcon: document.querySelector('.theme-icon'),
 };
 
 // API Functions
@@ -142,6 +144,9 @@ function initDashboard() {
     state.latencyData[endpoint] = Array(CONFIG.maxDataPoints).fill(null);
   });
 
+  // Initialize theme
+  initTheme();
+
   // Initialize chart
   initChart();
 
@@ -155,6 +160,60 @@ function initDashboard() {
   // Set up periodic updates
   setInterval(updateTime, 1000);
   setInterval(fetchAllData, CONFIG.updateInterval);
+}
+
+// Theme Management
+function initTheme() {
+  // Load theme from localStorage or default to dark
+  const savedTheme = localStorage.getItem('dashboardTheme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon(savedTheme);
+  
+  // Add theme toggle event listener
+  elements.themeToggle.addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  
+  // Update theme
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('dashboardTheme', newTheme);
+  updateThemeIcon(newTheme);
+  
+  // Update chart colors if needed
+  updateChartTheme();
+}
+
+function updateThemeIcon(theme) {
+  elements.themeIcon.textContent = theme === 'dark' ? '🌙' : '☀️';
+}
+
+function updateChartTheme() {
+  if (!state.chart) return;
+  
+  // Get current theme colors
+  const styles = getComputedStyle(document.documentElement);
+  const gridColor = styles.getPropertyValue('--chart-grid-color').trim();
+  const textColor = styles.getPropertyValue('--chart-text-color').trim();
+  
+  // Update chart options
+  state.chart.options.scales.y.grid.color = gridColor;
+  state.chart.options.scales.y.ticks.color = textColor;
+  
+  // Update dataset colors if needed
+  const ctx = document.getElementById('latencyChart').getContext('2d');
+  state.apiEndpoints.forEach((endpoint, index) => {
+    if (CONFIG.colors[endpoint] && state.chart.data.datasets[index]) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, CONFIG.colors[endpoint].replace('0.8', '0.5'));
+      gradient.addColorStop(1, CONFIG.colors[endpoint].replace('0.8', '0.1'));
+      state.chart.data.datasets[index].backgroundColor = gradient;
+    }
+  });
+  
+  state.chart.update('none');
 }
 
 // Initialize mobile-specific features

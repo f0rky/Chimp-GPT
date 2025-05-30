@@ -1,6 +1,6 @@
 /* Discord Theme Styles - Matching Main Dashboard */
 :root {
-  /* Colors - Matching main status dashboard */
+  /* Default Dark Theme Colors */
   --primary-color: #7289da;
   --secondary-color: #424549;
   --background-color: #36393f;
@@ -37,6 +37,57 @@
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+  
+  /* Chart colors */
+  --chart-grid-color: rgba(255, 255, 255, 0.1);
+  --chart-text-color: #b9bbbe;
+  
+  /* Status colors */
+  --status-bg-online: rgba(67, 181, 129, 0.1);
+  --status-bg-error: rgba(0, 0, 0, 0.2);
+  
+  /* Button colors */
+  --button-hover-bg: #5b73bc;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  /* Light Theme Colors */
+  --primary-color: #5865f2;
+  --secondary-color: #f2f3f5;
+  --background-color: #ffffff;
+  --card-color: #f2f3f5;
+  --text-color: #2e3338;
+  --text-secondary: #4f5660;
+  --success-color: #3ba55c;
+  --warning-color: #faa61a;
+  --error-color: #ed4245;
+  --pending-color: #5865f2;
+  
+  /* Light theme accents */
+  --accent-1: #5865f2;
+  --accent-2: #7289da;
+  --bg-color: #ffffff;
+  --success: #3ba55c;
+  --warning: #faa61a;
+  --danger: #ed4245;
+  --info: #5865f2;
+
+  /* Card Styles for light theme */
+  --card-bg: #f2f3f5;
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --card-border: 1px solid rgba(0, 0, 0, 0.06);
+  
+  /* Chart colors for light theme */
+  --chart-grid-color: rgba(0, 0, 0, 0.1);
+  --chart-text-color: #4f5660;
+  
+  /* Status colors for light theme */
+  --status-bg-online: rgba(59, 165, 92, 0.1);
+  --status-bg-error: rgba(0, 0, 0, 0.05);
+  
+  /* Button colors for light theme */
+  --button-hover-bg: #4752c4;
 }
 
 /* Modern Animations */
@@ -227,7 +278,7 @@ body.crt {
   border-radius: 6px;
   font-weight: 500;
   font-size: 0.9rem;
-  background: rgba(67, 181, 129, 0.1);
+  background: var(--status-bg-online);
   color: var(--success-color);
 }
 
@@ -250,7 +301,7 @@ body.crt {
   display: flex;
   justify-content: space-between;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--status-bg-error);
   border-radius: 6px;
 }
 
@@ -494,6 +545,10 @@ body.crt {
     font-size: 0.75rem;
     justify-content: center;
     flex-wrap: wrap;
+  }
+
+  .theme-toggle {
+    margin: var(--spacing-xs) 0;
   }
 
   .time {
@@ -903,4 +958,53 @@ body.crt {
 
 .back-link .icon {
   font-size: 1rem;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: 8px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  position: relative;
+  margin: 0 var(--spacing-sm);
+}
+
+.theme-toggle:hover {
+  background: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle:active {
+  transform: translateY(0);
+}
+
+.theme-icon {
+  font-size: 1.2rem;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover .theme-icon {
+  transform: rotate(20deg);
+}
+
+/* Light theme specific button styling */
+[data-theme="light"] .theme-toggle {
+  background: var(--card-bg);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
 }

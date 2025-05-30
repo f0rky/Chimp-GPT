@@ -114,6 +114,7 @@ dist
 
 # Project specific
 archive/
+CHECKLIST.md
 
 # vuepress v2.x temp and cache directory
 .temp
