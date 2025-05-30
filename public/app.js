@@ -1,4 +1,4 @@
-/* global Chart */
+/* global Chart:readonly */
 /**
  * ChimpGPT Status Page
  *
@@ -905,11 +905,11 @@ function displaySummary(container, summary, functionName) {
 async function loadFullResults(functionType, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '<div class="loading">Loading full results...</div>';
-  
+
   try {
     const response = await fetch(`/function-results?limit=5`);
     const data = await response.json();
-    
+
     if (functionType === 'weather' && data.weather) {
       displayWeatherDetails(container, data.weather);
     } else if (functionType === 'GPT Image-1' && data.gptimage) {
@@ -931,8 +931,11 @@ function displayWeatherDetails(container, results) {
     container.innerHTML = '<div class="no-data">No weather results</div>';
     return;
   }
-  
-  container.innerHTML = results.slice(0, 3).map(item => `
+
+  container.innerHTML = results
+    .slice(0, 3)
+    .map(
+      item => `
     <div class="function-call">
       <div class="function-header">
         <span class="function-location">${item.result?.location?.name || item.params.location || 'Unknown'}</span>
@@ -940,7 +943,9 @@ function displayWeatherDetails(container, results) {
       </div>
       <div class="function-details">${item.result?.formatted || 'Weather data'}</div>
     </div>
-  `).join('');
+  `
+    )
+    .join('');
 }
 
 function displayImageDetails(container, results) {
@@ -948,8 +953,11 @@ function displayImageDetails(container, results) {
     container.innerHTML = '<div class="no-data">No image results</div>';
     return;
   }
-  
-  container.innerHTML = results.slice(0, 3).map(item => `
+
+  container.innerHTML = results
+    .slice(0, 3)
+    .map(
+      item => `
     <div class="function-call">
       <div class="function-header">
         <span class="function-location">GPT Image-1</span>
@@ -961,7 +969,9 @@ function displayImageDetails(container, results) {
         ${item.result?.images?.[0] ? `<br><img src="${item.result.images[0]}" style="max-width: 200px; margin-top: 8px;" alt="Generated image">` : ''}
       </div>
     </div>
-  `).join('');
+  `
+    )
+    .join('');
 }
 
 function displayTimeDetails(container, results) {
@@ -969,8 +979,11 @@ function displayTimeDetails(container, results) {
     container.innerHTML = '<div class="no-data">No time results</div>';
     return;
   }
-  
-  container.innerHTML = results.slice(0, 3).map(item => `
+
+  container.innerHTML = results
+    .slice(0, 3)
+    .map(
+      item => `
     <div class="function-call">
       <div class="function-header">
         <span class="function-location">${item.result?.location || item.params.location || 'Unknown'}</span>
@@ -978,7 +991,9 @@ function displayTimeDetails(container, results) {
       </div>
       <div class="function-details">${item.result?.formatted || 'Time data'}</div>
     </div>
-  `).join('');
+  `
+    )
+    .join('');
 }
 
 function displayWolframDetails(container, results) {
@@ -986,8 +1001,11 @@ function displayWolframDetails(container, results) {
     container.innerHTML = '<div class="no-data">No Wolfram results</div>';
     return;
   }
-  
-  container.innerHTML = results.slice(0, 3).map(item => `
+
+  container.innerHTML = results
+    .slice(0, 3)
+    .map(
+      item => `
     <div class="function-call">
       <div class="function-header">
         <span class="function-location">${item.params?.query || 'Unknown query'}</span>
@@ -995,7 +1013,9 @@ function displayWolframDetails(container, results) {
       </div>
       <div class="function-details">${item.result?.formatted || JSON.stringify(item.result, null, 2)}</div>
     </div>
-  `).join('');
+  `
+    )
+    .join('');
 }
 
 function updateWeatherResults(summary) {
@@ -1160,6 +1180,9 @@ async function updateStatus() {
     // Update status indicator
     setStatusIndicator(data.status || 'unknown');
 
+    // Update conversation mode
+    updateConversationMode(data.conversationMode);
+
     // Update overview stats
     safeUpdateText('uptime', data.uptime !== undefined ? formatUptime(data.uptime) : '-');
     safeUpdateText('version', data.version || '-');
@@ -1321,6 +1344,9 @@ function setStatusIndicator(status) {
         case 'offline':
           dot.classList.add('offline');
           break;
+        default:
+          dot.classList.add('offline');
+          break;
       }
     }
 
@@ -1339,12 +1365,55 @@ function setStatusIndicator(status) {
         case 'offline':
           statusMessage = 'Offline';
           break;
+        default:
+          statusMessage = 'Unknown';
+          break;
       }
 
       statusText.textContent = statusMessage;
     }
   } catch (error) {
     console.error('Error in setStatusIndicator:', error);
+  }
+}
+
+/**
+ * Update conversation mode display
+ * @param {Object} conversationMode - Conversation mode information
+ */
+function updateConversationMode(conversationMode) {
+  try {
+    const modeElement = document.querySelector('.mode-text');
+
+    if (!modeElement) {
+      console.warn('Conversation mode element not found');
+      return;
+    }
+
+    if (!conversationMode) {
+      modeElement.textContent = 'Mode Unknown';
+      modeElement.title = 'Conversation mode information not available';
+      return;
+    }
+
+    // Set the mode text and tooltip
+    modeElement.textContent = conversationMode.mode || 'Unknown Mode';
+
+    // Create detailed tooltip
+    const details = [];
+    if (conversationMode.blendedConversations !== undefined) {
+      details.push(`Blended: ${conversationMode.blendedConversations ? 'Enabled' : 'Disabled'}`);
+    }
+    if (conversationMode.replyContext !== undefined) {
+      details.push(`Reply Context: ${conversationMode.replyContext ? 'Enabled' : 'Disabled'}`);
+    }
+    if (conversationMode.blendedConversations && conversationMode.maxMessagesPerUser) {
+      details.push(`Max msgs/user: ${conversationMode.maxMessagesPerUser}`);
+    }
+
+    modeElement.title = details.length > 0 ? details.join(' | ') : 'Conversation Mode';
+  } catch (error) {
+    console.error('Error in updateConversationMode:', error);
   }
 }
 

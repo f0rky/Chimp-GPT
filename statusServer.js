@@ -182,7 +182,7 @@ function initStatusServer(options = {}) {
 
   return new Promise((resolve, reject) => {
     const app = express();
-    
+
     // Add body parsing middleware
     app.use(express.json());
 
@@ -467,6 +467,25 @@ function initStatusServer(options = {}) {
       // Get detailed version information
       const versionInfo = getDetailedVersionInfo();
 
+      // Get conversation mode information
+      const blendedConversations =
+        config.USE_BLENDED_CONVERSATIONS === 'true' || config.USE_BLENDED_CONVERSATIONS === true;
+      const replyContext =
+        config.ENABLE_REPLY_CONTEXT === 'true' || config.ENABLE_REPLY_CONTEXT === true;
+      const maxMessagesPerUser = parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5;
+
+      // Determine mode description
+      let mode;
+      if (blendedConversations && replyContext) {
+        mode = 'Blended with Reply Context';
+      } else if (blendedConversations && !replyContext) {
+        mode = 'Blended Only';
+      } else if (!blendedConversations && replyContext) {
+        mode = 'Individual with Reply Context';
+      } else {
+        mode = 'Individual Only';
+      }
+
       const health = {
         status: discordStatus === 'ok' ? 'ok' : 'offline', // overall status reflects Discord status
         name: botName,
@@ -517,6 +536,12 @@ function initStatusServer(options = {}) {
         conversations: {
           ...getConversationStorageStatus(),
           lastChecked: new Date().toISOString(),
+        },
+        conversationMode: {
+          blendedConversations: blendedConversations,
+          replyContext: replyContext,
+          mode: mode,
+          maxMessagesPerUser: maxMessagesPerUser,
         },
       };
 
@@ -581,11 +606,11 @@ function initStatusServer(options = {}) {
 
       try {
         // Add pagination support to prevent massive data transfers
-        const limit = parseInt(req.query.limit) || 50; // Default to last 50 results
-        const skip = parseInt(req.query.skip) || 0;
-        
+        const limit = parseInt(req.query.limit, 10) || 50; // Default to last 50 results
+        const skip = parseInt(req.query.skip, 10) || 0;
+
         const allResults = await functionResults.getAllResults();
-        
+
         // If it's an object with categories, limit each category
         if (typeof allResults === 'object' && !Array.isArray(allResults)) {
           const limitedResults = {};
@@ -619,14 +644,14 @@ function initStatusServer(options = {}) {
     app.get('/function-results/summary', async (req, res) => {
       try {
         const allResults = await functionResults.getAllResults();
-        
+
         // Create summary with just counts and latest timestamps
         const summary = {};
         for (const [category, items] of Object.entries(allResults)) {
           if (Array.isArray(items)) {
             summary[category] = {
               count: items.length,
-              latest: items.length > 0 ? items[items.length - 1]?.timestamp : null
+              latest: items.length > 0 ? items[items.length - 1]?.timestamp : null,
             };
           } else if (category === 'lastUpdated') {
             summary[category] = items;
@@ -637,7 +662,8 @@ function initStatusServer(options = {}) {
               if (Array.isArray(pluginData)) {
                 summary[category][pluginName] = {
                   count: pluginData.length,
-                  latest: pluginData.length > 0 ? pluginData[pluginData.length - 1]?.timestamp : null
+                  latest:
+                    pluginData.length > 0 ? pluginData[pluginData.length - 1]?.timestamp : null,
                 };
               } else {
                 summary[category][pluginName] = pluginData;
@@ -647,7 +673,7 @@ function initStatusServer(options = {}) {
             summary[category] = items;
           }
         }
-        
+
         res.json(summary);
       } catch (error) {
         logger.error({ error }, 'Error getting function results summary');
@@ -937,38 +963,38 @@ function initStatusServer(options = {}) {
      */
     app.get('/blocked-users', async (req, res) => {
       logger.info('Getting blocked users list');
-      
+
       try {
         // Initialize malicious user manager if not already done
         if (!maliciousUserManagerInitialized) {
           await maliciousUserManager.init();
           maliciousUserManagerInitialized = true;
         }
-        
+
         const blockedUserIds = maliciousUserManager.getBlockedUsers();
         const blockedUsersData = [];
-        
+
         // Get stats for each blocked user
         for (const userId of blockedUserIds) {
-          const stats = maliciousUserManager.getUserStats(userId);
+          const userStats = maliciousUserManager.getUserStats(userId);
           blockedUsersData.push({
             userId,
-            ...stats,
-            blockedAt: new Date().toISOString() // This is approximate, actual block time not stored
+            ...userStats,
+            blockedAt: new Date().toISOString(), // This is approximate, actual block time not stored
           });
         }
-        
+
         res.json({
           success: true,
           count: blockedUsersData.length,
           users: blockedUsersData,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error({ error }, 'Error getting blocked users');
         res.status(500).json({
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     });
@@ -983,35 +1009,224 @@ function initStatusServer(options = {}) {
      */
     app.post('/unblock-user', requireOwnerToken, async (req, res) => {
       const { userId } = req.body;
-      
+
       if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'userId is required'
+          error: 'userId is required',
         });
       }
-      
+
       logger.info({ userId }, 'Unblocking user via dashboard');
-      
+
       try {
         const wasUnblocked = await maliciousUserManager.unblockUser(userId);
-        
+
         if (wasUnblocked) {
-          res.json({
+          return res.json({
             success: true,
-            message: `User ${userId} has been unblocked`
-          });
-        } else {
-          res.status(404).json({
-            success: false,
-            error: 'User was not blocked'
+            message: `User ${userId} has been unblocked`,
           });
         }
+        
+        return res.status(404).json({
+          success: false,
+          error: 'User was not blocked',
+        });
       } catch (error) {
         logger.error({ error, userId }, 'Error unblocking user');
+        return res.status(500).json({
+          success: false,
+          error: error.message,
+        });
+      }
+    });
+
+    /**
+     * GET /settings
+     * Returns application settings/configuration information
+     *
+     * @route GET /settings
+     * @returns {Object} Settings data with validation status
+     */
+    app.get('/settings', async (req, res) => {
+      logger.info('Getting application settings');
+
+      try {
+        // Import the config schema for reference
+        const configPath = require.resolve('./configValidator');
+        delete require.cache[configPath]; // Clear cache to get fresh schema
+        const configModule = require('./configValidator.js');
+
+        // Access the CONFIG_SCHEMA by re-requiring the file and looking at its internals
+        // Since CONFIG_SCHEMA is not exported, we'll recreate the logic here
+        const settings = [];
+
+        // Define the schema locally (this could be extracted to a separate module if needed)
+        const CONFIG_SCHEMA = {
+          // Required variables
+          DISCORD_TOKEN: { required: true, description: 'Discord Bot Token', sensitive: true },
+          OPENAI_API_KEY: { required: true, description: 'OpenAI API Key', sensitive: true },
+          CHANNEL_ID: {
+            required: true,
+            description: 'Channel IDs where the bot is allowed to respond',
+          },
+
+          // Optional variables
+          CLIENT_ID: {
+            required: false,
+            description: 'Discord application client ID (required for slash commands)',
+          },
+          X_RAPIDAPI_KEY: {
+            required: false,
+            description: 'RapidAPI Key for weather and other external services',
+            sensitive: true,
+          },
+          BOT_NAME: {
+            required: false,
+            description: 'Bot name for display purposes',
+            default: 'ChimpGPT',
+          },
+          BOT_PERSONALITY: {
+            required: false,
+            description: 'Bot personality prompt',
+            default: 'I am ChimpGPT, a helpful Discord bot.',
+          },
+          IGNORE_MESSAGE_PREFIX: {
+            required: false,
+            description: 'Messages starting with this prefix will be ignored',
+            default: '.',
+          },
+          LOADING_EMOJI: {
+            required: false,
+            description: 'Discord emoji ID for loading animation',
+            default: '⏳',
+          },
+          LOG_LEVEL: { required: false, description: 'Logging level', default: 'info' },
+          NODE_ENV: { required: false, description: 'Node environment', default: 'development' },
+          PORT: { required: false, description: 'Port for all services', default: '3001' },
+          STATUS_HOSTNAME: {
+            required: false,
+            description: 'Hostname for remote access to status page',
+            default: 'localhost',
+          },
+          OWNER_ID: {
+            required: false,
+            description: 'Discord user ID of the bot owner for status reports',
+          },
+          CORS_ALLOWED_ORIGINS: {
+            required: false,
+            description: 'Comma-separated list of allowed origins',
+            default: 'http://localhost,http://127.0.0.1',
+          },
+          DEPLOY_COMMANDS: {
+            required: false,
+            description: 'Whether to deploy slash commands on bot startup',
+            default: 'true',
+          },
+          ENABLE_IMAGE_GENERATION: {
+            required: false,
+            description: 'Enable or disable image generation feature',
+            default: 'true',
+          },
+          STATUS_RATE_LIMIT_POINTS: {
+            required: false,
+            description: 'Maximum number of requests allowed per client',
+            default: '60',
+          },
+          STATUS_RATE_LIMIT_DURATION: {
+            required: false,
+            description: 'Duration in seconds for rate limit window',
+            default: '60',
+          },
+          ENABLE_REPLY_CONTEXT: {
+            required: false,
+            description: 'Whether to use message replies as context',
+            default: 'true',
+          },
+          MAX_REFERENCE_DEPTH: {
+            required: false,
+            description: 'Maximum depth for message reference chains',
+            default: '5',
+          },
+          MAX_REFERENCE_CONTEXT: {
+            required: false,
+            description: 'Maximum number of referenced messages to include',
+            default: '5',
+          },
+          USE_BLENDED_CONVERSATIONS: {
+            required: false,
+            description: 'Whether to use blended conversations',
+            default: 'true',
+          },
+          MAX_MESSAGES_PER_USER_BLENDED: {
+            required: false,
+            description: 'Maximum messages to keep per user in blended mode',
+            default: '5',
+          },
+        };
+
+        // Process each setting
+        for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
+          const envValue = process.env[key];
+          const configValue = configModule[key];
+
+          const setting = {
+            key,
+            description: schema.description,
+            required: schema.required,
+            hasDefault: schema.default !== undefined,
+            defaultValue: schema.default,
+            isSet: envValue !== undefined && envValue !== '',
+            isValid: configValue !== undefined,
+            isUsed: configValue !== undefined, // If it made it through validation, it's being used
+            isSensitive: schema.sensitive || false,
+          };
+
+          // Show actual value for non-sensitive settings, mask sensitive ones
+          if (setting.isSensitive) {
+            setting.displayValue = setting.isSet ? '●●●●●●●●' : 'Not set';
+            setting.actualValue = null; // Never expose sensitive values
+          } else {
+            setting.displayValue =
+              configValue !== undefined
+                ? String(configValue)
+                : setting.hasDefault
+                  ? setting.defaultValue
+                  : 'Not set';
+            setting.actualValue = configValue;
+          }
+
+          settings.push(setting);
+        }
+
+        // Sort settings: required first, then by alphabetical order
+        settings.sort((a, b) => {
+          if (a.required !== b.required) {
+            return a.required ? -1 : 1;
+          }
+          return a.key.localeCompare(b.key);
+        });
+
+        res.json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          environment: process.env.NODE_ENV || 'development',
+          settings,
+          summary: {
+            total: settings.length,
+            required: settings.filter(s => s.required).length,
+            optional: settings.filter(s => !s.required).length,
+            set: settings.filter(s => s.isSet).length,
+            valid: settings.filter(s => s.isValid).length,
+            sensitive: settings.filter(s => s.isSensitive).length,
+          },
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error getting application settings');
         res.status(500).json({
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     });

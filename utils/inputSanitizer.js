@@ -151,11 +151,11 @@ function sanitizeLocation(location) {
  */
 function sanitizeQuery(query) {
   let sanitized = sanitizeText(query, 'QUERY');
-  
+
   // Remove SQL injection patterns
   sanitized = sanitized.replace(/['";]/g, '');
   sanitized = sanitized.replace(/\b(DROP|DELETE|INSERT|UPDATE|UNION|SELECT)\b/gi, '');
-  
+
   return sanitized;
 }
 
@@ -167,12 +167,12 @@ function sanitizeQuery(query) {
  */
 function sanitizeCommand(command) {
   let sanitized = sanitizeText(command, 'COMMAND_ARG');
-  
+
   // Remove command injection patterns
   sanitized = sanitized.replace(/[;&|`$()]/g, '');
   sanitized = sanitized.replace(/\b(exec|eval|system|rm|del|format)\b/gi, '');
   sanitized = sanitized.replace(/ignore previous instructions?/gi, '');
-  
+
   return sanitized;
 }
 
@@ -184,11 +184,11 @@ function sanitizeCommand(command) {
  */
 function sanitizePath(path) {
   let sanitized = sanitizeText(path, 'LOCATION');
-  
+
   // Remove path traversal patterns
   sanitized = sanitized.replace(/\.\./g, '');
   sanitized = sanitized.replace(/[\\]/g, '/');
-  
+
   return sanitized;
 }
 
@@ -200,11 +200,11 @@ function sanitizePath(path) {
  */
 function sanitizeOpenAIPrompt(prompt) {
   let sanitized = sanitizeText(prompt, 'PROMPT');
-  
+
   // Remove potential prompt injection
   sanitized = sanitized.replace(/ignore previous instructions?/gi, '');
   sanitized = sanitized.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  
+
   return sanitized;
 }
 
@@ -216,14 +216,14 @@ function sanitizeOpenAIPrompt(prompt) {
  */
 function sanitizeWeatherLocation(location) {
   let sanitized = sanitizeText(location, 'LOCATION');
-  
+
   // Remove SQL injection and command injection
   sanitized = sanitized.replace(/[;'"]/g, '');
   sanitized = sanitized.replace(/\b(DROP|DELETE|INSERT|UPDATE|UNION|SELECT)\b/gi, '');
-  
+
   // Only allow alphanumeric, spaces, commas, periods, hyphens
-  sanitized = sanitized.replace(/[^\w\s.,\-]/g, '');
-  
+  sanitized = sanitized.replace(/[^\w\s.,-]/g, '');
+
   return sanitized;
 }
 
@@ -235,11 +235,11 @@ function sanitizeWeatherLocation(location) {
  */
 function sanitizeWolframQuery(query) {
   let sanitized = sanitizeText(query, 'QUERY');
-  
+
   // Remove command injection patterns
   sanitized = sanitized.replace(/[;&|`]/g, '');
   sanitized = sanitized.replace(/\b(rm|del|format|exec)\b/gi, '');
-  
+
   return sanitized;
 }
 
@@ -305,7 +305,7 @@ function sanitizeObject(obj, maxDepth = 3) {
 function isValidUsername(username) {
   if (!username || typeof username !== 'string') return false;
   if (username.length > MAX_LENGTHS.USERNAME) return false;
-  
+
   // Only allow alphanumeric characters and underscores
   return /^[a-zA-Z0-9_]+$/.test(username);
 }
@@ -319,7 +319,7 @@ function isValidUsername(username) {
 function isValidChannelName(channelName) {
   if (!channelName || typeof channelName !== 'string') return false;
   if (channelName.length > MAX_LENGTHS.CHANNEL_NAME) return false;
-  
+
   // Allow alphanumeric characters, hyphens, and underscores
   return /^[a-zA-Z0-9_-]+$/.test(channelName);
 }

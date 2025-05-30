@@ -486,6 +486,9 @@ function updateTime() {
 function updateHealthDisplay(data) {
   if (!data) return;
 
+  // Update conversation mode
+  updateConversationMode(data.conversationMode);
+
   // Update API status indicators
   elements.openaiStatus.textContent = data.discord?.status === 'ok' ? 'ONLINE' : 'OFFLINE';
   elements.openaiStatus.className = data.discord?.status === 'ok' ? 'online' : 'offline';
@@ -519,6 +522,43 @@ function updateHealthDisplay(data) {
   // Update cost tracker based on API calls
   if (data.stats?.apiCalls) {
     updateCostTrackerFromStats(data.stats);
+  }
+}
+
+// Update conversation mode display
+function updateConversationMode(conversationMode) {
+  try {
+    const modeElement = document.querySelector('#conversation-mode-dashboard .mode-text');
+    
+    if (!modeElement) {
+      console.warn('Dashboard conversation mode element not found');
+      return;
+    }
+    
+    if (!conversationMode) {
+      modeElement.textContent = 'Mode Unknown';
+      modeElement.title = 'Conversation mode information not available';
+      return;
+    }
+    
+    // Set the mode text and tooltip
+    modeElement.textContent = conversationMode.mode || 'Unknown Mode';
+    
+    // Create detailed tooltip
+    const details = [];
+    if (conversationMode.blendedConversations !== undefined) {
+      details.push(`Blended: ${conversationMode.blendedConversations ? 'Enabled' : 'Disabled'}`);
+    }
+    if (conversationMode.replyContext !== undefined) {
+      details.push(`Reply Context: ${conversationMode.replyContext ? 'Enabled' : 'Disabled'}`);
+    }
+    if (conversationMode.blendedConversations && conversationMode.maxMessagesPerUser) {
+      details.push(`Max msgs/user: ${conversationMode.maxMessagesPerUser}`);
+    }
+    
+    modeElement.title = details.length > 0 ? details.join(' | ') : 'Conversation Mode';
+  } catch (error) {
+    console.error('Error in updateConversationMode:', error);
   }
 }
 
@@ -744,5 +784,187 @@ async function handleUnblockUser(event) {
   }
 }
 
+// Settings functionality
+let settingsData = null;
+let currentFilter = 'all';
+
+// Tab management
+function initTabs() {
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetTab = button.getAttribute('data-tab');
+      
+      // Remove active class from all buttons and panels
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      tabPanels.forEach(panel => panel.classList.remove('active'));
+      
+      // Add active class to clicked button and corresponding panel
+      button.classList.add('active');
+      document.getElementById(`${targetTab}-tab`).classList.add('active');
+      
+      // Load settings data when settings tab is activated
+      if (targetTab === 'settings') {
+        fetchSettings();
+      }
+    });
+  });
+}
+
+// Fetch settings data
+async function fetchSettings() {
+  try {
+    const response = await fetch(CONFIG.apiBaseUrl + '/settings');
+    settingsData = await response.json();
+    
+    if (settingsData.success) {
+      updateSettingsSummary(settingsData.summary);
+      updateEnvironmentInfo(settingsData.environment, settingsData.timestamp);
+      updateSettingsTable(settingsData.settings);
+    } else {
+      console.error('Failed to fetch settings:', settingsData.error);
+    }
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    document.getElementById('settingsTableBody').innerHTML = 
+      '<tr><td colspan="5" class="error-cell">Error loading settings</td></tr>';
+  }
+}
+
+// Update settings summary
+function updateSettingsSummary(summary) {
+  document.getElementById('totalSettings').textContent = summary.total || '-';
+  document.getElementById('requiredSettings').textContent = summary.required || '-';
+  document.getElementById('setSettings').textContent = summary.set || '-';
+  document.getElementById('validSettings').textContent = summary.valid || '-';
+}
+
+// Update environment info
+function updateEnvironmentInfo(environment, timestamp) {
+  document.getElementById('envMode').textContent = environment || 'development';
+  document.getElementById('lastCheck').textContent = new Date(timestamp).toLocaleString();
+}
+
+// Update settings table
+function updateSettingsTable(settings) {
+  const tbody = document.getElementById('settingsTableBody');
+  const filteredSettings = filterSettings(settings, currentFilter);
+  
+  if (filteredSettings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-data-cell">No settings match the current filter</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = filteredSettings.map(setting => {
+    const statusClass = getStatusClass(setting);
+    const statusText = getStatusText(setting);
+    
+    return `
+      <tr class="setting-row ${statusClass}">
+        <td class="setting-key">
+          ${setting.key}
+          ${setting.isSensitive ? '<span class="sensitive-badge">🔒</span>' : ''}
+        </td>
+        <td class="setting-description">${setting.description}</td>
+        <td class="setting-required">
+          ${setting.required ? '<span class="required-badge">Required</span>' : '<span class="optional-badge">Optional</span>'}
+        </td>
+        <td class="setting-status">
+          <span class="status-indicator ${statusClass}">${statusText}</span>
+        </td>
+        <td class="setting-value">
+          <span class="value-display">${setting.displayValue}</span>
+          ${setting.hasDefault && !setting.isSet ? `<span class="default-badge">Default: ${setting.defaultValue}</span>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Filter settings based on current filter
+function filterSettings(settings, filter) {
+  switch (filter) {
+    case 'required':
+      return settings.filter(s => s.required);
+    case 'optional':
+      return settings.filter(s => !s.required);
+    case 'invalid':
+      return settings.filter(s => !s.isValid || (s.required && !s.isSet));
+    default:
+      return settings;
+  }
+}
+
+// Get status class for a setting
+function getStatusClass(setting) {
+  if (!setting.isValid || (setting.required && !setting.isSet)) {
+    return 'error';
+  }
+  if (setting.isSet && setting.isValid) {
+    return 'success';
+  }
+  if (setting.hasDefault) {
+    return 'default';
+  }
+  return 'warning';
+}
+
+// Get status text for a setting
+function getStatusText(setting) {
+  if (!setting.isValid) {
+    return 'Invalid';
+  }
+  if (setting.required && !setting.isSet) {
+    return 'Missing';
+  }
+  if (setting.isSet && setting.isValid) {
+    return 'Set';
+  }
+  if (setting.hasDefault) {
+    return 'Default';
+  }
+  return 'Not Set';
+}
+
+// Initialize settings filters
+function initSettingsFilters() {
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const filter = button.getAttribute('data-filter');
+      
+      // Update active filter button
+      filterButtons.forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+      
+      // Update current filter and refresh table
+      currentFilter = filter;
+      if (settingsData && settingsData.settings) {
+        updateSettingsTable(settingsData.settings);
+      }
+    });
+  });
+  
+  // Refresh settings button
+  const refreshButton = document.getElementById('refreshSettings');
+  if (refreshButton) {
+    refreshButton.addEventListener('click', () => {
+      fetchSettings();
+      // Visual feedback
+      refreshButton.style.transform = 'rotate(360deg)';
+      setTimeout(() => {
+        refreshButton.style.transform = '';
+      }, 500);
+    });
+  }
+}
+
 // Initialize the dashboard when the DOM is loaded
-document.addEventListener('DOMContentLoaded', initDashboard);
+document.addEventListener('DOMContentLoaded', () => {
+  initDashboard();
+  initTabs();
+  initSettingsFilters();
+});

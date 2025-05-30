@@ -151,7 +151,7 @@ const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configVali
  *
  * This function sends the conversation context to OpenAI's API and handles the response.
  * It uses the latest user message from the conversation log for processing.
- * It includes function calling capabilities for weather, time, Quake server stats, 
+ * It includes function calling capabilities for weather, time, Quake server stats,
  * and Wolfram Alpha queries.
  *
  * @param {string} content - The user's message content (fallback if conversation log is empty)
@@ -163,16 +163,16 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
   // Get the latest user message from the conversation log
   const latestUserMessage = [...conversationLog].reverse().find(msg => msg.role === 'user');
   const currentContent = latestUserMessage ? latestUserMessage.content : content;
-  
+
   // Debug logging to help track conversation flow issues
   if (currentContent !== content) {
     openaiLogger.debug('Using conversation log content instead of passed content', {
       passedContent: content,
       conversationLogContent: currentContent,
-      conversationLength: conversationLog.length
+      conversationLength: conversationLog.length,
     });
   }
-  
+
   const timerId = performanceMonitor.startTimer('openai_api_detail', {
     messageLength: currentContent.length,
     contextLength: JSON.stringify(conversationLog).length,
@@ -561,7 +561,7 @@ client.on('messageDelete', async message => {
         channelId: message.channelId,
         authorId: message.author?.id,
         content: message.content?.substring(0, 100), // Log first 100 chars for context
-        timeSinceCreation
+        timeSinceCreation,
       },
       'Message deleted, removing from conversation history'
     );
@@ -576,40 +576,45 @@ client.on('messageDelete', async message => {
           message.content,
           timeSinceCreation
         );
-        
+
         // Check for suspicious behavior and potentially trigger human approval
         await maliciousUserManager.checkForSuspiciousBehavior(message.author.id, client);
       } catch (error) {
-        discordLogger.error({ error, userId: message.author.id }, 'Error tracking message deletion');
+        discordLogger.error(
+          { error, userId: message.author.id },
+          'Error tracking message deletion'
+        );
       }
     }
 
     // Determine if this is a DM
     const isDM = message.channel?.isDMBased() || false;
-    
+
     // Remove from conversation history
     if (isDM) {
       // For DMs, try to remove using the author's user ID as the key
       const removed = await removeMessageById(message.author?.id, message.id);
       if (removed) {
-        discordLogger.debug({ messageId: message.id }, 'Removed deleted message from DM conversation');
+        discordLogger.debug(
+          { messageId: message.id },
+          'Removed deleted message from DM conversation'
+        );
       }
     } else {
       // For channels, remove using channel ID
       const removed = await removeMessageById(message.channelId, message.id, isDM);
       if (removed) {
-        discordLogger.debug({ messageId: message.id }, 'Removed deleted message from channel conversation');
+        discordLogger.debug(
+          { messageId: message.id },
+          'Removed deleted message from channel conversation'
+        );
       }
     }
 
     // Save conversations after removal
     await saveConversationsToStorage();
-    
   } catch (error) {
-    discordLogger.error(
-      { error, messageId: message.id },
-      'Error handling message deletion'
-    );
+    discordLogger.error({ error, messageId: message.id }, 'Error handling message deletion');
   }
 });
 
@@ -637,37 +642,48 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
         channelId: newMessage.channelId,
         authorId: newMessage.author?.id,
         oldContent: oldMessage.content?.substring(0, 50),
-        newContent: newMessage.content?.substring(0, 50)
+        newContent: newMessage.content?.substring(0, 50),
       },
       'Message edited, updating conversation history'
     );
 
     // Determine if this is a DM
     const isDM = newMessage.channel?.isDMBased() || false;
-    
+
     // Update in conversation history
     if (isDM) {
       // For DMs, update using the author's user ID as the key
-      const updated = await updateMessageById(newMessage.author?.id, newMessage.id, newMessage.content);
+      const updated = await updateMessageById(
+        newMessage.author?.id,
+        newMessage.id,
+        newMessage.content
+      );
       if (updated) {
-        discordLogger.debug({ messageId: newMessage.id }, 'Updated edited message in DM conversation');
+        discordLogger.debug(
+          { messageId: newMessage.id },
+          'Updated edited message in DM conversation'
+        );
       }
     } else {
       // For channels, update using channel ID
-      const updated = await updateMessageById(newMessage.channelId, newMessage.id, newMessage.content, isDM);
+      const updated = await updateMessageById(
+        newMessage.channelId,
+        newMessage.id,
+        newMessage.content,
+        isDM
+      );
       if (updated) {
-        discordLogger.debug({ messageId: newMessage.id }, 'Updated edited message in channel conversation');
+        discordLogger.debug(
+          { messageId: newMessage.id },
+          'Updated edited message in channel conversation'
+        );
       }
     }
 
     // Save conversations after update
     await saveConversationsToStorage();
-    
   } catch (error) {
-    discordLogger.error(
-      { error, messageId: newMessage.id },
-      'Error handling message update'
-    );
+    discordLogger.error({ error, messageId: newMessage.id }, 'Error handling message update');
   }
 });
 
@@ -756,11 +772,11 @@ client.on('messageCreate', async message => {
     if (maliciousUserManager.isUserBlocked(message.author.id)) {
       addTiming('malicious_user_check', { result: 'blocked' });
       discordLogger.info(
-        { 
-          userId: message.author.id, 
+        {
+          userId: message.author.id,
           channelId: message.channelId,
-          messageId: message.id 
-        }, 
+          messageId: message.id,
+        },
         'Ignoring message from blocked user'
       );
       return;
@@ -2598,6 +2614,30 @@ async function startBot() {
     // Connect to Discord
     await client.login(config.DISCORD_TOKEN);
     discordLogger.info('Successfully logged in to Discord');
+
+    // Log conversation mode configuration
+    const conversationMode = {
+      blended: config.USE_BLENDED_CONVERSATIONS,
+      replyContext: config.ENABLE_REPLY_CONTEXT,
+      maxPerUser: config.MAX_MESSAGES_PER_USER_BLENDED,
+    };
+    const modeDescription = conversationMode.blended
+      ? conversationMode.replyContext
+        ? 'Blended with Reply Context'
+        : 'Blended Only'
+      : conversationMode.replyContext
+        ? 'Individual with Reply Context'
+        : 'Individual Only';
+
+    discordLogger.info(
+      {
+        conversationMode: modeDescription,
+        blendedConversations: conversationMode.blended,
+        replyContext: conversationMode.replyContext,
+        maxMessagesPerUser: conversationMode.maxPerUser,
+      },
+      'Conversation mode configuration'
+    );
 
     // Execute onBotStart hooks for plugins
     await pluginManager.executeHook('onBotStart', client);

@@ -116,6 +116,34 @@ h1 {
   background-color: var(--error-color);
 }
 
+.conversation-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.conversation-mode:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+.mode-icon {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.mode-text {
+  font-weight: 500;
+  cursor: help;
+}
+
 .dashboard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));

@@ -26,14 +26,27 @@
         <div class="cost-tracker" id="costTracker">
           [API COST TRACKER] 24h: $1.23 | Today: $0.45 | Current: $0.02
         </div>
+        <div id="conversation-mode-dashboard" class="conversation-mode">
+          <span class="mode-icon">💬</span>
+          <span class="mode-text" title="Conversation Mode">Loading...</span>
+        </div>
         <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
           <span class="theme-icon">🌙</span>
         </button>
         <div class="time" id="currentTime">00:00:00</div>
       </header>
 
+      <!-- Navigation Tabs -->
+      <nav class="dashboard-tabs">
+        <button class="tab-button active" data-tab="overview">Performance</button>
+        <button class="tab-button" data-tab="settings">Settings</button>
+      </nav>
+
       <!-- Main Content -->
-      <main class="dashboard-grid">
+      <main class="tab-content">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-panel active">
+          <div class="dashboard-grid">
         <!-- API Status Panel -->
         <section class="card status-panel">
           <h2>API STATUS</h2>
@@ -152,6 +165,83 @@
             </button>
           </div>
         </section>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-panel">
+          <div class="settings-grid">
+            <!-- Settings Summary -->
+            <section class="card settings-summary">
+              <h2>CONFIGURATION SUMMARY</h2>
+              <div class="summary-stats" id="settingsSummary">
+                <div class="stat-item">
+                  <span class="stat-label">Total Settings:</span>
+                  <span class="stat-value" id="totalSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Required:</span>
+                  <span class="stat-value" id="requiredSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Set:</span>
+                  <span class="stat-value" id="setSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Valid:</span>
+                  <span class="stat-value" id="validSettings">-</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Environment Info -->
+            <section class="card environment-info">
+              <h2>ENVIRONMENT</h2>
+              <div class="env-details" id="environmentInfo">
+                <div class="env-item">
+                  <span class="env-label">Mode:</span>
+                  <span class="env-value" id="envMode">-</span>
+                </div>
+                <div class="env-item">
+                  <span class="env-label">Last Check:</span>
+                  <span class="env-value" id="lastCheck">-</span>
+                </div>
+              </div>
+              <button class="refresh-btn" id="refreshSettings" title="Refresh settings">
+                <span>⟳</span>
+              </button>
+            </section>
+
+            <!-- Settings Table -->
+            <section class="card settings-table">
+              <h2>CONFIGURATION VARIABLES</h2>
+              <div class="settings-filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="required">Required</button>
+                <button class="filter-btn" data-filter="optional">Optional</button>
+                <button class="filter-btn" data-filter="invalid">Issues</button>
+              </div>
+              <div class="table-container">
+                <table class="settings-data-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Description</th>
+                      <th>Required</th>
+                      <th>Status</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settingsTableBody">
+                    <tr>
+                      <td colspan="5" class="loading-cell">Loading settings...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
       </main>
 
       <!-- Scanline Overlay -->
