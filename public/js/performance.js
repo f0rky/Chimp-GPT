@@ -22,8 +22,8 @@ function initPerformanceMonitoring() {
   // Load initial data
   loadPerformanceData();
 
-  // Set up auto-refresh
-  updateInterval = setInterval(loadPerformanceData, 5000);
+  // Set up auto-refresh (optimized from 5s to 10s for bandwidth efficiency)
+  updateInterval = setInterval(loadPerformanceData, 10000);
 
   // Set up UI controls
   document.getElementById('refresh-performance').addEventListener('click', loadPerformanceData);

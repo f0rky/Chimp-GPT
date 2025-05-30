@@ -1,7 +1,7 @@
 // Dashboard Configuration
 const CONFIG = {
-  updateInterval: 2000, // Update every 2 seconds
-  maxDataPoints: 60, // 2 minutes of data at 2s intervals
+  updateInterval: 10000, // Update every 10 seconds (was 2s - too frequent!)
+  maxDataPoints: 36, // 6 minutes of data at 10s intervals
   apiBaseUrl: window.location.origin, // Use absolute URL
   endpoints: {
     health: '/health',
@@ -53,6 +53,8 @@ const elements = {
   slowFunctions: document.getElementById('slowFunctions'),
   themeToggle: document.getElementById('themeToggle'),
   themeIcon: document.querySelector('.theme-icon'),
+  blockedUsersContent: document.getElementById('blockedUsersContent'),
+  refreshBlockedUsers: document.getElementById('refreshBlockedUsers'),
 };
 
 // API Functions
@@ -130,10 +132,18 @@ async function fetchPerformanceData() {
 }
 
 async function fetchFunctionResults() {
-  const data = await fetchData(CONFIG.endpoints.functionResults);
+  // Use summary endpoint to avoid massive data transfer
+  const data = await fetchData('/function-results/summary');
   if (data) {
     state.functionResults = data;
     updateActiveRequests();
+  }
+}
+
+async function fetchBlockedUsers() {
+  const data = await fetchData('/blocked-users');
+  if (data && data.success) {
+    updateBlockedUsersDisplay(data);
   }
 }
 
@@ -160,6 +170,9 @@ function initDashboard() {
   // Set up periodic updates
   setInterval(updateTime, 1000);
   setInterval(fetchAllData, CONFIG.updateInterval);
+  
+  // Update blocked users less frequently (every 30 seconds)
+  setInterval(fetchBlockedUsers, 30000);
 }
 
 // Theme Management
@@ -171,6 +184,18 @@ function initTheme() {
   
   // Add theme toggle event listener
   elements.themeToggle.addEventListener('click', toggleTheme);
+  
+  // Add refresh blocked users button listener
+  if (elements.refreshBlockedUsers) {
+    elements.refreshBlockedUsers.addEventListener('click', () => {
+      fetchBlockedUsers();
+      // Visual feedback
+      elements.refreshBlockedUsers.style.transform = 'rotate(360deg)';
+      setTimeout(() => {
+        elements.refreshBlockedUsers.style.transform = '';
+      }, 500);
+    });
+  }
 }
 
 function toggleTheme() {
@@ -362,7 +387,8 @@ async function fetchAllData() {
   await Promise.all([
     fetchHealthData(),
     fetchPerformanceData(),
-    fetchFunctionResults(),
+    // fetchFunctionResults(), // Removed - too large (47MB), not critical for dashboard
+    // fetchBlockedUsers(), // Moved to separate timer (every 30s)
   ]);
 }
 
@@ -607,42 +633,33 @@ function updateFunctionPerformanceFromData(summary) {
 
 // Update active requests display
 function updateActiveRequests() {
-  // Use function results to simulate active requests
-  if (state.functionResults && state.functionResults.length > 0) {
-    // Get the most recent function result
-    const recentResults = state.functionResults.slice(-5); // Last 5 results
+  // Use summary data to show recent activity
+  if (state.functionResults && typeof state.functionResults === 'object') {
     const now = Date.now();
+    let mostRecentActivity = null;
+    let mostRecentTime = 0;
     
-    // Find any ongoing operations (e.g., image generation which takes longer)
-    let activeRequest = null;
-    
-    for (const result of recentResults) {
-      if (result.timestamp) {
-        const age = now - new Date(result.timestamp).getTime();
-        // Consider requests within last 10 seconds as potentially active
-        if (age < 10000) {
-          const estimatedDuration = result.functionName === 'generateImage' ? 5000 : 
-                                   result.functionName === 'lookupWeather' ? 1500 : 
-                                   result.functionName === 'getWolframShortAnswer' ? 2000 : 1000;
-          
-          if (age < estimatedDuration) {
-            activeRequest = {
-              name: result.functionName || 'Unknown',
-              startTime: new Date(result.timestamp).getTime(),
-              duration: estimatedDuration,
-              elapsed: age,
-            };
-            break;
-          }
+    // Find the most recent activity from all function types
+    for (const [functionType, info] of Object.entries(state.functionResults)) {
+      if (info && info.latest && info.count > 0) {
+        const timestamp = new Date(info.latest).getTime();
+        if (timestamp > mostRecentTime) {
+          mostRecentTime = timestamp;
+          mostRecentActivity = {
+            name: functionType,
+            timestamp: timestamp,
+            age: now - timestamp
+          };
         }
       }
     }
     
-    if (activeRequest) {
-      const progress = Math.min(100, (activeRequest.elapsed / activeRequest.duration) * 100);
+    // Show activity if it's recent (within last 30 seconds)
+    if (mostRecentActivity && mostRecentActivity.age < 30000) {
+      const progress = Math.max(10, Math.min(100, 100 - (mostRecentActivity.age / 30000) * 100));
       elements.requestProgress.style.width = `${progress}%`;
-      elements.currentEndpoint.textContent = activeRequest.name;
-      elements.requestTime.textContent = `${Math.round(activeRequest.elapsed)}ms`;
+      elements.currentEndpoint.textContent = mostRecentActivity.name;
+      elements.requestTime.textContent = `${Math.round(mostRecentActivity.age / 1000)}s ago`;
     } else {
       elements.requestProgress.style.width = '0%';
       elements.currentEndpoint.textContent = '-';
@@ -652,6 +669,78 @@ function updateActiveRequests() {
     elements.requestProgress.style.width = '0%';
     elements.currentEndpoint.textContent = '-';
     elements.requestTime.textContent = '0ms';
+  }
+}
+
+// Update blocked users display
+function updateBlockedUsersDisplay(data) {
+  if (!elements.blockedUsersContent) return;
+  
+  if (!data.users || data.users.length === 0) {
+    elements.blockedUsersContent.innerHTML = '<div class="no-blocked-users">No blocked users</div>';
+    return;
+  }
+  
+  // Create HTML for blocked users list
+  const usersHTML = data.users.map(user => `
+    <div class="blocked-user-item">
+      <div class="user-info">
+        <span class="user-id">${user.userId}</span>
+        <span class="deletion-stats">
+          ${user.totalDeletions} deletions (${user.rapidDeletions} rapid)
+        </span>
+      </div>
+      <button class="unblock-btn" data-user-id="${user.userId}" title="Unblock user">
+        ✖
+      </button>
+    </div>
+  `).join('');
+  
+  elements.blockedUsersContent.innerHTML = usersHTML;
+  
+  // Add event listeners to unblock buttons
+  const unblockButtons = elements.blockedUsersContent.querySelectorAll('.unblock-btn');
+  unblockButtons.forEach(button => {
+    button.addEventListener('click', handleUnblockUser);
+  });
+}
+
+// Handle unblock user action
+async function handleUnblockUser(event) {
+  const userId = event.target.getAttribute('data-user-id');
+  if (!userId) return;
+  
+  // Confirm action
+  if (!confirm(`Are you sure you want to unblock user ${userId}?`)) {
+    return;
+  }
+  
+  // Get owner token from user
+  const ownerToken = prompt('Enter owner token to unblock user:');
+  if (!ownerToken) return;
+  
+  try {
+    const response = await fetch(CONFIG.apiBaseUrl + '/unblock-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Owner-Token': ownerToken,
+      },
+      body: JSON.stringify({ userId }),
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      alert(data.message);
+      // Refresh the blocked users list
+      fetchBlockedUsers();
+    } else {
+      alert(`Failed to unblock user: ${data.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error unblocking user:', error);
+    alert(`Error unblocking user: ${error.message}`);
   }
 }
 

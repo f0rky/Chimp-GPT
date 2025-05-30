@@ -1008,3 +1008,145 @@ body.crt {
   border-color: var(--primary-color);
   color: white;
 }
+
+/* Blocked Users Section */
+.blocked-users {
+  grid-column: span 2;
+}
+
+.blocked-users-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-sm);
+}
+
+.refresh-btn {
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: 6px;
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-color);
+  font-size: 1.2rem;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-btn:hover {
+  background: var(--primary-color);
+  transform: rotate(180deg);
+}
+
+.blocked-user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm);
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: 6px;
+  margin-bottom: var(--spacing-xs);
+  transition: all 0.2s ease;
+}
+
+.blocked-user-item:hover {
+  background: rgba(114, 137, 218, 0.1);
+  border-color: var(--primary-color);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.user-id {
+  font-weight: 600;
+  color: var(--text-color);
+  font-family: 'Courier New', monospace;
+}
+
+.deletion-stats {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.unblock-btn {
+  background: var(--error-color);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  font-size: 1rem;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.unblock-btn:hover {
+  background: #cc3a3d;
+  transform: scale(1.1);
+}
+
+.no-blocked-users {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.loading-message {
+  text-align: center;
+  padding: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+/* Light theme adjustments for blocked users */
+[data-theme="light"] .blocked-user-item {
+  background: var(--card-bg);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .blocked-user-item:hover {
+  background: rgba(88, 101, 242, 0.1);
+  border-color: var(--primary-color);
+}
+
+[data-theme="light"] .refresh-btn {
+  background: var(--card-bg);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .refresh-btn:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Mobile responsiveness for blocked users */
+@media (max-width: 768px) {
+  .blocked-users {
+    grid-column: span 1;
+  }
+  
+  .blocked-user-item {
+    font-size: 0.875rem;
+  }
+  
+  .user-id {
+    font-size: 0.875rem;
+  }
+  
+  .deletion-stats {
+    font-size: 0.75rem;
+  }
+}

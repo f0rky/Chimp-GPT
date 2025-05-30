@@ -945,3 +945,32 @@ footer {
   text-align: center;
   padding: 1rem 0;
 }
+
+/* View details button */
+.summary-actions {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.view-details-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-details-btn:hover {
+  background: #5b73bc;
+  transform: translateY(-1px);
+}
+
+.loading {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

@@ -17,8 +17,8 @@ let errorChart = null;
 let metricsChart = null;
 let historyChart = null;
 
-// Update interval in milliseconds
-const UPDATE_INTERVAL = 5000; // 5 seconds
+// Update interval in milliseconds (optimized for bandwidth efficiency)
+const UPDATE_INTERVAL = 10000; // 10 seconds (was 5s)
 
 function closeImageModal() {
   const modal = document.getElementById('gallery-modal');
@@ -616,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
   }
-  setInterval(fetchBreakerStatus, 3000);
+  setInterval(fetchBreakerStatus, 15000); // Reduced from 3s to 15s for bandwidth efficiency
   fetchBreakerStatus();
   document.getElementById('breaker-reset-btn').onclick = () => {
     const token = document.getElementById('owner-token').value;
@@ -656,7 +656,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up periodic updates
   setInterval(updateStatus, UPDATE_INTERVAL);
-  setInterval(updateFunctionResults, UPDATE_INTERVAL);
+  // Disabled function results updates to save bandwidth (was 47MB every 10s)
+  // setInterval(updateFunctionResults, UPDATE_INTERVAL);
   // Performance metrics are updated via updateStatus, no need for separate interval
 
   // Set up event listeners with null checks
@@ -834,7 +835,8 @@ function initCharts() {
  */
 async function updateFunctionResults() {
   try {
-    const response = await fetch('/function-results');
+    // Use summary endpoint to avoid massive data transfer (was 47MB!)
+    const response = await fetch('/function-results/summary');
     if (!response.ok) {
       console.error(`Error fetching function results: ${response.status} ${response.statusText}`);
       return;
@@ -847,13 +849,14 @@ async function updateFunctionResults() {
       return;
     }
 
-    // Update each tab with its function results
-    updateWeatherResults(data.weather || []);
-    updateTimeResults(data.time || []);
-    updateWolframResults(data.wolfram || []);
-    updateQuakeResults(data.quake || []);
-    updateDalleResults(data.gptimage || data.dalle || []);
-    updateGallery(data.gptimage || data.dalle || []);
+    // Update each tab with summary data (count/latest format)
+    updateWeatherResults(data.weather || { count: 0, latest: null });
+    updateTimeResults(data.time || { count: 0, latest: null });
+    updateWolframResults(data.wolfram || { count: 0, latest: null });
+    updateQuakeResults(data.quake || { count: 0, latest: null });
+    updateDalleResults(data.gptimage || data.dalle || { count: 0, latest: null });
+    // Gallery disabled since we're using summary data (not full image arrays)
+    // updateGallery(data.gptimage || data.dalle || []);
   } catch (error) {
     console.error('Error updating function results:', error.message || error);
     // Display a message in each tab indicating there was an error
@@ -872,176 +875,168 @@ async function updateFunctionResults() {
  * Update the weather results tab
  * @param {Array} results - Weather function results
  */
-function updateWeatherResults(results) {
-  const container = document.getElementById('weather-results');
-
-  if (results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent weather lookups</div>';
+// Generic function to display summary data
+function displaySummary(container, summary, functionName) {
+  if (!summary || summary.count === 0) {
+    container.innerHTML = `<div class="no-data">No recent ${functionName} calls</div>`;
     return;
   }
 
-  container.innerHTML = '';
+  container.innerHTML = `
+    <div class="result-summary">
+      <div class="summary-stat">
+        <span class="stat-label">Total Calls:</span>
+        <span class="stat-value">${summary.count}</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-label">Last Used:</span>
+        <span class="stat-value">${summary.latest ? new Date(summary.latest).toLocaleString() : 'Never'}</span>
+      </div>
+      <div class="summary-actions">
+        <button class="view-details-btn" onclick="loadFullResults('${functionName}', '${container.id}')">
+          📋 View Details
+        </button>
+      </div>
+    </div>
+  `;
+}
 
-  results.forEach(item => {
-    const callElement = document.createElement('div');
-    callElement.className = 'function-call';
+// Function to load full results on demand
+async function loadFullResults(functionType, containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '<div class="loading">Loading full results...</div>';
+  
+  try {
+    const response = await fetch(`/function-results?limit=5`);
+    const data = await response.json();
+    
+    if (functionType === 'weather' && data.weather) {
+      displayWeatherDetails(container, data.weather);
+    } else if (functionType === 'GPT Image-1' && data.gptimage) {
+      displayImageDetails(container, data.gptimage);
+    } else if (functionType === 'time' && data.time) {
+      displayTimeDetails(container, data.time);
+    } else if (functionType === 'Wolfram Alpha' && data.wolfram) {
+      displayWolframDetails(container, data.wolfram);
+    } else {
+      container.innerHTML = `<div class="no-data">No ${functionType} results available</div>`;
+    }
+  } catch (error) {
+    container.innerHTML = `<div class="error">Error loading ${functionType} results</div>`;
+  }
+}
 
-    const locationName = item.result.location?.name || item.params.location || 'Unknown';
-    const timestamp = new Date(item.timestamp).toLocaleString();
-    const isExtended = item.params.extended ? 'Extended Forecast' : 'Current Weather';
+function displayWeatherDetails(container, results) {
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div class="no-data">No weather results</div>';
+    return;
+  }
+  
+  container.innerHTML = results.slice(0, 3).map(item => `
+    <div class="function-call">
+      <div class="function-header">
+        <span class="function-location">${item.result?.location?.name || item.params.location || 'Unknown'}</span>
+        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="function-details">${item.result?.formatted || 'Weather data'}</div>
+    </div>
+  `).join('');
+}
 
-    callElement.innerHTML = `
-            <div class="function-header">
-                <span class="function-location">${locationName} (${isExtended})</span>
-                <span class="function-time">${timestamp}</span>
-            </div>
-            <div class="function-params">Query: ${item.params.location}</div>
-            <div class="function-details">${item.result.formatted}</div>
-        `;
+function displayImageDetails(container, results) {
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div class="no-data">No image results</div>';
+    return;
+  }
+  
+  container.innerHTML = results.slice(0, 3).map(item => `
+    <div class="function-call">
+      <div class="function-header">
+        <span class="function-location">GPT Image-1</span>
+        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="function-params">Prompt: "${item.params?.prompt || 'Unknown'}"</div>
+      <div class="function-details">
+        ${item.result?.success ? '✅ Generated successfully' : '❌ Generation failed'}
+        ${item.result?.images?.[0] ? `<br><img src="${item.result.images[0]}" style="max-width: 200px; margin-top: 8px;" alt="Generated image">` : ''}
+      </div>
+    </div>
+  `).join('');
+}
 
-    container.appendChild(callElement);
-  });
+function displayTimeDetails(container, results) {
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div class="no-data">No time results</div>';
+    return;
+  }
+  
+  container.innerHTML = results.slice(0, 3).map(item => `
+    <div class="function-call">
+      <div class="function-header">
+        <span class="function-location">${item.result?.location || item.params.location || 'Unknown'}</span>
+        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="function-details">${item.result?.formatted || 'Time data'}</div>
+    </div>
+  `).join('');
+}
+
+function displayWolframDetails(container, results) {
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div class="no-data">No Wolfram results</div>';
+    return;
+  }
+  
+  container.innerHTML = results.slice(0, 3).map(item => `
+    <div class="function-call">
+      <div class="function-header">
+        <span class="function-location">${item.params?.query || 'Unknown query'}</span>
+        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="function-details">${item.result?.formatted || JSON.stringify(item.result, null, 2)}</div>
+    </div>
+  `).join('');
+}
+
+function updateWeatherResults(summary) {
+  const container = document.getElementById('weather-results');
+  displaySummary(container, summary, 'weather');
 }
 
 /**
  * Update the time results tab
  * @param {Array} results - Time function results
  */
-function updateTimeResults(results) {
+function updateTimeResults(summary) {
   const container = document.getElementById('time-results');
-
-  if (results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent time lookups</div>';
-    return;
-  }
-
-  container.innerHTML = '';
-
-  results.forEach(item => {
-    const callElement = document.createElement('div');
-    callElement.className = 'function-call';
-
-    const locationName = item.result.location || item.params.location || 'Unknown';
-    const timestamp = new Date(item.timestamp).toLocaleString();
-
-    callElement.innerHTML = `
-            <div class="function-header">
-                <span class="function-location">${locationName}</span>
-                <span class="function-time">${timestamp}</span>
-            </div>
-            <div class="function-params">Timezone: ${item.result.timezone || 'Unknown'}</div>
-            <div class="function-details">${item.result.formatted}</div>
-        `;
-
-    container.appendChild(callElement);
-  });
+  displaySummary(container, summary, 'time');
 }
 
 /**
  * Update the Wolfram results tab
  * @param {Array} results - Wolfram function results
  */
-function updateWolframResults(results) {
+function updateWolframResults(summary) {
   const container = document.getElementById('wolfram-results');
-
-  if (results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent Wolfram Alpha queries</div>';
-    return;
-  }
-
-  container.innerHTML = '';
-
-  results.forEach(item => {
-    const callElement = document.createElement('div');
-    callElement.className = 'function-call';
-
-    const query = item.params.query || 'Unknown query';
-    const timestamp = new Date(item.timestamp).toLocaleString();
-
-    callElement.innerHTML = `
-            <div class="function-header">
-                <span class="function-location">${query}</span>
-                <span class="function-time">${timestamp}</span>
-            </div>
-            <div class="function-details">${item.result.formatted || JSON.stringify(item.result, null, 2)}</div>
-        `;
-
-    container.appendChild(callElement);
-  });
+  displaySummary(container, summary, 'Wolfram Alpha');
 }
 
 /**
  * Update the Quake results tab
  * @param {Array} results - Quake function results
  */
-function updateQuakeResults(results) {
+function updateQuakeResults(summary) {
   const container = document.getElementById('quake-results');
-
-  if (results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent Quake server stats</div>';
-    return;
-  }
-
-  container.innerHTML = '';
-
-  results.forEach(item => {
-    const callElement = document.createElement('div');
-    callElement.className = 'function-call';
-
-    const server = item.params.server || 'Unknown server';
-    const timestamp = new Date(item.timestamp).toLocaleString();
-
-    callElement.innerHTML = `
-            <div class="function-header">
-                <span class="function-location">${server}</span>
-                <span class="function-time">${timestamp}</span>
-            </div>
-            <div class="function-details">${item.result.formatted || JSON.stringify(item.result, null, 2)}</div>
-        `;
-
-    container.appendChild(callElement);
-  });
+  displaySummary(container, summary, 'Quake server');
 }
 
 /**
  * Update the DALL-E results tab
  * @param {Array} results - DALL-E function results
  */
-function updateDalleResults(results) {
+function updateDalleResults(summary) {
   const container = document.getElementById('gptimage-results');
-
-  if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No recent GPT Image-1 generations</div>';
-    return;
-  }
-
-  container.innerHTML = '';
-
-  results.forEach(item => {
-    const callElement = document.createElement('div');
-    callElement.className = 'function-call';
-
-    const prompt = item.params.prompt || 'Unknown prompt';
-    const model = item.params.model || 'dall-e-3';
-    const modelDisplay = model === 'dall-e-3' ? 'DALL-E 3' : 'DALL-E 2';
-    const timestamp = new Date(item.timestamp).toLocaleString();
-
-    // Create a more user-friendly display of the image generation
-    callElement.innerHTML = `
-            <div class="function-header">
-                <span class="function-location">${modelDisplay}</span>
-                <span class="function-time">${timestamp}</span>
-            </div>
-            <div class="function-params">Prompt: "${prompt}"</div>
-            <div class="function-details">
-                <div>Size: ${item.params.size || '1024x1024'}</div>
-                ${item.params.enhance ? '<div>Enhanced prompt: Yes</div>' : ''}
-                ${item.result && item.result.success ? '<div class="success">✅ Image generated successfully</div>' : '<div class="error">❌ Image generation failed</div>'}
-            </div>
-        `;
-
-    container.appendChild(callElement);
-  });
+  displaySummary(container, summary, 'GPT Image-1');
 }
 
 /**

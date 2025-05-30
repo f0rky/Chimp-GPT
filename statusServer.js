@@ -77,6 +77,12 @@ const functionResults = require('./functionResults');
 // Import performance history
 const performanceHistory = require('./performanceHistory');
 
+// Import malicious user manager
+const maliciousUserManager = require('./utils/maliciousUserManager');
+
+// Track if malicious user manager is initialized
+let maliciousUserManagerInitialized = false;
+
 // Track server health status
 let serverHealthy = true;
 let lastError = null;
@@ -176,6 +182,9 @@ function initStatusServer(options = {}) {
 
   return new Promise((resolve, reject) => {
     const app = express();
+    
+    // Add body parsing middleware
+    app.use(express.json());
 
     // If demo mode is enabled, import the demo data generator
     if (demoMode) {
@@ -571,11 +580,78 @@ function initStatusServer(options = {}) {
       }
 
       try {
-        const results = await functionResults.getAllResults();
-        res.json(results);
+        // Add pagination support to prevent massive data transfers
+        const limit = parseInt(req.query.limit) || 50; // Default to last 50 results
+        const skip = parseInt(req.query.skip) || 0;
+        
+        const allResults = await functionResults.getAllResults();
+        
+        // If it's an object with categories, limit each category
+        if (typeof allResults === 'object' && !Array.isArray(allResults)) {
+          const limitedResults = {};
+          for (const [category, items] of Object.entries(allResults)) {
+            if (Array.isArray(items)) {
+              limitedResults[category] = items.slice(skip, skip + limit);
+            } else {
+              limitedResults[category] = items;
+            }
+          }
+          res.json(limitedResults);
+        } else if (Array.isArray(allResults)) {
+          // If it's an array, just slice it
+          res.json(allResults.slice(skip, skip + limit));
+        } else {
+          res.json(allResults);
+        }
       } catch (error) {
         logger.error({ error }, 'Error getting function results');
         res.status(500).json({ success: false, message: 'Error getting function results' });
+      }
+    });
+
+    /**
+     * GET /function-results/summary
+     * Returns summarized function results (counts only, no full data)
+     *
+     * @route GET /function-results/summary
+     * @returns {Object} Summary of function results without the large data
+     */
+    app.get('/function-results/summary', async (req, res) => {
+      try {
+        const allResults = await functionResults.getAllResults();
+        
+        // Create summary with just counts and latest timestamps
+        const summary = {};
+        for (const [category, items] of Object.entries(allResults)) {
+          if (Array.isArray(items)) {
+            summary[category] = {
+              count: items.length,
+              latest: items.length > 0 ? items[items.length - 1]?.timestamp : null
+            };
+          } else if (category === 'lastUpdated') {
+            summary[category] = items;
+          } else if (category === 'plugins' && typeof items === 'object') {
+            // Summarize plugins data instead of returning full arrays
+            summary[category] = {};
+            for (const [pluginName, pluginData] of Object.entries(items)) {
+              if (Array.isArray(pluginData)) {
+                summary[category][pluginName] = {
+                  count: pluginData.length,
+                  latest: pluginData.length > 0 ? pluginData[pluginData.length - 1]?.timestamp : null
+                };
+              } else {
+                summary[category][pluginName] = pluginData;
+              }
+            }
+          } else {
+            summary[category] = items;
+          }
+        }
+        
+        res.json(summary);
+      } catch (error) {
+        logger.error({ error }, 'Error getting function results summary');
+        res.status(500).json({ success: false, message: 'Error getting function results summary' });
       }
     });
 
@@ -848,6 +924,94 @@ function initStatusServer(options = {}) {
           success: false,
           message: 'Error during function results file repair',
           error: error.message,
+        });
+      }
+    });
+
+    /**
+     * GET /blocked-users
+     * Returns list of blocked users and their statistics
+     *
+     * @route GET /blocked-users
+     * @returns {Object} Blocked users data
+     */
+    app.get('/blocked-users', async (req, res) => {
+      logger.info('Getting blocked users list');
+      
+      try {
+        // Initialize malicious user manager if not already done
+        if (!maliciousUserManagerInitialized) {
+          await maliciousUserManager.init();
+          maliciousUserManagerInitialized = true;
+        }
+        
+        const blockedUserIds = maliciousUserManager.getBlockedUsers();
+        const blockedUsersData = [];
+        
+        // Get stats for each blocked user
+        for (const userId of blockedUserIds) {
+          const stats = maliciousUserManager.getUserStats(userId);
+          blockedUsersData.push({
+            userId,
+            ...stats,
+            blockedAt: new Date().toISOString() // This is approximate, actual block time not stored
+          });
+        }
+        
+        res.json({
+          success: true,
+          count: blockedUsersData.length,
+          users: blockedUsersData,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error getting blocked users');
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    /**
+     * POST /unblock-user
+     * Unblocks a user (requires owner token)
+     *
+     * @route POST /unblock-user
+     * @body {string} userId - The user ID to unblock
+     * @returns {Object} Success status
+     */
+    app.post('/unblock-user', requireOwnerToken, async (req, res) => {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          error: 'userId is required'
+        });
+      }
+      
+      logger.info({ userId }, 'Unblocking user via dashboard');
+      
+      try {
+        const wasUnblocked = await maliciousUserManager.unblockUser(userId);
+        
+        if (wasUnblocked) {
+          res.json({
+            success: true,
+            message: `User ${userId} has been unblocked`
+          });
+        } else {
+          res.status(404).json({
+            success: false,
+            error: 'User was not blocked'
+          });
+        }
+      } catch (error) {
+        logger.error({ error, userId }, 'Error unblocking user');
+        res.status(500).json({
+          success: false,
+          error: error.message
         });
       }
     });
