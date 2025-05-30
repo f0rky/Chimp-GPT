@@ -468,22 +468,22 @@ function initStatusServer(options = {}) {
       const versionInfo = getDetailedVersionInfo();
 
       // Get conversation mode information
-      const blendedConversations =
-        config.USE_BLENDED_CONVERSATIONS === 'true' || config.USE_BLENDED_CONVERSATIONS === true;
-      const replyContext =
-        config.ENABLE_REPLY_CONTEXT === 'true' || config.ENABLE_REPLY_CONTEXT === true;
+      const blendedConversations = config.USE_BLENDED_CONVERSATIONS;
+      const replyContext = config.ENABLE_REPLY_CONTEXT;
       const maxMessagesPerUser = parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5;
 
       // Determine mode description
       let mode;
-      if (blendedConversations && replyContext) {
+      if (blendedConversations === true && replyContext === true) {
         mode = 'Blended with Reply Context';
-      } else if (blendedConversations && !replyContext) {
+      } else if (blendedConversations === true && replyContext === false) {
         mode = 'Blended Only';
-      } else if (!blendedConversations && replyContext) {
+      } else if (blendedConversations === false && replyContext === true) {
         mode = 'Individual with Reply Context';
-      } else {
+      } else if (blendedConversations === false && replyContext === false) {
         mode = 'Individual Only';
+      } else {
+        mode = `Unknown (blended: ${blendedConversations}, reply: ${replyContext})`;
       }
 
       const health = {
