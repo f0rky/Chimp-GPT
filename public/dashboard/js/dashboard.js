@@ -145,6 +145,9 @@ function initDashboard() {
   // Initialize chart
   initChart();
 
+  // Initialize mobile features
+  initMobileFeatures();
+
   // Start updates
   updateTime();
   fetchAllData();
@@ -154,8 +157,149 @@ function initDashboard() {
   setInterval(fetchAllData, CONFIG.updateInterval);
 }
 
+// Initialize mobile-specific features
+function initMobileFeatures() {
+  // Detect mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isTablet = /iPad|Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent);
+  
+  if (isMobile || isTablet) {
+    // Add mobile class to body
+    document.body.classList.add('mobile-device');
+    
+    // Adjust update interval for mobile to reduce battery usage
+    if (isMobile && !isTablet) {
+      CONFIG.updateInterval = 5000; // Update every 5 seconds on mobile
+    }
+    
+    // Add touch event handlers
+    addTouchEventHandlers();
+    
+    // Handle orientation changes
+    handleOrientationChange();
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', debounce(handleResize, 250));
+  }
+  
+  // Add visibility change handler to pause updates when page is hidden
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+}
+
+// Handle touch events for better mobile interaction
+function addTouchEventHandlers() {
+  // Add swipe to refresh functionality
+  let touchStartY = 0;
+  let touchEndY = 0;
+  
+  document.addEventListener('touchstart', (e) => {
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+  
+  document.addEventListener('touchend', (e) => {
+    touchEndY = e.changedTouches[0].screenY;
+    handleSwipe();
+  }, { passive: true });
+  
+  function handleSwipe() {
+    // Pull down to refresh (swipe down from top)
+    if (touchEndY > touchStartY + 100 && window.scrollY === 0) {
+      fetchAllData();
+      showRefreshIndicator();
+    }
+  }
+  
+  // Add tap to expand/collapse cards on mobile
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (window.innerWidth <= 767 && !e.target.closest('a')) {
+        card.classList.toggle('expanded');
+      }
+    });
+  });
+}
+
+// Show refresh indicator
+function showRefreshIndicator() {
+  const indicator = document.createElement('div');
+  indicator.className = 'refresh-indicator';
+  indicator.innerHTML = '<span>↻</span> Refreshing...';
+  indicator.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+  `;
+  document.body.appendChild(indicator);
+  
+  setTimeout(() => {
+    indicator.remove();
+  }, 2000);
+}
+
+// Handle orientation changes
+function handleOrientationChange() {
+  const orientation = window.orientation || 0;
+  const isLandscape = Math.abs(orientation) === 90;
+  
+  if (isLandscape && window.innerHeight < 600) {
+    // Compact mode for landscape on small devices
+    document.body.classList.add('landscape-compact');
+  } else {
+    document.body.classList.remove('landscape-compact');
+  }
+  
+  // Resize chart on orientation change
+  if (state.chart) {
+    setTimeout(() => {
+      state.chart.resize();
+    }, 300);
+  }
+}
+
+// Handle window resize
+function handleResize() {
+  if (state.chart) {
+    state.chart.resize();
+  }
+}
+
+// Handle visibility changes to optimize performance
+function handleVisibilityChange() {
+  if (document.hidden) {
+    // Pause updates when page is hidden
+    state.updatesPaused = true;
+  } else {
+    // Resume updates when page is visible
+    state.updatesPaused = false;
+    fetchAllData();
+  }
+}
+
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // Fetch all data from API endpoints
 async function fetchAllData() {
+  // Skip updates if page is hidden
+  if (state.updatesPaused) return;
+  
   await Promise.all([
     fetchHealthData(),
     fetchPerformanceData(),
