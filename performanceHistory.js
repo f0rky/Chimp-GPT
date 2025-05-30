@@ -1,6 +1,8 @@
 const fs = require('fs').promises;
 const path = require('path');
-const logger = require('./logger');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('performanceHistory');
 
 class PerformanceHistory {
   constructor(dataDir = './data') {
