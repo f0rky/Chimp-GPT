@@ -59,6 +59,33 @@ ChimpGPT supports a unique blended conversation mode that enhances group interac
 
 This feature creates a more natural group conversation experience where the bot can understand context from multiple users interacting together in the same channel.
 
+### Conversation Mode Configuration
+
+ChimpGPT's conversation behavior is controlled by two key settings that work together:
+
+#### **Setting Interaction Matrix**
+
+| `USE_BLENDED_CONVERSATIONS` | `ENABLE_REPLY_CONTEXT` | **Result Mode** | **Description** |
+|------------------------------|------------------------|-----------------|-----------------|
+| `true` | `true` | **Blended with Reply Context** | Group conversations + reply chain following |
+| `true` | `false` | **Blended Only** | Group conversations without reply context |
+| `false` | `true` | **Individual with Reply Context** | 1-on-1 conversations + reply chains |
+| `false` | `false` | **Individual Only** | Traditional individual bot conversations |
+
+#### **Setting Details**
+
+- **`USE_BLENDED_CONVERSATIONS`**: When enabled, combines messages from ALL users in a channel into shared context (max 5 messages per user to prevent dominance)
+- **`ENABLE_REPLY_CONTEXT`**: When enabled, bot follows Discord reply chains to understand conversation context and thread relationships
+
+#### **Mode Visibility**
+
+The current conversation mode is displayed across all status pages:
+- **Main Status Page**: Header shows mode with hover details (e.g., "💬 Blended with Reply Context")
+- **Performance Dashboard**: Header displays mode with configuration tooltip
+- **Settings Dashboard**: Shows detailed conversation configuration
+- **Startup Logs**: Bot logs current mode configuration on startup
+- **API Endpoints**: `/health` includes `conversationMode` object for monitoring
+
 ### Recent Improvements (v1.2.3)
 
 - **Enhanced Image Generation Handling**: Added graceful fallback to text descriptions when image generation is disabled, providing users with detailed descriptions instead of error messages.
@@ -148,12 +175,22 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 - **Blocked user management** with owner-authenticated unblock functionality
 - **Real-time performance metrics** with interactive charts
 - **Smart polling**: Different update frequencies for different data types
+- **Settings dashboard** with configuration validation and security masking
+- **Conversation mode display** across all pages with detailed tooltips
 
 #### **Efficient Data Display**
 - **Summary View**: Shows function call counts and last usage times by default
 - **Details on Demand**: "📋 View Details" buttons load full data only when needed
 - **Image Gallery**: Optimized image loading with modal viewer
 - **Performance History**: Hourly and daily aggregated performance data
+
+#### **Settings Dashboard (`/dashboard/` → Settings Tab)**
+- **Configuration Validation**: Shows all environment variables with validation status
+- **Security Masking**: Sensitive data (API keys, tokens) displayed as `●●●●●●●●` but shows if valid
+- **Status Indicators**: Required vs Optional badges, Set/Missing/Invalid/Default status
+- **Interactive Filtering**: Filter by All/Required/Optional/Issues for focused troubleshooting
+- **Configuration Drift Detection**: Identifies unused or deprecated environment variables
+- **Real-time Validation**: Shows which variables are actually being used by the code
 
 ## Error Handling & Logging
 
