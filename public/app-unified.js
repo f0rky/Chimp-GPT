@@ -337,6 +337,8 @@ async function fetchPerformanceDataForStatus() {
     const data = await response.json();
     
     console.log('Performance data for status tab:', data);
+    console.log('Performance summary:', data.summary);
+    console.log('Available keys in summary:', Object.keys(data.summary || {}));
     updateStatusResponseTime(data);
     logDebug('Status response time updated', 'info');
   } catch (error) {
@@ -479,14 +481,43 @@ function updateStatusDisplay(data) {
 }
 
 function updateStatusResponseTime(data) {
-  if (!data.summary) return;
+  if (!data.summary) {
+    console.warn('No summary in performance data');
+    return;
+  }
   
   const responseTimeEl = document.getElementById('response-time');
   const avgResponseTimeEl = document.getElementById('avg-response-time');
   
+  console.log('Looking for messageProcessing in:', data.summary);
+  console.log('messageProcessing value:', data.summary.messageProcessing);
+  
   if (responseTimeEl && avgResponseTimeEl) {
-    // Get response time from performance data
-    const avgResponseTime = Math.round(data.summary.messageProcessing?.avg || 0);
+    // Try different possible fields for response time
+    let avgResponseTime = 0;
+    
+    if (data.summary.messageProcessing?.avg) {
+      avgResponseTime = Math.round(data.summary.messageProcessing.avg);
+      console.log('Found messageProcessing.avg:', avgResponseTime);
+    } else if (data.summary.openai?.avg) {
+      avgResponseTime = Math.round(data.summary.openai.avg);
+      console.log('Using openai.avg as fallback:', avgResponseTime);
+    } else if (data.summary.responseTime?.avg) {
+      avgResponseTime = Math.round(data.summary.responseTime.avg);
+      console.log('Found responseTime.avg:', avgResponseTime);
+    } else {
+      // Check all available fields
+      console.log('All summary fields:', Object.keys(data.summary));
+      for (const [key, value] of Object.entries(data.summary)) {
+        if (value && value.avg) {
+          console.log(`Field ${key} has avg:`, value.avg);
+          avgResponseTime = Math.round(value.avg);
+          break;
+        }
+      }
+    }
+    
+    console.log('Setting response time to:', avgResponseTime);
     responseTimeEl.textContent = `${avgResponseTime} ms`;
     avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
     
