@@ -37,11 +37,26 @@ const logger = createLogger('image');
 const { trackApiCall, trackError } = require('./healthCheck');
 const functionResults = require('./functionResults');
 const config = require('./configValidator');
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const breakerManager = require('./breakerManager');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Circuit breaker configuration for image generation API calls
+const IMAGE_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 3, // Opens after 3 consecutive failures (more conservative for image gen)
+  breakerTimeoutMs: 300000, // 5 minutes timeout (longer due to image generation complexity)
+  onBreakerOpen: error => {
+    logger.error({ error }, 'Image generation API circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered(
+      'Image generation API circuit breaker opened: ' + error.message
+    );
+  },
+};
 
 /**
  * Available image generation models
@@ -198,19 +213,21 @@ async function generateImage(prompt, options = {}) {
 
     try {
       // Log that we're about to make the API call
-      logger.debug('Making OpenAI API call for image generation');
+      logger.debug('Making OpenAI API call for image generation with circuit breaker protection');
 
-      // Make the API call and track the time it takes
-      response = await openai.images.generate(imageParams);
-      apiCallDuration = Date.now() - apiCallStartTime;
+      // Make the API call with circuit breaker protection
+      response = await retryWithBreaker(async () => {
+        const callStart = Date.now();
+        const result = await openai.images.generate(imageParams);
+        apiCallDuration = Date.now() - callStart;
+        logger.info({ apiCallDuration }, 'OpenAI image generation API call completed');
+        return result;
+      }, IMAGE_BREAKER_CONFIG);
 
-      // Log the API call duration
-      logger.info({ apiCallDuration }, 'OpenAI API call completed');
-
-      // Track the API call
+      // Track the successful API call
       trackApiCall('gptimage');
     } catch (error) {
-      // Check for content policy violation
+      // Check for content policy violation (should be handled before circuit breaker retry)
       if (error.status === 400 && error.code === 'moderation_blocked') {
         logger.warn({ prompt, error: error.message }, 'Image generation blocked by content policy');
         // Return a specific error result for content policy violations
@@ -222,7 +239,19 @@ async function generateImage(prompt, options = {}) {
           prompt,
         };
       }
-      // Re-throw other errors for the retry mechanism
+
+      // Check for circuit breaker open state
+      if (error.message.includes('Circuit breaker is open')) {
+        logger.warn({ prompt }, 'Image generation failed due to circuit breaker');
+        return {
+          success: false,
+          error: 'Image generation service is temporarily unavailable. Please try again in a few minutes.',
+          isCircuitBreakerOpen: true,
+          prompt,
+        };
+      }
+
+      // For other errors, re-throw to be handled by the outer try-catch
       throw error;
     }
 

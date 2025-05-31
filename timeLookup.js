@@ -2,6 +2,21 @@ const moment = require('moment-timezone');
 const { time: timeLogger } = require('./logger');
 const functionResults = require('./functionResults');
 const { sanitizeLocation } = require('./utils/inputSanitizer');
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const breakerManager = require('./breakerManager');
+
+// Circuit breaker configuration for time lookup operations
+const TIME_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5, // Opens after 5 consecutive failures
+  breakerTimeoutMs: 60000, // 1 minute timeout (shorter since it's local computation)
+  onBreakerOpen: error => {
+    timeLogger.error({ error }, 'Time lookup circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered(
+      'Time lookup circuit breaker opened: ' + error.message
+    );
+  },
+};
 
 /**
  * Convert a user-friendly location to a timezone string
@@ -188,11 +203,11 @@ function findTimezoneByPartialMatch(query) {
 }
 
 /**
- * Look up the current time for a location
+ * Internal time lookup function that performs the actual computation
  * @param {string} location - The location to look up time for
- * @returns {string} - Formatted response with the current time
+ * @returns {Promise<string>} - Formatted response with the current time
  */
-async function lookupTime(location) {
+async function _performTimeLookup(location) {
   // Sanitize the location input
   const sanitizedLocation = sanitizeLocation(location);
 
@@ -281,6 +296,30 @@ async function lookupTime(location) {
     );
 
     return `Sorry, I encountered an error getting the time for "${location}". Please try a different location.`;
+  }
+}
+
+/**
+ * Look up the current time for a location with circuit breaker protection
+ * @param {string} location - The location to look up time for
+ * @returns {Promise<string>} - Formatted response with the current time
+ */
+async function lookupTime(location) {
+  try {
+    return await retryWithBreaker(
+      () => _performTimeLookup(location),
+      TIME_BREAKER_CONFIG
+    );
+  } catch (error) {
+    timeLogger.error({ error, location }, 'Time lookup failed after circuit breaker protection');
+    
+    // Provide a fallback response when circuit breaker is open
+    if (error.message.includes('Circuit breaker is open')) {
+      return `Time lookup service is temporarily unavailable. Please try again in a few minutes.`;
+    }
+    
+    // For other errors, provide a generic fallback
+    return `Sorry, I couldn't get the time for "${location}" right now. Please try again later.`;
   }
 }
 

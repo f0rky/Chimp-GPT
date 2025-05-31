@@ -15,19 +15,29 @@ const { wolfram: wolframLogger } = require('./logger');
 const { sanitizeQuery } = require('./utils/inputSanitizer');
 const functionResults = require('./functionResults');
 const apiKeyManager = require('./utils/apiKeyManager');
+const retryWithBreaker = require('./utils/retryWithBreaker');
+const breakerManager = require('./breakerManager');
+
+// Circuit breaker configuration for Wolfram Alpha API calls
+const WOLFRAM_BREAKER_CONFIG = {
+  maxRetries: 2,
+  breakerLimit: 5, // Opens after 5 consecutive failures
+  breakerTimeoutMs: 180000, // 3 minutes timeout
+  onBreakerOpen: error => {
+    wolframLogger.error({ error }, 'Wolfram Alpha API circuit breaker opened');
+    breakerManager.notifyOwnerBreakerTriggered(
+      'Wolfram Alpha API circuit breaker opened: ' + error.message
+    );
+  },
+};
 
 /**
- * Get a short answer from Wolfram Alpha for a given query
- *
- * This function sends a query to the Wolfram Alpha Short Answer API
- * and returns the response. It handles errors gracefully and logs
- * both the query and response for debugging purposes.
- *
+ * Internal function that performs the actual Wolfram Alpha API call
  * @async
  * @param {string} query - The question or query to send to Wolfram Alpha
- * @returns {Promise<string>} The answer from Wolfram Alpha or an error message
+ * @returns {Promise<string>} The answer from Wolfram Alpha
  */
-async function getWolframShortAnswer(query) {
+async function _performWolframLookup(query) {
   // Sanitize the query input
   const sanitizedQuery = sanitizeQuery(query);
 
@@ -99,10 +109,50 @@ async function getWolframShortAnswer(query) {
         }
       )
       .catch(err => wolframLogger.error({ err }, 'Failed to store Wolfram lookup error result'));
-    if (error.response && error.response.data) {
-      return `Error: ${error.response.data}`;
+    
+    // Re-throw the error for the circuit breaker to handle
+    throw error;
+  }
+}
+
+/**
+ * Get a short answer from Wolfram Alpha for a given query with circuit breaker protection
+ *
+ * This function sends a query to the Wolfram Alpha Short Answer API
+ * and returns the response. It handles errors gracefully and logs
+ * both the query and response for debugging purposes.
+ *
+ * @async
+ * @param {string} query - The question or query to send to Wolfram Alpha
+ * @returns {Promise<string>} The answer from Wolfram Alpha or an error message
+ */
+async function getWolframShortAnswer(query) {
+  try {
+    return await retryWithBreaker(
+      () => _performWolframLookup(query),
+      WOLFRAM_BREAKER_CONFIG
+    );
+  } catch (error) {
+    wolframLogger.error({ error, query }, 'Wolfram Alpha lookup failed after circuit breaker protection');
+    
+    // Provide a fallback response when circuit breaker is open
+    if (error.message.includes('Circuit breaker is open')) {
+      return `Wolfram Alpha service is temporarily unavailable. Please try again in a few minutes.`;
     }
-    return `Error: ${error.message}`;
+    
+    // For API errors, provide more specific feedback
+    if (error.response) {
+      if (error.response.status === 401) {
+        return `Sorry, Wolfram Alpha API authentication failed. Please try again later.`;
+      } else if (error.response.status === 429) {
+        return `Wolfram Alpha rate limit reached. Please try again later.`;
+      } else if (error.response.data) {
+        return `Wolfram Alpha error: ${error.response.data}`;
+      }
+    }
+    
+    // For other errors, provide a generic fallback
+    return `Sorry, I couldn't get an answer from Wolfram Alpha for "${query}" right now. Please try again later.`;
   }
 }
 
