@@ -306,18 +306,15 @@ async function _performTimeLookup(location) {
  */
 async function lookupTime(location) {
   try {
-    return await retryWithBreaker(
-      () => _performTimeLookup(location),
-      TIME_BREAKER_CONFIG
-    );
+    return await retryWithBreaker(() => _performTimeLookup(location), TIME_BREAKER_CONFIG);
   } catch (error) {
     timeLogger.error({ error, location }, 'Time lookup failed after circuit breaker protection');
-    
+
     // Provide a fallback response when circuit breaker is open
     if (error.message.includes('Circuit breaker is open')) {
       return `Time lookup service is temporarily unavailable. Please try again in a few minutes.`;
     }
-    
+
     // For other errors, provide a generic fallback
     return `Sorry, I couldn't get the time for "${location}" right now. Please try again later.`;
   }

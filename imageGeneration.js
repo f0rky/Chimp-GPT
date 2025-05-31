@@ -245,7 +245,8 @@ async function generateImage(prompt, options = {}) {
         logger.warn({ prompt }, 'Image generation failed due to circuit breaker');
         return {
           success: false,
-          error: 'Image generation service is temporarily unavailable. Please try again in a few minutes.',
+          error:
+            'Image generation service is temporarily unavailable. Please try again in a few minutes.',
           isCircuitBreakerOpen: true,
           prompt,
         };

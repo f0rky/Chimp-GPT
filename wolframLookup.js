@@ -109,7 +109,7 @@ async function _performWolframLookup(query) {
         }
       )
       .catch(err => wolframLogger.error({ err }, 'Failed to store Wolfram lookup error result'));
-    
+
     // Re-throw the error for the circuit breaker to handle
     throw error;
   }
@@ -128,18 +128,18 @@ async function _performWolframLookup(query) {
  */
 async function getWolframShortAnswer(query) {
   try {
-    return await retryWithBreaker(
-      () => _performWolframLookup(query),
-      WOLFRAM_BREAKER_CONFIG
-    );
+    return await retryWithBreaker(() => _performWolframLookup(query), WOLFRAM_BREAKER_CONFIG);
   } catch (error) {
-    wolframLogger.error({ error, query }, 'Wolfram Alpha lookup failed after circuit breaker protection');
-    
+    wolframLogger.error(
+      { error, query },
+      'Wolfram Alpha lookup failed after circuit breaker protection'
+    );
+
     // Provide a fallback response when circuit breaker is open
     if (error.message.includes('Circuit breaker is open')) {
       return `Wolfram Alpha service is temporarily unavailable. Please try again in a few minutes.`;
     }
-    
+
     // For API errors, provide more specific feedback
     if (error.response) {
       if (error.response.status === 401) {
@@ -150,7 +150,7 @@ async function getWolframShortAnswer(query) {
         return `Wolfram Alpha error: ${error.response.data}`;
       }
     }
-    
+
     // For other errors, provide a generic fallback
     return `Sorry, I couldn't get an answer from Wolfram Alpha for "${query}" right now. Please try again later.`;
   }

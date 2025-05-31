@@ -384,20 +384,20 @@ function initStatusServer(options = {}) {
 
     // Serve static files from the public directory
     app.use(express.static(path.join(__dirname, 'public')));
-    
+
     // Redirect old dashboard paths to unified dashboard
     app.get('/dashboard', (req, res) => {
       res.redirect('/#performance');
     });
-    
+
     app.get('/dashboard/', (req, res) => {
       res.redirect('/#performance');
     });
-    
+
     app.get('/performance.html', (req, res) => {
       res.redirect('/#performance');
     });
-    
+
     // Serve old index as backup
     app.get('/index-old.html', (req, res) => {
       res.sendFile(path.join(__dirname, 'public', 'index-old.html'));
@@ -1046,7 +1046,7 @@ function initStatusServer(options = {}) {
             message: `User ${userId} has been unblocked`,
           });
         }
-        
+
         return res.status(404).json({
           success: false,
           error: 'User was not blocked',
