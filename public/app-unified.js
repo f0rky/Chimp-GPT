@@ -733,8 +733,8 @@ function updateFunctionSummary(data) {
   }
 
   // Auto-load images if they exist
-  if (data.images && data.images.count > 0) {
-    loadFunctionDetails('images');
+  if (data.gptimage && data.gptimage.count > 0) {
+    loadFunctionDetails('gptimage');
   }
 
   // Auto-load weather if it exists
@@ -979,8 +979,8 @@ async function loadFunctionDetails(func) {
     logDebug(`Loaded details for ${func}`, 'info');
 
     // If it's images, update the gallery
-    if (func === 'images' && data.images) {
-      updateImageGallery(data.images);
+    if ((func === 'images' || func === 'gptimage') && (data.images || data.gptimage)) {
+      updateImageGallery(data.images || data.gptimage);
     } else if (func === 'weather' && data.weather) {
       updateWeatherResults(data.weather);
     }
