@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <title id="page-title">Bot Status</title>
+
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png" />
+    <link rel="manifest" href="/images/site.webmanifest" />
+    <link rel="shortcut icon" href="/images/favicon.ico" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bot Status" />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="logo">
+          <i class="fas fa-robot"></i>
+          <h1 id="bot-name-header">Bot Status</h1>
+        </div>
+        <div class="header-controls">
+          <a href="/dashboard/" class="dashboard-link" title="Performance Dashboard">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Performance Dashboard</span>
+          </a>
+          <div id="status-indicator" class="status-indicator">
+            <span class="dot"></span>
+            <span class="status-text">Checking...</span>
+          </div>
+          <div id="conversation-mode" class="conversation-mode">
+            <span class="mode-icon">💬</span>
+            <span class="mode-text" title="Conversation Mode">Loading...</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="dashboard">
+        <!-- Critical Status Bar - Always Visible -->
+        <div class="card status-bar">
+          <div class="stat">
+            <span class="label">Uptime</span>
+            <span id="uptime" class="value">--:--:--</span>
+          </div>
+          <div class="stat">
+            <span class="label">Version</span>
+            <span id="version" class="value">-.-.-</span>
+          </div>
+          <div class="stat">
+            <span class="label">Messages</span>
+            <span id="message-count" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Discord Ping</span>
+            <span id="discord-ping" class="value">-- ms</span>
+          </div>
+          <div class="status-actions">
+            <button id="run-tests" class="btn btn-secondary" title="Run Tests">
+              <i class="fas fa-flask"></i>
+            </button>
+            <button id="reset-stats" class="btn btn-warning" title="Reset Stats">
+              <i class="fas fa-redo"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Performance Overview -->
+        <div class="card combined-performance">
+          <h2>Real-Time Performance & System Health</h2>
+          <div class="performance-overview">
+            <div class="performance-chart">
+              <canvas id="metrics-chart"></canvas>
+            </div>
+            <div class="performance-stats">
+              <div class="stat-grid compact">
+                <div class="stat">
+                  <span class="label">Response Time</span>
+                  <span id="response-time" class="value">-- ms</span>
+                  <span class="subtext">Avg: <span id="avg-response-time">-- ms</span></span>
+                </div>
+                <div class="stat">
+                  <span class="label">Min/Max</span>
+                  <span id="minmax-response-time" class="value">-- / -- ms</span>
+                  <span class="subtext">Last 100 requests</span>
+                </div>
+                <div class="stat">
+                  <span class="label">CPU Usage</span>
+                  <span id="cpu-usage" class="value">-- %</span>
+                  <span class="subtext">Load: <span id="cpu-load">--</span></span>
+                </div>
+                <div class="stat">
+                  <span class="label">Memory Usage</span>
+                  <span id="memory-usage" class="value">-- MB</span>
+                  <span class="subtext">Used / Total</span>
+                </div>
+                <div class="stat">
+                  <span class="label">RSS</span>
+                  <span id="memory-rss" class="value">-- MB</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Heap Used</span>
+                  <span id="memory-heap-used" class="value">-- MB</span>
+                </div>
+                <div class="stat">
+                  <span class="label">System Memory</span>
+                  <span id="system-memory" class="value">-- / -- MB</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Rate Limits</span>
+                  <span id="rate-limit-hits" class="value">0</span>
+                  <span class="subtext"><span id="rate-limit-users">0</span> users</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card performance-history">
+          <h2>Performance History</h2>
+          <div class="history-controls">
+            <button class="history-btn active" data-period="hourly" data-range="24">
+              Last 24 Hours
+            </button>
+            <button class="history-btn" data-period="hourly" data-range="168">Last 7 Days</button>
+            <button class="history-btn" data-period="daily" data-range="30">Last 30 Days</button>
+            <button class="history-btn" data-period="daily" data-range="90">Last 90 Days</button>
+          </div>
+          <div class="chart-container" style="height: 300px">
+            <canvas id="history-chart"></canvas>
+          </div>
+          <div class="history-stats">
+            <div class="stat">
+              <span class="label">Avg Response Time</span>
+              <span id="history-avg-response" class="value">-- ms</span>
+            </div>
+            <div class="stat">
+              <span class="label">Total Messages</span>
+              <span id="history-total-messages" class="value">--</span>
+            </div>
+            <div class="stat">
+              <span class="label">API Calls</span>
+              <span id="history-api-calls" class="value">--</span>
+            </div>
+            <div class="stat">
+              <span class="label">Avg Memory</span>
+              <span id="history-avg-memory" class="value">-- MB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Health & System Status -->
+        <div class="card api-system-health">
+          <h2>API Health & System Status</h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px">
+            <div>
+              <h3 style="font-size: 1rem; margin-bottom: 10px; color: var(--text-secondary)">
+                API Calls
+              </h3>
+              <div class="chart-container" style="height: 180px">
+                <canvas id="api-chart"></canvas>
+              </div>
+              <div class="info-dense">
+                <div class="stat">
+                  <span class="label">OpenAI</span>
+                  <span id="openai-calls" class="value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Weather</span>
+                  <span id="weather-calls" class="value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Time</span>
+                  <span id="time-calls" class="value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Wolfram</span>
+                  <span id="wolfram-calls" class="value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Quake</span>
+                  <span id="quake-calls" class="value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">GPT Image</span>
+                  <span id="dalle-calls" class="value">0</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; margin-bottom: 10px; color: var(--text-secondary)">
+                Errors & Health
+              </h3>
+              <div class="chart-container" style="height: 180px">
+                <canvas id="error-chart"></canvas>
+              </div>
+              <div class="info-dense">
+                <div class="stat">
+                  <span class="label">OpenAI Errors</span>
+                  <span id="openai-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Discord Errors</span>
+                  <span id="discord-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Weather Errors</span>
+                  <span id="weather-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Time Errors</span>
+                  <span id="time-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Wolfram Errors</span>
+                  <span id="wolfram-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Quake Errors</span>
+                  <span id="quake-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">GPT Image Errors</span>
+                  <span id="dalle-errors" class="value error-count">0</span>
+                </div>
+                <div class="stat">
+                  <span class="label">Other Errors</span>
+                  <span id="other-errors" class="value error-count">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compact Plugin & System Info -->
+        <div class="card compact-info mini-card">
+          <h2>Plugins & System</h2>
+          <div class="info-dense">
+            <div class="stat">
+              <span class="label">Plugins</span>
+              <span id="plugin-count" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Commands</span>
+              <span id="plugin-commands" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Functions</span>
+              <span id="plugin-functions" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Heap Total</span>
+              <span id="memory-heap-total" class="value">-- MB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Advanced Diagnostics -->
+        <div class="card collapsible-section">
+          <div class="collapsible-header" onclick="toggleCollapsible('advanced-diagnostics')">
+            <h2>Advanced Diagnostics & Plugin Details</h2>
+            <i class="fas fa-chevron-down collapsible-toggle" id="advanced-diagnostics-toggle"></i>
+          </div>
+          <div class="collapsible-content" id="advanced-diagnostics-content">
+            <div class="card mini-card">
+              <h3>Plugin Details</h3>
+              <div class="plugin-details">
+                <div id="plugin-api-calls" class="plugin-list">
+                  <div class="empty-message">No plugin API calls recorded</div>
+                </div>
+                <div id="plugin-errors" class="plugin-list">
+                  <div class="empty-message">No plugin errors recorded</div>
+                </div>
+                <div id="plugin-errors-container" class="detailed-errors">
+                  <p class="text-success">No plugin errors reported.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mini-card">
+              <h3>Memory Details</h3>
+              <div class="progress-container">
+                <div class="progress-label">Heap Used</div>
+                <div class="progress-bar">
+                  <div id="heap-used-bar" class="progress" style="width: 0%"></div>
+                </div>
+                <div id="heap-used" class="progress-value">0 MB</div>
+              </div>
+              <div class="progress-container">
+                <div class="progress-label">RSS</div>
+                <div class="progress-bar">
+                  <div id="rss-bar" class="progress" style="width: 0%"></div>
+                </div>
+                <div id="rss" class="progress-value">0 MB</div>
+              </div>
+              <div class="progress-container">
+                <div class="progress-label">System Memory</div>
+                <div class="progress-bar">
+                  <div id="system-memory-bar" class="progress" style="width: 0%"></div>
+                </div>
+                <div id="system-memory" class="progress-value">0 MB</div>
+              </div>
+            </div>
+
+            <div class="card mini-card">
+              <h3>Rate Limit Details</h3>
+              <div class="rate-limit-details">
+                <div id="rate-limited-users-list" class="user-list">
+                  <div class="no-data">No rate limited users</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mini-card">
+              <h3>Test Results</h3>
+              <div id="test-results">
+                <p>Click "Run Tests" to execute system diagnostics</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card function-results">
+          <div class="card-header">
+            <h2>Recent Function Calls</h2>
+            <div class="tab-container">
+              <button class="tab-button active" data-tab="weather">Weather</button>
+              <button class="tab-button" data-tab="time">Time</button>
+              <button class="tab-button" data-tab="wolfram">Wolfram</button>
+              <button class="tab-button" data-tab="quake">Quake</button>
+              <button class="tab-button" data-tab="gptimage">GPT Image-1</button>
+              <button class="tab-button" data-tab="gallery">Image Gallery</button>
+            </div>
+          </div>
+          <div class="tab-content">
+            <div class="tab-pane active" id="weather-results">
+              <div class="no-data">No recent weather lookups</div>
+            </div>
+            <div class="tab-pane" id="time-results">
+              <div class="no-data">No recent time lookups</div>
+            </div>
+            <div class="tab-pane" id="wolfram-results">
+              <div class="no-data">No recent Wolfram Alpha queries</div>
+            </div>
+            <div class="tab-pane" id="quake-results">
+              <div class="no-data">No recent Quake server stats</div>
+            </div>
+            <div class="tab-pane" id="gptimage-results">
+              <div class="no-data">No recent GPT Image-1 generations</div>
+            </div>
+            <div class="tab-pane" id="gallery-results">
+              <div class="gallery-container">
+                <div class="no-data">No images to display</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>Last updated: <span id="last-updated">Never</span></p>
+        <p>ChimpGPT Status Page &copy; 2025</p>
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Image Gallery Modal -->
+    <div class="gallery-modal" id="gallery-modal">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-content">
+        <img id="modal-image" src="" alt="Generated image" />
+      </div>
+      <div class="modal-prompt" id="modal-prompt"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

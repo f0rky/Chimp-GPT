@@ -4,7 +4,7 @@
 
 ## 🚀 Current Focus: Dashboard Enhancement
 
-- [ ] **Dashboard Implementation**
+- [x] **Dashboard Implementation**
   - [x] Basic dashboard layout and styling
   - [x] Real-time performance metrics display
   - [x] API status monitoring
@@ -13,7 +13,15 @@
   - [x] Add error handling for API connection failures
   - [x] Add historical data storage and analysis
   - [x] Create mobile-responsive design
-  - [ ] Add dark/light mode toggle
+  - [x] Add dark/light mode toggle
+  - [x] Implement blocked user management
+  - [x] Add settings dashboard with configuration validation
+  - [x] Implement conversation mode display across all pages
+  - [x] Add bandwidth optimization (99.99% reduction)
+  - [x] Create on-demand detail loading for function results
+  - [x] Unified dashboard with tabs combining all interfaces
+  - [x] Common header/navigation with status page theme
+  - [x] Debug console relocated to bottom left corner
 
 ## ⚠️ Issues/Items to Fix (from Code Review)
 
@@ -65,16 +73,10 @@
 - [x] **Emoji toggles and ELO display for Quake stats:** Added SHOW_TEAM_EMOJIS, SHOW_SERVER_STATS_EMOJIS, and ELO_DISPLAY_MODE environment variables. Team/spectator formatting improved (done).
 - [x] **Image gallery modal/mobile/error handling:** Status page image gallery includes modal viewer, mobile support, and robust error handling (done).
 - [x] **Logger standardization (Pino):** All main modules now use Pino-based logger for error handling and debugging. Test/CLI files reviewed for consistency (done; see README for details).
+- [x] **Settings dashboard with configuration validation:** Added comprehensive settings dashboard showing all environment variables with validation status, security masking for sensitive data, and filtering capabilities. Helps identify configuration drift and unused variables.
+- [x] **Conversation mode visualization:** Added conversation mode indicators across all status pages showing current mode (Blended/Individual with/without Reply Context), startup logging, and detailed tooltips. Provides clear visibility into bot conversation behavior configuration.
 
 ---
-
-## Targeted Function Enhancement: `greeting`
-
-### Instructions
-
-- **Assessment:** Begin by conducting a thorough examination of the 'greeting' function, noting any discrepancies, limitations, or areas ripe for enhancement.
-- **Modification:** With meticulous care and a bold vision, rewrite or augment the existing code. Whether it be through introducing new algorithms, refining dialogue models, or integrating advanced forms of witty banter, your expertise will lead the way.
-- **Test and Feedback Loop:** Implement the modified functionalities and observe them in action. Engage in a cycle of testing and refinement, with each iteration guided by the principles of creativity, efficiency, and user delight.
 
 ## High Priority (Easier Implementation)
 
@@ -93,7 +95,7 @@
 
 ### Performance & Reliability
 
-- [ ] Add circuit breaker pattern for external API calls
+- [x] Add circuit breaker pattern for external API calls
 - [x] Implement graceful shutdown handling
 - [x] Status page now reliably shows live bot online/offline state and name (backend/frontend integration)
 - [x] Status server multi-port fallback and remote access confirmed working
@@ -106,9 +108,6 @@
 - [x] Add image gallery view for DALL-E generations in the status page (includes modal, mobile, error handling)
 - [x] Status server now reads Discord status and bot name from persistent stats for accurate frontend display
 - [ ] Implement persistent conversation history across bot restarts
-- [ ] Add support for multiple languages
-- [ ] Add image variation and editing capabilities to the DALL-E integration
-- [ ] Support plugin command removal (for deprecated commands)
 
 ### Testing & Quality Assurance
 
@@ -131,26 +130,6 @@
 
 ---
 
-## Forward-Looking Enhancements & AI Potential
-
-- [ ] **Contextual Memory and Long-Term Conversation Retention:**  
-       Implement advanced state management to enable the bot to retain and utilize conversation history across extended interactions and restarts, providing more natural, context-aware responses.
-
-- [ ] **Dynamic and Diverse Content Generation:**  
-       Integrate advanced NLP techniques and tune content generation algorithms to produce more varied, engaging, and contextually appropriate responses tailored to user needs.
-
-- [ ] **Adaptive Learning and Personalization:**  
-       Explore mechanisms for the bot to learn from user interactions and feedback, allowing it to refine its responses and adapt its style or strategies over time (e.g., via engagement metrics or explicit ratings).
-
-- [ ] **Highly Modular Architecture:**  
-       Refactor core systems into modular, easily extensible components, ensuring new features and integrations can be added or swapped with minimal friction.
-
-- [ ] **Enhanced Error Diagnostics and Reporting:**  
-       Expand error handling to include detailed diagnostics, structured error classes, and user-facing explanations for failures, making troubleshooting easier for both users and developers.
-
----
-
-- [ ] Create a proper error handling system with customized error classes
 - [x] Implement a plugin system for easier extension of bot functionality
 
 ### Testing & Quality Assurance

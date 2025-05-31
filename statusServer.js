@@ -387,15 +387,20 @@ function initStatusServer(options = {}) {
     
     // Redirect old dashboard paths to unified dashboard
     app.get('/dashboard', (req, res) => {
-      res.redirect('/unified-index.html');
+      res.redirect('/#performance');
     });
     
     app.get('/dashboard/', (req, res) => {
-      res.redirect('/unified-index.html');
+      res.redirect('/#performance');
     });
     
     app.get('/performance.html', (req, res) => {
-      res.redirect('/unified-index.html#performance');
+      res.redirect('/#performance');
+    });
+    
+    // Serve old index as backup
+    app.get('/index-old.html', (req, res) => {
+      res.sendFile(path.join(__dirname, 'public', 'index-old.html'));
     });
 
     /**
