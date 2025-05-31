@@ -489,35 +489,24 @@ function updateStatusResponseTime(data) {
   const responseTimeEl = document.getElementById('response-time');
   const avgResponseTimeEl = document.getElementById('avg-response-time');
   
-  console.log('Looking for messageProcessing in:', data.summary);
-  console.log('messageProcessing value:', data.summary.messageProcessing);
   
   if (responseTimeEl && avgResponseTimeEl) {
-    // Try different possible fields for response time
+    // Get response time from the correct field name (with underscores)
     let avgResponseTime = 0;
     
-    if (data.summary.messageProcessing?.avg) {
-      avgResponseTime = Math.round(data.summary.messageProcessing.avg);
-      console.log('Found messageProcessing.avg:', avgResponseTime);
-    } else if (data.summary.openai?.avg) {
-      avgResponseTime = Math.round(data.summary.openai.avg);
-      console.log('Using openai.avg as fallback:', avgResponseTime);
-    } else if (data.summary.responseTime?.avg) {
-      avgResponseTime = Math.round(data.summary.responseTime.avg);
-      console.log('Found responseTime.avg:', avgResponseTime);
+    if (data.summary.message_processing?.avg) {
+      avgResponseTime = Math.round(data.summary.message_processing.avg);
+    } else if (data.summary.openai_api?.avg) {
+      avgResponseTime = Math.round(data.summary.openai_api.avg);
     } else {
-      // Check all available fields
-      console.log('All summary fields:', Object.keys(data.summary));
+      // Fallback to any field with avg
       for (const [key, value] of Object.entries(data.summary)) {
         if (value && value.avg) {
-          console.log(`Field ${key} has avg:`, value.avg);
           avgResponseTime = Math.round(value.avg);
           break;
         }
       }
     }
-    
-    console.log('Setting response time to:', avgResponseTime);
     responseTimeEl.textContent = `${avgResponseTime} ms`;
     avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
     
@@ -583,10 +572,10 @@ function updatePerformanceDisplay(data) {
     return;
   }
   
-  // Update response time (only if elements exist)
+  // Update response time (only if elements exist) - using correct field name
   const responseTimeEl = document.getElementById('response-time');
   const avgResponseTimeEl = document.getElementById('avg-response-time');
-  const avgResponseTime = Math.round(data.summary.messageProcessing?.avg || 0);
+  const avgResponseTime = Math.round(data.summary.message_processing?.avg || 0);
   
   if (responseTimeEl) responseTimeEl.textContent = `${avgResponseTime} ms`;
   if (avgResponseTimeEl) avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
@@ -594,8 +583,8 @@ function updatePerformanceDisplay(data) {
   // Update min/max
   const minMaxEl = document.getElementById('minmax-response-time');
   if (minMaxEl) {
-    const min = Math.round(data.summary.messageProcessing?.min || 0);
-    const max = Math.round(data.summary.messageProcessing?.max || 0);
+    const min = Math.round(data.summary.message_processing?.min || 0);
+    const max = Math.round(data.summary.message_processing?.max || 0);
     minMaxEl.textContent = `${min} / ${max} ms`;
   }
   
@@ -605,14 +594,14 @@ function updatePerformanceDisplay(data) {
   // Update memory gauge
   updateMemoryGauge(data.serverHealth?.memory);
   
-  // Update latency stats (only if elements exist)
+  // Update latency stats (only if elements exist) - using correct field names
   const openaiLatencyEl = document.getElementById('openaiLatency');
   const weatherLatencyEl = document.getElementById('weatherLatency');
   const otherLatencyEl = document.getElementById('otherLatency');
   
-  if (openaiLatencyEl) openaiLatencyEl.textContent = `${Math.round(data.summary.openai?.avg || 0)}ms`;
-  if (weatherLatencyEl) weatherLatencyEl.textContent = `${Math.round(data.summary.weather?.avg || 0)}ms`;
-  if (otherLatencyEl) otherLatencyEl.textContent = `${Math.round(data.summary.other?.avg || 0)}ms`;
+  if (openaiLatencyEl) openaiLatencyEl.textContent = `${Math.round(data.summary.openai_api?.avg || 0)}ms`;
+  if (weatherLatencyEl) weatherLatencyEl.textContent = `${Math.round(data.summary.weather_api?.avg || 0)}ms`;
+  if (otherLatencyEl) otherLatencyEl.textContent = `${Math.round(data.summary.plugin_execution?.avg || 0)}ms`;
   
   // Update request history
   updateRequestHistory(data.detailed);
@@ -704,10 +693,10 @@ function updateCharts(data) {
     });
   }
   
-  // Update with actual API latency data
-  state.charts.latency.data.datasets[0].data.push(data.summary.openai?.avg || 0);
-  state.charts.latency.data.datasets[1].data.push(data.summary.weather?.avg || 0);
-  state.charts.latency.data.datasets[2].data.push(data.summary.other?.avg || 0);
+  // Update with actual API latency data (using correct field names)
+  state.charts.latency.data.datasets[0].data.push(data.summary.openai_api?.avg || 0);
+  state.charts.latency.data.datasets[1].data.push(data.summary.weather_api?.avg || 0);
+  state.charts.latency.data.datasets[2].data.push(data.summary.plugin_execution?.avg || 0);
   
   state.charts.latency.update('none');
 }
