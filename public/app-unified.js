@@ -7,9 +7,9 @@ const state = {
   theme: localStorage.getItem('theme') || 'dark',
   debugCollapsed: localStorage.getItem('debugCollapsed') === 'true',
   updateIntervals: {
-    status: 10000,    // 10 seconds
+    status: 10000, // 10 seconds
     performance: 5000, // 5 seconds
-    functions: 15000   // 15 seconds
+    functions: 15000, // 15 seconds
   },
   charts: {},
   timers: {},
@@ -17,15 +17,15 @@ const state = {
     labels: [],
     responseTime: [],
     cpuUsage: [],
-    memoryUsage: []
-  }
+    memoryUsage: [],
+  },
 };
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Unified dashboard initializing...');
   logDebug('Dashboard starting up', 'info');
-  
+
   initializeTheme();
   initializeTabs();
   initializeDebugConsole();
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startDataFetching();
   setupEventListeners();
   updateClock();
-  
+
   console.log('Unified dashboard initialized');
   logDebug('Dashboard fully loaded', 'info');
 });
@@ -66,16 +66,16 @@ function initializeTabs() {
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const targetTab = tab.dataset.tab;
-      
+
       // Update active states
       tabs.forEach(t => t.classList.remove('active'));
       contents.forEach(c => c.classList.remove('active'));
-      
+
       tab.classList.add('active');
       document.getElementById(`${targetTab}-tab`).classList.add('active');
-      
+
       state.currentTab = targetTab;
-      
+
       // Load tab-specific data
       loadTabData(targetTab);
     });
@@ -83,7 +83,7 @@ function initializeTabs() {
 }
 
 function loadTabData(tab) {
-  switch(tab) {
+  switch (tab) {
     case 'status':
       fetchHealthData();
       // Also fetch performance data for response time metrics
@@ -99,6 +99,8 @@ function loadTabData(tab) {
     case 'settings':
       fetchSettings();
       break;
+    default:
+      break;
   }
 }
 
@@ -107,21 +109,21 @@ function initializeDebugConsole() {
   const debugConsole = document.getElementById('debug-console');
   const debugToggle = document.getElementById('debug-toggle');
   const debugInput = document.getElementById('debug-command');
-  
+
   if (state.debugCollapsed) {
     debugConsole.classList.add('collapsed');
   }
-  
+
   debugToggle.addEventListener('click', () => {
     debugConsole.classList.toggle('collapsed');
     state.debugCollapsed = debugConsole.classList.contains('collapsed');
     localStorage.setItem('debugCollapsed', state.debugCollapsed);
-    
+
     const icon = debugToggle.querySelector('i');
     icon.className = state.debugCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
   });
-  
-  debugInput.addEventListener('keypress', (e) => {
+
+  debugInput.addEventListener('keypress', e => {
     if (e.key === 'Enter') {
       executeDebugCommand(e.target.value);
       e.target.value = '';
@@ -132,14 +134,14 @@ function initializeDebugConsole() {
 function logDebug(message, type = 'info') {
   const debugMessages = document.getElementById('debug-messages');
   const timestamp = new Date().toLocaleTimeString();
-  
+
   const messageEl = document.createElement('div');
   messageEl.className = `debug-message ${type}`;
   messageEl.textContent = `[${timestamp}] ${message}`;
-  
+
   debugMessages.appendChild(messageEl);
   debugMessages.scrollTop = debugMessages.scrollHeight;
-  
+
   // Keep only last 100 messages
   while (debugMessages.children.length > 100) {
     debugMessages.removeChild(debugMessages.firstChild);
@@ -148,11 +150,11 @@ function logDebug(message, type = 'info') {
 
 function executeDebugCommand(command) {
   logDebug(`> ${command}`, 'info');
-  
+
   // Simple command parser
   const [cmd, ...args] = command.toLowerCase().split(' ');
-  
-  switch(cmd) {
+
+  switch (cmd) {
     case 'clear':
       document.getElementById('debug-messages').innerHTML = '';
       break;
@@ -174,30 +176,33 @@ function executeDebugCommand(command) {
 // Chart Initialization
 function initializeCharts() {
   console.log('Initializing charts...');
-  
+
   // Status page metrics chart
   const metricsCanvas = document.getElementById('metrics-chart');
   console.log('Metrics canvas found:', metricsCanvas);
-  
+
   if (metricsCanvas) {
     const metricsCtx = metricsCanvas.getContext('2d');
     state.charts.metrics = new Chart(metricsCtx, {
       type: 'line',
       data: {
         labels: [],
-        datasets: [{
-          label: 'Response Time (ms)',
-          data: [],
-          borderColor: '#7289da',
-          backgroundColor: 'rgba(114, 137, 218, 0.1)',
-          tension: 0.4
-        }, {
-          label: 'CPU Usage (%)',
-          data: [],
-          borderColor: '#43b581',
-          backgroundColor: 'rgba(67, 181, 129, 0.1)',
-          tension: 0.4
-        }]
+        datasets: [
+          {
+            label: 'Response Time (ms)',
+            data: [],
+            borderColor: '#7289da',
+            backgroundColor: 'rgba(114, 137, 218, 0.1)',
+            tension: 0.4,
+          },
+          {
+            label: 'CPU Usage (%)',
+            data: [],
+            borderColor: '#43b581',
+            backgroundColor: 'rgba(67, 181, 129, 0.1)',
+            tension: 0.4,
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -205,78 +210,82 @@ function initializeCharts() {
         plugins: {
           legend: {
             display: true,
-            position: 'bottom'
-          }
+            position: 'bottom',
+          },
         },
         scales: {
           y: {
             beginAtZero: true,
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
+              color: 'rgba(255, 255, 255, 0.1)',
+            },
           },
           x: {
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
-          }
-        }
-      }
+              color: 'rgba(255, 255, 255, 0.1)',
+            },
+          },
+        },
+      },
     });
   }
 
   // Performance dashboard latency chart
   const latencyCanvas = document.getElementById('latencyChart');
   console.log('Latency canvas found:', latencyCanvas);
-  
+
   if (latencyCanvas) {
     const latencyCtx = latencyCanvas.getContext('2d');
     state.charts.latency = new Chart(latencyCtx, {
       type: 'line',
       data: {
         labels: [],
-        datasets: [{
-          label: 'OpenAI',
-          data: [],
-          borderColor: '#7289da',
-          tension: 0.4
-        }, {
-          label: 'Weather',
-          data: [],
-          borderColor: '#43b581',
-          tension: 0.4
-        }, {
-          label: 'Other',
-          data: [],
-          borderColor: '#faa61a',
-          tension: 0.4
-        }]
+        datasets: [
+          {
+            label: 'OpenAI',
+            data: [],
+            borderColor: '#7289da',
+            tension: 0.4,
+          },
+          {
+            label: 'Weather',
+            data: [],
+            borderColor: '#43b581',
+            tension: 0.4,
+          },
+          {
+            label: 'Other',
+            data: [],
+            borderColor: '#faa61a',
+            tension: 0.4,
+          },
+        ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            display: false
-          }
+            display: false,
+          },
         },
         scales: {
           y: {
             beginAtZero: true,
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
+              color: 'rgba(255, 255, 255, 0.1)',
+            },
           },
           x: {
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
-          }
-        }
-      }
+              color: 'rgba(255, 255, 255, 0.1)',
+            },
+          },
+        },
+      },
     });
   }
-  
+
   console.log('Charts initialized:', state.charts);
 }
 
@@ -285,7 +294,7 @@ function startDataFetching() {
   // Initial fetch
   fetchHealthData();
   fetchPerformanceDataForStatus();
-  
+
   // Set up intervals
   state.timers.status = setInterval(() => {
     if (state.currentTab === 'status') {
@@ -293,7 +302,7 @@ function startDataFetching() {
       fetchPerformanceDataForStatus();
     }
   }, state.updateIntervals.status);
-  
+
   state.timers.performance = setInterval(() => {
     if (state.currentTab === 'performance') {
       fetchPerformanceData();
@@ -305,7 +314,7 @@ async function fetchHealthData() {
   try {
     const response = await fetch('/health');
     const data = await response.json();
-    
+
     console.log('Health data received:', data);
     updateStatusDisplay(data);
     updateConversationMode(data.conversationMode);
@@ -320,7 +329,7 @@ async function fetchPerformanceData() {
   try {
     const response = await fetch('/performance');
     const data = await response.json();
-    
+
     console.log('Performance data received:', data);
     updatePerformanceDisplay(data);
     updateCharts(data);
@@ -335,7 +344,7 @@ async function fetchPerformanceDataForStatus() {
   try {
     const response = await fetch('/performance');
     const data = await response.json();
-    
+
     console.log('Performance data for status tab:', data);
     console.log('Performance summary:', data.summary);
     console.log('Available keys in summary:', Object.keys(data.summary || {}));
@@ -351,7 +360,7 @@ async function fetchFunctionResults() {
   try {
     const response = await fetch('/function-results/summary');
     const data = await response.json();
-    
+
     console.log('Function results summary:', data);
     updateFunctionSummary(data);
     logDebug('Function results updated', 'info');
@@ -365,7 +374,7 @@ async function fetchBlockedUsers() {
   try {
     const response = await fetch('/blocked-users');
     const data = await response.json();
-    
+
     updateBlockedUsers(data);
     logDebug('Blocked users updated', 'info');
   } catch (error) {
@@ -377,7 +386,7 @@ async function fetchSettings() {
   try {
     const response = await fetch('/settings');
     const data = await response.json();
-    
+
     updateSettingsDisplay(data);
     logDebug('Settings loaded', 'info');
   } catch (error) {
@@ -388,7 +397,7 @@ async function fetchSettings() {
 // Display Updates
 function updateStatusDisplay(data) {
   console.log('Updating status display with data:', data);
-  
+
   // Update header
   const headerEl = document.getElementById('bot-name-header');
   if (headerEl) {
@@ -397,11 +406,11 @@ function updateStatusDisplay(data) {
   } else {
     console.warn('bot-name-header element not found');
   }
-  
+
   // Update status indicator
   const statusDot = document.querySelector('.dot');
   const statusText = document.querySelector('.status-text');
-  
+
   if (statusDot && statusText) {
     if (data.discord?.status === 'ok' || data.status === 'ok') {
       statusDot.className = 'dot online';
@@ -413,16 +422,16 @@ function updateStatusDisplay(data) {
   } else {
     console.warn('Status indicator elements not found');
   }
-  
+
   // Update stats with null checks
   const elements = ['uptime', 'version', 'message-count', 'discord-ping'];
   const values = [
     data.formattedUptime || '--:--:--',
     data.version || '-.-.-',
     data.stats?.messageCount || '0',
-    `${data.discord?.ping || '--'} ms`
+    `${data.discord?.ping || '--'} ms`,
   ];
-  
+
   elements.forEach((id, index) => {
     const el = document.getElementById(id);
     if (el) {
@@ -431,7 +440,7 @@ function updateStatusDisplay(data) {
       console.warn(`Element ${id} not found`);
     }
   });
-  
+
   // Update system stats from actual data
   if (data.system?.loadAvg && data.system?.cpus) {
     const cpuUsage = Math.round((data.system.loadAvg[0] / data.system.cpus) * 100);
@@ -444,12 +453,12 @@ function updateStatusDisplay(data) {
       cpuElement.textContent = '---%';
     }
   }
-  
+
   const memoryElement = document.getElementById('memory-usage');
   if (memoryElement) {
     memoryElement.textContent = data.memory?.rss || '-- MB';
   }
-  
+
   // For response time, we need to fetch it from performance data or calculate a mock value
   // Since this is the health endpoint, let's show a reasonable placeholder
   const responseTimeEl = document.getElementById('response-time');
@@ -459,7 +468,7 @@ function updateStatusDisplay(data) {
     responseTimeEl.textContent = '-- ms';
     avgResponseTimeEl.textContent = '-- ms';
   }
-  
+
   // Calculate total API calls
   const totalApiCalls = Object.values(data.stats?.apiCalls || {}).reduce((sum, count) => {
     // Handle nested plugin calls
@@ -469,13 +478,13 @@ function updateStatusDisplay(data) {
     return sum + (typeof count === 'number' ? count : 0);
   }, 0);
   document.getElementById('total-api-calls').textContent = totalApiCalls;
-  
+
   // Update API stats
   updateApiStats(data.stats?.apiCalls);
-  
+
   // Update rate limits
   updateRateLimits(data.stats?.rateLimits);
-  
+
   // Update the metrics chart with real data
   updateMetricsChart(data);
 }
@@ -485,15 +494,14 @@ function updateStatusResponseTime(data) {
     console.warn('No summary in performance data');
     return;
   }
-  
+
   const responseTimeEl = document.getElementById('response-time');
   const avgResponseTimeEl = document.getElementById('avg-response-time');
-  
-  
+
   if (responseTimeEl && avgResponseTimeEl) {
     // Get response time from the correct field name (with underscores)
     let avgResponseTime = 0;
-    
+
     if (data.summary.message_processing?.avg) {
       avgResponseTime = Math.round(data.summary.message_processing.avg);
     } else if (data.summary.openai_api?.avg) {
@@ -509,7 +517,7 @@ function updateStatusResponseTime(data) {
     }
     responseTimeEl.textContent = `${avgResponseTime} ms`;
     avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
-    
+
     // Also update the chart if we're on the status tab
     if (state.currentTab === 'status') {
       updateMetricsChart({ stats: { responseTime: avgResponseTime }, system: {} });
@@ -532,14 +540,14 @@ function updateApiStats(apiCalls) {
     return;
   }
   container.innerHTML = '';
-  
+
   for (const [api, count] of Object.entries(apiCalls || {})) {
     // Handle nested plugin API calls
     if (typeof count === 'object' && count !== null) {
       // Skip nested objects for now, or sum them up
       continue;
     }
-    
+
     const item = document.createElement('div');
     item.className = 'api-stat-item';
     item.innerHTML = `
@@ -571,15 +579,15 @@ function updatePerformanceDisplay(data) {
     console.warn('No performance summary data');
     return;
   }
-  
+
   // Update response time (only if elements exist) - using correct field name
   const responseTimeEl = document.getElementById('response-time');
   const avgResponseTimeEl = document.getElementById('avg-response-time');
   const avgResponseTime = Math.round(data.summary.message_processing?.avg || 0);
-  
+
   if (responseTimeEl) responseTimeEl.textContent = `${avgResponseTime} ms`;
   if (avgResponseTimeEl) avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
-  
+
   // Update min/max
   const minMaxEl = document.getElementById('minmax-response-time');
   if (minMaxEl) {
@@ -587,22 +595,25 @@ function updatePerformanceDisplay(data) {
     const max = Math.round(data.summary.message_processing?.max || 0);
     minMaxEl.textContent = `${min} / ${max} ms`;
   }
-  
+
   // Update API status
   updateApiStatus(data);
-  
+
   // Update memory gauge
   updateMemoryGauge(data.serverHealth?.memory);
-  
+
   // Update latency stats (only if elements exist) - using correct field names
   const openaiLatencyEl = document.getElementById('openaiLatency');
   const weatherLatencyEl = document.getElementById('weatherLatency');
   const otherLatencyEl = document.getElementById('otherLatency');
-  
-  if (openaiLatencyEl) openaiLatencyEl.textContent = `${Math.round(data.summary.openai_api?.avg || 0)}ms`;
-  if (weatherLatencyEl) weatherLatencyEl.textContent = `${Math.round(data.summary.weather_api?.avg || 0)}ms`;
-  if (otherLatencyEl) otherLatencyEl.textContent = `${Math.round(data.summary.plugin_execution?.avg || 0)}ms`;
-  
+
+  if (openaiLatencyEl)
+    openaiLatencyEl.textContent = `${Math.round(data.summary.openai_api?.avg || 0)}ms`;
+  if (weatherLatencyEl)
+    weatherLatencyEl.textContent = `${Math.round(data.summary.weather_api?.avg || 0)}ms`;
+  if (otherLatencyEl)
+    otherLatencyEl.textContent = `${Math.round(data.summary.plugin_execution?.avg || 0)}ms`;
+
   // Update request history
   updateRequestHistory(data.detailed);
 }
@@ -617,17 +628,17 @@ function updateApiStatus(data) {
 
 function updateMemoryGauge(memory) {
   if (!memory) return;
-  
-  const rss = parseInt(memory.rss);
+
+  const rss = parseInt(memory.rss, 10);
   const maxMemory = 1500; // 1.5GB typical limit
   const percentage = Math.min((rss / maxMemory) * 100, 100);
-  
+
   const gauge = document.getElementById('memoryGauge');
   const text = document.getElementById('memoryText');
-  
+
   gauge.style.height = `${percentage}%`;
   text.textContent = `${rss}MB / ${maxMemory}MB`;
-  
+
   // Change color based on usage
   if (percentage > 80) {
     gauge.style.background = 'linear-gradient(180deg, #f04747, #faa61a)';
@@ -643,28 +654,29 @@ function updateMetricsChart(data) {
     console.warn('Metrics chart not initialized');
     return;
   }
-  
+
   // Add new data point
   const now = new Date().toLocaleTimeString();
   state.performanceData.labels.push(now);
-  
+
   // Use actual response time from performance data if available
   const responseTime = data.stats?.responseTime || Math.random() * 100 + 50;
   state.performanceData.responseTime.push(responseTime);
-  
+
   // Calculate actual CPU usage from system data
-  const cpuUsage = (data.system?.loadAvg && data.system?.cpus)
-    ? Math.round((data.system.loadAvg[0] / data.system.cpus) * 100)
-    : Math.random() * 20 + 10;
+  const cpuUsage =
+    data.system?.loadAvg && data.system?.cpus
+      ? Math.round((data.system.loadAvg[0] / data.system.cpus) * 100)
+      : Math.random() * 20 + 10;
   state.performanceData.cpuUsage.push(cpuUsage);
-  
+
   // Keep only last 20 points
   if (state.performanceData.labels.length > 20) {
     state.performanceData.labels.shift();
     state.performanceData.responseTime.shift();
     state.performanceData.cpuUsage.shift();
   }
-  
+
   try {
     // Update chart
     state.charts.metrics.data.labels = state.performanceData.labels;
@@ -679,12 +691,12 @@ function updateMetricsChart(data) {
 function updateCharts(data) {
   // Update latency chart if on performance tab
   if (!state.charts.latency || !data.summary) return;
-  
+
   const now = new Date().toLocaleTimeString();
-  
+
   // Add new data points
   state.charts.latency.data.labels.push(now);
-  
+
   // Keep only last 30 points
   if (state.charts.latency.data.labels.length > 30) {
     state.charts.latency.data.labels.shift();
@@ -692,19 +704,19 @@ function updateCharts(data) {
       dataset.data.shift();
     });
   }
-  
+
   // Update with actual API latency data (using correct field names)
   state.charts.latency.data.datasets[0].data.push(data.summary.openai_api?.avg || 0);
   state.charts.latency.data.datasets[1].data.push(data.summary.weather_api?.avg || 0);
   state.charts.latency.data.datasets[2].data.push(data.summary.plugin_execution?.avg || 0);
-  
+
   state.charts.latency.update('none');
 }
 
 function updateFunctionSummary(data) {
   const container = document.getElementById('function-summary');
   container.innerHTML = '';
-  
+
   for (const [func, info] of Object.entries(data)) {
     if (typeof info === 'object' && info.count !== undefined) {
       const item = document.createElement('div');
@@ -719,12 +731,12 @@ function updateFunctionSummary(data) {
       container.appendChild(item);
     }
   }
-  
+
   // Auto-load images if they exist
   if (data.images && data.images.count > 0) {
     loadFunctionDetails('images');
   }
-  
+
   // Auto-load weather if it exists
   if (data.weather && data.weather.count > 0) {
     loadFunctionDetails('weather');
@@ -734,7 +746,7 @@ function updateFunctionSummary(data) {
 function updateBlockedUsers(data) {
   const container = document.getElementById('blocked-users-container');
   container.innerHTML = '';
-  
+
   if (data.users && data.users.length > 0) {
     data.users.forEach(user => {
       const item = document.createElement('div');
@@ -776,17 +788,17 @@ function updateSettingsDisplay(data) {
       <small>Valid</small>
     </div>
   `;
-  
+
   // Update settings list
   const list = document.getElementById('settings-list');
   list.innerHTML = '';
-  
+
   data.settings.forEach(setting => {
     const item = document.createElement('div');
     item.className = 'setting-item';
     item.dataset.required = setting.required;
     item.dataset.set = setting.isSet;
-    
+
     item.innerHTML = `
       <div class="setting-info">
         <h3>${setting.key}</h3>
@@ -798,7 +810,7 @@ function updateSettingsDisplay(data) {
         ${setting.isSet ? '<span class="badge set">Set</span>' : '<span class="badge missing">Missing</span>'}
       </div>
     `;
-    
+
     list.appendChild(item);
   });
 }
@@ -807,18 +819,18 @@ function updateSettingsDisplay(data) {
 function setupEventListeners() {
   // Theme toggle
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  
+
   // Test button
   document.getElementById('run-tests')?.addEventListener('click', runTests);
-  
+
   // Reset stats button
   document.getElementById('reset-stats')?.addEventListener('click', resetStats);
-  
+
   // Settings filter buttons
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       filterSettings(btn.dataset.filter);
-      
+
       // Update active state
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -832,7 +844,7 @@ function updateClock() {
     const now = new Date();
     document.getElementById('currentTime').textContent = now.toLocaleTimeString();
   };
-  
+
   updateTime();
   setInterval(updateTime, 1000);
 }
@@ -851,11 +863,11 @@ async function runTests() {
 
 async function resetStats() {
   if (!confirm('Are you sure you want to reset all statistics?')) return;
-  
+
   try {
     const response = await fetch('/reset-stats', { method: 'POST' });
     const result = await response.json();
-    
+
     if (result.success) {
       logDebug('Statistics reset successfully', 'info');
       fetchHealthData();
@@ -870,19 +882,19 @@ async function resetStats() {
 async function unblockUser(userId) {
   const token = prompt('Enter owner token:');
   if (!token) return;
-  
+
   try {
     const response = await fetch('/unblock-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Owner-Token': token
+        'X-Owner-Token': token,
       },
-      body: JSON.stringify({ userId })
+      body: JSON.stringify({ userId }),
     });
-    
+
     const result = await response.json();
-    
+
     if (result.success) {
       logDebug(`User ${userId} unblocked`, 'info');
       fetchBlockedUsers();
@@ -897,9 +909,9 @@ async function unblockUser(userId) {
 function updateRequestHistory(detailed) {
   const container = document.getElementById('requestHistory');
   if (!container || !detailed) return;
-  
+
   container.innerHTML = '';
-  
+
   // Get recent operations
   const operations = [];
   for (const [op, stats] of Object.entries(detailed)) {
@@ -909,16 +921,16 @@ function updateRequestHistory(detailed) {
       });
     }
   }
-  
+
   // Sort by timestamp and take last 10
   operations.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   const recent = operations.slice(0, 10);
-  
+
   if (recent.length === 0) {
     container.innerHTML = '<div class="text-center">No recent requests</div>';
     return;
   }
-  
+
   recent.forEach(req => {
     const div = document.createElement('div');
     div.className = 'result-item';
@@ -934,11 +946,11 @@ function updateRequestHistory(detailed) {
 
 function filterSettings(filter) {
   const items = document.querySelectorAll('.setting-item');
-  
+
   items.forEach(item => {
     let show = true;
-    
-    switch(filter) {
+
+    switch (filter) {
       case 'required':
         show = item.dataset.required === 'true';
         break;
@@ -948,8 +960,11 @@ function filterSettings(filter) {
       case 'issues':
         show = item.dataset.set === 'false' && item.dataset.required === 'true';
         break;
+      default:
+        show = true;
+        break;
     }
-    
+
     item.style.display = show ? 'grid' : 'none';
   });
 }
@@ -958,11 +973,11 @@ async function loadFunctionDetails(func) {
   try {
     const response = await fetch(`/function-results?limit=10`);
     const data = await response.json();
-    
+
     // Display the results for this function
     console.log(`Details for ${func}:`, data[func]);
     logDebug(`Loaded details for ${func}`, 'info');
-    
+
     // If it's images, update the gallery
     if (func === 'images' && data.images) {
       updateImageGallery(data.images);
@@ -977,12 +992,12 @@ async function loadFunctionDetails(func) {
 function updateImageGallery(images) {
   const gallery = document.getElementById('images-gallery');
   gallery.innerHTML = '';
-  
+
   if (!images || images.length === 0) {
     gallery.innerHTML = '<p class="text-center">No images generated yet</p>';
     return;
   }
-  
+
   // Show latest 12 images
   const recentImages = images.slice(-12).reverse();
   recentImages.forEach(img => {
@@ -996,12 +1011,12 @@ function updateImageGallery(images) {
 function updateWeatherResults(weatherData) {
   const container = document.getElementById('weather-results');
   container.innerHTML = '';
-  
+
   if (!weatherData || weatherData.length === 0) {
     container.innerHTML = '<p class="text-center">No weather lookups yet</p>';
     return;
   }
-  
+
   // Show latest 5 weather lookups
   const recent = weatherData.slice(-5).reverse();
   recent.forEach(item => {
@@ -1020,13 +1035,13 @@ function openImageModal(url, prompt) {
   const modal = document.getElementById('image-modal');
   const modalImg = document.getElementById('modal-image');
   const modalCaption = document.getElementById('modal-caption');
-  
+
   modal.style.display = 'block';
   modalImg.src = url;
   modalCaption.textContent = prompt || 'Generated image';
-  
+
   // Close modal on click
-  modal.onclick = function(e) {
+  modal.onclick = function (e) {
     if (e.target === modal || e.target.className === 'close') {
       modal.style.display = 'none';
     }
