@@ -23,6 +23,9 @@ const state = {
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('Unified dashboard initializing...');
+  logDebug('Dashboard starting up', 'info');
+  
   initializeTheme();
   initializeTabs();
   initializeDebugConsole();
@@ -30,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
   startDataFetching();
   setupEventListeners();
   updateClock();
+  
+  console.log('Unified dashboard initialized');
+  logDebug('Dashboard fully loaded', 'info');
 });
 
 // Theme Management
@@ -286,10 +292,12 @@ async function fetchHealthData() {
     const response = await fetch('/health');
     const data = await response.json();
     
+    console.log('Health data received:', data);
     updateStatusDisplay(data);
     updateConversationMode(data.conversationMode);
     logDebug('Health data updated', 'info');
   } catch (error) {
+    console.error('Error fetching health data:', error);
     logDebug(`Error fetching health data: ${error.message}`, 'error');
   }
 }
@@ -299,10 +307,12 @@ async function fetchPerformanceData() {
     const response = await fetch('/performance');
     const data = await response.json();
     
+    console.log('Performance data received:', data);
     updatePerformanceDisplay(data);
     updateCharts(data);
     logDebug('Performance data updated', 'info');
   } catch (error) {
+    console.error('Error fetching performance data:', error);
     logDebug(`Error fetching performance data: ${error.message}`, 'error');
   }
 }
@@ -312,9 +322,11 @@ async function fetchFunctionResults() {
     const response = await fetch('/function-results/summary');
     const data = await response.json();
     
+    console.log('Function results summary:', data);
     updateFunctionSummary(data);
     logDebug('Function results updated', 'info');
   } catch (error) {
+    console.error('Error fetching function results:', error);
     logDebug(`Error fetching function results: ${error.message}`, 'error');
   }
 }
@@ -345,32 +357,61 @@ async function fetchSettings() {
 
 // Display Updates
 function updateStatusDisplay(data) {
+  console.log('Updating status display with data:', data);
+  
   // Update header
-  document.getElementById('bot-name-header').textContent = data.name || 'Bot Status';
-  document.title = `${data.name || 'Bot'} Status`;
+  const headerEl = document.getElementById('bot-name-header');
+  if (headerEl) {
+    headerEl.textContent = data.name || 'Bot Status';
+    document.title = `${data.name || 'Bot'} Status`;
+  } else {
+    console.warn('bot-name-header element not found');
+  }
   
   // Update status indicator
   const statusDot = document.querySelector('.dot');
   const statusText = document.querySelector('.status-text');
   
-  if (data.discord?.status === 'ok' || data.status === 'ok') {
-    statusDot.className = 'dot online';
-    statusText.textContent = 'Online';
+  if (statusDot && statusText) {
+    if (data.discord?.status === 'ok' || data.status === 'ok') {
+      statusDot.className = 'dot online';
+      statusText.textContent = 'Online';
+    } else {
+      statusDot.className = 'dot offline';
+      statusText.textContent = 'Offline';
+    }
   } else {
-    statusDot.className = 'dot offline';
-    statusText.textContent = 'Offline';
+    console.warn('Status indicator elements not found');
   }
   
-  // Update stats
-  document.getElementById('uptime').textContent = data.formattedUptime || '--:--:--';
-  document.getElementById('version').textContent = data.version || '-.-.-';
-  document.getElementById('message-count').textContent = data.stats?.messageCount || '0';
-  document.getElementById('discord-ping').textContent = `${data.discord?.ping || '--'} ms`;
+  // Update stats with null checks
+  const elements = ['uptime', 'version', 'message-count', 'discord-ping'];
+  const values = [
+    data.formattedUptime || '--:--:--',
+    data.version || '-.-.-',
+    data.stats?.messageCount || '0',
+    `${data.discord?.ping || '--'} ms`
+  ];
+  
+  elements.forEach((id, index) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = values[index];
+    } else {
+      console.warn(`Element ${id} not found`);
+    }
+  });
   
   // Update system stats from actual data
-  if (data.system?.loadAvg) {
+  if (data.system?.loadAvg && data.system?.cpus) {
     const cpuUsage = Math.round((data.system.loadAvg[0] / data.system.cpus) * 100);
     document.getElementById('cpu-usage').textContent = `${cpuUsage}%`;
+  } else {
+    // Fallback if system data is not available
+    const cpuElement = document.getElementById('cpu-usage');
+    if (cpuElement) {
+      cpuElement.textContent = '---%';
+    }
   }
   document.getElementById('memory-usage').textContent = data.memory?.rss || '-- MB';
   
@@ -404,9 +445,19 @@ function updateConversationMode(modeData) {
 
 function updateApiStats(apiCalls) {
   const container = document.getElementById('api-stats');
+  if (!container) {
+    console.warn('api-stats container not found');
+    return;
+  }
   container.innerHTML = '';
   
   for (const [api, count] of Object.entries(apiCalls || {})) {
+    // Handle nested plugin API calls
+    if (typeof count === 'object' && count !== null) {
+      // Skip nested objects for now, or sum them up
+      continue;
+    }
+    
     const item = document.createElement('div');
     item.className = 'api-stat-item';
     item.innerHTML = `
@@ -434,17 +485,26 @@ function updateRateLimits(rateLimits) {
 }
 
 function updatePerformanceDisplay(data) {
-  if (!data.summary) return;
+  if (!data.summary) {
+    console.warn('No performance summary data');
+    return;
+  }
   
-  // Update response time
+  // Update response time (only if elements exist)
+  const responseTimeEl = document.getElementById('response-time');
+  const avgResponseTimeEl = document.getElementById('avg-response-time');
   const avgResponseTime = Math.round(data.summary.messageProcessing?.avg || 0);
-  document.getElementById('response-time').textContent = `${avgResponseTime} ms`;
-  document.getElementById('avg-response-time').textContent = `${avgResponseTime} ms`;
+  
+  if (responseTimeEl) responseTimeEl.textContent = `${avgResponseTime} ms`;
+  if (avgResponseTimeEl) avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
   
   // Update min/max
-  const min = Math.round(data.summary.messageProcessing?.min || 0);
-  const max = Math.round(data.summary.messageProcessing?.max || 0);
-  document.getElementById('minmax-response-time').textContent = `${min} / ${max} ms`;
+  const minMaxEl = document.getElementById('minmax-response-time');
+  if (minMaxEl) {
+    const min = Math.round(data.summary.messageProcessing?.min || 0);
+    const max = Math.round(data.summary.messageProcessing?.max || 0);
+    minMaxEl.textContent = `${min} / ${max} ms`;
+  }
   
   // Update API status
   updateApiStatus(data);
@@ -452,10 +512,14 @@ function updatePerformanceDisplay(data) {
   // Update memory gauge
   updateMemoryGauge(data.serverHealth?.memory);
   
-  // Update latency stats
-  document.getElementById('openaiLatency').textContent = `${Math.round(data.summary.openai?.avg || 0)}ms`;
-  document.getElementById('weatherLatency').textContent = `${Math.round(data.summary.weather?.avg || 0)}ms`;
-  document.getElementById('otherLatency').textContent = `${Math.round(data.summary.other?.avg || 0)}ms`;
+  // Update latency stats (only if elements exist)
+  const openaiLatencyEl = document.getElementById('openaiLatency');
+  const weatherLatencyEl = document.getElementById('weatherLatency');
+  const otherLatencyEl = document.getElementById('otherLatency');
+  
+  if (openaiLatencyEl) openaiLatencyEl.textContent = `${Math.round(data.summary.openai?.avg || 0)}ms`;
+  if (weatherLatencyEl) weatherLatencyEl.textContent = `${Math.round(data.summary.weather?.avg || 0)}ms`;
+  if (otherLatencyEl) otherLatencyEl.textContent = `${Math.round(data.summary.other?.avg || 0)}ms`;
   
   // Update request history
   updateRequestHistory(data.detailed);
@@ -493,7 +557,10 @@ function updateMemoryGauge(memory) {
 }
 
 function updateMetricsChart(data) {
-  if (!state.charts.metrics) return;
+  if (!state.charts.metrics) {
+    console.warn('Metrics chart not initialized');
+    return;
+  }
   
   // Add new data point
   const now = new Date().toLocaleTimeString();
@@ -504,7 +571,7 @@ function updateMetricsChart(data) {
   state.performanceData.responseTime.push(responseTime);
   
   // Calculate actual CPU usage from system data
-  const cpuUsage = data.system?.loadAvg 
+  const cpuUsage = (data.system?.loadAvg && data.system?.cpus)
     ? Math.round((data.system.loadAvg[0] / data.system.cpus) * 100)
     : Math.random() * 20 + 10;
   state.performanceData.cpuUsage.push(cpuUsage);
@@ -516,11 +583,15 @@ function updateMetricsChart(data) {
     state.performanceData.cpuUsage.shift();
   }
   
-  // Update chart
-  state.charts.metrics.data.labels = state.performanceData.labels;
-  state.charts.metrics.data.datasets[0].data = state.performanceData.responseTime;
-  state.charts.metrics.data.datasets[1].data = state.performanceData.cpuUsage;
-  state.charts.metrics.update('none');
+  try {
+    // Update chart
+    state.charts.metrics.data.labels = state.performanceData.labels;
+    state.charts.metrics.data.datasets[0].data = state.performanceData.responseTime;
+    state.charts.metrics.data.datasets[1].data = state.performanceData.cpuUsage;
+    state.charts.metrics.update('none');
+  } catch (error) {
+    console.error('Error updating metrics chart:', error);
+  }
 }
 
 function updateCharts(data) {
