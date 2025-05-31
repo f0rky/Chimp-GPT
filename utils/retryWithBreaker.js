@@ -106,6 +106,31 @@ async function retryWithBreaker(fn, opts = {}) {
       return result;
     } catch (err) {
       lastError = err;
+      
+      // Check if this is a non-retryable error
+      const isContentPolicyViolation = err.status === 400 && 
+        (err.code === 'moderation_blocked' || 
+         err.message?.includes('content policy') ||
+         err.message?.includes('safety system'));
+      
+      const isNonRetryableError = isContentPolicyViolation || 
+        err.status === 401 || // Authentication error
+        err.status === 403 || // Forbidden
+        err.code === 'invalid_request_error';
+      
+      if (isNonRetryableError) {
+        logger.warn(
+          {
+            error: err.message,
+            status: err.status,
+            code: err.code,
+            attempt,
+          },
+          'Non-retryable error encountered, failing immediately'
+        );
+        throw err; // Don't retry, just fail immediately
+      }
+      
       attempt++;
       breakerState.failures++;
 
@@ -152,8 +177,10 @@ async function retryWithBreaker(fn, opts = {}) {
 
       if (attempt > maxRetries) break;
 
-      // Exponential backoff
-      const backoffMs = 200 * Math.pow(2, attempt);
+      // Exponential backoff with configurable limits
+      const initialBackoff = options.initialBackoffMs || 200;
+      const maxBackoff = options.maxBackoffMs || 10000;
+      const backoffMs = Math.min(initialBackoff * Math.pow(2, attempt - 1), maxBackoff);
       logger.info({ backoffMs, attempt }, 'Backing off before retry');
       await new Promise(r => setTimeout(r, backoffMs));
     }

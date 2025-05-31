@@ -47,9 +47,11 @@ const openai = new OpenAI({
 
 // Circuit breaker configuration for image generation API calls
 const IMAGE_BREAKER_CONFIG = {
-  maxRetries: 2,
-  breakerLimit: 3, // Opens after 3 consecutive failures (more conservative for image gen)
-  breakerTimeoutMs: 300000, // 5 minutes timeout (longer due to image generation complexity)
+  maxRetries: 1, // Only retry once for image generation to avoid long waits
+  breakerLimit: 3, // Opens after 3 consecutive failures
+  breakerTimeoutMs: 300000, // 5 minutes timeout
+  initialBackoffMs: 500, // Start with shorter backoff
+  maxBackoffMs: 2000, // Cap backoff at 2 seconds
   onBreakerOpen: error => {
     logger.error({ error }, 'Image generation API circuit breaker opened');
     breakerManager.notifyOwnerBreakerTriggered(
@@ -227,14 +229,18 @@ async function generateImage(prompt, options = {}) {
       // Track the successful API call
       trackApiCall('gptimage');
     } catch (error) {
-      // Check for content policy violation (should be handled before circuit breaker retry)
-      if (error.status === 400 && error.code === 'moderation_blocked') {
+      // Check for content policy violation
+      if (error.status === 400 && 
+          (error.code === 'moderation_blocked' || 
+           error.message?.includes('safety system') ||
+           error.message?.includes('content policy'))) {
         logger.warn({ prompt, error: error.message }, 'Image generation blocked by content policy');
+        trackError('gptimage', error);
+        
         // Return a specific error result for content policy violations
         return {
           success: false,
-          error:
-            'This request was rejected due to content policy violations. Please modify your prompt and try again.',
+          error: 'This image request was blocked by the safety system. Please try a different prompt.',
           isContentPolicyViolation: true,
           prompt,
         };
