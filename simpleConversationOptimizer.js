@@ -395,27 +395,30 @@ async function getStatus() {
  */
 async function removeMessageById(userId, messageId) {
   if (!messageId) return false;
-  
+
   // Make sure we're initialized
   if (!isInitialized) {
     await init();
   }
-  
+
   const conversation = conversationsCache.get(userId);
   if (!conversation) return false;
-  
+
   const index = conversation.findIndex(msg => msg.messageId === messageId);
   if (index !== -1) {
     conversation.splice(index, 1);
     isDirty = true;
-    logger.info({
-      userId,
-      messageId,
-      remainingMessages: conversation.length
-    }, 'Removed message from individual conversation');
+    logger.info(
+      {
+        userId,
+        messageId,
+        remainingMessages: conversation.length,
+      },
+      'Removed message from individual conversation'
+    );
     return true;
   }
-  
+
   return false;
 }
 
@@ -428,28 +431,31 @@ async function removeMessageById(userId, messageId) {
  */
 async function updateMessageById(userId, messageId, newContent) {
   if (!messageId || !newContent) return false;
-  
+
   // Make sure we're initialized
   if (!isInitialized) {
     await init();
   }
-  
+
   const conversation = conversationsCache.get(userId);
   if (!conversation) return false;
-  
+
   const message = conversation.find(msg => msg.messageId === messageId);
   if (message) {
     message.content = newContent;
     message.edited = true;
     message.editedTimestamp = new Date().toISOString();
     isDirty = true;
-    logger.info({
-      userId,
-      messageId
-    }, 'Updated message in individual conversation');
+    logger.info(
+      {
+        userId,
+        messageId,
+      },
+      'Updated message in individual conversation'
+    );
     return true;
   }
-  
+
   return false;
 }
 

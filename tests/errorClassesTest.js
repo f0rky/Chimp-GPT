@@ -1,9 +1,9 @@
 /**
  * Error Classes Tests
- * 
+ *
  * Tests for the custom error classes including ChimpError, ApiError,
  * PluginError, ValidationError, ConfigError, and DiscordError
- * 
+ *
  * @module ErrorClassesTest
  */
 
@@ -23,10 +23,10 @@ async function testErrorClasses() {
       const chimpError = new errors.ChimpError('Test error message', {
         code: 'TEST_ERROR',
         statusCode: 500,
-        context: { foo: 'bar' }
+        context: { foo: 'bar' },
       });
 
-      const success = 
+      const success =
         chimpError instanceof Error &&
         chimpError instanceof errors.ChimpError &&
         chimpError.message === 'Test error message' &&
@@ -38,13 +38,13 @@ async function testErrorClasses() {
         name: 'ChimpError Base Class',
         success,
         errorName: chimpError.name,
-        hasStack: !!chimpError.stack
+        hasStack: !!chimpError.stack,
       });
     } catch (error) {
       results.push({
         name: 'ChimpError Base Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -54,10 +54,10 @@ async function testErrorClasses() {
         endpoint: '/api/test',
         service: 'test-api',
         statusCode: 404,
-        responseData: { error: 'Not found' }
+        responseData: { error: 'Not found' },
       });
 
-      const success = 
+      const success =
         apiError instanceof errors.ChimpError &&
         apiError instanceof errors.ApiError &&
         apiError.message === 'API request failed' &&
@@ -71,13 +71,13 @@ async function testErrorClasses() {
         name: 'ApiError Class',
         success,
         errorName: apiError.name,
-        endpoint: apiError.endpoint
+        endpoint: apiError.endpoint,
       });
     } catch (error) {
       results.push({
         name: 'ApiError Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -87,10 +87,10 @@ async function testErrorClasses() {
         pluginName: 'test-plugin',
         pluginVersion: '1.0.0',
         hookName: 'onLoad',
-        cause: new Error('Original error')
+        cause: new Error('Original error'),
       });
 
-      const success = 
+      const success =
         pluginError instanceof errors.ChimpError &&
         pluginError instanceof errors.PluginError &&
         pluginError.message === 'Plugin failed to load' &&
@@ -104,13 +104,13 @@ async function testErrorClasses() {
         name: 'PluginError Class',
         success,
         errorName: pluginError.name,
-        pluginName: pluginError.pluginName
+        pluginName: pluginError.pluginName,
       });
     } catch (error) {
       results.push({
         name: 'PluginError Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -120,10 +120,10 @@ async function testErrorClasses() {
         field: 'email',
         value: 'invalid-email',
         constraint: 'must be valid email format',
-        code: 'INVALID_EMAIL'
+        code: 'INVALID_EMAIL',
       });
 
-      const success = 
+      const success =
         validationError instanceof errors.ChimpError &&
         validationError instanceof errors.ValidationError &&
         validationError.message === 'Invalid input' &&
@@ -137,13 +137,13 @@ async function testErrorClasses() {
         name: 'ValidationError Class',
         success,
         errorName: validationError.name,
-        field: validationError.field
+        field: validationError.field,
       });
     } catch (error) {
       results.push({
         name: 'ValidationError Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -152,10 +152,10 @@ async function testErrorClasses() {
       const configError = new errors.ConfigError('Missing configuration', {
         configKey: 'OPENAI_API_KEY',
         missingRequired: true,
-        requiredType: 'string'
+        requiredType: 'string',
       });
 
-      const success = 
+      const success =
         configError instanceof errors.ChimpError &&
         configError instanceof errors.ConfigError &&
         configError.message === 'Missing configuration' &&
@@ -168,13 +168,13 @@ async function testErrorClasses() {
         name: 'ConfigError Class',
         success,
         errorName: configError.name,
-        configKey: configError.configKey
+        configKey: configError.configKey,
       });
     } catch (error) {
       results.push({
         name: 'ConfigError Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -184,10 +184,10 @@ async function testErrorClasses() {
         channelId: '123456789',
         guildId: '987654321',
         permissions: { missing: ['SEND_MESSAGES'] },
-        statusCode: 403
+        statusCode: 403,
       });
 
-      const success = 
+      const success =
         discordError instanceof errors.ChimpError &&
         discordError instanceof errors.DiscordError &&
         discordError instanceof errors.ApiError &&
@@ -202,13 +202,13 @@ async function testErrorClasses() {
         name: 'DiscordError Class',
         success,
         errorName: discordError.name,
-        statusCode: discordError.statusCode
+        statusCode: discordError.statusCode,
       });
     } catch (error) {
       results.push({
         name: 'DiscordError Class',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -216,12 +216,14 @@ async function testErrorClasses() {
     try {
       const apiError = errors.createError('api', 'API Error', { endpoint: '/test' });
       const pluginError = errors.createError('plugin', 'Plugin Error', { pluginName: 'test' });
-      const validationError = errors.createError('validation', 'Validation Error', { field: 'test' });
+      const validationError = errors.createError('validation', 'Validation Error', {
+        field: 'test',
+      });
       const configError = errors.createError('config', 'Config Error', { configKey: 'TEST' });
       const discordError = errors.createError('discord', 'Discord Error', { channelId: '123' });
       const genericError = errors.createError('unknown', 'Generic Error');
 
-      const success = 
+      const success =
         apiError instanceof errors.ApiError &&
         pluginError instanceof errors.PluginError &&
         validationError instanceof errors.ValidationError &&
@@ -233,13 +235,13 @@ async function testErrorClasses() {
       results.push({
         name: 'createError Helper',
         success,
-        typesCreated: 6
+        typesCreated: 6,
       });
     } catch (error) {
       results.push({
         name: 'createError Helper',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -250,13 +252,13 @@ async function testErrorClasses() {
 
       const wrappedError = errors.wrapError(originalError, 'File not found', {
         code: 'FILE_ERROR',
-        context: { path: '/test/file.txt' }
+        context: { path: '/test/file.txt' },
       });
 
       // Test wrapping an already wrapped error
       const doubleWrapped = errors.wrapError(wrappedError, 'Still wrapped');
 
-      const success = 
+      const success =
         wrappedError instanceof errors.ChimpError &&
         wrappedError.message === 'File not found' &&
         wrappedError.cause === originalError &&
@@ -268,13 +270,13 @@ async function testErrorClasses() {
         name: 'wrapError Helper',
         success,
         hasCause: !!wrappedError.cause,
-        sameOnDoubleWrap: doubleWrapped === wrappedError
+        sameOnDoubleWrap: doubleWrapped === wrappedError,
       });
     } catch (error) {
       results.push({
         name: 'wrapError Helper',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -284,14 +286,14 @@ async function testErrorClasses() {
         endpoint: '/api/data',
         statusCode: 500,
         responseData: { error: 'Internal server error', details: { foo: 'bar' } },
-        cause: new Error('Network timeout')
+        cause: new Error('Network timeout'),
       });
 
       // Convert to JSON and back
       const serialized = JSON.stringify(complexError);
       const parsed = JSON.parse(serialized);
 
-      const success = 
+      const success =
         parsed.name === 'ApiError' &&
         parsed.message === 'Complex error' &&
         parsed.endpoint === '/api/data' &&
@@ -301,21 +303,21 @@ async function testErrorClasses() {
       results.push({
         name: 'Error Serialization',
         success,
-        serializedLength: serialized.length
+        serializedLength: serialized.length,
       });
     } catch (error) {
       results.push({
         name: 'Error Serialization',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
     // Test 10: Error inheritance chain
     try {
       const apiError = new errors.ApiError('Test');
-      
-      const inheritanceCorrect = 
+
+      const inheritanceCorrect =
         apiError instanceof Error &&
         apiError instanceof errors.ChimpError &&
         apiError instanceof errors.ApiError &&
@@ -324,22 +326,21 @@ async function testErrorClasses() {
 
       results.push({
         name: 'Error Inheritance Chain',
-        success: inheritanceCorrect
+        success: inheritanceCorrect,
       });
     } catch (error) {
       results.push({
         name: 'Error Inheritance Chain',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
-
   } catch (error) {
     logger.error({ error }, 'Error in error classes tests');
     return {
       success: false,
       error: error.message,
-      results
+      results,
     };
   }
 
@@ -348,7 +349,7 @@ async function testErrorClasses() {
 
   return {
     success,
-    results
+    results,
   };
 }
 

@@ -13,7 +13,7 @@ const originalConsole = {
   error: console.error,
   warn: console.warn,
   info: console.info,
-  debug: console.debug
+  debug: console.debug,
 };
 
 // Override console methods to reduce noise during tests
@@ -83,10 +83,10 @@ class TestRunner {
       console.log = (...args) => {
         process.stdout.write(args.join(' ') + '\n');
       };
-      
+
       console.log('\n🚀 Starting test runner...');
       console.log(`Found ${this._tests.length} tests to run`);
-      
+
       // Run beforeAll hooks
       if (this._beforeAll && this._beforeAll.length > 0) {
         console.log('\n=== Running Before All Hooks ===');
@@ -99,14 +99,14 @@ class TestRunner {
       console.log('\n=== Running Tests ===');
       for (const test of this._tests) {
         this._currentTest = test;
-        
+
         // Run beforeEach hooks
         if (this._beforeEach && this._beforeEach.length > 0) {
           for (const hook of this._beforeEach) {
             await hook();
           }
         }
-        
+
         const startTime = Date.now();
         try {
           await test.fn();
@@ -116,16 +116,18 @@ class TestRunner {
         } catch (error) {
           const duration = Date.now() - startTime;
           this._failed++;
-          console.error(`  ✖ ${test.suite} - ${test.name} (${duration}ms)\n     Error: ${error.message}`);
+          console.error(
+            `  ✖ ${test.suite} - ${test.name} (${duration}ms)\n     Error: ${error.message}`
+          );
           if (error.stack) {
             console.error(`     ${error.stack.split('\n').slice(1).join('\n     ')}`);
           }
         }
-        
+
         // Force output to be flushed
         await new Promise(resolve => process.nextTick(resolve));
       }
-      
+
       // Run afterAll hooks
       if (this._afterAll && this._afterAll.length > 0) {
         console.log('\n=== Running After All Hooks ===');
@@ -137,12 +139,12 @@ class TestRunner {
           }
         }
       }
-      
+
       // Print summary
       console.log('\n📊 Test Summary:');
       console.log(`🏁 ${this._passed + this._failed} tests completed`);
       console.log(`✅ ${this._passed} passed`);
-      
+
       if (this._failed > 0) {
         console.log(`❌ ${this._failed} tests failed`);
         console.log('\n🔥 Test run failed');
@@ -172,18 +174,18 @@ function createMockMessage(content, user = { id: '123', username: 'testuser' }, 
     channel: {
       type: isDM ? 'DM' : 'text',
       send: sinon.stub().resolves(),
-      isDMBased: sinon.stub().returns(isDM)
+      isDMBased: sinon.stub().returns(isDM),
     },
     reply: sinon.stub().resolves(),
     member: {
       permissions: {
-        has: sinon.stub().returns(false)
-      }
+        has: sinon.stub().returns(false),
+      },
     },
     guild: isDM ? null : { id: 'guild123', name: 'Test Guild' },
-    delete: sinon.stub().resolves()
+    delete: sinon.stub().resolves(),
   };
-  
+
   return message;
 }
 
@@ -195,30 +197,29 @@ testRunner.describe('Basic Command Functionality', () => {
     delete require.cache[require.resolve('../commands/commandHandler')];
     commandHandler = require('../commands/commandHandler');
   });
-  
+
   let testCommand;
-  
+
   // Reset command handler before each test
   testRunner.beforeEach(() => {
     // Reset any state in the command handler
     commandHandler.setPrefixes(['!']);
-    
+
     // Clear any registered commands
     const commands = commandHandler.getCommands ? commandHandler.getCommands() : {};
     for (const cmd of Object.keys(commands)) {
-
     }
-    
+
     // Create a test command
     testCommand = {
       name: 'test',
       description: 'Test command',
-      execute: sinon.stub().resolves({ success: true })
+      execute: sinon.stub().resolves({ success: true }),
     };
-    
+
     // Register test command
     commandHandler.registerCommand(testCommand);
-    
+
     // Reset stubs
     sinon.resetHistory();
   });
@@ -255,47 +256,46 @@ testRunner.describe('Command Permissions', () => {
     delete require.cache[require.resolve('../commands/commandHandler')];
     commandHandler = require('../commands/commandHandler');
   });
-  
+
   let adminCommand, ownerCommand, dmCommand;
-  
+
   // Reset command handler before each test
   testRunner.beforeEach(() => {
     // Reset any state in the command handler
     commandHandler.setPrefixes(['!']);
-    
+
     // Clear any registered commands
     const commands = commandHandler.getCommands ? commandHandler.getCommands() : {};
     for (const cmd of Object.keys(commands)) {
-
     }
-    
+
     // Create test commands
     adminCommand = {
       name: 'admin',
       description: 'Admin command',
       adminOnly: true,
-      execute: sinon.stub().resolves({ success: true })
+      execute: sinon.stub().resolves({ success: true }),
     };
-    
+
     ownerCommand = {
       name: 'owner',
       description: 'Owner command',
       ownerOnly: true,
-      execute: sinon.stub().resolves({ success: true })
+      execute: sinon.stub().resolves({ success: true }),
     };
-    
+
     dmCommand = {
       name: 'dm',
       description: 'DM command',
       dmAllowed: true, // Changed from dmOnly to dmAllowed to match the command handler
-      execute: sinon.stub().resolves({ success: true })
+      execute: sinon.stub().resolves({ success: true }),
     };
-    
+
     // Register test commands
     commandHandler.registerCommand(adminCommand);
     commandHandler.registerCommand(ownerCommand);
     commandHandler.registerCommand(dmCommand);
-    
+
     // Reset stubs
     sinon.resetHistory();
   });
@@ -305,18 +305,18 @@ testRunner.describe('Command Permissions', () => {
     const message = createMockMessage('!admin', adminUser);
     const { PermissionFlagsBits } = require('discord.js');
     message.member.permissions.has.withArgs(PermissionFlagsBits.Administrator).returns(true);
-    
+
     const result = await commandHandler.handleCommand(message, { OWNER_ID: 'different_owner_id' });
     expect(result).to.be.true;
     expect(adminCommand.execute.calledOnce).to.be.true;
   });
-  
+
   testRunner.it('should block admin commands for non-admin users', async () => {
     const regularUser = { id: 'user123', username: 'regularuser' };
     const message = createMockMessage('!admin', regularUser);
     const { PermissionFlagsBits } = require('discord.js');
     message.member.permissions.has.withArgs(PermissionFlagsBits.Administrator).returns(false);
-    
+
     const result = await commandHandler.handleCommand(message, { OWNER_ID: 'different_owner_id' });
     expect(result).to.be.true; // Should be handled by rejecting with a message
     expect(adminCommand.execute.called).to.be.false;
@@ -325,7 +325,7 @@ testRunner.describe('Command Permissions', () => {
   testRunner.it('should allow DM commands in DMs', async () => {
     const user = { id: 'user123', username: 'testuser' };
     const message = createMockMessage('!dm', user, true);
-    
+
     const result = await commandHandler.handleCommand(message, {});
     expect(result).to.be.true;
     expect(dmCommand.execute.calledOnce).to.be.true;
@@ -335,12 +335,12 @@ testRunner.describe('Command Permissions', () => {
     const user = { id: 'user123', username: 'testuser' };
     // Create a message in a guild channel (not a DM)
     const message = createMockMessage('!dm', user, false);
-    
+
     // Reset any previous calls to the reply method
     message.reply.resetHistory();
-    
+
     const result = await commandHandler.handleCommand(message, {});
-    
+
     // The command handler currently doesn't block DM-only commands in guilds
     // This is a limitation of the current implementation
     // TODO: Update the command handler to support DM-only commands
@@ -358,20 +358,19 @@ testRunner.describe('Command Arguments', () => {
     delete require.cache[require.resolve('../commands/commandHandler')];
     commandHandler = require('../commands/commandHandler');
   });
-  
+
   let argsCommand;
-  
+
   // Reset command handler before each test
   testRunner.beforeEach(() => {
     // Reset any state in the command handler
     commandHandler.setPrefixes(['!']);
-    
+
     // Clear any registered commands
     const commands = commandHandler.getCommands ? commandHandler.getCommands() : {};
     for (const cmd of Object.keys(commands)) {
-
     }
-    
+
     // Create a test command with argument parsing
     argsCommand = {
       name: 'args',
@@ -379,14 +378,14 @@ testRunner.describe('Command Arguments', () => {
       usage: '<required> [optional]',
       args: [
         { name: 'required', type: 'string', required: true },
-        { name: 'optional', type: 'string', required: false }
+        { name: 'optional', type: 'string', required: false },
       ],
-      execute: sinon.stub().resolves({ success: true })
+      execute: sinon.stub().resolves({ success: true }),
     };
-    
+
     // Register test command
     commandHandler.registerCommand(argsCommand);
-    
+
     // Reset stubs
     sinon.resetHistory();
   });
@@ -394,34 +393,34 @@ testRunner.describe('Command Arguments', () => {
   testRunner.it('should parse command arguments', async () => {
     const message = createMockMessage('!args first second');
     const result = await commandHandler.handleCommand(message, {});
-    
+
     expect(result).to.be.true;
     expect(argsCommand.execute.calledOnce).to.be.true;
-    
+
     const call = argsCommand.execute.getCall(0);
     expect(call.args[0]).to.equal(message);
     expect(call.args[1]).to.deep.equal(['first', 'second']);
   });
-  
+
   testRunner.it('should handle quoted arguments', async () => {
     const message = createMockMessage('!args "first argument" "second argument"');
     const result = await commandHandler.handleCommand(message, {});
-    
+
     expect(result).to.be.true;
     expect(argsCommand.execute.calledOnce).to.be.true;
-    
+
     const call = argsCommand.execute.getCall(0);
     expect(call.args[0]).to.equal(message);
     expect(call.args[1]).to.deep.equal(['"first', 'argument"', '"second', 'argument"']);
   });
-  
+
   testRunner.it('should handle commands with no arguments', async () => {
     const message = createMockMessage('!args');
     const result = await commandHandler.handleCommand(message, {});
-    
+
     expect(result).to.be.true;
     expect(argsCommand.execute.calledOnce).to.be.true;
-    
+
     const call = argsCommand.execute.getCall(0);
     expect(call.args[0]).to.equal(message);
     expect(call.args[1]).to.deep.equal([]);

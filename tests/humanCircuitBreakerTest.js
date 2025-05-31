@@ -1,9 +1,9 @@
 /**
  * Human Circuit Breaker Tests
- * 
+ *
  * Tests for the human circuit breaker functionality including
  * approval requests, notifications, and integration with the main circuit breaker
- * 
+ *
  * @module HumanCircuitBreakerTest
  */
 
@@ -20,8 +20,14 @@ async function testHumanCircuitBreaker() {
     // Test 1: Check sensitive operations constants
     try {
       const operations = humanCircuitBreaker.SENSITIVE_OPERATIONS;
-      const expectedOps = ['DATA_WRITE', 'COMMAND_EXECUTION', 'API_CALL', 'SYSTEM_CHANGE', 'PLUGIN_ACTION'];
-      
+      const expectedOps = [
+        'DATA_WRITE',
+        'COMMAND_EXECUTION',
+        'API_CALL',
+        'SYSTEM_CHANGE',
+        'PLUGIN_ACTION',
+      ];
+
       const hasAllOps = expectedOps.every(op => operations[op] !== undefined);
       const allStrings = Object.values(operations).every(val => typeof val === 'string');
 
@@ -29,13 +35,13 @@ async function testHumanCircuitBreaker() {
         name: 'Sensitive Operations Constants',
         success: hasAllOps && allStrings,
         operationCount: Object.keys(operations).length,
-        hasAllExpected: hasAllOps
+        hasAllExpected: hasAllOps,
       });
     } catch (error) {
       results.push({
         name: 'Sensitive Operations Constants',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -43,7 +49,7 @@ async function testHumanCircuitBreaker() {
     try {
       const hasRequestFunction = typeof humanCircuitBreaker.requestHumanApproval === 'function';
       const funcLength = humanCircuitBreaker.requestHumanApproval.length;
-      
+
       // Function should accept 4 parameters: details, onApprove, onDeny, client
       const correctSignature = funcLength === 4;
 
@@ -51,13 +57,13 @@ async function testHumanCircuitBreaker() {
         name: 'Request Approval Function',
         success: hasRequestFunction && correctSignature,
         functionExists: hasRequestFunction,
-        parameterCount: funcLength
+        parameterCount: funcLength,
       });
     } catch (error) {
       results.push({
         name: 'Request Approval Function',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -66,19 +72,19 @@ async function testHumanCircuitBreaker() {
       const hasExecuteWithApproval = typeof humanCircuitBreaker.executeWithApproval === 'function';
       const hasRequiresApproval = typeof humanCircuitBreaker.requiresHumanApproval === 'function';
       const hasCreateMessage = typeof humanCircuitBreaker.createApprovalMessage === 'function';
-      
+
       results.push({
         name: 'Approval Management Functions',
         success: hasExecuteWithApproval && hasRequiresApproval && hasCreateMessage,
         hasExecuteFunction: hasExecuteWithApproval,
         hasRequiresFunction: hasRequiresApproval,
-        hasCreateMessageFunction: hasCreateMessage
+        hasCreateMessageFunction: hasCreateMessage,
       });
     } catch (error) {
       results.push({
         name: 'Approval Management Functions',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -92,13 +98,13 @@ async function testHumanCircuitBreaker() {
         name: 'Module Exports',
         success: hasRequiredExports,
         exportCount: exports.length,
-        exports: exports
+        exports: exports,
       });
     } catch (error) {
       results.push({
         name: 'Module Exports',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
 
@@ -107,7 +113,7 @@ async function testHumanCircuitBreaker() {
       // Check if the module correctly imports circuit breaker dependencies
       const circuitBreaker = require('../circuitBreaker');
       const breakerManager = require('../breakerManager');
-      
+
       const hasCircuitBreaker = !!circuitBreaker;
       const hasBreakerManager = !!breakerManager;
 
@@ -115,22 +121,21 @@ async function testHumanCircuitBreaker() {
         name: 'Circuit Breaker Integration',
         success: hasCircuitBreaker && hasBreakerManager,
         hasCircuitBreaker,
-        hasBreakerManager
+        hasBreakerManager,
       });
     } catch (error) {
       results.push({
         name: 'Circuit Breaker Integration',
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
-
   } catch (error) {
     logger.error({ error }, 'Error in human circuit breaker tests');
     return {
       success: false,
       error: error.message,
-      results
+      results,
     };
   }
 
@@ -139,7 +144,7 @@ async function testHumanCircuitBreaker() {
 
   return {
     success,
-    results
+    results,
   };
 }
 

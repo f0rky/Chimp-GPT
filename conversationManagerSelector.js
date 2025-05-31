@@ -1,9 +1,9 @@
 /**
  * Conversation Manager Selector
- * 
+ *
  * This module dynamically selects between blended and individual conversation managers
  * based on the configuration setting USE_BLENDED_CONVERSATIONS.
- * 
+ *
  * @module ConversationManagerSelector
  */
 

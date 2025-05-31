@@ -79,7 +79,8 @@ module.exports = {
       // Get all commands from the command handler
       const allCommands = getCommands();
       const isOwner = message.author.id === config.ownerId;
-      const isAdmin = message.member?.permissions.has(PermissionsBitField.Flags.Administrator) || false;
+      const isAdmin =
+        message.member?.permissions.has(PermissionsBitField.Flags.Administrator) || false;
 
       // Get the first prefix for help messages
       const primaryPrefix = getCurrentPrefixes()[0];

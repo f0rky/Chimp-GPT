@@ -1,9 +1,9 @@
 /**
  * Blended Conversation Manager Module
- * 
+ *
  * This module manages conversations in a blended mode where messages from all users
  * in a channel are combined into a shared context, with a limit on messages per user.
- * 
+ *
  * @module BlendedConversationManager
  * @author Brett
  * @version 1.0.0
@@ -66,15 +66,18 @@ function addMessageToBlended(channelId, userId, message, isDM = false, messageId
   if (message.content) {
     const validation = validateMessage(message.content);
     if (!validation.valid) {
-      logger.warn({
-        userId,
-        channelId,
-        validationError: validation.reason
-      }, 'Message validation failed, sanitizing');
+      logger.warn(
+        {
+          userId,
+          channelId,
+          validationError: validation.reason,
+        },
+        'Message validation failed, sanitizing'
+      );
     }
     message.content = sanitizeMessage(message.content, {
       stripNewlines: false,
-      trim: true
+      trim: true,
     });
   }
 
@@ -85,43 +88,44 @@ function addMessageToBlended(channelId, userId, message, isDM = false, messageId
     }
     const dmConvo = dmConversations.get(userId);
     dmConvo.push(message);
-    
+
     // Limit DM conversation length
     while (dmConvo.length > MAX_BLENDED_CONVERSATION_LENGTH) {
-      if (dmConvo[1]) { // Keep system message
+      if (dmConvo[1]) {
+        // Keep system message
         dmConvo.splice(1, 1);
       }
     }
-    
+
     return dmConvo;
   }
 
   // Get channel conversation map
   const channelConvo = getChannelConversation(channelId);
-  
+
   // Get or create user's message array
   if (!channelConvo.has(userId)) {
     channelConvo.set(userId, []);
   }
-  
+
   const userMessages = channelConvo.get(userId);
-  
+
   // Add message with metadata
   const messageWithMeta = {
     ...message,
     userId,
     timestamp: Date.now(),
     username: message.username || 'User',
-    messageId: messageId // Track Discord message ID if provided
+    messageId: messageId, // Track Discord message ID if provided
   };
-  
+
   userMessages.push(messageWithMeta);
-  
+
   // Limit messages per user
   while (userMessages.length > MAX_MESSAGES_PER_USER) {
     userMessages.shift();
   }
-  
+
   // Build blended conversation
   return buildBlendedConversation(channelId);
 }
@@ -134,40 +138,44 @@ function addMessageToBlended(channelId, userId, message, isDM = false, messageId
 function buildBlendedConversation(channelId) {
   const channelConvo = getChannelConversation(channelId);
   const blended = [{ role: 'system', content: config.BOT_PERSONALITY }];
-  
+
   // Collect all messages from all users with timestamps
   const allMessages = [];
-  
+
   for (const [userId, userMessages] of channelConvo.entries()) {
     allMessages.push(...userMessages);
   }
-  
+
   // Sort by timestamp to maintain chronological order
   allMessages.sort((a, b) => a.timestamp - b.timestamp);
-  
+
   // Add to blended conversation with user identification
   for (const msg of allMessages) {
     // Format message to include username for context
     const formattedMessage = {
       role: msg.role,
-      content: msg.role === 'user' ? `${msg.username}: ${msg.content}` : msg.content
+      content: msg.role === 'user' ? `${msg.username}: ${msg.content}` : msg.content,
     };
     blended.push(formattedMessage);
   }
-  
+
   // Limit total conversation length
   while (blended.length > MAX_BLENDED_CONVERSATION_LENGTH) {
-    if (blended[1]) { // Keep system message
+    if (blended[1]) {
+      // Keep system message
       blended.splice(1, 1);
     }
   }
-  
-  logger.debug({
-    channelId,
-    totalMessages: blended.length,
-    userCount: channelConvo.size
-  }, 'Built blended conversation');
-  
+
+  logger.debug(
+    {
+      channelId,
+      totalMessages: blended.length,
+      userCount: channelConvo.size,
+    },
+    'Built blended conversation'
+  );
+
   return blended;
 }
 
@@ -183,7 +191,7 @@ function clearConversation(id, isDM = false) {
     dmConversations.delete(id);
     return existed;
   }
-  
+
   const existed = channelConversations.has(id);
   channelConversations.delete(id);
   return existed;
@@ -197,7 +205,7 @@ function getActiveConversationCount() {
   return {
     channels: channelConversations.size,
     dms: dmConversations.size,
-    total: channelConversations.size + dmConversations.size
+    total: channelConversations.size + dmConversations.size,
   };
 }
 
@@ -209,18 +217,18 @@ async function saveConversationsToStorage() {
   try {
     // Convert blended conversations to a format suitable for storage
     const conversationsToSave = new Map();
-    
+
     // Save channel conversations as combined
     for (const [channelId, userMap] of channelConversations.entries()) {
       const blended = buildBlendedConversation(channelId);
       conversationsToSave.set(`channel_${channelId}`, blended);
     }
-    
+
     // Save DM conversations
     for (const [userId, messages] of dmConversations.entries()) {
       conversationsToSave.set(userId, messages);
     }
-    
+
     await conversationStorage.saveConversations(conversationsToSave);
     logger.info('Saved blended conversations to storage');
     return true;
@@ -237,7 +245,7 @@ async function saveConversationsToStorage() {
 async function loadConversationsFromStorage() {
   try {
     const loaded = await conversationStorage.loadConversations();
-    
+
     // Separate channel and DM conversations
     for (const [key, messages] of loaded.entries()) {
       if (key.startsWith('channel_')) {
@@ -249,11 +257,14 @@ async function loadConversationsFromStorage() {
         dmConversations.set(key, messages);
       }
     }
-    
-    logger.info({
-      loadedDMs: dmConversations.size
-    }, 'Loaded conversations from storage');
-    
+
+    logger.info(
+      {
+        loadedDMs: dmConversations.size,
+      },
+      'Loaded conversations from storage'
+    );
+
     return true;
   } catch (error) {
     logger.error({ error }, 'Error loading conversations');
@@ -267,7 +278,7 @@ async function loadConversationsFromStorage() {
  */
 function getConversationStatus() {
   const counts = getActiveConversationCount();
-  
+
   // Calculate total messages
   let totalChannelMessages = 0;
   for (const userMap of channelConversations.values()) {
@@ -275,12 +286,12 @@ function getConversationStatus() {
       totalChannelMessages += messages.length;
     }
   }
-  
+
   let totalDMMessages = 0;
   for (const messages of dmConversations.values()) {
     totalDMMessages += messages.length;
   }
-  
+
   return {
     mode: 'blended',
     maxMessagesPerUser: MAX_MESSAGES_PER_USER,
@@ -288,7 +299,7 @@ function getConversationStatus() {
     activeChannels: counts.channels,
     activeDMs: counts.dms,
     totalChannelMessages,
-    totalDMMessages
+    totalDMMessages,
   };
 }
 
@@ -301,7 +312,7 @@ function getConversationStatus() {
  */
 function removeMessageById(channelId, messageId, isDM = false) {
   if (!messageId) return false;
-  
+
   // Handle DMs
   if (isDM) {
     // For DMs, we need to find which user's conversation contains this message
@@ -309,36 +320,42 @@ function removeMessageById(channelId, messageId, isDM = false) {
       const index = conversation.findIndex(msg => msg.messageId === messageId);
       if (index !== -1) {
         conversation.splice(index, 1);
-        logger.info({
-          userId,
-          messageId,
-          remainingMessages: conversation.length
-        }, 'Removed message from DM conversation');
+        logger.info(
+          {
+            userId,
+            messageId,
+            remainingMessages: conversation.length,
+          },
+          'Removed message from DM conversation'
+        );
         return true;
       }
     }
     return false;
   }
-  
+
   // Handle channel conversations
   const channelConvo = channelConversations.get(channelId);
   if (!channelConvo) return false;
-  
+
   // Search through all users' messages in the channel
   for (const [userId, userMessages] of channelConvo.entries()) {
     const index = userMessages.findIndex(msg => msg.messageId === messageId);
     if (index !== -1) {
       userMessages.splice(index, 1);
-      logger.info({
-        channelId,
-        userId,
-        messageId,
-        remainingMessages: userMessages.length
-      }, 'Removed message from channel conversation');
+      logger.info(
+        {
+          channelId,
+          userId,
+          messageId,
+          remainingMessages: userMessages.length,
+        },
+        'Removed message from channel conversation'
+      );
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -352,13 +369,13 @@ function removeMessageById(channelId, messageId, isDM = false) {
  */
 function updateMessageById(channelId, messageId, newContent, isDM = false) {
   if (!messageId || !newContent) return false;
-  
+
   // Sanitize the new content
   const sanitizedContent = sanitizeMessage(newContent, {
     stripNewlines: false,
-    trim: true
+    trim: true,
   });
-  
+
   // Handle DMs
   if (isDM) {
     for (const [userId, conversation] of dmConversations.entries()) {
@@ -367,20 +384,23 @@ function updateMessageById(channelId, messageId, newContent, isDM = false) {
         message.content = sanitizedContent;
         message.edited = true;
         message.editedTimestamp = Date.now();
-        logger.info({
-          userId,
-          messageId
-        }, 'Updated message in DM conversation');
+        logger.info(
+          {
+            userId,
+            messageId,
+          },
+          'Updated message in DM conversation'
+        );
         return true;
       }
     }
     return false;
   }
-  
+
   // Handle channel conversations
   const channelConvo = channelConversations.get(channelId);
   if (!channelConvo) return false;
-  
+
   // Search through all users' messages in the channel
   for (const [userId, userMessages] of channelConvo.entries()) {
     const message = userMessages.find(msg => msg.messageId === messageId);
@@ -393,15 +413,18 @@ function updateMessageById(channelId, messageId, newContent, isDM = false) {
       }
       message.edited = true;
       message.editedTimestamp = Date.now();
-      logger.info({
-        channelId,
-        userId,
-        messageId
-      }, 'Updated message in channel conversation');
+      logger.info(
+        {
+          channelId,
+          userId,
+          messageId,
+        },
+        'Updated message in channel conversation'
+      );
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -415,5 +438,5 @@ module.exports = {
   getConversationStatus,
   removeMessageById,
   updateMessageById,
-  MAX_MESSAGES_PER_USER
+  MAX_MESSAGES_PER_USER,
 };

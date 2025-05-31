@@ -1,9 +1,9 @@
 /**
  * Malicious User Detection and Management
- * 
+ *
  * Tracks and manages users who exhibit suspicious or malicious behavior,
  * particularly those who frequently delete messages after sending them.
- * 
+ *
  * @module MaliciousUserManager
  */
 
@@ -20,13 +20,13 @@ const DETECTION_CONFIG = {
   MAX_DELETIONS_PER_HOUR: 5,
   MAX_DELETIONS_PER_DAY: 15,
   RAPID_DELETE_THRESHOLD_MS: 30000, // 30 seconds
-  
+
   // Time windows
   HOUR_MS: 60 * 60 * 1000,
   DAY_MS: 24 * 60 * 60 * 1000,
-  
+
   // Data retention
-  CLEANUP_AFTER_DAYS: 30
+  CLEANUP_AFTER_DAYS: 30,
 };
 
 // File paths
@@ -47,10 +47,10 @@ async function init() {
     await ensureDataDirectory();
     await loadBlockedUsers();
     await loadDeletionHistory();
-    
+
     // Clean up old data
     await cleanupOldData();
-    
+
     logger.info('Malicious user manager initialized');
   } catch (error) {
     logger.error({ error }, 'Failed to initialize malicious user manager');
@@ -98,7 +98,7 @@ async function saveBlockedUsers() {
   try {
     const data = {
       blockedUserIds: Array.from(blockedUsers),
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
     await fs.writeFile(BLOCKED_USERS_FILE, JSON.stringify(data, null, 2));
     logger.debug('Saved blocked users to file');
@@ -115,17 +115,17 @@ async function loadDeletionHistory() {
   try {
     const data = await fs.readFile(DELETION_HISTORY_FILE, 'utf8');
     const history = JSON.parse(data);
-    
+
     deletionHistory = new Map();
     for (const [userId, deletions] of Object.entries(history.deletions || {})) {
       deletionHistory.set(userId, deletions);
     }
-    
+
     rapidDeletions = new Map();
     for (const [userId, events] of Object.entries(history.rapidDeletions || {})) {
       rapidDeletions.set(userId, events);
     }
-    
+
     logger.info({ userCount: deletionHistory.size }, 'Loaded deletion history');
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -147,7 +147,7 @@ async function saveDeletionHistory() {
     const data = {
       deletions: Object.fromEntries(deletionHistory),
       rapidDeletions: Object.fromEntries(rapidDeletions),
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
     await fs.writeFile(DELETION_HISTORY_FILE, JSON.stringify(data, null, 2));
     logger.debug('Saved deletion history to file');
@@ -168,52 +168,48 @@ async function saveDeletionHistory() {
 async function recordDeletion(userId, messageId, channelId, content, timeSinceCreation) {
   try {
     const now = Date.now();
-    
+
     // Initialize user's deletion history if needed
     if (!deletionHistory.has(userId)) {
       deletionHistory.set(userId, []);
     }
-    
+
     // Add deletion record
     const deletionRecord = {
       messageId,
       channelId,
       content: content ? content.substring(0, 100) : '',
       timestamp: now,
-      timeSinceCreation
+      timeSinceCreation,
     };
-    
+
     deletionHistory.get(userId).push(deletionRecord);
-    
+
     // Check for rapid deletion (deleted within threshold after creation)
     if (timeSinceCreation < DETECTION_CONFIG.RAPID_DELETE_THRESHOLD_MS) {
       if (!rapidDeletions.has(userId)) {
         rapidDeletions.set(userId, []);
       }
       rapidDeletions.get(userId).push(deletionRecord);
-      
+
       logger.warn(
-        { 
-          userId, 
-          messageId, 
+        {
+          userId,
+          messageId,
           timeSinceCreation,
-          content: deletionRecord.content 
-        }, 
+          content: deletionRecord.content,
+        },
         'Rapid message deletion detected'
       );
     }
-    
+
     // Check for suspicious behavior
     await checkForSuspiciousBehavior(userId);
-    
+
     // Save to file
     await saveDeletionHistory();
-    
-    logger.debug(
-      { userId, messageId, timeSinceCreation }, 
-      'Recorded message deletion'
-    );
-    
+
+    logger.debug({ userId, messageId, timeSinceCreation }, 'Recorded message deletion');
   } catch (error) {
     logger.error({ error, userId }, 'Error recording deletion');
   }
@@ -228,58 +224,57 @@ async function checkForSuspiciousBehavior(userId, client = null) {
     const now = Date.now();
     const userDeletions = deletionHistory.get(userId) || [];
     const userRapidDeletions = rapidDeletions.get(userId) || [];
-    
+
     // Count deletions in the last hour and day
     const deletionsLastHour = userDeletions.filter(
       d => now - d.timestamp < DETECTION_CONFIG.HOUR_MS
     ).length;
-    
+
     const deletionsLastDay = userDeletions.filter(
       d => now - d.timestamp < DETECTION_CONFIG.DAY_MS
     ).length;
-    
+
     // Check rapid deletions in last hour
     const rapidDeletionsLastHour = userRapidDeletions.filter(
       d => now - d.timestamp < DETECTION_CONFIG.HOUR_MS
     ).length;
-    
+
     // Determine suspicion level
     let isSuspicious = false;
-    let reasons = [];
-    
+    const reasons = [];
+
     if (deletionsLastHour >= DETECTION_CONFIG.MAX_DELETIONS_PER_HOUR) {
       isSuspicious = true;
       reasons.push(`${deletionsLastHour} deletions in last hour`);
     }
-    
+
     if (deletionsLastDay >= DETECTION_CONFIG.MAX_DELETIONS_PER_DAY) {
       isSuspicious = true;
       reasons.push(`${deletionsLastDay} deletions in last day`);
     }
-    
+
     if (rapidDeletionsLastHour >= 3) {
       isSuspicious = true;
       reasons.push(`${rapidDeletionsLastHour} rapid deletions in last hour`);
     }
-    
+
     if (isSuspicious) {
       logger.warn(
-        { 
-          userId, 
-          deletionsLastHour, 
-          deletionsLastDay, 
+        {
+          userId,
+          deletionsLastHour,
+          deletionsLastDay,
           rapidDeletionsLastHour,
-          reasons 
-        }, 
+          reasons,
+        },
         'Suspicious user behavior detected'
       );
-      
+
       // Request human approval for blocking
       if (client && !blockedUsers.has(userId)) {
         await requestBlockApproval(userId, reasons, client);
       }
     }
-    
   } catch (error) {
     logger.error({ error, userId }, 'Error checking suspicious behavior');
   }
@@ -301,11 +296,11 @@ async function requestBlockApproval(userId, reasons, client) {
         reasons,
         deletionStats: {
           total: deletionHistory.get(userId)?.length || 0,
-          rapid: rapidDeletions.get(userId)?.length || 0
-        }
-      }
+          rapid: rapidDeletions.get(userId)?.length || 0,
+        },
+      },
     };
-    
+
     await humanCircuitBreaker.requestHumanApproval(
       details,
       async () => {
@@ -319,7 +314,6 @@ async function requestBlockApproval(userId, reasons, client) {
       },
       client
     );
-    
   } catch (error) {
     logger.error({ error, userId }, 'Error requesting block approval');
   }
@@ -334,12 +328,8 @@ async function blockUser(userId, reason) {
   try {
     blockedUsers.add(userId);
     await saveBlockedUsers();
-    
-    logger.warn(
-      { userId, reason }, 
-      'User blocked for malicious behavior'
-    );
-    
+
+    logger.warn({ userId, reason }, 'User blocked for malicious behavior');
   } catch (error) {
     logger.error({ error, userId }, 'Error blocking user');
     throw error;
@@ -390,18 +380,15 @@ function getUserStats(userId) {
   const userDeletions = deletionHistory.get(userId) || [];
   const userRapidDeletions = rapidDeletions.get(userId) || [];
   const now = Date.now();
-  
+
   return {
     totalDeletions: userDeletions.length,
     rapidDeletions: userRapidDeletions.length,
-    deletionsLastHour: userDeletions.filter(
-      d => now - d.timestamp < DETECTION_CONFIG.HOUR_MS
-    ).length,
-    deletionsLastDay: userDeletions.filter(
-      d => now - d.timestamp < DETECTION_CONFIG.DAY_MS
-    ).length,
+    deletionsLastHour: userDeletions.filter(d => now - d.timestamp < DETECTION_CONFIG.HOUR_MS)
+      .length,
+    deletionsLastDay: userDeletions.filter(d => now - d.timestamp < DETECTION_CONFIG.DAY_MS).length,
     isBlocked: blockedUsers.has(userId),
-    recentDeletions: userDeletions.slice(-5) // Last 5 deletions
+    recentDeletions: userDeletions.slice(-5), // Last 5 deletions
   };
 }
 
@@ -410,9 +397,9 @@ function getUserStats(userId) {
  */
 async function cleanupOldData() {
   try {
-    const cutoffTime = Date.now() - (DETECTION_CONFIG.CLEANUP_AFTER_DAYS * DETECTION_CONFIG.DAY_MS);
+    const cutoffTime = Date.now() - DETECTION_CONFIG.CLEANUP_AFTER_DAYS * DETECTION_CONFIG.DAY_MS;
     let cleanedCount = 0;
-    
+
     // Clean up deletion history
     for (const [userId, deletions] of deletionHistory.entries()) {
       const filtered = deletions.filter(d => d.timestamp > cutoffTime);
@@ -425,7 +412,7 @@ async function cleanupOldData() {
         }
       }
     }
-    
+
     // Clean up rapid deletions
     for (const [userId, deletions] of rapidDeletions.entries()) {
       const filtered = deletions.filter(d => d.timestamp > cutoffTime);
@@ -437,12 +424,11 @@ async function cleanupOldData() {
         }
       }
     }
-    
+
     if (cleanedCount > 0) {
       await saveDeletionHistory();
       logger.info({ cleanedCount }, 'Cleaned up old deletion history');
     }
-    
   } catch (error) {
     logger.error({ error }, 'Error cleaning up old data');
   }
@@ -458,5 +444,5 @@ module.exports = {
   getUserStats,
   checkForSuspiciousBehavior,
   cleanupOldData,
-  DETECTION_CONFIG
+  DETECTION_CONFIG,
 };

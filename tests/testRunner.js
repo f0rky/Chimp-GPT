@@ -38,7 +38,7 @@ function loadTestModules() {
     testMessageHandler = require('./messageHandlerTest').testMessageHandler;
     testRateLimiter = require('./rateLimiterTest').testRateLimiter;
     quakeLookup = require('../quakeLookup');
-    
+
     // Load new test modules
     testHumanCircuitBreaker = require('./humanCircuitBreakerTest').testHumanCircuitBreaker;
     testInputSanitizer = require('./inputSanitizerTest').testInputSanitizer;

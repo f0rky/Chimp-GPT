@@ -1,9 +1,9 @@
 /**
  * Wrapper module to use blended conversation manager
- * 
+ *
  * This module provides an interface that matches the existing conversation manager
  * but uses the blended conversation system underneath.
- * 
+ *
  * @module UseBlendedConversations
  */
 
@@ -22,14 +22,14 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
   try {
     // Determine if this is a DM
     const isDM = discordMessage?.channel?.isDMBased() || false;
-    const channelId = isDM ? 'DM' : (discordMessage?.channelId || 'unknown');
+    const channelId = isDM ? 'DM' : discordMessage?.channelId || 'unknown';
     const messageId = discordMessage?.id || null;
-    
+
     // Add username to the message for context
     if (newMessage && discordMessage) {
       newMessage.username = discordMessage.author.username || discordMessage.author.tag || 'User';
     }
-    
+
     // Use blended conversation manager with message ID
     const conversation = blendedManager.addMessageToBlended(
       channelId,
@@ -38,14 +38,17 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
       isDM,
       messageId
     );
-    
-    logger.debug({
-      userId,
-      channelId,
-      isDM,
-      conversationLength: conversation.length
-    }, 'Managed blended conversation');
-    
+
+    logger.debug(
+      {
+        userId,
+        channelId,
+        isDM,
+        conversationLength: conversation.length,
+      },
+      'Managed blended conversation'
+    );
+
     return conversation;
   } catch (error) {
     logger.error({ error, userId }, 'Error in manageConversation wrapper');
@@ -104,7 +107,7 @@ function getConversationStorageStatus() {
   return {
     ...status,
     mode: 'blended',
-    info: 'Using blended conversation manager with per-user limits'
+    info: 'Using blended conversation manager with per-user limits',
   };
 }
 
@@ -158,5 +161,5 @@ module.exports = {
   startPeriodicSaving,
   stopPeriodicSaving,
   shutdown,
-  MAX_MESSAGES_PER_USER: blendedManager.MAX_MESSAGES_PER_USER
+  MAX_MESSAGES_PER_USER: blendedManager.MAX_MESSAGES_PER_USER,
 };

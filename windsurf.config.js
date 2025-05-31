@@ -26,13 +26,7 @@ module.exports = {
     provider: '', // e.g., 'netlify', 'vercel', or leave blank
     buildCommand: 'npm run build',
     publishDir: 'dist',
-    env: [
-      'DISCORD_TOKEN',
-      'OPENAI_API_KEY',
-      'X_RAPIDAPI_KEY',
-      'BOT_PERSONALITY',
-      'PORT',
-    ],
+    env: ['DISCORD_TOKEN', 'OPENAI_API_KEY', 'X_RAPIDAPI_KEY', 'BOT_PERSONALITY', 'PORT'],
   },
   plugins: {
     validate: true,

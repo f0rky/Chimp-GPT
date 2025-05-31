@@ -6,7 +6,7 @@
  * - Prefix changes at runtime
  * - Help command prefix display
  * - Edge cases and error conditions
- * 
+ *
  * @module CommandHandlerTests
  * @author Brett
  * @version 1.1.0
@@ -29,8 +29,8 @@ const TEST_CONFIG = {
     custom: ['$', '#'],
     special: ['%', '^', '&'],
     unicode: ['Ω', 'π', '∑'],
-    edge: ['', ' ', '!@#$%^&*()', 'a'.repeat(100)]
-  }
+    edge: ['', ' ', '!@#$%^&*()', 'a'.repeat(100)],
+  },
 };
 
 /**
@@ -74,15 +74,15 @@ function logError(message, error) {
  */
 function formatError(error, context = {}) {
   const stack = error.stack.split('\n').slice(0, 3).join('\n');
-  const contextStr = Object.keys(context).length 
-    ? `\nContext: ${JSON.stringify(context, null, 2)}` 
+  const contextStr = Object.keys(context).length
+    ? `\nContext: ${JSON.stringify(context, null, 2)}`
     : '';
   return `${error.name}: ${error.message}\n${stack}${contextStr}`;
 }
 
 /**
  * Test the command handler's prefix functionality
- * 
+ *
  * @returns {Promise<Object>} Test results
  */
 async function testCommandHandler() {
@@ -96,7 +96,7 @@ async function testCommandHandler() {
     duration: 0,
     errors: [],
     warnings: [],
-    tests: {}
+    tests: {},
   };
 
   /**
@@ -110,7 +110,7 @@ async function testCommandHandler() {
   async function runTest(name, testFn, { skip = false, skipReason = '' } = {}) {
     results.total++;
     const testStartTime = Date.now();
-    
+
     if (skip) {
       results.skipped++;
       results.tests[name] = { status: 'skipped', reason: skipReason };
@@ -123,9 +123,9 @@ async function testCommandHandler() {
       await testFn();
       const duration = Date.now() - testStartTime;
       results.passed++;
-      results.tests[name] = { 
+      results.tests[name] = {
         status: 'passed',
-        duration: `${duration}ms`
+        duration: `${duration}ms`,
       };
       logger.info(`✅ [PASSED] ${name} (${duration}ms)`);
     } catch (error) {
@@ -133,21 +133,24 @@ async function testCommandHandler() {
       results.failed++;
       const errorInfo = formatError(error, { test: name });
       results.errors.push(errorInfo);
-      results.tests[name] = { 
+      results.tests[name] = {
         status: 'failed',
         error: error.message,
         stack: error.stack,
-        duration: `${duration}ms`
+        duration: `${duration}ms`,
       };
       logger.error(`❌ [FAILED] ${name} (${duration}ms)\n${errorInfo}`);
-      
+
       // Log additional debug info if available
       if (error.actual !== undefined || error.expected !== undefined) {
-        logger.debug({
-          actual: error.actual,
-          expected: error.expected,
-          operator: error.operator
-        }, 'Assertion details');
+        logger.debug(
+          {
+            actual: error.actual,
+            expected: error.expected,
+            operator: error.operator,
+          },
+          'Assertion details'
+        );
       }
     }
   }
@@ -162,12 +165,10 @@ async function testCommandHandler() {
    * @param {string} [options.username] - Username
    * @returns {Object} Mock message object
    */
-  function createMockMessage(content, { 
-    isAdmin = false, 
-    isOwner = false, 
-    userId = '123456789',
-    username = 'testuser'
-  } = {}) {
+  function createMockMessage(
+    content,
+    { isAdmin = false, isOwner = false, userId = '123456789', username = 'testuser' } = {}
+  ) {
     const message = {
       id: `msg_${Math.random().toString(36).substr(2, 9)}`,
       content,
@@ -177,8 +178,8 @@ async function testCommandHandler() {
         bot: false,
         username,
         tag: `${username}#1234`,
-        equals: (other) => other.id === userId,
-        toString: () => `<@${userId}>`
+        equals: other => other.id === userId,
+        toString: () => `<@${userId}>`,
       },
       member: {
         id: userId,
@@ -186,18 +187,18 @@ async function testCommandHandler() {
         user: {
           id: userId,
           username,
-          tag: `${username}#1234`
+          tag: `${username}#1234`,
         },
         permissions: {
-          has: (permission) => {
+          has: permission => {
             const perms = {
-              'ADMINISTRATOR': isAdmin,
-              'MANAGE_GUILD': isAdmin,
-              'MANAGE_MESSAGES': isAdmin
+              ADMINISTRATOR: isAdmin,
+              MANAGE_GUILD: isAdmin,
+              MANAGE_MESSAGES: isAdmin,
             };
             return perms[permission] || false;
-          }
-        }
+          },
+        },
       },
       channel: {
         id: 'channel_123',
@@ -206,28 +207,28 @@ async function testCommandHandler() {
         isTextBased: () => true,
         send: sinon.stub().resolves({
           id: `msg_${Math.random().toString(36).substr(2, 9)}`,
-          delete: sinon.stub().resolves()
+          delete: sinon.stub().resolves(),
         }),
-        delete: sinon.stub().resolves()
+        delete: sinon.stub().resolves(),
       },
       guild: {
         id: 'guild_123',
         name: 'Test Guild',
-        available: true
+        available: true,
       },
       reply: sinon.stub().callsFake((...args) => {
         logStep(`Message reply called`, { content, args });
         return Promise.resolve({
           id: `msg_${Math.random().toString(36).substr(2, 9)}`,
-          delete: sinon.stub().resolves()
+          delete: sinon.stub().resolves(),
         });
       }),
-      react: sinon.stub().callsFake((emoji) => {
+      react: sinon.stub().callsFake(emoji => {
         logStep(`Reaction added`, { content, emoji });
         return Promise.resolve();
       }),
       delete: sinon.stub().resolves(),
-      edit: sinon.stub().resolves()
+      edit: sinon.stub().resolves(),
     };
 
     // Add debug info if enabled
@@ -238,7 +239,7 @@ async function testCommandHandler() {
         author: message.author.tag,
         channel: message.channel.name,
         timestamp: new Date(message.createdTimestamp).toISOString(),
-        reactions: message.reactions ? message.reactions.map(r => r.emoji) : []
+        reactions: message.reactions ? message.reactions.map(r => r.emoji) : [],
       });
     }
 
@@ -252,23 +253,23 @@ async function testCommandHandler() {
     registerCommand: commandHandler.registerCommand,
     getCommands: commandHandler.getCommands,
     handleCommand: commandHandler.handleCommand,
-    originalPrefixes: [...commandHandler.getPrefixes()]
+    originalPrefixes: [...commandHandler.getPrefixes()],
   };
 
   // Setup function to run before tests
   function setupTestEnvironment() {
     logStep('Setting up test environment');
-    
+
     // Reset command registry
     commandHandler.setPrefixes([...originalState.originalPrefixes]);
-    
+
     // Clear any registered commands from previous tests
     const commands = commandHandler.getCommands();
     Object.keys(commands).forEach(cmd => {
       delete commandHandler.commands[cmd];
     });
   }
-  
+
   // Teardown function to run after tests
   function teardownTestEnvironment() {
     // Restore original state
@@ -279,12 +280,12 @@ async function testCommandHandler() {
     });
     logStep('Test environment cleaned up');
   }
-  
+
   // --- Test Cases ---
-  
+
   // Run setup before tests
   setupTestEnvironment();
-  
+
   // Run all tests
   const tests = [
     // Basic Functionality Tests
@@ -295,7 +296,7 @@ async function testCommandHandler() {
         expect(prefixes).to.be.an('array');
         expect(prefixes).to.include('!');
         expect(prefixes).to.include('.');
-      }
+      },
     },
     {
       name: 'Basic: should register and execute a simple command',
@@ -304,19 +305,19 @@ async function testCommandHandler() {
         const testCommand = {
           name: 'test',
           description: 'A test command',
-          execute: async () => { 
-            executed = true; 
-            return { success: true, message: 'Test command executed' }; 
-          }
+          execute: async () => {
+            executed = true;
+            return { success: true, message: 'Test command executed' };
+          },
         };
-        
+
         commandHandler.registerCommand(testCommand);
         const message = createMockMessage('!test');
         const result = await commandHandler.handleCommand(message, {});
-        
+
         expect(executed).to.be.true;
         expect(result).to.be.true;
-      }
+      },
     },
     {
       name: 'Prefix: should handle custom prefixes',
@@ -325,36 +326,36 @@ async function testCommandHandler() {
         commandHandler.setPrefixes(testPrefixes);
         const currentPrefixes = commandHandler.getPrefixes();
         expect(currentPrefixes).to.deep.equal(testPrefixes);
-      }
+      },
     },
     {
       name: 'Help: should show current prefixes in help message',
       test: async () => {
         const testPrefixes = ['%', '^'];
         commandHandler.setPrefixes(testPrefixes);
-        
+
         let helpMessage = '';
         const helpCommand = {
           name: 'help',
           description: 'Show help information',
-          execute: async (message) => {
+          execute: async message => {
             helpMessage = `Current prefixes: ${testPrefixes.join(', ')}`;
             await message.reply(helpMessage);
             return { success: true, message: helpMessage };
-          }
+          },
         };
-        
+
         commandHandler.registerCommand(helpCommand);
         const message = createMockMessage(`${testPrefixes[0]}help`);
         const result = await commandHandler.handleCommand(message, {});
-        
+
         expect(result).to.be.true;
         expect(helpMessage).to.include(testPrefixes[0]);
         expect(helpMessage).to.include(testPrefixes[1]);
-      }
-    }
+      },
+    },
   ];
-  
+
   // Initialize test results
   const testResults = {
     total: tests.length,
@@ -362,7 +363,7 @@ async function testCommandHandler() {
     failed: 0,
     skipped: 0,
     startTime: new Date(),
-    tests: {}
+    tests: {},
   };
 
   // Run all tests
@@ -376,22 +377,22 @@ async function testCommandHandler() {
     } catch (error) {
       logError(`✗ FAIL: ${test.name}`, error);
       testResults.failed++;
-      testResults.tests[test.name] = { 
+      testResults.tests[test.name] = {
         status: 'failed',
         error: error.message,
-        stack: error.stack 
+        stack: error.stack,
       };
     }
   }
-  
+
   // Clean up
   teardownTestEnvironment();
-  
+
   // Calculate test summary
   testResults.endTime = new Date();
   testResults.duration = testResults.endTime - testResults.startTime;
   testResults.success = testResults.failed === 0;
-  
+
   // Log test summary
   logger.info('\n=== Test Summary ===');
   logger.info(`Total: ${testResults.total}`);
@@ -399,7 +400,7 @@ async function testCommandHandler() {
   logger.info(`Failed: ${testResults.failed}`);
   logger.info(`Skipped: ${testResults.skipped}`);
   logger.info(`Duration: ${testResults.duration}ms`);
-  
+
   if (testResults.failed > 0) {
     logger.warn('\nFailed Tests:');
     Object.entries(testResults.tests)
@@ -416,5 +417,5 @@ async function testCommandHandler() {
 }
 
 module.exports = {
-  testCommandHandler
+  testCommandHandler,
 };
