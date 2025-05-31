@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <title id="page-title">Bot Status</title>
+
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png" />
+    <link rel="manifest" href="/images/site.webmanifest" />
+    <link rel="shortcut icon" href="/images/favicon.ico" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bot Status" />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="unified-styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Unified Header -->
+      <header>
+        <div class="logo">
+          <i class="fas fa-robot"></i>
+          <h1 id="bot-name-header">Bot Status</h1>
+        </div>
+        <div class="header-controls">
+          <!-- Critical Status Indicators -->
+          <div id="status-indicator" class="status-indicator">
+            <span class="dot"></span>
+            <span class="status-text">Checking...</span>
+          </div>
+          <div id="conversation-mode" class="conversation-mode">
+            <span class="mode-icon">💬</span>
+            <span class="mode-text" title="Conversation Mode">Loading...</span>
+          </div>
+          <!-- Quick Actions -->
+          <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
+            <i class="fas fa-moon"></i>
+          </button>
+          <div class="time" id="currentTime">00:00:00</div>
+        </div>
+      </header>
+
+      <!-- Tab Navigation -->
+      <nav class="tab-navigation">
+        <button class="tab-button active" data-tab="status">
+          <i class="fas fa-info-circle"></i>
+          <span>Status</span>
+        </button>
+        <button class="tab-button" data-tab="performance">
+          <i class="fas fa-tachometer-alt"></i>
+          <span>Performance</span>
+        </button>
+        <button class="tab-button" data-tab="functions">
+          <i class="fas fa-cogs"></i>
+          <span>Functions</span>
+        </button>
+        <button class="tab-button" data-tab="settings">
+          <i class="fas fa-sliders-h"></i>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- Tab Content -->
+      <div class="tab-container">
+        <!-- Status Tab -->
+        <div id="status-tab" class="tab-content active">
+          <!-- Critical Status Bar - Always Visible -->
+          <div class="card status-bar">
+            <div class="stat">
+              <span class="label">Uptime</span>
+              <span id="uptime" class="value">--:--:--</span>
+            </div>
+            <div class="stat">
+              <span class="label">Version</span>
+              <span id="version" class="value">-.-.-</span>
+            </div>
+            <div class="stat">
+              <span class="label">Messages</span>
+              <span id="message-count" class="value">0</span>
+            </div>
+            <div class="stat">
+              <span class="label">Discord Ping</span>
+              <span id="discord-ping" class="value">-- ms</span>
+            </div>
+            <div class="status-actions">
+              <button id="run-tests" class="btn btn-secondary" title="Run Tests">
+                <i class="fas fa-flask"></i>
+              </button>
+              <button id="reset-stats" class="btn btn-warning" title="Reset Stats">
+                <i class="fas fa-redo"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- System Health -->
+          <div class="card combined-performance">
+            <h2>System Health</h2>
+            <div class="performance-overview">
+              <div class="performance-chart">
+                <canvas id="metrics-chart"></canvas>
+              </div>
+              <div class="performance-stats">
+                <div class="stat-grid compact">
+                  <div class="stat">
+                    <span class="label">Response Time</span>
+                    <span id="response-time" class="value">-- ms</span>
+                    <span class="subtext">Avg: <span id="avg-response-time">-- ms</span></span>
+                  </div>
+                  <div class="stat">
+                    <span class="label">CPU Usage</span>
+                    <span id="cpu-usage" class="value">--%</span>
+                    <span class="subtext">Process Load</span>
+                  </div>
+                  <div class="stat">
+                    <span class="label">Memory</span>
+                    <span id="memory-usage" class="value">-- MB</span>
+                    <span class="subtext">RSS Memory</span>
+                  </div>
+                  <div class="stat">
+                    <span class="label">API Calls</span>
+                    <span id="total-api-calls" class="value">0</span>
+                    <span class="subtext">Total Today</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- API Statistics -->
+          <div class="card">
+            <h2>API Usage</h2>
+            <div id="api-stats" class="api-stats">
+              <!-- API stats will be populated here -->
+            </div>
+          </div>
+
+          <!-- Rate Limits -->
+          <div class="card">
+            <h2>Rate Limit Status</h2>
+            <div id="rate-limits" class="rate-limits">
+              <!-- Rate limit info will be populated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Tab -->
+        <div id="performance-tab" class="tab-content">
+          <div class="dashboard-grid">
+            <!-- API Status Panel -->
+            <section class="card status-panel">
+              <h2>API STATUS</h2>
+              <div class="status-indicator online">● ONLINE</div>
+              <div class="status-grid">
+                <div class="status-item">
+                  <span class="label">OpenAI</span>
+                  <span class="value" id="openaiStatus">Operational</span>
+                </div>
+                <div class="status-item">
+                  <span class="label">Weather</span>
+                  <span class="value" id="weatherStatus">Operational</span>
+                </div>
+                <div class="status-item">
+                  <span class="label">Quake</span>
+                  <span class="value" id="quakeStatus">Operational</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Active Request -->
+            <section class="card active-request">
+              <h2>ACTIVE REQUEST</h2>
+              <div class="request-details">
+                <div class="progress-container">
+                  <div class="progress-bar" id="requestProgress" style="width: 0%"></div>
+                </div>
+                <div class="request-info">
+                  <span id="currentEndpoint">-</span>
+                  <span id="requestTime">0ms</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Memory Usage -->
+            <section class="card memory-usage">
+              <h2>MEMORY USAGE</h2>
+              <div class="memory-gauge">
+                <div class="gauge-fill" id="memoryGauge"></div>
+                <div class="gauge-text" id="memoryText">0MB / 0MB</div>
+              </div>
+            </section>
+
+            <!-- Latency Graph -->
+            <section class="card latency-graph">
+              <h2>API LATENCY (LAST 5 MIN)</h2>
+              <div class="chart-container">
+                <canvas id="latencyChart"></canvas>
+              </div>
+              <div class="latency-stats" id="latencyStats">
+                <span>OpenAI: <span id="openaiLatency">-</span></span>
+                <span>Weather: <span id="weatherLatency">-</span></span>
+                <span>Other: <span id="otherLatency">-</span></span>
+              </div>
+            </section>
+
+            <!-- Request History -->
+            <section class="card request-history">
+              <h2>REQUEST HISTORY</h2>
+              <div class="history-list" id="requestHistory">
+                <!-- Request history will be populated here -->
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Functions Tab -->
+        <div id="functions-tab" class="tab-content">
+          <!-- Function Results Summary -->
+          <div class="card">
+            <h2>Function Calls Summary</h2>
+            <div id="function-summary" class="function-summary">
+              <!-- Function summary will be populated here -->
+            </div>
+          </div>
+
+          <!-- Blocked Users -->
+          <div class="card">
+            <h2>Blocked Users</h2>
+            <div id="blocked-users-container" class="blocked-users">
+              <!-- Blocked users will be populated here -->
+            </div>
+          </div>
+
+          <!-- Images Gallery -->
+          <div class="card">
+            <h2>Generated Images</h2>
+            <div id="images-gallery" class="images-gallery">
+              <!-- Images will be populated here -->
+            </div>
+          </div>
+
+          <!-- Weather Results -->
+          <div class="card">
+            <h2>Recent Weather Lookups</h2>
+            <div id="weather-results" class="function-results">
+              <!-- Weather results will be populated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+          <div class="card">
+            <h2>Environment Configuration</h2>
+            
+            <!-- Settings Filter -->
+            <div class="settings-filter">
+              <button class="filter-btn active" data-filter="all">All</button>
+              <button class="filter-btn" data-filter="required">Required</button>
+              <button class="filter-btn" data-filter="optional">Optional</button>
+              <button class="filter-btn" data-filter="issues">Issues</button>
+            </div>
+
+            <!-- Settings Summary -->
+            <div id="settings-summary" class="settings-summary">
+              <!-- Summary will be populated here -->
+            </div>
+
+            <!-- Settings List -->
+            <div id="settings-list" class="settings-list">
+              <!-- Settings will be populated here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug Console (Bottom Left) -->
+      <div id="debug-console" class="debug-console">
+        <div class="debug-header">
+          <span>Debug Console</span>
+          <button id="debug-toggle" class="btn-icon-small">
+            <i class="fas fa-chevron-up"></i>
+          </button>
+        </div>
+        <div id="debug-content" class="debug-content">
+          <div id="debug-messages" class="debug-messages"></div>
+          <div class="debug-input">
+            <input type="text" id="debug-command" placeholder="Enter command..." />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for images -->
+    <div id="image-modal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <img id="modal-image" src="" alt="Generated Image" />
+        <div id="modal-caption"></div>
+      </div>
+    </div>
+
+    <script src="unified-app.js"></script>
+  </body>
+</html>
