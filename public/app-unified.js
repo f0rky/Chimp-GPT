@@ -86,6 +86,8 @@ function loadTabData(tab) {
   switch(tab) {
     case 'status':
       fetchHealthData();
+      // Also fetch performance data for response time metrics
+      fetchPerformanceDataForStatus();
       break;
     case 'performance':
       fetchPerformanceData();
@@ -171,9 +173,14 @@ function executeDebugCommand(command) {
 
 // Chart Initialization
 function initializeCharts() {
+  console.log('Initializing charts...');
+  
   // Status page metrics chart
-  const metricsCtx = document.getElementById('metrics-chart')?.getContext('2d');
-  if (metricsCtx) {
+  const metricsCanvas = document.getElementById('metrics-chart');
+  console.log('Metrics canvas found:', metricsCanvas);
+  
+  if (metricsCanvas) {
+    const metricsCtx = metricsCanvas.getContext('2d');
     state.charts.metrics = new Chart(metricsCtx, {
       type: 'line',
       data: {
@@ -219,8 +226,11 @@ function initializeCharts() {
   }
 
   // Performance dashboard latency chart
-  const latencyCtx = document.getElementById('latencyChart')?.getContext('2d');
-  if (latencyCtx) {
+  const latencyCanvas = document.getElementById('latencyChart');
+  console.log('Latency canvas found:', latencyCanvas);
+  
+  if (latencyCanvas) {
+    const latencyCtx = latencyCanvas.getContext('2d');
     state.charts.latency = new Chart(latencyCtx, {
       type: 'line',
       data: {
@@ -266,17 +276,21 @@ function initializeCharts() {
       }
     });
   }
+  
+  console.log('Charts initialized:', state.charts);
 }
 
 // Data Fetching
 function startDataFetching() {
   // Initial fetch
   fetchHealthData();
+  fetchPerformanceDataForStatus();
   
   // Set up intervals
   state.timers.status = setInterval(() => {
     if (state.currentTab === 'status') {
       fetchHealthData();
+      fetchPerformanceDataForStatus();
     }
   }, state.updateIntervals.status);
   
@@ -314,6 +328,20 @@ async function fetchPerformanceData() {
   } catch (error) {
     console.error('Error fetching performance data:', error);
     logDebug(`Error fetching performance data: ${error.message}`, 'error');
+  }
+}
+
+async function fetchPerformanceDataForStatus() {
+  try {
+    const response = await fetch('/performance');
+    const data = await response.json();
+    
+    console.log('Performance data for status tab:', data);
+    updateStatusResponseTime(data);
+    logDebug('Status response time updated', 'info');
+  } catch (error) {
+    console.error('Error fetching performance data for status:', error);
+    logDebug(`Error fetching performance data for status: ${error.message}`, 'error');
   }
 }
 
@@ -405,7 +433,8 @@ function updateStatusDisplay(data) {
   // Update system stats from actual data
   if (data.system?.loadAvg && data.system?.cpus) {
     const cpuUsage = Math.round((data.system.loadAvg[0] / data.system.cpus) * 100);
-    document.getElementById('cpu-usage').textContent = `${cpuUsage}%`;
+    const cpuElement = document.getElementById('cpu-usage');
+    if (cpuElement) cpuElement.textContent = `${cpuUsage}%`;
   } else {
     // Fallback if system data is not available
     const cpuElement = document.getElementById('cpu-usage');
@@ -413,7 +442,21 @@ function updateStatusDisplay(data) {
       cpuElement.textContent = '---%';
     }
   }
-  document.getElementById('memory-usage').textContent = data.memory?.rss || '-- MB';
+  
+  const memoryElement = document.getElementById('memory-usage');
+  if (memoryElement) {
+    memoryElement.textContent = data.memory?.rss || '-- MB';
+  }
+  
+  // For response time, we need to fetch it from performance data or calculate a mock value
+  // Since this is the health endpoint, let's show a reasonable placeholder
+  const responseTimeEl = document.getElementById('response-time');
+  const avgResponseTimeEl = document.getElementById('avg-response-time');
+  if (responseTimeEl && avgResponseTimeEl) {
+    // We'll update this when performance data is available
+    responseTimeEl.textContent = '-- ms';
+    avgResponseTimeEl.textContent = '-- ms';
+  }
   
   // Calculate total API calls
   const totalApiCalls = Object.values(data.stats?.apiCalls || {}).reduce((sum, count) => {
@@ -433,6 +476,25 @@ function updateStatusDisplay(data) {
   
   // Update the metrics chart with real data
   updateMetricsChart(data);
+}
+
+function updateStatusResponseTime(data) {
+  if (!data.summary) return;
+  
+  const responseTimeEl = document.getElementById('response-time');
+  const avgResponseTimeEl = document.getElementById('avg-response-time');
+  
+  if (responseTimeEl && avgResponseTimeEl) {
+    // Get response time from performance data
+    const avgResponseTime = Math.round(data.summary.messageProcessing?.avg || 0);
+    responseTimeEl.textContent = `${avgResponseTime} ms`;
+    avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
+    
+    // Also update the chart if we're on the status tab
+    if (state.currentTab === 'status') {
+      updateMetricsChart({ stats: { responseTime: avgResponseTime }, system: {} });
+    }
+  }
 }
 
 function updateConversationMode(modeData) {
