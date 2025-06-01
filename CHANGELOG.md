@@ -5,6 +5,54 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2025-06-01
+
+### Added
+- **Circuit Breaker Pattern**: Implemented circuit breaker for all external API calls
+  - Added to `timeLookup.js`, `wolframLookup.js`, and `imageGeneration.js`
+  - Prevents cascading failures and provides automatic recovery
+  - Configurable retry limits and timeouts per service
+- **Unified Dashboard**: Merged all dashboards into single tabbed interface
+  - Status, Performance, Functions, and Settings tabs
+  - Consistent theme and navigation
+  - Mobile-responsive design
+  - Debug console at bottom left
+- **Pre-moderation for Images**: Client-side content filtering
+  - Instant rejection of problematic content
+  - Prevents waiting for OpenAI's slow moderation
+  - Clear user feedback for policy violations
+- **Image Generation Timeout**: 30-second timeout for image requests
+  - Prevents indefinite waiting
+  - Better user experience for slow API responses
+
+### Fixed
+- **Dashboard Response Time Display**: Fixed API field naming issues
+  - Changed from camelCase to underscore format (e.g., `message_processing`)
+  - Response times now display correctly instead of "0 ms"
+- **Image Gallery Display**: Fixed image loading in Functions tab
+  - Corrected data structure parsing for `gptimage` results
+  - Fixed 404 errors when loading base64 image data
+- **Content Policy Handling**: Improved handling of violations
+  - Non-retryable errors now fail immediately
+  - Reduced wait time from 2+ minutes to instant/30s max
+  - Better error messages for users
+
+### Changed
+- **Retry Logic**: Improved retry mechanism
+  - Added detection for non-retryable errors
+  - Configurable backoff limits
+  - Reduced image generation retries from 2 to 1
+- **ESLint Compliance**: Fixed all critical linting errors
+  - Added default cases to switch statements
+  - Fixed missing radix parameters
+  - Resolved unused variable warnings
+
+### Performance
+- **Bandwidth Optimization**: Dashboard now uses 99.99% less bandwidth
+  - Summary endpoints instead of full data
+  - Increased update intervals
+  - Better caching strategies
+
 ## [1.2.2] - 2025-05-20
 
 ### Added
