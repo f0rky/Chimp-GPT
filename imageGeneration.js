@@ -209,6 +209,40 @@ async function generateImage(prompt, options = {}) {
 
     logger.info({ imageParams }, 'Generating image with GPT Image-1');
 
+    // Pre-check for potentially problematic content with quick client-side check
+    // This helps provide immediate feedback for obvious cases
+    const problematicPatterns = [
+      /\bbikini\b/i,
+      /\bswimsuit\b/i,
+      /\bunderwear\b/i,
+      /\blingerie\b/i,
+      /\bnude\b/i,
+      /\bnaked\b/i,
+      /\bnsfw\b/i,
+      /\bprovocative\b/i,
+      /\bseductive\b/i,
+      /\bsensual\b/i,
+      /\bintimate\b/i,
+      /\berotic\b/i
+    ];
+    
+    const containsProblematicContent = problematicPatterns.some(pattern => 
+      pattern.test(prompt)
+    );
+    
+    if (containsProblematicContent) {
+      logger.info({ prompt }, 'Pre-moderation: Potentially problematic content detected');
+      trackError('gptimage', new Error('Pre-moderation block'));
+      
+      // Return immediately without calling OpenAI
+      return {
+        success: false,
+        error: 'This request may contain content that violates our content policy. Please try a different prompt that doesn\'t include references to swimwear, nudity, or suggestive content.',
+        isContentPolicyViolation: true,
+        prompt,
+      };
+    }
+
     let response;
     const apiCallStartTime = Date.now();
     let apiCallDuration;
@@ -217,10 +251,23 @@ async function generateImage(prompt, options = {}) {
       // Log that we're about to make the API call
       logger.debug('Making OpenAI API call for image generation with circuit breaker protection');
 
-      // Make the API call with circuit breaker protection
+      // Make the API call with circuit breaker protection and timeout
       response = await retryWithBreaker(async () => {
         const callStart = Date.now();
-        const result = await openai.images.generate(imageParams);
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Image generation request timed out after 30 seconds'));
+          }, 30000); // 30 second timeout
+        });
+        
+        // Race between the API call and timeout
+        const result = await Promise.race([
+          openai.images.generate(imageParams),
+          timeoutPromise
+        ]);
+        
         apiCallDuration = Date.now() - callStart;
         logger.info({ apiCallDuration }, 'OpenAI image generation API call completed');
         return result;
