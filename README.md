@@ -1,6 +1,6 @@
 # Chimp-GPT Discord Bot
 
-**Bot Version:** 1.2.3 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
+**Bot Version:** 1.7.0 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
 
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
@@ -86,26 +86,36 @@ The current conversation mode is displayed across all status pages:
 - **Startup Logs**: Bot logs current mode configuration on startup
 - **API Endpoints**: `/health` includes `conversationMode` object for monitoring
 
-### Recent Improvements (v1.2.3)
+### Recent Improvements (v1.7.0)
 
-- **Enhanced Image Generation Handling**: Added graceful fallback to text descriptions when image generation is disabled, providing users with detailed descriptions instead of error messages.
-- **Improved Weather API Integration**: Refactored weather API integration with robust error handling and fallback mechanisms.
-- **Progress Tracking for Image Generation**: Added real-time progress updates with elapsed time reporting and phase tracking.
-- **Centralized Startup Message Coordinator**: Eliminated duplicate startup messages from different components.
+- **Circuit Breaker Pattern**: Implemented across all external API integrations for enhanced resilience and automatic failure recovery
+- **Unified Dashboard**: Merged all dashboards into a single tabbed interface with Status, Performance, Functions, and Settings tabs
+- **Pre-moderation for Images**: Client-side content filtering prevents waiting for slow API moderation responses
+- **Image Generation Timeout**: Added 30-second timeout to prevent indefinite waiting on slow image generation
+- **Dashboard Response Time Fix**: Fixed API response time display issues in the performance dashboard
+- **Content Policy Handling**: Improved handling of violations with instant feedback instead of long waits
 
-### Error Resilience for External APIs
+### Circuit Breaker Pattern for External APIs
 
-All external API calls are now protected by a retry mechanism with exponential backoff and a circuit breaker pattern:
+All external API calls are protected by a comprehensive circuit breaker pattern with retry mechanisms:
 
 - **OpenAI API**: Up to 3 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-- **Weather API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Weather API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)  
+- **Wolfram Alpha API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Time API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
 - **Quake Server Stats API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (3-minute timeout)
-- **Dad Jokes API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-- **Image Download**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+- **Image Generation**: Up to 1 retry attempt with circuit breaker opening after 5 consecutive failures (2-minute timeout)
+  - Includes 30-second timeout for individual requests
+  - Pre-moderation to reject problematic content instantly
 
-When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and avoids API abuse during outages.
+When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and provides automatic recovery when services come back online.
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
+- **Circuit Breaker Pattern**: All external APIs protected with automatic failure detection and recovery:
+  - Prevents cascading failures when services are down
+  - Automatic recovery after timeout period
+  - Configurable retry attempts and backoff strategies
+  - Per-service configuration (OpenAI, Weather, Wolfram, Image Generation, etc.)
 - **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT o4-mini).
 - **Weather Lookup**: Reliable weather info with robust error handling and fallback mechanisms.
 - **Time Inquiry**: Ask for the current time in any location.
@@ -169,13 +179,17 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 - **Function Results**: Smart summary display with on-demand detail loading
 - **Update Intervals**: Optimized from 2-5 seconds to 10-15 seconds
 
-#### **Enhanced Dashboard (`/dashboard/`)**
+#### **Unified Dashboard (`/dashboard/`)**
+- **Single tabbed interface** combining all dashboards:
+  - **Status Tab**: Bot uptime, API statistics, and system health
+  - **Performance Tab**: Real-time metrics with interactive charts  
+  - **Functions Tab**: Function call summaries and image gallery
+  - **Settings Tab**: Configuration validation with security masking
 - **Mobile-responsive design** with optimized touch interactions
 - **Dark/light theme toggle** with persistent user preferences
 - **Blocked user management** with owner-authenticated unblock functionality
-- **Real-time performance metrics** with interactive charts
 - **Smart polling**: Different update frequencies for different data types
-- **Settings dashboard** with configuration validation and security masking
+- **Debug console** at bottom left for troubleshooting
 - **Conversation mode display** across all pages with detailed tooltips
 
 #### **Efficient Data Display**
@@ -230,6 +244,9 @@ The bot is configured via environment variables (see `.env.example`). Below is a
 | SHOW_SERVER_STATS_EMOJIS | false        | Show emojis in Quake server info headers                          |
 | ELO_DISPLAY_MODE         | 0            | ELO display: 0=off, 1=categorized, 2=actual values                |
 | ENABLE_IMAGE_GENERATION  | true         | Enable/disable image generation (falls back to text descriptions)  |
+| DISABLE_PLUGINS          | true         | Set to 'false' to enable plugins or 'true' to disable them        |
+| WEATHER_API_KEY          | (required)   | API key for weather lookups via weatherapi.com                    |
+| WOLFRAM_APP_ID           | (required)   | Wolfram Alpha App ID for computational queries                     |
 | USE_BLENDED_CONVERSATIONS| true         | Enable blended conversation mode for group chats                   |
 | MAX_MESSAGES_PER_USER_BLENDED | 5      | Maximum messages per user in blended conversation mode             |
 | ...                      |              | See .env.example for full list and documentation                  |
@@ -434,72 +451,6 @@ For VSCode users, debugging configurations are available in the `.vscode/launch.
 
 MIT
 
-## Prerequisites
-
-- Node.js and npm installed.
-- An OpenAI API key.
-- A Discord bot token.
-- A RapidAPI key for weather lookups.
-
-## Setup and Installation
-
-1. **Clone the Repository**:
-
-   ```bash
-   git clone https://github.com/f0rky/Chimp-GPT
-   cd Chimp-GPT
-   ```
-
-2. **Install Dependencies**:
-
-   ```bash
-   npm install
-   ```
-
-3. **Set Up Environment Variables**:
-   Create a `.env` file in the root directory and set up the following environment variables (refer to `.env.example`):
-
-   ```env
-   DISCORD_TOKEN = your_discord_bot_token
-   OPENAI_API_KEY = your_openai_api_key
-   CHANNEL_ID = your_channel_id(s) # Single or comma-separated
-   X_RAPIDAPI_KEY = your_rapidapi_key
-   BOT_PERSONALITY = "Your bot's personality"
-   IGNORE_MESSAGE_PREFIX = "." # Prefix to ignore messages
-   LOADING_EMOJI = <a:loading:1139032461712556062> # say \:emoji: on discord to get this ID
-   LOG_LEVEL = "info" # Logging level (fatal, error, warn, info, debug, trace)
-
-   # Reply Context Feature
-   ENABLE_REPLY_CONTEXT = "true" # Enable/disable reply context feature
-   MAX_REFERENCE_DEPTH = "5" # Maximum depth for message reference chains
-   MAX_REFERENCE_CONTEXT = "5" # Maximum number of reference messages to include in context
-
-   # Blended Conversation Mode
-   USE_BLENDED_CONVERSATIONS = "true" # Enable blended conversation mode (default: true)
-   MAX_MESSAGES_PER_USER_BLENDED = "5" # Max messages per user in blended mode (default: 5)
-
-   # NODE_ENV = "production" # Uncomment in production to disable pretty printing
-   ```
-
-4. **Set Up Bot Personality**:
-   Modify the `BOT_PERSONALITY` variable in the code to define the personality and behavior of the bot as you see fit. (protip ChatGPT to create a persona!)
-
-5. **Set Discord Channel ID**:
-   Modify the `CHANNEL_ID` variable in the code to specify the Discord channel where the bot will operate in, this can be multiple (comma seperated)
-
-6. **Run the Bot**:
-
-   ```bash
-   # Using PM2 (recommended for all deployments)
-   # For development environment
-   pm2 start combined.js --name [bot name] --env development
-
-   # For production environment
-   pm2 start chimpGPT.js --name [bot name] --env production
-
-   # Or use the ecosystem.config.js file
-   pm2 start ecosystem.config.js
-   ```
 
 ## PM2 Management & Performance Monitoring
 
@@ -512,7 +463,7 @@ ChimpGPT is designed to be managed using PM2, which provides advanced process ma
 pm2 status
 
 # Start ChimpGPT
-pm2 start chimpGPT.js --name chimpGPT
+pm2 start combined.js --name chimpGPT
 
 # Restart the bot
 pm2 restart chimpGPT
@@ -642,17 +593,6 @@ The bot supports Discord's slash commands. Type `/` to see available commands:
 - `/ping` - Check if the bot is responding
 - `/serverstats` - Display Quake Live server statistics
 
-## Recent Updates
-
-- **Improved Weather API Integration**: Fixed issues with weather API authentication and implemented robust error handling with fallback mechanisms
-- **Enhanced Rate Limiting**: Adjusted rate limits to 30 requests per 30 seconds with a 5-second cooldown
-- **Fixed Server Count Detection**: Improved Quake server count detection for more accurate status updates
-- **Added Timeout Protection**: Implemented timeout protection for OpenAI API calls to prevent the bot from getting stuck
-- **Added Comprehensive Testing Tools**: Created test scripts for diagnosing and verifying API integrations
-- Added support for Discord's slash commands
-- Improved error handling and logging
-- Enhanced Quake Live server stats display
-- Added Wolfram Alpha integration
 
 ## Contributing
 
@@ -662,7 +602,8 @@ If you'd like to contribute to the development of Chimp-GPT, please fork the rep
 
 ### Core Files
 
-- `chimpGPT.js` - Main Discord bot file
+- `combined.js` - Main entry point that starts both bot and status server
+- `chimpGPT.js` - Core Discord bot implementation
 - `openaiConfig.js` - OpenAI API configuration
 - `configValidator.js` - Environment variable validation
 - `logger.js` - Structured logging configuration using Pino
