@@ -178,8 +178,8 @@ async function retryWithBreaker(fn, opts = {}) {
       if (attempt > maxRetries) break;
 
       // Exponential backoff with configurable limits
-      const initialBackoff = options.initialBackoffMs || 200;
-      const maxBackoff = options.maxBackoffMs || 10000;
+      const initialBackoff = opts.initialBackoffMs || 200;
+      const maxBackoff = opts.maxBackoffMs || 10000;
       const backoffMs = Math.min(initialBackoff * Math.pow(2, attempt - 1), maxBackoff);
       logger.info({ backoffMs, attempt }, 'Backing off before retry');
       await new Promise(r => setTimeout(r, backoffMs));
