@@ -258,8 +258,8 @@ async function generateImage(prompt, options = {}) {
         // Create a timeout promise
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Image generation request timed out after 30 seconds'));
-          }, 30000); // 30 second timeout
+            reject(new Error('Image generation request timed out after 60 seconds'));
+          }, 60000); // 60 second timeout
         });
         
         // Race between the API call and timeout
