@@ -127,7 +127,7 @@ async function processMessage(userMessage, conversationLog) {
       async () => {
         try {
           return await openaiWithLogging.chat.completions.create({
-            model: 'gpt-3.5-turbo', // Using faster model for better responsiveness
+            model: 'gpt-4.1-nano', // Using faster model for better responsiveness
             messages: sanitizedLog,
             max_completion_tokens: 512, // Limit token usage (optional)
             functions: [
@@ -290,7 +290,7 @@ async function generateResponse(functionResult, conversationLog) {
     async () => {
       try {
         return await openaiWithLogging.chat.completions.create({
-          model: 'gpt-4o-mini', // Using faster model for better responsiveness
+          model: 'gpt-4.1-nano', // Using faster model for better responsiveness
           messages: conversationLog,
           max_completion_tokens: 256,
         });
@@ -321,7 +321,7 @@ async function generateResponse(functionResult, conversationLog) {
  * @returns {string} The model name
  */
 function getOpenAIModel() {
-  return 'gpt-4o-mini'; // Using faster model for better responsiveness
+  return 'gpt-4.1-nano'; // Using faster model for better responsiveness
 }
 
 // openaiConfig.js

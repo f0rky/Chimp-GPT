@@ -110,7 +110,7 @@ window.fetch = function (url, options) {
                 details: {
                   responseReceived: true,
                   validResponse: Math.random() > 0.3,
-                  model: 'gpt-3.5-turbo',
+                  model: 'gpt-4.1-nano',
                 },
               },
               quakeServerStats: {

@@ -210,7 +210,7 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
     // Otherwise, use the full context for other requests
     openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-nano',
       messages: conversationLog,
       functions: [
         {
@@ -501,7 +501,7 @@ async function generateNaturalResponse(
 
     const response = await Promise.race([
       openai.chat.completions.create({
-        model: 'gpt-4o-mini', // Using faster model for better responsiveness
+        model: 'gpt-4.1-nano', // Using faster model for better responsiveness
         messages: messages,
       }),
       timeoutPromise,

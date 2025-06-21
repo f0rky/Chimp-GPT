@@ -856,7 +856,7 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
       const aiResponse = await retryWithBreaker(async () => {
         quakeLogger.debug('Making OpenAI API request for server summary');
         return await openaiClient.chat.completions.create({
-          model: 'gpt-3.5-turbo', // Using GPT-3.5 for cost efficiency and adequate performance
+          model: 'gpt-4.1-nano', // Using GPT-4.1-nano for cost efficiency and adequate performance
           messages: [
             {
               role: 'system',
