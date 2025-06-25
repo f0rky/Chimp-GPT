@@ -464,6 +464,10 @@ function scheduleHealthReports(client) {
 
   setInterval(async () => {
     try {
+      if (!client.isReady()) {
+        logger.warn('Client not ready, skipping health report');
+        return;
+      }
       const owner = await client.users.fetch(config.OWNER_ID);
       if (owner) {
         const report = generateHealthReport();
@@ -484,7 +488,7 @@ function scheduleHealthReports(client) {
   // Send the startup message after a short delay
   setTimeout(async () => {
     try {
-      if (config.OWNER_ID) {
+      if (config.OWNER_ID && client.isReady()) {
         const owner = await client.users.fetch(config.OWNER_ID);
         if (owner) {
           // Send the initial startup message if not already sent
