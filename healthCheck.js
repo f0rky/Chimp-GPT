@@ -468,6 +468,12 @@ function scheduleHealthReports(client) {
         logger.warn('Client not ready, skipping health report');
         return;
       }
+      
+      if (!config.OWNER_ID) {
+        logger.debug('No OWNER_ID configured, skipping health report');
+        return;
+      }
+      
       const owner = await client.users.fetch(config.OWNER_ID);
       if (owner) {
         const report = generateHealthReport();
@@ -499,6 +505,12 @@ function scheduleHealthReports(client) {
           // Wait a bit to gather more startup information
           setTimeout(async () => {
             try {
+              // Check if client is still ready before proceeding
+              if (!client.isReady()) {
+                logger.warn('Client not ready in delayed startup message, skipping');
+                return;
+              }
+              
               // Import the greeting manager to get system information
               const greetingManager = require('./utils/greetingManager');
               const report = generateHealthReport(true);
