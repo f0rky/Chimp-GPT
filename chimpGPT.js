@@ -689,6 +689,11 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 
 // Handle message creation
 client.on('messageCreate', async message => {
+  // Check if client is ready before processing
+  if (!client.isReady()) {
+    return;
+  }
+
   // Skip if there's already an operation in progress for this channel
   if (inProgressOperations.has(message.channelId)) {
     discordLogger.debug(
