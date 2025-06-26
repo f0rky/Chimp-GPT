@@ -208,7 +208,30 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
     }
 
     // Otherwise, use the full context for other requests
-    openaiLogger.debug({ messages: conversationLog }, 'Sending request to OpenAI');
+    // Log detailed token estimation for debugging
+    const tokenEstimate = conversationLog.reduce((sum, msg) => {
+      const contentLength = msg.content ? msg.content.length : 0;
+      // Function definitions also consume tokens
+      const roleTokens = msg.role === 'system' ? 10 : 5;
+      return sum + Math.ceil(contentLength / 4) + roleTokens;
+    }, 0);
+    
+    // Add tokens for function definitions (rough estimate)
+    const functionDefsTokens = 6 * 100; // 6 functions, ~100 tokens each
+    const totalEstimatedTokens = tokenEstimate + functionDefsTokens;
+    
+    openaiLogger.info({ 
+      conversationLogLength: conversationLog.length,
+      messages: conversationLog.map(msg => ({
+        role: msg.role,
+        contentLength: msg.content ? msg.content.length : 0,
+        contentPreview: msg.content ? msg.content.substring(0, 100) : 'N/A',
+        isReference: msg.isReference || false
+      })),
+      estimatedPromptTokens: totalEstimatedTokens,
+      functionDefinitions: 6
+    }, 'Sending request to OpenAI with token estimate');
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-nano',
       messages: conversationLog,
