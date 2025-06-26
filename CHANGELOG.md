@@ -5,6 +5,24 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2025-06-26
+
+### Added
+- **Token Usage Logging**: Comprehensive logging for OpenAI API token consumption
+  - Detailed breakdown of prompt tokens including system message, user messages, and function definitions
+  - Message previews and length tracking for debugging
+  - Helps identify optimization opportunities
+
+### Fixed
+- **Client Readiness Check**: Added client.isReady() check in messageCreate event to prevent errors during bot initialization
+- **Message Update Handler**: Fixed error when processing message updates by adding client readiness validation
+
+### Security
+- Updated tar-fs from vulnerable version to 2.1.3
+
+### Changed
+- Migrated from GPT-3.5-turbo and GPT-4o-mini to GPT-4.1-nano model
+
 ## [1.7.0] - 2025-06-01
 
 ### Added
