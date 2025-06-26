@@ -492,11 +492,44 @@ function scheduleHealthReports(client) {
   startupCoordinator.registerComponent('healthCheck');
 
   // Send the startup message after a short delay
-  setTimeout(async () => {
+  // Use a retry mechanism to wait for client to be ready
+  let startupRetries = 0;
+  const maxStartupRetries = 10;
+  
+  const tryStartupMessage = async () => {
     try {
-      if (config.OWNER_ID && client.isReady()) {
-        const owner = await client.users.fetch(config.OWNER_ID);
-        if (owner) {
+      if (!config.OWNER_ID) {
+        logger.debug('No OWNER_ID configured, skipping startup message');
+        return;
+      }
+      
+      if (!client.isReady() || !client.token) {
+        startupRetries++;
+        if (startupRetries < maxStartupRetries) {
+          logger.debug(`Client not ready for startup message, retry ${startupRetries}/${maxStartupRetries}`);
+          setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
+          return;
+        } else {
+          logger.warn('Client not ready after max retries, giving up on startup message');
+          return;
+        }
+      }
+      
+      // Additional check for client token
+      if (!client.token) {
+        logger.warn('Client token not set, skipping startup message');
+        return;
+      }
+      
+      let owner;
+      try {
+        owner = await client.users.fetch(config.OWNER_ID);
+      } catch (fetchError) {
+        logger.error({ error: fetchError, ownerId: config.OWNER_ID }, 'Failed to fetch owner user');
+        return;
+      }
+      
+      if (owner) {
           // Send the initial startup message if not already sent
           if (!startupCoordinator.hasMessage) {
             await startupCoordinator.sendStartupMessage(owner);
@@ -550,11 +583,13 @@ function scheduleHealthReports(client) {
             }
           }, 5000); // Wait 5 seconds before updating with details
         }
-      }
     } catch (error) {
       logger.error({ error }, 'Failed to send startup health report to owner');
     }
-  }, 10000); // Wait 10 seconds after startup
+  };
+  
+  // Start the first attempt after 10 seconds
+  setTimeout(tryStartupMessage, 10000);
 }
 
 /**
