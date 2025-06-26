@@ -494,7 +494,7 @@ function scheduleHealthReports(client) {
   // Send the startup message after a short delay
   // Use a retry mechanism to wait for client to be ready
   let startupRetries = 0;
-  const maxStartupRetries = 10;
+  const maxStartupRetries = 20; // Increase retries to 20 (100 seconds total)
   
   const tryStartupMessage = async () => {
     try {
@@ -503,10 +503,25 @@ function scheduleHealthReports(client) {
         return;
       }
       
-      if (!client.isReady() || !client.token) {
+      // Check multiple conditions for client readiness
+      const isClientReady = () => {
+        return client.isReady() && 
+               client.token && 
+               client.rest && 
+               client.rest.requestManager && 
+               client.user && 
+               client.user.id;
+      };
+      
+      if (!isClientReady()) {
         startupRetries++;
         if (startupRetries < maxStartupRetries) {
-          logger.debug(`Client not ready for startup message, retry ${startupRetries}/${maxStartupRetries}`);
+          logger.debug(`Client not fully ready for startup message, retry ${startupRetries}/${maxStartupRetries}`, {
+            isReady: client.isReady(),
+            hasToken: !!client.token,
+            hasRest: !!client.rest,
+            hasUser: !!client.user
+          });
           setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
           return;
         } else {
@@ -515,16 +530,21 @@ function scheduleHealthReports(client) {
         }
       }
       
-      // Additional check for client token
-      if (!client.token) {
-        logger.warn('Client token not set, skipping startup message');
-        return;
-      }
-      
       let owner;
       try {
         owner = await client.users.fetch(config.OWNER_ID);
       } catch (fetchError) {
+        // If it's a token error, retry
+        if (fetchError.message && fetchError.message.includes('token')) {
+          startupRetries++;
+          if (startupRetries < maxStartupRetries) {
+            logger.warn(`Token error when fetching owner, retry ${startupRetries}/${maxStartupRetries}`, {
+              error: fetchError.message
+            });
+            setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
+            return;
+          }
+        }
         logger.error({ error: fetchError, ownerId: config.OWNER_ID }, 'Failed to fetch owner user');
         return;
       }
@@ -588,8 +608,18 @@ function scheduleHealthReports(client) {
     }
   };
   
-  // Start the first attempt after 10 seconds
-  setTimeout(tryStartupMessage, 10000);
+  // If client is already ready, start after a delay
+  // Otherwise, wait for the ready event
+  if (client.isReady()) {
+    // Client is already ready, start after 10 seconds
+    setTimeout(tryStartupMessage, 10000);
+  } else {
+    // Wait for the ready event before starting
+    client.once('ready', () => {
+      logger.info('Client ready event fired, scheduling startup message');
+      setTimeout(tryStartupMessage, 10000);
+    });
+  }
 }
 
 /**
