@@ -716,6 +716,12 @@ client.on('messageCreate', async message => {
   if (!client.isReady()) {
     return;
   }
+  
+  // Additional check for token to prevent REST errors
+  if (!client.token || !client.rest) {
+    discordLogger.debug('Client token or REST not ready, skipping message');
+    return;
+  }
 
   // Skip if there's already an operation in progress for this channel
   if (inProgressOperations.has(message.channelId)) {
@@ -726,13 +732,8 @@ client.on('messageCreate', async message => {
     return;
   }
 
-  // Start overall message processing timer
-  const messageTimerId = performanceMonitor.startTimer('message_processing', {
-    userId: message.author.id,
-    channelId: message.channelId,
-    messageId: message.id,
-    messageLength: message.content.length,
-  });
+  // Initialize timer variable
+  let messageTimerId = null;
 
   // Add a debug object to track timing of each step
   const timings = {
@@ -810,6 +811,14 @@ client.on('messageCreate', async message => {
       return;
     }
     addTiming('malicious_user_check', { result: 'allowed' });
+    
+    // Start the performance timer now that we know we'll process this message
+    messageTimerId = performanceMonitor.startTimer('message_processing', {
+      userId: message.author.id,
+      channelId: message.channelId,
+      messageId: message.id,
+      messageLength: message.content.length,
+    });
 
     // HIGHEST PRIORITY: Send initial feedback IMMEDIATELY before any other processing
     // This ensures users get immediate feedback that their message was received
@@ -1131,18 +1140,22 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // Stop the timer with error information
-    performanceMonitor.stopTimer(messageTimerId, {
-      success: false,
-      error: error.message,
-    });
+    // Stop the timer with error information if it was started
+    if (messageTimerId) {
+      performanceMonitor.stopTimer(messageTimerId, {
+        success: false,
+        error: error.message,
+      });
+    }
   } finally {
-    // Always stop the timer if it hasn't been stopped yet
-    const finalTiming = addTiming('processing_complete');
-    performanceMonitor.stopTimer(messageTimerId, {
-      success: true,
-      totalDuration: finalTiming,
-    });
+    // Always stop the timer if it was started and hasn't been stopped yet
+    if (messageTimerId) {
+      const finalTiming = addTiming('processing_complete');
+      performanceMonitor.stopTimer(messageTimerId, {
+        success: true,
+        totalDuration: finalTiming,
+      });
+    }
   }
 });
 
