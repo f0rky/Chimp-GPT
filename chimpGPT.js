@@ -1122,7 +1122,14 @@ client.on('messageCreate', async message => {
       'Error in message handler'
     );
 
-    await message.channel.send('Sorry, I encountered an error processing your request.');
+    // Check if we can send a message before trying
+    if (client.isReady() && message.channel) {
+      try {
+        await message.channel.send('Sorry, I encountered an error processing your request.');
+      } catch (sendError) {
+        discordLogger.error({ error: sendError }, 'Failed to send error message to channel');
+      }
+    }
 
     // Stop the timer with error information
     performanceMonitor.stopTimer(messageTimerId, {
