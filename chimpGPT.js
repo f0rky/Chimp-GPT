@@ -215,23 +215,26 @@ async function processOpenAIMessage(content, conversationLog, timings = {}) {
       const roleTokens = msg.role === 'system' ? 10 : 5;
       return sum + Math.ceil(contentLength / 4) + roleTokens;
     }, 0);
-    
+
     // Add tokens for function definitions (rough estimate)
     const functionDefsTokens = 6 * 100; // 6 functions, ~100 tokens each
     const totalEstimatedTokens = tokenEstimate + functionDefsTokens;
-    
-    openaiLogger.info({ 
-      conversationLogLength: conversationLog.length,
-      messages: conversationLog.map(msg => ({
-        role: msg.role,
-        contentLength: msg.content ? msg.content.length : 0,
-        contentPreview: msg.content ? msg.content.substring(0, 100) : 'N/A',
-        isReference: msg.isReference || false
-      })),
-      estimatedPromptTokens: totalEstimatedTokens,
-      functionDefinitions: 6
-    }, 'Sending request to OpenAI with token estimate');
-    
+
+    openaiLogger.info(
+      {
+        conversationLogLength: conversationLog.length,
+        messages: conversationLog.map(msg => ({
+          role: msg.role,
+          contentLength: msg.content ? msg.content.length : 0,
+          contentPreview: msg.content ? msg.content.substring(0, 100) : 'N/A',
+          isReference: msg.isReference || false,
+        })),
+        estimatedPromptTokens: totalEstimatedTokens,
+        functionDefinitions: 6,
+      },
+      'Sending request to OpenAI with token estimate'
+    );
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-nano',
       messages: conversationLog,
@@ -716,7 +719,7 @@ client.on('messageCreate', async message => {
   if (!client.isReady()) {
     return;
   }
-  
+
   // Additional check for token to prevent REST errors
   if (!client.token || !client.rest) {
     discordLogger.debug('Client token or REST not ready, skipping message');
@@ -811,7 +814,7 @@ client.on('messageCreate', async message => {
       return;
     }
     addTiming('malicious_user_check', { result: 'allowed' });
-    
+
     // Start the performance timer now that we know we'll process this message
     messageTimerId = performanceMonitor.startTimer('message_processing', {
       userId: message.author.id,
@@ -2597,9 +2600,7 @@ client.on('ready', async () => {
     discordLogger.info('PFP rotation started');
   }
 
-  // Load command modules (now pfpManager will be available to them)
-  const commandsLoaded = await commandHandler.loadCommands();
-  discordLogger.info({ commandsLoaded }, 'Command modules loaded');
+  // Commands are already loaded in startBot(), no need to load them again
 
   // Set command prefixes
   commandHandler.setPrefixes(['!', '.']);

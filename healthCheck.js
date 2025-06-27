@@ -64,8 +64,6 @@
  * @version 1.0.0
  */
 
-const express = require('express');
-const cors = require('cors');
 const { createLogger } = require('./logger');
 const logger = createLogger('health');
 const os = require('os');
@@ -144,308 +142,21 @@ const stats = {
 /**
  * Initialize the health check system.
  *
- * Sets up an Express server for health monitoring endpoints and schedules periodic health reports to be sent to the bot owner.
+ * Sets up health monitoring statistics and schedules periodic health reports to be sent to the bot owner.
  *
  * @param {import('discord.js').Client} client - Discord.js client instance
- * @returns {{ app: import('express').Application, stats: HealthStats }} Object containing the Express app and stats tracking object
+ * @returns {{ stats: HealthStats }} Object containing the stats tracking object
  */
 function initHealthCheck(client) {
-  const app = express();
-  const path = require('path');
-
-  // Determine port for CORS configuration (must be done before app.use(cors(...)))
-  const nodeEnvForPort = process.env.NODE_ENV || 'development';
-  let currentPort;
-  if (nodeEnvForPort === 'production') {
-    currentPort = config.PORT || 3001;
-  } else {
-    currentPort = config.PORT || 3001;
-  }
-
-  const allowedOrigins = [`http://localhost:${currentPort}`, `http://127.0.0.1:${currentPort}`];
-
-  if (config.STATUS_HOSTNAME) {
-    allowedOrigins.push(`http://${config.STATUS_HOSTNAME}:${currentPort}`);
-  }
-
-  const corsOptions = {
-    origin: function (origin, callback) {
-      // In development, allow all origins for easier development
-      if (nodeEnvForPort !== 'production') {
-        return callback(null, true);
-      }
-
-      // In production, only allow specific origins
-      if (!origin) return callback(null, true); // Allow requests with no origin (like mobile apps or curl requests)
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        return callback(null, true);
-      }
-      logger.warn({ origin, allowedOrigins }, 'CORS: Blocked an origin');
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true, // If you need to handle cookies or authorization headers
-  };
-
-  app.use(cors(corsOptions));
-  app.use(express.json()); // Middleware to parse JSON bodies
-
-  // Serve static files from the public directory
-  app.use(express.static(path.join(__dirname, 'public')));
-
-  // Basic info endpoint
-  app.get('/api', (req, res) => {
-    res.json({
-      name: 'ChimpGPT',
-      status: 'online',
-      version,
-    });
-  });
-
-  // Circuit Breaker API Endpoints (Placeholders)
-  app.get('/api/breaker/status', (req, res) => {
-    // In a real implementation, you'd fetch the actual breaker status
-    res.json({
-      breakerOpen: false, // Example status
-      pendingRequests: [], // Example pending requests
-    });
-  });
-
-  app.post('/api/breaker/reset', (req, res) => {
-    // In a real implementation, you'd handle the owner token and reset logic
-    logger.info({ body: req.body }, 'Received POST to /api/breaker/reset');
-    res.json({ success: true, message: 'Breaker reset request received (placeholder).' });
-  });
-
-  app.post('/api/breaker/approve', (req, res) => {
-    // In a real implementation, you'd handle the owner token and approval/denial logic
-    logger.info({ body: req.body }, 'Received POST to /api/breaker/approve');
-    res.json({ success: true, message: 'Breaker approval/denial request received (placeholder).' });
-  });
-
-  // Detailed health check endpoint
-  app.get('/function-results', (req, res) => {
-    const functionResults =
-      stats.customStats && stats.customStats.functionResults
-        ? stats.customStats.functionResults
-        : {};
-    res.json(functionResults);
-  });
-
-  app.get('/health', (req, res) => {
-    // Track request start time for latency calculation
-    req._startTime = Date.now();
-    try {
-      const uptime = Math.floor((new Date() - stats.startTime) / 1000);
-      const memoryUsage = process.memoryUsage();
-
-      // Calculate average response time
-      const avgResponseTime =
-        responseTimes.length > 0
-          ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
-          : 0;
-
-      // Get current timestamp for metrics
-      const now = new Date();
-
-      // Add current metrics to history
-      systemMetrics.memory.push(process.memoryUsage().heapUsed);
-      systemMetrics.cpu.push(process.cpuUsage().user);
-      systemMetrics.load.push(os.loadavg()[0]);
-      systemMetrics.timestamps.push(now);
-
-      // Keep only the most recent metrics
-      if (systemMetrics.memory.length > MAX_METRICS) {
-        systemMetrics.memory.shift();
-        systemMetrics.cpu.shift();
-        systemMetrics.load.shift();
-        systemMetrics.timestamps.shift();
-      }
-
-      const health = {
-        status: 'ok',
-        name: client.user?.username || 'ChimpGPT',
-        uptime: uptime,
-        version: version,
-        metrics: {
-          responseTime: {
-            current: Date.now() - req._startTime,
-            average: avgResponseTime,
-            min: responseTimes.length > 0 ? Math.min(...responseTimes) : 0,
-            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0,
-          },
-          system: {
-            memory: systemMetrics.memory,
-            cpu: systemMetrics.cpu,
-            load: systemMetrics.load,
-            timestamps: systemMetrics.timestamps.map(t => t.toISOString()),
-          },
-        },
-        debug: {
-          nodeVersion: process.version,
-          platform: process.platform,
-          arch: process.arch,
-          pid: process.pid,
-          uptime: process.uptime(),
-          env: process.env.NODE_ENV || 'development',
-        },
-        memory: {
-          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-          heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-        },
-        system: {
-          platform: process.platform,
-          arch: process.arch,
-          cpus: os.cpus().length,
-          loadAvg: os.loadavg(),
-          freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
-          totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
-        },
-        stats: {
-          messageCount: stats.messageCount,
-          apiCalls: stats.apiCalls,
-          errors: stats.errors,
-          rateLimits: {
-            count:
-              stats.rateLimits && typeof stats.rateLimits.hit === 'number'
-                ? stats.rateLimits.hit
-                : 0,
-            uniqueUsers:
-              stats.rateLimits &&
-              stats.rateLimits.users &&
-              typeof stats.rateLimits.users.size === 'number'
-                ? stats.rateLimits.users.size
-                : 0,
-            userDetails:
-              stats.rateLimits && stats.rateLimits.users ? Array.from(stats.rateLimits.users) : [],
-          },
-        },
-        discord: {
-          ping: client.ws.ping,
-          status: client.ws.status === 0 ? 'online' : 'issues',
-          guilds: client.guilds.cache.size,
-          channels: client.channels.cache.size,
-        },
-      };
-
-      // Add slash command deployment info
-      try {
-        // Remove async/await since we're not using it here
-        const lastDeploymentMs = getLastDeploymentTimestamp();
-        let nextCheckEstimate = 'N/A';
-        const autoDeployEnabled =
-          config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true';
-
-        if (lastDeploymentMs) {
-          try {
-            const nextCheckDate = new Date(lastDeploymentMs + 12 * 60 * 60 * 1000);
-            nextCheckEstimate =
-              autoDeployEnabled && !isNaN(nextCheckDate.getTime())
-                ? nextCheckDate.toISOString()
-                : 'Disabled or invalid date';
-          } catch (e) {
-            console.error('Error calculating next check date:', e);
-            nextCheckEstimate = 'Error calculating';
-          }
-        }
-
-        health.slashCommands = {
-          lastDeployed:
-            lastDeploymentMs && !isNaN(new Date(lastDeploymentMs).getTime())
-              ? new Date(lastDeploymentMs).toISOString()
-              : 'Never or Unknown',
-          nextScheduledCheck: nextCheckEstimate,
-          autoDeployEnabled: autoDeployEnabled,
-        };
-      } catch (err) {
-        logger.error({ err }, 'Error fetching slash command deployment info for /health endpoint');
-        health.slashCommands = {
-          lastDeployed: 'Error fetching',
-          nextScheduledCheck: 'Error fetching',
-          autoDeployEnabled: config.DEPLOY_COMMANDS === true || config.DEPLOY_COMMANDS === 'true',
-          error: 'Failed to retrieve deployment timestamps',
-        };
-      }
-
-      // Check if any error counts are high
-      const errorSum = calculateTotalErrors(stats.errors);
-      if (errorSum > 20 || (stats.errors.openai || 0) > 10) {
-        health.status = 'warning';
-      }
-
-      // Calculate response time and add to history
-      const responseTime = Date.now() - req._startTime;
-      responseTimes.push(responseTime);
-      if (responseTimes.length > MAX_RESPONSE_TIMES) {
-        responseTimes.shift();
-      }
-
-      // Add current response time to the health object
-      health.metrics.responseTime.current = responseTime;
-
-      res.json(health);
-    } catch (err) {
-      logger.error({ err }, 'Critical error in /health endpoint');
-      res.status(500).json({
-        status: 'error',
-        message: 'Server error while fetching health data.',
-        error: err.message,
-      });
-    }
-  });
-
-  // Add test endpoint
-  app.get('/run-tests', async (req, res) => {
-    logger.info('Running tests from web interface');
-
-    try {
-      // Run conversation log tests
-      const conversationLogResults = await runConversationLogTests();
-
-      // Run OpenAI integration tests
-      const openaiResults = await runOpenAITests();
-
-      // Run Quake server stats tests
-      const quakeResults = await runQuakeTests();
-
-      // Return all test results
-      res.json({
-        conversationLog: conversationLogResults,
-        openaiIntegration: openaiResults,
-        quakeServerStats: quakeResults,
-      });
-    } catch (error) {
-      logger.error({ error }, 'Error running tests');
-      res.status(500).json({ error: 'Failed to run tests' });
-    }
-  });
-
-  // Start the server
-  // Determine which port to use based on environment
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  let PORT;
-
-  if (nodeEnv === 'production') {
-    PORT = config.PORT || 3001;
-  } else {
-    PORT = config.PORT || 3001;
-  }
-
-  const LISTEN_ADDRESS = '0.0.0.0';
-  const DISPLAY_HOSTNAME = config.STATUS_HOSTNAME || 'localhost';
-
-  app.listen(PORT, LISTEN_ADDRESS, () => {
-    logger.info(
-      `Health check server running at http://${DISPLAY_HOSTNAME}:${PORT}/ (listening on ${LISTEN_ADDRESS}:${PORT} in ${nodeEnv} mode)`
-    );
-  });
+  // Initialize health monitoring without starting a server
+  logger.info('Initializing health check statistics and reporting');
 
   // Schedule periodic health reports to owner
   if (config.OWNER_ID) {
     scheduleHealthReports(client);
   }
 
-  return { app, stats };
+  return { stats };
 }
 
 /**
@@ -468,12 +179,12 @@ function scheduleHealthReports(client) {
         logger.warn('Client not ready, skipping health report');
         return;
       }
-      
+
       if (!config.OWNER_ID) {
         logger.debug('No OWNER_ID configured, skipping health report');
         return;
       }
-      
+
       const owner = await client.users.fetch(config.OWNER_ID);
       if (owner) {
         const report = generateHealthReport();
@@ -495,41 +206,45 @@ function scheduleHealthReports(client) {
   // Use a retry mechanism to wait for client to be ready
   let startupRetries = 0;
   const maxStartupRetries = 20; // Increase retries to 20 (100 seconds total)
-  
+
   const tryStartupMessage = async () => {
     try {
       if (!config.OWNER_ID) {
         logger.debug('No OWNER_ID configured, skipping startup message');
         return;
       }
-      
+
       // Check multiple conditions for client readiness
       const isClientReady = () => {
-        return client.isReady() && 
-               client.token && 
-               client.rest && 
-               client.rest.requestManager && 
-               client.user && 
-               client.user.id;
+        return (
+          client.isReady() &&
+          client.token &&
+          client.rest &&
+          client.rest.requestManager &&
+          client.user &&
+          client.user.id
+        );
       };
-      
+
       if (!isClientReady()) {
         startupRetries++;
         if (startupRetries < maxStartupRetries) {
-          logger.debug(`Client not fully ready for startup message, retry ${startupRetries}/${maxStartupRetries}`, {
-            isReady: client.isReady(),
-            hasToken: !!client.token,
-            hasRest: !!client.rest,
-            hasUser: !!client.user
-          });
+          logger.debug(
+            `Client not fully ready for startup message, retry ${startupRetries}/${maxStartupRetries}`,
+            {
+              isReady: client.isReady(),
+              hasToken: !!client.token,
+              hasRest: !!client.rest,
+              hasUser: !!client.user,
+            }
+          );
           setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
           return;
-        } else {
-          logger.warn('Client not ready after max retries, giving up on startup message');
-          return;
         }
+        logger.warn('Client not ready after max retries, giving up on startup message');
+        return;
       }
-      
+
       let owner;
       try {
         owner = await client.users.fetch(config.OWNER_ID);
@@ -538,9 +253,12 @@ function scheduleHealthReports(client) {
         if (fetchError.message && fetchError.message.includes('token')) {
           startupRetries++;
           if (startupRetries < maxStartupRetries) {
-            logger.warn(`Token error when fetching owner, retry ${startupRetries}/${maxStartupRetries}`, {
-              error: fetchError.message
-            });
+            logger.warn(
+              `Token error when fetching owner, retry ${startupRetries}/${maxStartupRetries}`,
+              {
+                error: fetchError.message,
+              }
+            );
             setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
             return;
           }
@@ -548,66 +266,66 @@ function scheduleHealthReports(client) {
         logger.error({ error: fetchError, ownerId: config.OWNER_ID }, 'Failed to fetch owner user');
         return;
       }
-      
+
       if (owner) {
-          // Send the initial startup message if not already sent
-          if (!startupCoordinator.hasMessage) {
-            await startupCoordinator.sendStartupMessage(owner);
-          }
-
-          // Wait a bit to gather more startup information
-          setTimeout(async () => {
-            try {
-              // Check if client is still ready before proceeding
-              if (!client.isReady()) {
-                logger.warn('Client not ready in delayed startup message, skipping');
-                return;
-              }
-              
-              // Import the greeting manager to get system information
-              const greetingManager = require('./utils/greetingManager');
-              const report = generateHealthReport(true);
-              const botVersionInfo = require('./getBotVersion').getBotVersion();
-
-              // Generate the system information embed
-              try {
-                const systemEmbed = greetingManager.generateStartupReport();
-                // Update the color to match our success theme
-                systemEmbed.setColor(0x00ff00);
-                startupCoordinator.addEmbed('greetingManager', systemEmbed);
-              } catch (err) {
-                logger.error({ error: err }, 'Failed to generate system information embed');
-              }
-
-              // Add health data as a second embed
-              startupCoordinator.addEmbed('healthCheck', {
-                title: '📊 Detailed Health Information',
-                description: report,
-                color: 0x00ff00, // Green color for success
-                timestamp: new Date(),
-                footer: {
-                  text: `ChimpGPT v${version}`,
-                },
-              });
-
-              // Update the startup message with all embeds
-              await startupCoordinator.updateStartupMessage();
-              logger.info('Updated startup message with comprehensive report');
-
-              // Reset the coordinator after some time to free memory
-              setTimeout(() => {
-                startupCoordinator.reset();
-              }, 10000);
-            } catch (updateError) {
-              logger.error({ error: updateError }, 'Failed to update startup message with details');
-            }
-          }, 5000); // Wait 5 seconds before updating with details
+        // Send the initial startup message if not already sent
+        if (!startupCoordinator.hasMessage) {
+          await startupCoordinator.sendStartupMessage(owner);
         }
+
+        // Wait a bit to gather more startup information
+        setTimeout(async () => {
+          try {
+            // Check if client is still ready before proceeding
+            if (!client.isReady()) {
+              logger.warn('Client not ready in delayed startup message, skipping');
+              return;
+            }
+
+            // Import the greeting manager to get system information
+            const greetingManager = require('./utils/greetingManager');
+            const report = generateHealthReport(true);
+            const botVersionInfo = require('./getBotVersion').getBotVersion();
+
+            // Generate the system information embed
+            try {
+              const systemEmbed = greetingManager.generateStartupReport();
+              // Update the color to match our success theme
+              systemEmbed.setColor(0x00ff00);
+              startupCoordinator.addEmbed('greetingManager', systemEmbed);
+            } catch (err) {
+              logger.error({ error: err }, 'Failed to generate system information embed');
+            }
+
+            // Add health data as a second embed
+            startupCoordinator.addEmbed('healthCheck', {
+              title: '📊 Detailed Health Information',
+              description: report,
+              color: 0x00ff00, // Green color for success
+              timestamp: new Date(),
+              footer: {
+                text: `ChimpGPT v${version}`,
+              },
+            });
+
+            // Update the startup message with all embeds
+            await startupCoordinator.updateStartupMessage();
+            logger.info('Updated startup message with comprehensive report');
+
+            // Reset the coordinator after some time to free memory
+            setTimeout(() => {
+              startupCoordinator.reset();
+            }, 10000);
+          } catch (updateError) {
+            logger.error({ error: updateError }, 'Failed to update startup message with details');
+          }
+        }, 5000); // Wait 5 seconds before updating with details
+      }
     } catch (error) {
       logger.error({ error }, 'Failed to send startup health report to owner');
     }
   };
-  
+
   // If client is already ready, start after a delay
   // Otherwise, wait for the ready event
   if (client.isReady()) {
