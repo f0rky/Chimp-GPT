@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'chimpGPT',
-      script: './combined.js',
+      script: './src/core/combined.js',
       watch: false,
       node_args: '--no-deprecation', // Suppress deprecation warnings including util.isArray
       env: {
@@ -15,8 +15,8 @@ module.exports = {
       },
       max_memory_restart: '1G',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      error_file: './logs/chimpGPT-error.log',
-      out_file: './logs/chimpGPT-out.log',
+      error_file: './assets/logs/chimpGPT-error.log',
+      out_file: './assets/logs/chimpGPT-out.log',
       merge_logs: true,
       restart_delay: 5000,
     },

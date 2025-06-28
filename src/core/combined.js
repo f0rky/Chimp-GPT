@@ -22,7 +22,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
-const { parseRunMode } = require('./runModes');
+const { parseRunMode } = require('../../runModes');
 
 // Parse run mode from command-line arguments
 const runConfig = parseRunMode();
@@ -34,16 +34,16 @@ const logger = createLogger('combined', { level: runConfig.logLevel });
 const bot = require('./chimpGPT');
 
 // Import the status server
-const { initStatusServer } = require('./statusServer');
+const { initStatusServer } = require('../web/statusServer');
 
 /**
  * Ensure required directories exist
  */
 function ensureDirectories() {
-  const directories = ['logs', 'data', 'data/conversations', 'data/pfp'];
+  const directories = ['assets/logs', 'data', 'data/conversations', 'assets/pfp'];
 
   directories.forEach(dir => {
-    const dirPath = path.join(__dirname, dir);
+    const dirPath = path.join(__dirname, '..', '..', dir);
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
       logger.info(`Created directory: ${dir}`);
@@ -78,7 +78,7 @@ async function startCombinedApp() {
 
     if (runConfig.enableTests) {
       logger.info('Running in test mode - executing test suite');
-      const runTests = require('./tests/runTests');
+      const runTests = require('../../tests/unit/testRunner');
       await runTests();
     }
 

@@ -15,31 +15,31 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const OpenAI = require('openai');
 const path = require('path');
 const fs = require('fs');
-const { lookupWeather, lookupExtendedForecast } = require('./weatherLookup');
-const simplifiedWeather = require('./simplified-weather');
-const lookupTime = require('./timeLookup');
-const lookupQuakeServer = require('./quakeLookup');
-const { initStatusManager } = require('./statusManager');
-const lookupWolfram = require('./wolframLookup');
-const { generateImage, enhanceImagePrompt } = require('./imageGeneration');
-const pluginManager = require('./pluginManager');
-const { processVersionQuery } = require('./utils/versionSelfQuery');
-const { sendChannelGreeting } = require('./utils/greetingManager');
-const PFPManager = require('./utils/pfpManager');
+const { lookupWeather, lookupExtendedForecast } = require('../services/weatherLookup');
+const simplifiedWeather = require('../services/simplified-weather');
+const lookupTime = require('../services/timeLookup');
+const lookupQuakeServer = require('../services/quakeLookup');
+const { initStatusManager } = require('../web/statusManager');
+const lookupWolfram = require('../services/wolframLookup');
+const { generateImage, enhanceImagePrompt } = require('../services/imageGeneration');
+const pluginManager = require('../plugins/pluginManager');
+const { processVersionQuery } = require('../../utils/versionSelfQuery');
+const { sendChannelGreeting } = require('../../utils/greetingManager');
+const PFPManager = require('../../utils/pfpManager');
 const { stats: healthCheckStats } = require('./healthCheck'); // Moved from updateDiscordStats
-const commandHandler = require('./commands/commandHandler');
+const commandHandler = require('../../commands/commandHandler');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
 
 // Import performance monitoring
-const performanceMonitor = require('./utils/performanceMonitor');
+const performanceMonitor = require('../middleware/performanceMonitor');
 
 // Import validated configuration
 const config = require('./configValidator');
 
 // Import the function results optimization patch
-const optimizationPatch = require('./optimizationPatch');
+const optimizationPatch = require('../conversation/optimizationPatch');
 logger.info(
   `Function results optimization patch applied: ${optimizationPatch.success ? 'SUCCESS' : 'FAILED'}`
 );
@@ -57,7 +57,7 @@ const {
   checkUserRateLimit,
   checkImageGenerationRateLimit,
   constants: { IMAGE_GEN_POINTS },
-} = require('./rateLimiter');
+} = require('../middleware/rateLimiter');
 
 // Import health check system
 const {
@@ -72,11 +72,11 @@ const {
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
-const statsStorage = require('./statsStorage');
-const { shouldDeploy, recordSuccessfulDeployment } = require('./utils/deploymentManager');
+const statsStorage = require('../../statsStorage');
+const { shouldDeploy, recordSuccessfulDeployment } = require('../../utils/deploymentManager');
 
 // Import malicious user manager for tracking suspicious behavior
-const maliciousUserManager = require('./utils/maliciousUserManager');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
 
 // Module-level variable for status manager
 let statusManager = null;
@@ -89,7 +89,7 @@ const openai = new OpenAI({
 });
 
 // Log bot version at startup
-const { version: botVersion } = require('./package.json');
+const { version: botVersion } = require('../../package.json');
 logger.info(`ChimpGPT starting up - version ${botVersion}`);
 // Initialize Discord client with proper intents
 const client = new Client({

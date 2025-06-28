@@ -82,6 +82,18 @@
 
 ### Code Structure & Architecture
 
+- [x] **Project Structure Cleanup**: Complete reorganization of the codebase into a clean, modular architecture
+  - [x] Created organized src/ directory with core/, services/, conversation/, middleware/, web/, plugins/ subdirectories
+  - [x] Moved all core bot files to src/core/ (chimpGPT.js, combined.js, logger.js, configValidator.js, healthCheck.js)
+  - [x] Organized external API integrations into src/services/ (OpenAI, weather, time, Wolfram, Quake, image generation)
+  - [x] Grouped conversation management files in src/conversation/ (conversation managers, storage, optimization)
+  - [x] Separated middleware components into src/middleware/ (rate limiting, circuit breaker, performance monitoring)
+  - [x] Organized web interface in src/web/ (status server, status manager, performance history)
+  - [x] Restructured tests/ into unit/, integration/, and fixtures/ subdirectories
+  - [x] Created scripts/ directory for build and deployment scripts
+  - [x] Created assets/ directory for generated content (PFP, logs)
+  - [x] Updated all import statements and configuration files (package.json, ecosystem.config.js)
+  - [x] Updated documentation with new structure and architecture benefits
 - [x] Refactor the weather API integration to use a single consistent approach (now unified on weatherLookup.js, legacy code removed)
 - [x] Consolidate error handling patterns across modules (Logging is now standardized across all main modules with Pino-based loggers. Error handling is consistent and robust.)
 - [x] Add stricter type-checking for plugin interfaces and function arguments (JSDoc or TypeScript) (JSDoc/type coverage is comprehensive across all major modules and plugin interfaces. Minor gaps may remain for new code.)

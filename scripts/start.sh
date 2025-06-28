@@ -78,7 +78,7 @@ if [[ "$COMPONENT" != "all" && "$COMPONENT" != "bot" && "$COMPONENT" != "status"
 fi
 
 # Build command
-CMD="node combined.js --mode $MODE"
+CMD="node ../src/core/combined.js --mode $MODE"
 
 # Add component flags
 if [[ "$COMPONENT" == "bot" ]]; then

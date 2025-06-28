@@ -600,33 +600,82 @@ If you'd like to contribute to the development of Chimp-GPT, please fork the rep
 
 ## File Structure
 
-### Core Files
+ChimpGPT follows a clean, modular architecture with clear separation of concerns:
 
-- `combined.js` - Main entry point that starts both bot and status server
-- `chimpGPT.js` - Core Discord bot implementation
-- `openaiConfig.js` - OpenAI API configuration
-- `configValidator.js` - Environment variable validation
-- `logger.js` - Structured logging configuration using Pino
-- `rateLimiter.js` - Rate limiting for API calls
-- `healthCheck.js` - Bot health monitoring system
+```
+chimp-gpt/
+├── 📁 src/                          # Core application source code
+│   ├── 📁 core/                     # Main bot components
+│   │   ├── chimpGPT.js              # Core Discord bot implementation
+│   │   ├── combined.js              # Main entry point (bot + status server)
+│   │   ├── logger.js                # Structured logging configuration
+│   │   ├── configValidator.js       # Environment variable validation
+│   │   └── healthCheck.js           # Bot health monitoring system
+│   │
+│   ├── 📁 services/                 # External API integrations
+│   │   ├── openaiConfig.js          # OpenAI API configuration
+│   │   ├── weatherLookup.js         # Weather API service
+│   │   ├── timeLookup.js           # Time lookup functionality
+│   │   ├── wolframLookup.js        # Wolfram Alpha integration
+│   │   ├── quakeLookup.js          # Quake Live server stats
+│   │   └── imageGeneration.js      # GPT Image-1 generation
+│   │
+│   ├── 📁 conversation/             # Conversation management
+│   │   ├── conversationManager.js
+│   │   ├── blendedConversationManager.js
+│   │   ├── conversationStorage.js
+│   │   └── optimizationPatch.js
+│   │
+│   ├── 📁 middleware/               # Bot middleware & utilities
+│   │   ├── rateLimiter.js          # Rate limiting for API calls
+│   │   ├── circuitBreaker.js       # Circuit breaker pattern
+│   │   └── performanceMonitor.js   # Performance tracking
+│   │
+│   ├── 📁 web/                      # Web interface & status server
+│   │   ├── statusServer.js         # Status page HTTP server
+│   │   ├── statusManager.js        # Status management
+│   │   └── performanceHistory.js   # Performance data storage
+│   │
+│   └── 📁 plugins/                  # Plugin system
+│       └── pluginManager.js        # Plugin loading and management
+│
+├── 📁 commands/                     # Discord commands
+│   ├── commandHandler.js           # Command registration and routing
+│   ├── deploySlashCommands.js      # Slash command deployment
+│   └── modules/                    # Individual command implementations
+│
+├── 📁 utils/                        # Utility functions
+│   ├── apiKeyManager.js            # API key management
+│   ├── performanceMonitor.js       # Performance monitoring
+│   └── [other utilities]
+│
+├── 📁 tests/                        # All test files
+│   ├── 📁 unit/                     # Unit tests
+│   ├── 📁 integration/              # Integration tests
+│   └── 📁 fixtures/                 # Test fixtures
+│
+├── 📁 scripts/                      # Build & deployment scripts
+│   ├── start.sh                    # Main startup script
+│   └── [other scripts]
+│
+├── 📁 assets/                       # Generated content & resources
+│   ├── 📁 pfp/                      # Profile pictures
+│   └── 📁 logs/                     # Log files
+│
+├── 📁 public/                       # Web interface assets
+├── 📁 plugins/                      # User plugins
+├── 📁 data/                         # Runtime data
+├── 📁 docs/                         # Documentation
+└── 📁 archive/                      # Legacy/backup files
+```
 
-### Feature Modules
+### Architecture Benefits
 
-- `quakeLookup.js` - Quake Live server stats functionality
-- `timeLookup.js` - Time lookup functionality
-- `weatherLookup.js` - Weather lookup functionality
-- `wolframLookup.js` - Wolfram Alpha integration
-
-### Command System
-
-- `commands/commandHandler.js` - Command registration and routing
-- `commands/deploySlashCommands.js` - Slash command deployment
-- `commands/modules/` - Individual command implementations
-
-### Utility Directories
-
-- `utils/` - Utility scripts for maintenance and debugging
-- `archive/` - Archived files for reference
+- **Clear separation of concerns**: Core, services, web, middleware are logically separated
+- **Easier navigation**: Related files are grouped together
+- **Better maintainability**: New developers can quickly understand the structure
+- **Scalable**: Easy to add new services or features in appropriate directories
+- **Standard conventions**: Follows Node.js project best practices
 
 ## Configuration Options
 

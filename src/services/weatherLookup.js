@@ -39,11 +39,11 @@
  * It includes robust error handling and fallback mechanisms.
  */
 const axios = require('axios');
-const { weather: weatherLogger } = require('./logger');
-const retryWithBreaker = require('./utils/retryWithBreaker');
-const functionResults = require('./functionResults');
-const { sanitizeLocation } = require('./utils/inputSanitizer');
-const apiKeyManager = require('./utils/apiKeyManager');
+const { weather: weatherLogger } = require('../core/logger');
+const retryWithBreaker = require('../../utils/retryWithBreaker');
+const functionResults = require('../../functionResults');
+const { sanitizeLocation } = require('../../utils/inputSanitizer');
+const apiKeyManager = require('../../utils/apiKeyManager');
 const breakerManager = require('./breakerManager');
 
 // Circuit breaker configuration for weather API
