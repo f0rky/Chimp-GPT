@@ -5,6 +5,16 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2025-06-29
+
+### Fixed
+- **Health Check Startup Message**: Fixed compatibility issue with Discord.js v14.21.0
+  - Removed non-existent `client.rest.requestManager` property check that was causing 19/20 retry failures
+  - Removed non-existent `client.rest.agent` property check
+  - Enhanced client readiness validation with detailed condition logging
+  - Health check startup message now sends reliably without retry failures
+  - Maintains robust health monitoring system while fixing Discord.js v14 compatibility
+
 ## [1.7.1] - 2025-06-26
 
 ### Added

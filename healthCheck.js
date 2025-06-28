@@ -216,27 +216,37 @@ function scheduleHealthReports(client) {
 
       // Check multiple conditions for client readiness
       const isClientReady = () => {
-        return (
-          client.isReady() &&
-          client.token &&
-          client.rest &&
-          client.rest.requestManager &&
-          client.user &&
-          client.user.id
-        );
+        const conditions = {
+          isReady: client.isReady(),
+          hasToken: !!client.token,
+          hasRest: !!client.rest,
+          hasUser: !!client.user,
+          hasUserId: !!(client.user && client.user.id),
+        };
+
+        // No need for REST agent/options checks - if client.isReady() is true and client.rest exists,
+        // the REST client is functional in Discord.js v14
+
+        const allReady = Object.values(conditions).every(Boolean);
+
+        if (!allReady) {
+          const failedConditions = Object.entries(conditions)
+            .filter(([_, value]) => !value)
+            .map(([key]) => key);
+          logger.debug('Client readiness check failed', {
+            conditions,
+            failedConditions,
+          });
+        }
+
+        return allReady;
       };
 
       if (!isClientReady()) {
         startupRetries++;
         if (startupRetries < maxStartupRetries) {
           logger.debug(
-            `Client not fully ready for startup message, retry ${startupRetries}/${maxStartupRetries}`,
-            {
-              isReady: client.isReady(),
-              hasToken: !!client.token,
-              hasRest: !!client.rest,
-              hasUser: !!client.user,
-            }
+            `Client not fully ready for startup message, retry ${startupRetries}/${maxStartupRetries}`
           );
           setTimeout(tryStartupMessage, 5000); // Retry in 5 seconds
           return;
