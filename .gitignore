@@ -116,6 +116,9 @@ dist
 archive/
 CHECKLIST.md
 
+# Claude Code AI assistant cache
+.claude/
+
 # vuepress v2.x temp and cache directory
 .temp
 .cache
