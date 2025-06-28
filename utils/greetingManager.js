@@ -121,7 +121,7 @@ async function sendChannelGreeting(client) {
       logger.warn('Client not ready, skipping channel greeting');
       return;
     }
-    
+
     // Get the allowed channel IDs from config
     const allowedChannelIDs = config.CHANNEL_ID || [];
 

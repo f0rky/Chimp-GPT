@@ -1,4 +1,3 @@
-/* global Chart:readonly */
 /**
  * ChimpGPT Status Page
  *
@@ -14,8 +13,8 @@
 // Charts for visualizing data
 let apiChart = null;
 let errorChart = null;
-let metricsChart = null;
-let historyChart = null;
+const metricsChart = null;
+const historyChart = null;
 
 // Update interval in milliseconds (optimized for bandwidth efficiency)
 const UPDATE_INTERVAL = 10000; // 10 seconds (was 5s)
@@ -343,16 +342,16 @@ function initHistoryChart() {
         },
         tooltip: {
           callbacks: {
-            label: function (context) {
-              let label = context.dataset.label || '';
+            label: function (tooltipContext) {
+              let label = tooltipContext.dataset.label || '';
               if (label) {
                 label += ': ';
               }
-              if (context.parsed.y !== null) {
-                const value = context.parsed.y;
-                if (context.datasetIndex === 0) label += value.toFixed(2) + ' ms';
-                else if (context.datasetIndex === 1) label += Math.round(value);
-                else if (context.datasetIndex === 2) label += value.toFixed(2) + ' MB';
+              if (tooltipContext.parsed.y !== null) {
+                const value = tooltipContext.parsed.y;
+                if (tooltipContext.datasetIndex === 0) label += value.toFixed(2) + ' ms';
+                else if (tooltipContext.datasetIndex === 1) label += Math.round(value);
+                else if (tooltipContext.datasetIndex === 2) label += value.toFixed(2) + ' MB';
               }
               return label;
             },

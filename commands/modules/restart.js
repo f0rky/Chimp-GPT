@@ -14,15 +14,15 @@ module.exports = {
   dmAllowed: true,
   ownerOnly: true,
   requiresApproval: true,
+  // eslint-disable-next-line consistent-return
   async execute(message) {
     if (message.author.id !== config.OWNER_ID) {
       return message.reply('Sorry, only the bot owner can use this command.');
     }
     await message.reply('Restarting the bot...');
     process.exit(0); // Assumes process manager will restart the bot
-    // eslint-disable-next-line no-unreachable
-    return;
   },
+  // eslint-disable-next-line consistent-return
   async executeSlash(interaction) {
     if (interaction.user.id !== config.OWNER_ID) {
       return interaction.reply({
@@ -35,7 +35,5 @@ module.exports = {
       ephemeral: true,
     });
     process.exit(0); // Assumes process manager will restart the bot
-    // eslint-disable-next-line no-unreachable
-    return;
   },
 };

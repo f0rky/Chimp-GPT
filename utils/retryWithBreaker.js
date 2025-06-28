@@ -106,18 +106,20 @@ async function retryWithBreaker(fn, opts = {}) {
       return result;
     } catch (err) {
       lastError = err;
-      
+
       // Check if this is a non-retryable error
-      const isContentPolicyViolation = err.status === 400 && 
-        (err.code === 'moderation_blocked' || 
-         err.message?.includes('content policy') ||
-         err.message?.includes('safety system'));
-      
-      const isNonRetryableError = isContentPolicyViolation || 
+      const isContentPolicyViolation =
+        err.status === 400 &&
+        (err.code === 'moderation_blocked' ||
+          err.message?.includes('content policy') ||
+          err.message?.includes('safety system'));
+
+      const isNonRetryableError =
+        isContentPolicyViolation ||
         err.status === 401 || // Authentication error
         err.status === 403 || // Forbidden
         err.code === 'invalid_request_error';
-      
+
       if (isNonRetryableError) {
         logger.warn(
           {
@@ -130,7 +132,7 @@ async function retryWithBreaker(fn, opts = {}) {
         );
         throw err; // Don't retry, just fail immediately
       }
-      
+
       attempt++;
       breakerState.failures++;
 

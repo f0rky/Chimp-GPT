@@ -223,21 +223,20 @@ async function generateImage(prompt, options = {}) {
       /\bseductive\b/i,
       /\bsensual\b/i,
       /\bintimate\b/i,
-      /\berotic\b/i
+      /\berotic\b/i,
     ];
-    
-    const containsProblematicContent = problematicPatterns.some(pattern => 
-      pattern.test(prompt)
-    );
-    
+
+    const containsProblematicContent = problematicPatterns.some(pattern => pattern.test(prompt));
+
     if (containsProblematicContent) {
       logger.info({ prompt }, 'Pre-moderation: Potentially problematic content detected');
       trackError('gptimage', new Error('Pre-moderation block'));
-      
+
       // Return immediately without calling OpenAI
       return {
         success: false,
-        error: 'This request may contain content that violates our content policy. Please try a different prompt that doesn\'t include references to swimwear, nudity, or suggestive content.',
+        error:
+          "This request may contain content that violates our content policy. Please try a different prompt that doesn't include references to swimwear, nudity, or suggestive content.",
         isContentPolicyViolation: true,
         prompt,
       };
@@ -254,20 +253,17 @@ async function generateImage(prompt, options = {}) {
       // Make the API call with circuit breaker protection and timeout
       response = await retryWithBreaker(async () => {
         const callStart = Date.now();
-        
+
         // Create a timeout promise
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
             reject(new Error('Image generation request timed out after 60 seconds'));
           }, 60000); // 60 second timeout
         });
-        
+
         // Race between the API call and timeout
-        const result = await Promise.race([
-          openai.images.generate(imageParams),
-          timeoutPromise
-        ]);
-        
+        const result = await Promise.race([openai.images.generate(imageParams), timeoutPromise]);
+
         apiCallDuration = Date.now() - callStart;
         logger.info({ apiCallDuration }, 'OpenAI image generation API call completed');
         return result;
@@ -277,17 +273,20 @@ async function generateImage(prompt, options = {}) {
       trackApiCall('gptimage');
     } catch (error) {
       // Check for content policy violation
-      if (error.status === 400 && 
-          (error.code === 'moderation_blocked' || 
-           error.message?.includes('safety system') ||
-           error.message?.includes('content policy'))) {
+      if (
+        error.status === 400 &&
+        (error.code === 'moderation_blocked' ||
+          error.message?.includes('safety system') ||
+          error.message?.includes('content policy'))
+      ) {
         logger.warn({ prompt, error: error.message }, 'Image generation blocked by content policy');
         trackError('gptimage', error);
-        
+
         // Return a specific error result for content policy violations
         return {
           success: false,
-          error: 'This image request was blocked by the safety system. Please try a different prompt.',
+          error:
+            'This image request was blocked by the safety system. Please try a different prompt.',
           isContentPolicyViolation: true,
           prompt,
         };

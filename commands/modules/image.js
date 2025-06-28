@@ -137,6 +137,7 @@ module.exports = {
    * @param {Object} interaction - Discord interaction object
    * @returns {Promise<void>}
    */
+  // eslint-disable-next-line consistent-return
   async interactionExecute(interaction) {
     try {
       // Defer the reply to give us time to generate the image
@@ -248,7 +249,6 @@ module.exports = {
         },
         'Image generated and sent successfully'
       );
-      return;
     } catch (error) {
       logger.error({ error }, 'Error executing image command');
 
@@ -264,6 +264,5 @@ module.exports = {
         });
       }
     }
-    return;
   },
 };

@@ -463,7 +463,7 @@ async function getActiveQuakeServerCount() {
  * @returns {string} A concise summary of the conversation topic
  * @private
  */
-// eslint-disable-next-line no-unused-vars
+
 function _generateConversationSummary(message) {
   if (!message || typeof message !== 'string') {
     return 'a conversation';

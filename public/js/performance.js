@@ -356,10 +356,11 @@ function getRecentCallsRows(recentTimings) {
         metadata = Object.entries(timing.metadata)
           .map(([key, value]) => {
             // Truncate long values
-            if (typeof value === 'string' && value.length > 50) {
-              value = value.substring(0, 47) + '...';
-            }
-            return `<strong>${key}:</strong> ${value}`;
+            const displayValue =
+              typeof value === 'string' && value.length > 50
+                ? value.substring(0, 47) + '...'
+                : value;
+            return `<strong>${key}:</strong> ${displayValue}`;
           })
           .join('<br>');
       }

@@ -1003,17 +1003,17 @@ function updateImageGallery(images) {
   recentImages.forEach(img => {
     const item = document.createElement('div');
     item.className = 'gallery-item';
-    
+
     // Extract image URL and prompt from the correct data structure
     const imageUrl = img.result?.images?.[0]?.url || img.url;
     const imagePrompt = img.params?.prompt || img.prompt || 'Generated image';
-    
+
     if (imageUrl) {
       item.innerHTML = `<img src="${imageUrl}" alt="${imagePrompt}" onclick="openImageModal('${imageUrl}', '${imagePrompt.replace(/'/g, "\\'")}')">`;
     } else {
       item.innerHTML = '<div class="error">Image URL not available</div>';
     }
-    
+
     gallery.appendChild(item);
   });
 }
