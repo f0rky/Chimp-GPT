@@ -32,13 +32,13 @@
  */
 
 const { OpenAI } = require('openai');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('image');
-const { trackApiCall, trackError } = require('./healthCheck');
-const functionResults = require('./functionResults');
-const config = require('./configValidator');
-const retryWithBreaker = require('./utils/retryWithBreaker');
-const breakerManager = require('./breakerManager');
+const { trackApiCall, trackError } = require('../core/healthCheck');
+const functionResults = require('../../functionResults');
+const config = require('../core/configValidator');
+const retryWithBreaker = require('../../utils/retryWithBreaker');
+const breakerManager = require('../middleware/breakerManager');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -308,10 +308,14 @@ async function generateImage(prompt, options = {}) {
       throw error;
     }
 
-    // Log the response structure to understand the format
+    // Log response metadata without exposing base64 data
     logger.debug(
       {
-        responseStructure: JSON.stringify(response),
+        hasData: !!response?.data,
+        dataLength: response?.data?.length || 0,
+        firstItemKeys: response?.data?.[0] ? Object.keys(response.data[0]) : [],
+        responseId: response?.id,
+        created: response?.created,
       },
       'GPT Image-1 response structure'
     );
@@ -372,8 +376,36 @@ async function generateImage(prompt, options = {}) {
     let images = [];
 
     try {
-      // Log the full response to understand its structure
-      logger.debug({ fullResponse: JSON.stringify(response) }, 'Full GPT Image-1 response');
+      // Log response metadata without base64 data to save log space
+      const responseMetadata = {
+        dataCount: response?.data?.length || 0,
+        hasUrls: response?.data?.some(item => item.url) || false,
+        hasBase64: response?.data?.some(item => item.b64_json) || false,
+        totalBase64Size:
+          response?.data?.reduce((sum, item) => sum + (item.b64_json?.length || 0), 0) || 0,
+        estimatedFileSizeMB:
+          response?.data?.reduce((sum, item) => {
+            if (item.b64_json) {
+              // Base64 is ~33% larger than binary, so estimate actual image size
+              const estimatedBytes = (item.b64_json.length * 3) / 4;
+              return sum + estimatedBytes / 1024 / 1024;
+            }
+            return sum;
+          }, 0) || 0,
+        responseId: response?.id,
+      };
+      logger.info(responseMetadata, 'GPT Image-1 response metadata and file size estimation');
+
+      // Performance optimization: warn about large images that might impact Discord message limits
+      if (responseMetadata.estimatedFileSizeMB > 8) {
+        logger.warn(
+          {
+            estimatedFileSizeMB: responseMetadata.estimatedFileSizeMB,
+            discordLimit: '8MB',
+          },
+          'Generated image may exceed Discord file size limits'
+        );
+      }
 
       // According to OpenAI's documentation, the response should have a data array
       // Each item in the array can have either a url or b64_json property
@@ -420,7 +452,15 @@ async function generateImage(prompt, options = {}) {
       // Ensure we have at least one image with a valid URL
       if (images.length === 0 || !images.some(img => img.url)) {
         // If we couldn't extract a URL, try to find any URL-like string in the response
-        const responseStr = JSON.stringify(response);
+        // Only stringify non-base64 fields to avoid memory issues
+        const responseForSearch = {
+          ...response,
+          data: response.data?.map(item => ({
+            ...item,
+            b64_json: item.b64_json ? '[BASE64_DATA_REMOVED]' : undefined,
+          })),
+        };
+        const responseStr = JSON.stringify(responseForSearch);
         const urlMatch = responseStr.match(/https?:\/\/[^"'\s]+/g);
         if (urlMatch && urlMatch.length > 0) {
           images = [

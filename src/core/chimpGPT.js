@@ -139,14 +139,12 @@ const {
   removeMessageById,
   updateMessageById,
   shutdown: shutdownConversations,
-} = require('./conversationManagerSelector');
+} = require('../conversation/conversationManagerSelector');
 
 const loadingEmoji = config.LOADING_EMOJI || '⏳';
 const allowedChannelIDs = config.CHANNEL_ID; // Already an array from configValidator
 
 /**
- * Removes color codes from a string
- *
  * Processes a message using OpenAI's GPT model
  *
  * This function sends the conversation context to OpenAI's API and handles the response.
@@ -560,6 +558,55 @@ async function generateNaturalResponse(
 // Track in-progress operations
 const inProgressOperations = new Set();
 
+// Track relationships between user messages and bot responses
+// Map: userMessageId -> { botMessage, userInfo, context }
+const messageRelationships = new Map();
+
+/**
+ * Store relationship between user message and bot response for context preservation
+ * @param {Object} originalMessage - The original user message
+ * @param {Object} feedbackMessage - The bot's response message
+ * @param {string} contextType - Type of context (image, weather, time, etc.)
+ * @param {string} contextContent - The content or context description
+ */
+function storeMessageRelationship(originalMessage, feedbackMessage, contextType, contextContent) {
+  if (!originalMessage || !feedbackMessage) return;
+
+  messageRelationships.set(originalMessage.id, {
+    botMessage: feedbackMessage,
+    userInfo: {
+      username: originalMessage.author.username,
+      displayName: originalMessage.author.displayName || originalMessage.author.username,
+      id: originalMessage.author.id,
+    },
+    context: {
+      type: contextType,
+      content: contextContent || originalMessage.content || 'No content',
+    },
+    timestamp: Date.now(), // Add timestamp for cleanup
+  });
+
+  // Performance optimization: prevent memory leaks by limiting map size
+  const MAX_RELATIONSHIPS = 1000;
+  if (messageRelationships.size > MAX_RELATIONSHIPS) {
+    // Remove oldest 100 entries when limit is reached
+    const entries = Array.from(messageRelationships.entries());
+    entries.sort(([, a], [, b]) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    for (let i = 0; i < 100 && messageRelationships.size > MAX_RELATIONSHIPS - 100; i++) {
+      messageRelationships.delete(entries[i][0]);
+    }
+
+    discordLogger.debug(
+      {
+        removedCount: 100,
+        remainingCount: messageRelationships.size,
+      },
+      'Cleaned up old message relationships to prevent memory leaks'
+    );
+  }
+}
+
 // Handle message deletion
 client.on('messageDelete', async message => {
   try {
@@ -633,6 +680,54 @@ client.on('messageDelete', async message => {
         discordLogger.debug(
           { messageId: message.id },
           'Removed deleted message from channel conversation'
+        );
+      }
+    }
+
+    // Check if we have a bot response for this deleted message
+    const relationship = messageRelationships.get(message.id);
+    if (relationship) {
+      try {
+        const { botMessage, userInfo, context } = relationship;
+
+        // Update the bot message to show context about the deleted user message
+        const username = userInfo.username || userInfo.displayName || 'Unknown User';
+        const contextText = context.substring(0, 100) + (context.length > 100 ? '...' : '');
+
+        let updatedContent;
+        if (context.type === 'image') {
+          updatedContent = `**${username}** removed their message - Generated image for: *${contextText}*`;
+        } else if (context.type === 'weather') {
+          updatedContent = `**${username}** removed their message - Weather for: *${contextText}*`;
+        } else if (context.type === 'time') {
+          updatedContent = `**${username}** removed their message - Time for: *${contextText}*`;
+        } else if (context.type === 'wolfram') {
+          updatedContent = `**${username}** removed their message - Calculation: *${contextText}*`;
+        } else if (context.type === 'quake') {
+          updatedContent = `**${username}** removed their message - Quake server info: *${contextText}*`;
+        } else {
+          updatedContent = `**${username}** removed their message - Context: *${contextText}*`;
+        }
+
+        // Edit the bot message to preserve context
+        await botMessage.edit(updatedContent);
+
+        discordLogger.info(
+          {
+            deletedMessageId: message.id,
+            botMessageId: botMessage.id,
+            username,
+            contextType: context.type,
+          },
+          'Updated bot response after user message deletion'
+        );
+
+        // Remove the relationship since it's no longer needed
+        messageRelationships.delete(message.id);
+      } catch (updateError) {
+        discordLogger.error(
+          { error: updateError, messageId: message.id },
+          'Failed to update bot response after message deletion'
         );
       }
     }
@@ -1006,6 +1101,14 @@ client.on('messageCreate', async message => {
       finalResponse += subtext;
       await feedbackMessage.edit(finalResponse);
 
+      // Store message relationship for context preservation
+      if (message) {
+        const contextContent =
+          versionResponse.content.slice(0, 100) +
+          (versionResponse.content.length > 100 ? '...' : '');
+        storeMessageRelationship(message, feedbackMessage, 'version', contextContent);
+      }
+
       // Add the response to the conversation log
       await manageConversation(message.author.id, {
         role: 'assistant',
@@ -1070,7 +1173,8 @@ client.on('messageCreate', async message => {
           fullConversationLog,
           message.author.id,
           timings.startTime,
-          timings
+          timings,
+          message // Pass the original user message for relationship tracking
         );
         // Safe access to function name with fallback to prevent TypeError
         addTiming('after_function_call_handling', {
@@ -1084,11 +1188,20 @@ client.on('messageCreate', async message => {
           message.author.id,
           timings.startTime, // Use the original start time from when message was received
           gptResponse.usage, // Pass token usage information
-          timings.apiCalls // Pass API call counts
+          timings.apiCalls, // Pass API call counts
+          message // Pass the original user message for relationship tracking
         );
         addTiming('after_direct_message_handling');
       } else {
         await feedbackMessage.edit(gptResponse.content);
+
+        // Store message relationship for context preservation
+        if (message) {
+          const contextContent =
+            gptResponse.content.slice(0, 100) + (gptResponse.content.length > 100 ? '...' : '');
+          storeMessageRelationship(message, feedbackMessage, 'conversation', contextContent);
+        }
+
         addTiming('after_edit_message');
       }
     } catch (error) {
@@ -1134,10 +1247,10 @@ client.on('messageCreate', async message => {
       'Error in message handler'
     );
 
-    // Check if we can send a message before trying
+    // Try to send an error message to the channel
     if (client.isReady() && message.channel) {
       try {
-        await message.channel.send('Sorry, I encountered an error processing your request.');
+        await message.channel.send('❌ Sorry, I encountered an error processing your request.');
       } catch (sendError) {
         discordLogger.error({ error: sendError }, 'Failed to send error message to channel');
       }
@@ -1317,14 +1430,12 @@ async function handleImageGeneration(
       return `${minutes}m ${remainingSeconds}s`;
     };
 
-    // Send initial response or update existing message
-    let feedbackMessage = message;
-    if (message.channel && typeof message.channel.send === 'function') {
-      // This is a regular message, send to channel instead of replying
-      feedbackMessage = await message.channel.send('🎨 Creating your image...');
-    } else if (message.edit && typeof message.edit === 'function') {
-      // This is already a message we can edit
-      feedbackMessage = await message.edit('🎨 Creating your image...');
+    // Use the passed message parameter directly - it should be the feedback message from handleFunctionCall
+    const feedbackMessage = message;
+    if (!feedbackMessage || typeof feedbackMessage.edit !== 'function') {
+      throw new Error(
+        'Invalid feedbackMessage passed to handleImageGeneration - must have edit function'
+      );
     }
 
     // Start the progress updater
@@ -1663,13 +1774,21 @@ async function handleImageGeneration(
 
         discordLogger.info('Attempting to save image to PFP rotation', {
           filename,
-          bufferSize: buffer.length,
+          bufferSizeBytes: buffer.length,
+          bufferSizeKB: Math.round(buffer.length / 1024),
+          bufferSizeMB: Math.round((buffer.length / (1024 * 1024)) * 100) / 100,
           hasPfpManager: !!client.pfpManager,
+          imageFormat: 'PNG',
         });
 
         // Save the image to the PFP rotation
         const savedPath = await client.pfpManager.addImage(buffer, filename);
-        discordLogger.info('Image added to PFP rotation', { savedPath });
+        discordLogger.info('Image successfully saved', {
+          savedPath,
+          filename,
+          fileSizeKB: Math.round(buffer.length / 1024),
+          prompt: finalPrompt.substring(0, 100) + (finalPrompt.length > 100 ? '...' : ''),
+        });
 
         // Trigger an immediate PFP update with the new image
         try {
@@ -1720,7 +1839,7 @@ async function handleImageGeneration(
 
     // Track the image generation for usage statistics
     try {
-      const imageUsageTracker = require('./imageUsageTracker');
+      const imageUsageTracker = require('../../imageUsageTracker');
       const userId = message.author?.id || 'unknown';
       const authorUsername = message.author?.username || 'unknown';
 
@@ -1825,7 +1944,8 @@ async function handleFunctionCall(
   conversationLog,
   userIdFromMessage,
   startTime = Date.now(),
-  timings = {}
+  timings = {},
+  originalMessage = null
 ) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
@@ -2107,7 +2227,7 @@ async function handleFunctionCall(
       try {
         // First, check if image generation is disabled WITHOUT actually generating an image
         // This was causing a double image generation issue
-        const imageGeneration = require('./imageGeneration');
+        const imageGeneration = require('../services/imageGeneration');
 
         // Just check the environment variable directly instead of calling generateImage
         // Simplified to avoid requiring non-existent config file
@@ -2276,7 +2396,7 @@ async function handleFunctionCall(
     case 'getVersion':
       try {
         // Import the version utilities
-        const { generateVersionResponse } = require('./utils/versionSelfQuery');
+        const { generateVersionResponse } = require('../../utils/versionSelfQuery');
 
         // Get parameters with defaults
         const detailed = gptResponse.parameters?.detailed === true;
@@ -2348,6 +2468,14 @@ async function handleFunctionCall(
       finalResponse += subtext;
 
       await feedbackMessage.edit(finalResponse);
+
+      // Store message relationship for context preservation
+      if (originalMessage) {
+        const contextType = gptResponse.functionName;
+        const contextContent =
+          finalResponse.slice(0, 100) + (finalResponse.length > 100 ? '...' : '');
+        storeMessageRelationship(originalMessage, feedbackMessage, contextType, contextContent);
+      }
     } else {
       // If no natural response was generated, provide a direct response with the data
       let directResponse = '';
@@ -2390,6 +2518,14 @@ async function handleFunctionCall(
       directResponse += subtext;
 
       await feedbackMessage.edit(directResponse);
+
+      // Store message relationship for context preservation
+      if (originalMessage) {
+        const contextType = gptResponse.functionName;
+        const contextContent =
+          directResponse.slice(0, 100) + (directResponse.length > 100 ? '...' : '');
+        storeMessageRelationship(originalMessage, feedbackMessage, contextType, contextContent);
+      }
     }
   } catch (error) {
     discordLogger.error(
@@ -2476,7 +2612,8 @@ async function handleDirectMessage(
   userIdFromMessage,
   startTime = Date.now(),
   usage = {},
-  apiCalls = {}
+  apiCalls = {},
+  originalMessage = null
 ) {
   if (!gptResponse.content?.trim()) {
     await feedbackMessage.edit("Sorry, I couldn't understand your request. Please try again.");
@@ -2510,6 +2647,9 @@ async function handleDirectMessage(
   finalResponse += subtext;
 
   await feedbackMessage.edit(finalResponse);
+
+  // Store the relationship between user message and bot response for context preservation
+  storeMessageRelationship(originalMessage, feedbackMessage, 'message', originalMessage?.content);
 }
 
 // Utility to update Discord status in stats and persist it
@@ -2536,7 +2676,7 @@ client.on('ready', async () => {
   // Initialize health check system
   initHealthCheck(client);
   discordLogger.info('Initializing performance monitoring');
-  const { initPerformanceMonitoring } = require('./utils/healthCheckIntegration');
+  const { initPerformanceMonitoring } = require('../../utils/healthCheckIntegration');
   initPerformanceMonitoring();
   discordLogger.info('Health check system initialized');
 
