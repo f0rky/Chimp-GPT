@@ -32,12 +32,12 @@
  * @version 1.1.0
  */
 
-const config = require('./configValidator');
-const { createLogger } = require('./logger');
+const config = require('../core/configValidator');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('conversationManager');
 const conversationStorage = require('./conversationStorage');
-const referenceResolver = require('./utils/messageReferenceResolver');
-const { sanitizeMessage, validateMessage } = require('./utils/messageSanitizer');
+const referenceResolver = require('./messageReferenceResolver');
+const { sanitizeMessage, validateMessage } = require('../../utils/messageSanitizer');
 
 /**
  * Maximum number of messages to keep in a conversation

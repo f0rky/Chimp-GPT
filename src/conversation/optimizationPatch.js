@@ -10,9 +10,9 @@
  * @version 1.0.0
  */
 
-const originalFunctionResults = require('./functionResults');
-const optimizer = require('./functionResultsOptimizer');
-const { createLogger } = require('./logger');
+const originalFunctionResults = require('../../functionResults');
+const optimizer = require('../../functionResultsOptimizer');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('optimizationPatch');
 
 // Initialize the optimizer

@@ -9,12 +9,12 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('references');
-const { sanitizeMessage } = require('./messageSanitizer');
+const { sanitizeMessage } = require('../../utils/messageSanitizer');
 
 // Get config values from the validator
-const config = require('../configValidator');
+const config = require('../core/configValidator');
 
 // Configuration constants from environment or defaults
 const MAX_REFERENCE_DEPTH = config.MAX_REFERENCE_DEPTH;

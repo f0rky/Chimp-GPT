@@ -10,20 +10,20 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const { PermissionFlagsBits } = require('discord.js');
 const logger = createLogger('commands');
 const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');
-const { trackError } = require('../healthCheck');
+const { trackError } = require('../src/core/healthCheck');
 const { executeWithApproval, SENSITIVE_OPERATIONS } = require('../utils/humanCircuitBreaker');
 
 // Import slash command deployment function
 const deploySlashCommands = require('./deploySlashCommands');
 
 // Import plugin manager
-const pluginManager = require('../pluginManager');
+const pluginManager = require('../src/plugins/pluginManager');
 
 /**
  * Command registry to store all registered commands

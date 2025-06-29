@@ -14,7 +14,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('./src/core/logger');
 const logger = createLogger('functionOptimizer');
 
 // Path to the function results file

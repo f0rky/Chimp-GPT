@@ -9,18 +9,18 @@
  */
 
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('cmd-toggle-img');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const config = require('../../configValidator');
+const config = require('../../src/core/configValidator');
 
 // Path to the .env file - use absolute path from project root
 const envPath = path.resolve(process.cwd(), '.env');
 
 // Get the image generation module
-const imageGenerationModule = require('../../imageGeneration');
+const imageGenerationModule = require('../../src/services/imageGeneration');
 
 // Log the resolved path for debugging
 logger.debug({ envPath }, 'Resolved .env path');
@@ -62,13 +62,13 @@ async function toggleImageGeneration() {
     // Force reload the config in the imageGeneration module
     try {
       // Get the path to the config module
-      const configPath = require.resolve('../../configValidator');
+      const configPath = require.resolve('../../src/core/configValidator');
 
       // Clear the require cache for the config module
       delete require.cache[configPath];
 
       // Re-require the config module
-      const freshConfig = require('../../configValidator');
+      const freshConfig = require('../../src/core/configValidator');
 
       // Verify the config was updated
       logger.info(

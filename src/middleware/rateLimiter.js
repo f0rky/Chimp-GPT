@@ -30,7 +30,7 @@
  */
 
 const { RateLimiterMemory } = require('rate-limiter-flexible');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('ratelimit');
 
 /**

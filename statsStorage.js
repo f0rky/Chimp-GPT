@@ -42,7 +42,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('./src/core/logger');
 const logger = createLogger('stats');
 
 // Path to the stats file

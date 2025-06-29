@@ -4,7 +4,7 @@
  * Uses WeatherAPI.com with robust error handling and mock fallback.
  */
 
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder } = require('discord.js');
 const axios = require('axios');
 const { createLogger } = require('../../logger');
 const logger = createLogger('weather-plugin');

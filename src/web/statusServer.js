@@ -60,25 +60,25 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('status');
 const os = require('os');
-const { getDetailedVersionInfo, formatUptime } = require('./getBotVersion');
-const { getConversationStorageStatus } = require('./conversationManager');
-const config = require('./configValidator');
-const performanceMonitor = require('./utils/performanceMonitor');
+const { getDetailedVersionInfo, formatUptime } = require('../../getBotVersion');
+const { getConversationStorageStatus } = require('../conversation/conversationManager');
+const config = require('../core/configValidator');
+const performanceMonitor = require('../middleware/performanceMonitor');
 
 // Import stats storage
-const statsStorage = require('./statsStorage');
+const statsStorage = require('../../statsStorage');
 
 // Import function results storage
-const functionResults = require('./functionResults');
+const functionResults = require('../../functionResults');
 
 // Import performance history
 const performanceHistory = require('./performanceHistory');
 
 // Import malicious user manager
-const maliciousUserManager = require('./utils/maliciousUserManager');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
 
 // Track if malicious user manager is initialized
 let maliciousUserManagerInitialized = false;
@@ -106,10 +106,10 @@ const {
   runQuakeTests,
   runCorsTests,
   runRateLimiterTests,
-} = require('./tests/testRunner');
+} = require('../../tests/unit/testRunner');
 
 // Import rate limiter
-const { createRateLimiter } = require('./rateLimiter');
+const { createRateLimiter } = require('../middleware/rateLimiter');
 
 // --- Breaker Management API ---
 const OWNER_TOKEN = process.env.OWNER_TOKEN || 'changeme';
@@ -189,7 +189,7 @@ function initStatusServer(options = {}) {
     // If demo mode is enabled, import the demo data generator
     if (demoMode) {
       logger.info('Starting status server in DEMO MODE');
-      const { initDemoMode } = require('./utils/demoDataGenerator');
+      const { initDemoMode } = require('../../utils/demoDataGenerator');
       // Initialize demo mode with mock data
       initDemoMode(stats, functionResults);
     }
@@ -946,7 +946,7 @@ function initStatusServer(options = {}) {
       logger.info('Manual function results file repair requested');
 
       try {
-        const functionResultsModule = require('./functionResults');
+        const functionResultsModule = require('../../functionResults');
         const repairResult = await functionResultsModule.repairResultsFile();
 
         if (repairResult) {
@@ -1072,9 +1072,9 @@ function initStatusServer(options = {}) {
 
       try {
         // Import the config schema for reference
-        const configPath = require.resolve('./configValidator');
+        const configPath = require.resolve('../core/configValidator');
         delete require.cache[configPath]; // Clear cache to get fresh schema
-        const configModule = require('./configValidator.js');
+        const configModule = require('../core/configValidator.js');
 
         // Access the CONFIG_SCHEMA by re-requiring the file and looking at its internals
         // Since CONFIG_SCHEMA is not exported, we'll recreate the logic here

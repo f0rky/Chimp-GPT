@@ -5,7 +5,7 @@
  * Allows the bot owner to remotely restart the bot process.
  * Only the owner (config.OWNER_ID) can use this command.
  */
-const config = require('../../configValidator');
+const config = require('../../src/core/configValidator');
 
 module.exports = {
   name: 'restart',

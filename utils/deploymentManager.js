@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const logger = createLogger('deployment');
 
 const TIMESTAMP_FILE_PATH = path.join(__dirname, '..', '.last_slash_deployment');

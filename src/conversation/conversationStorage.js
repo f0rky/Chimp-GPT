@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('conversationStorage');
 
 // Path to the conversations file

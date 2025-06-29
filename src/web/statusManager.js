@@ -25,7 +25,7 @@
  */
 
 // const axios = require('axios'); // Removed unused import
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const { ActivityType } = require('discord.js');
 const logger = createLogger('status');
 

@@ -1,11 +1,11 @@
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('commands:clear');
 const {
   userConversations,
   clearConversation,
   getConversationStorageStatus,
   loadConversationsFromStorage,
-} = require('../../conversationManager');
+} = require('../../src/conversation/conversationManager');
 const fs = require('fs').promises;
 const path = require('path');
 const { formatBytes, formatNumber } = require('../../utils/formatters');

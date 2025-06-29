@@ -10,7 +10,7 @@
  * @version 1.0.1
  */
 
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('convOptimPatch');
 
 // Use a local variable to prevent multiple initialization attempts
@@ -96,11 +96,11 @@ function applyPatches() {
 
         // Process references if this is a message from Discord
         let referenceMessages = [];
-        const config = require('./configValidator');
+        const config = require('../core/configValidator');
 
         if (config.ENABLE_REPLY_CONTEXT && discordMessage?.reference) {
           try {
-            const referenceResolver = require('./utils/messageReferenceResolver');
+            const referenceResolver = require('../../utils/messageReferenceResolver');
 
             // Extract reference context
             referenceMessages = await referenceResolver.extractReferenceContext(discordMessage, {
@@ -168,7 +168,7 @@ function applyPatches() {
           );
 
           // Return a minimal valid conversation as last resort
-          return [{ role: 'system', content: require('./configValidator').BOT_PERSONALITY }];
+          return [{ role: 'system', content: require('../core/configValidator').BOT_PERSONALITY }];
         }
       }
     };

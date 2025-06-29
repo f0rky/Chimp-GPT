@@ -11,7 +11,7 @@
 
 // Import non-circular dependencies first
 const { OpenAI } = require('openai');
-const { createLogger } = require('../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('tests');
 const http = require('http');
 const https = require('https');

@@ -11,7 +11,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('simpleConvOpt');
 
 // Path to the conversations file
@@ -20,7 +20,7 @@ const CONVERSATIONS_FILE = path.join(__dirname, 'data', 'optimized-conversations
 // Configuration
 let BOT_PERSONALITY = 'I am ChimpGPT, a helpful AI assistant.';
 try {
-  BOT_PERSONALITY = require('./configValidator').BOT_PERSONALITY;
+  BOT_PERSONALITY = require('../core/configValidator').BOT_PERSONALITY;
 } catch (error) {
   logger.warn('Could not load BOT_PERSONALITY from config, using default');
 }

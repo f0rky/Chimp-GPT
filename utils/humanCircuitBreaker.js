@@ -13,10 +13,10 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const logger = createLogger('humanCircuitBreaker');
-const breakerManager = require('../breakerManager');
-const circuitBreaker = require('../circuitBreaker');
+const breakerManager = require('../src/middleware/breakerManager');
+const circuitBreaker = require('../src/middleware/circuitBreaker');
 const { Client } = require('discord.js');
 const { getBotVersion, getDetailedVersionInfo } = require('../getBotVersion');
 

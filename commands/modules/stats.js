@@ -9,8 +9,8 @@
  * @version 1.0.0
  */
 
-const { generateHealthReport } = require('../../healthCheck');
-const { createLogger } = require('../../logger');
+const { generateHealthReport } = require('../../src/core/healthCheck');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('commands:stats');
 const { SlashCommandBuilder } = require('discord.js');
 

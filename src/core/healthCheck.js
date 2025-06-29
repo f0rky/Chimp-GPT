@@ -67,8 +67,8 @@
 const { createLogger } = require('./logger');
 const logger = createLogger('health');
 const os = require('os');
-const { version } = require('./package.json');
-const { getLastDeploymentTimestamp } = require('./utils/deploymentManager');
+const { version } = require('../../package.json');
+const { getLastDeploymentTimestamp } = require('../../utils/deploymentManager');
 
 // Track response times for latency calculation
 const responseTimes = [];
@@ -85,8 +85,12 @@ const MAX_METRICS = 60; // Store last minute of data (assuming 1s interval)
 
 // Import configuration and test runners
 const config = require('./configValidator');
-const { runConversationLogTests, runOpenAITests, runQuakeTests } = require('./tests/testRunner');
-const statsStorage = require('./statsStorage');
+const {
+  runConversationLogTests,
+  runOpenAITests,
+  runQuakeTests,
+} = require('../../tests/unit/testRunner');
+const statsStorage = require('../../statsStorage');
 
 /**
  * Statistics tracking object for monitoring bot health
@@ -197,7 +201,7 @@ function scheduleHealthReports(client) {
   }, REPORT_INTERVAL);
 
   // Use the startup message coordinator for startup notifications
-  const startupCoordinator = require('./utils/startupMessageCoordinator');
+  const startupCoordinator = require('../../utils/startupMessageCoordinator');
 
   // Register health check as a component that will contribute to the startup message
   startupCoordinator.registerComponent('healthCheck');
@@ -293,9 +297,9 @@ function scheduleHealthReports(client) {
             }
 
             // Import the greeting manager to get system information
-            const greetingManager = require('./utils/greetingManager');
+            const greetingManager = require('../../utils/greetingManager');
             const report = generateHealthReport(true);
-            const botVersionInfo = require('./getBotVersion').getBotVersion();
+            const botVersionInfo = require('../../getBotVersion').getBotVersion();
 
             // Generate the system information embed
             try {
@@ -366,7 +370,7 @@ function scheduleHealthReports(client) {
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
   const memoryUsage = process.memoryUsage();
-  const { getBotVersion: getVersion } = require('./getBotVersion');
+  const { getBotVersion: getVersion } = require('../../getBotVersion');
   const botVersion = getVersion();
   const osModule = require('os');
   const hostname = osModule.hostname();
@@ -391,7 +395,7 @@ function generateHealthReport(isStartup = false) {
   // Get loaded plugins information
   const getLoadedPlugins = () => {
     try {
-      const pluginManager = require('./pluginManager');
+      const pluginManager = require('../plugins/pluginManager');
       if (pluginManager && pluginManager.getPluginMetadata) {
         const plugins = Object.values(pluginManager.getPluginMetadata());
         if (plugins.length === 0) return 'No plugins loaded.';
@@ -579,11 +583,11 @@ async function handleStatsCommand(message) {
   if (message.author.id === config.OWNER_ID) {
     try {
       // Get the startup message coordinator
-      const startupCoordinator = require('./utils/startupMessageCoordinator');
+      const startupCoordinator = require('../../utils/startupMessageCoordinator');
 
       // If the coordinator has a message reference, update it
       if (startupCoordinator.hasMessage && startupCoordinator.messageRef) {
-        const botVersion = require('./getBotVersion').getBotVersion();
+        const botVersion = require('../../getBotVersion').getBotVersion();
 
         // Update the health check embed with the latest report
         startupCoordinator.addEmbed('healthCheck', {
@@ -813,7 +817,7 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
     trackApiCall('plugins', pluginId);
 
     // Store in function results
-    const functionResults = require('./functionResults');
+    const functionResults = require('../../functionResults');
     try {
       return await functionResults.storeResult(
         `plugin.${pluginId}`,

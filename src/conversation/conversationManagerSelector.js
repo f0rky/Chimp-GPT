@@ -7,8 +7,8 @@
  * @module ConversationManagerSelector
  */
 
-const config = require('./configValidator');
-const { createLogger } = require('./logger');
+const config = require('../core/configValidator');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('conversationManagerSelector');
 
 // Dynamically load the appropriate conversation manager

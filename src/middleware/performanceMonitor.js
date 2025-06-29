@@ -6,7 +6,7 @@
  */
 
 const { performance } = require('perf_hooks');
-const { logger } = require('../logger');
+const { logger } = require('../core/logger');
 
 // Store timing data with optional metadata
 const timings = {};

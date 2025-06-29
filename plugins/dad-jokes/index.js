@@ -9,7 +9,7 @@
  * @author Brett
  */
 
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder } = require('discord.js');
 const axios = require('axios');
 const { createLogger } = require('../../logger');
 const retryWithBreaker = require('../../utils/retryWithBreaker');

@@ -38,7 +38,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 
 // Create a logger for the plugin manager
 const logger = createLogger('plugins');
@@ -64,7 +64,7 @@ function safeHealthCheck(functionName, ...args) {
   if (!healthCheckModule) {
     try {
       // Lazy load the health check module only when needed
-      healthCheckModule = require('./healthCheck');
+      healthCheckModule = require('../core/healthCheck');
     } catch (error) {
       logger.warn({ error: error.message }, 'Failed to load healthCheck module');
       return undefined;

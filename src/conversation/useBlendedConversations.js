@@ -8,7 +8,7 @@
  */
 
 const blendedManager = require('./blendedConversationManager');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('useBlendedConversations');
 
 /**

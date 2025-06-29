@@ -10,13 +10,13 @@
  */
 
 const { REST, Routes } = require('discord.js');
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const logger = createLogger('slashCommands');
 const fs = require('fs');
 const path = require('path');
 
 // Import plugin manager
-const pluginManager = require('../pluginManager');
+const pluginManager = require('../src/plugins/pluginManager');
 
 /**
  * Deploy slash commands to Discord

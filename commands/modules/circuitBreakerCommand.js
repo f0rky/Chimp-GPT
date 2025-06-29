@@ -10,10 +10,10 @@
  * @version 1.0.0
  */
 
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const { trackApiCall } = require('../../healthCheck');
-const circuitBreaker = require('../../circuitBreaker');
-const breakerManager = require('../../breakerManager');
+const { SlashCommandBuilder } = require('discord.js');
+const { trackApiCall } = require('../../src/core/healthCheck');
+const circuitBreaker = require('../../src/middleware/circuitBreaker');
+const breakerManager = require('../../src/middleware/breakerManager');
 const { getVersionInfo } = require('../../utils/humanCircuitBreaker');
 const { formatUptime } = require('../../getBotVersion');
 

@@ -5,7 +5,7 @@ const path = require('path');
 let logger;
 try {
   // Try to use the real logger if available
-  logger = require('./logger');
+  logger = require('../src/core/logger');
 } catch (error) {
   // Fallback to a simple console logger for testing
   logger = {

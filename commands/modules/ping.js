@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('commands:ping');
 const { SlashCommandBuilder } = require('discord.js');
 

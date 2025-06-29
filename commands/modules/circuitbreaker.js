@@ -4,9 +4,13 @@
 // NOTE: This file is disabled to avoid conflict with circuitBreakerCommand.js
 
 // This file is disabled but we keep the imports to avoid linting errors
-const { requestApproval, resolveApproval, listPendingApprovals } = require('../../circuitBreaker');
+const {
+  requestApproval,
+  resolveApproval,
+  listPendingApprovals,
+} = require('../../src/middleware/circuitBreaker');
 const { OWNER_ID } = process.env;
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder } = require('discord.js');
 
 // This module is disabled to avoid command name conflicts
 // with circuitBreakerCommand.js which is the primary implementation
@@ -87,7 +91,7 @@ module.exports = {
         user: interaction.user.tag,
         context: 'Debug circuit breaker test',
       };
-      const approvalId = require('../../circuitBreaker').requestApproval(
+      const approvalId = require('../../src/middleware/circuitBreaker').requestApproval(
         details,
         () =>
           interaction.followUp({ content: `✅ Debug action approved by owner.`, ephemeral: true }),

@@ -16,7 +16,7 @@ const { PermissionsBitField } = require('discord.js');
 function getCurrentPrefixes() {
   return getPrefixes();
 }
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('commands:help');
 
 // --- Command Registry Validation ---

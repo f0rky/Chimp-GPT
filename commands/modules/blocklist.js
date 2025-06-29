@@ -6,7 +6,7 @@
  * @module BlocklistCommand
  */
 
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
 
 const logger = createLogger('commands:blocklist');

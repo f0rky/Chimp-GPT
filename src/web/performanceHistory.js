@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 
 const logger = createLogger('performanceHistory');
 

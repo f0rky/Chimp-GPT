@@ -14,9 +14,9 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('convOptimizer');
-const config = require('./configValidator');
+const config = require('../core/configValidator');
 
 // Path to the conversations file
 const CONVERSATIONS_FILE = path.join(__dirname, 'data', 'conversations.json');

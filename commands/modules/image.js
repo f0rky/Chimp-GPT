@@ -9,20 +9,20 @@
  * @version 1.0.0
  */
 
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder } = require('discord.js');
 
 // Import the module as a whole instead of destructuring to avoid circular dependency issues
-const imageGeneration = require('../../imageGeneration');
+const imageGeneration = require('../../src/services/imageGeneration');
 const MODELS = imageGeneration.MODELS;
 const SIZES = imageGeneration.SIZES;
 const QUALITY = imageGeneration.QUALITY;
 const FORMAT = imageGeneration.FORMAT;
 const BACKGROUND = imageGeneration.BACKGROUND;
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('commands:image');
 const axios = require('axios');
 const retryWithBreaker = require('../../utils/retryWithBreaker');
-const breakerManager = require('../../breakerManager');
+const breakerManager = require('../../src/middleware/breakerManager');
 
 // Circuit breaker configuration for image downloads
 const IMAGE_DOWNLOAD_BREAKER_CONFIG = {

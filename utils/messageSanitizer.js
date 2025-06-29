@@ -9,7 +9,7 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const logger = createLogger('messageSanitizer');
 
 // Maximum allowed message length (in characters)

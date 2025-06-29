@@ -10,12 +10,12 @@
 
 const { EmbedBuilder } = require('discord.js');
 const os = require('os');
-const { createLogger } = require('../logger');
-const config = require('../configValidator');
+const { createLogger } = require('../src/core/logger');
+const config = require('../src/core/configValidator');
 const { version: botVersion } = require('../package.json');
-const { getOpenAIModel } = require('../openaiConfig');
-const { getConversationStorageStatus } = require('../conversationStorage');
-const { getHealthStatus } = require('../healthCheck');
+const { getOpenAIModel } = require('../src/services/openaiConfig');
+const { getConversationStorageStatus } = require('../src/conversation/conversationStorage');
+const { getHealthStatus } = require('../src/core/healthCheck');
 
 // Create a logger for this module
 const logger = createLogger('greeting');

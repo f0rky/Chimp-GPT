@@ -9,11 +9,11 @@
  * @version 1.0.0
  */
 
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder } = require('discord.js');
 const { EmbedBuilder } = require('discord.js');
 const { getDetailedVersionInfo } = require('../../getBotVersion');
 const { generateVersionResponse } = require('../../utils/versionSelfQuery');
-const { trackApiCall } = require('../../healthCheck');
+const { trackApiCall } = require('../../src/core/healthCheck');
 const { formatUptime } = require('../../getBotVersion');
 
 // Create the command definition

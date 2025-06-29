@@ -44,7 +44,7 @@ const retryWithBreaker = require('../../utils/retryWithBreaker');
 const functionResults = require('../../functionResults');
 const { sanitizeLocation } = require('../../utils/inputSanitizer');
 const apiKeyManager = require('../../utils/apiKeyManager');
-const breakerManager = require('./breakerManager');
+const breakerManager = require('../middleware/breakerManager');
 
 // Circuit breaker configuration for weather API
 const WEATHER_BREAKER_CONFIG = {

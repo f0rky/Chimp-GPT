@@ -10,7 +10,7 @@
  */
 
 const simpleOptimizer = require('./simpleConversationOptimizer');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('useSimpleOpt');
 
 // Initialize the optimizer once
@@ -26,7 +26,7 @@ module.exports = {
     } catch (error) {
       logger.error({ error, userId }, 'Error in manageConversation');
       // Return a minimal valid conversation as fallback
-      return [{ role: 'system', content: require('./configValidator').BOT_PERSONALITY }];
+      return [{ role: 'system', content: require('../core/configValidator').BOT_PERSONALITY }];
     }
   },
 

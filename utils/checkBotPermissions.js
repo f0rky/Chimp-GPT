@@ -2,7 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 
 // Import logger
-const { createLogger } = require('../logger');
+const { createLogger } = require('../src/core/logger');
 const logger = createLogger('permissions');
 
 // Initialize Discord client with proper intents
@@ -74,7 +74,7 @@ client.on('ready', async () => {
 
 // Login to Discord
 client.login(process.env.DISCORD_TOKEN).catch(error => {
-  const { discord: discordLogger } = require('../logger');
+  const { discord: discordLogger } = require('../src/core/logger');
   discordLogger.error({ error }, 'Failed to log in to Discord');
   process.exit(1);
 });

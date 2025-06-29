@@ -9,11 +9,11 @@
  * @version 1.0.0
  */
 
-const config = require('./configValidator');
-const { createLogger } = require('./logger');
+const config = require('../core/configValidator');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('blendedConversationManager');
 const conversationStorage = require('./conversationStorage');
-const { sanitizeMessage, validateMessage } = require('./utils/messageSanitizer');
+const { sanitizeMessage, validateMessage } = require('../../utils/messageSanitizer');
 
 /**
  * Maximum messages to keep per user in blended mode

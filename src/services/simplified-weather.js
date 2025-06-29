@@ -6,8 +6,8 @@
  */
 const axios = require('axios');
 const { OpenAI } = require('openai');
-const { weather: weatherLogger } = require('./logger');
-const functionResults = require('./functionResults');
+const { weather: weatherLogger } = require('../core/logger');
+const functionResults = require('../../functionResults');
 
 // Initialize OpenAI client
 const openai = new OpenAI({

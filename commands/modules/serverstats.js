@@ -10,9 +10,9 @@
  * @version 1.0.0
  */
 
-const lookupQuakeServer = require('../../quakeLookup');
-const { createLogger } = require('../../logger');
-const { trackApiCall } = require('../../healthCheck');
+const lookupQuakeServer = require('../../src/services/quakeLookup');
+const { createLogger } = require('../../src/core/logger');
+const { trackApiCall } = require('../../src/core/healthCheck');
 const {
   validateServerInput,
   validateEloMode,

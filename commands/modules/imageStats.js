@@ -4,7 +4,7 @@
  * Displays statistics about image generation usage and costs
  */
 
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('cmd-image-stats');
 const { MessageEmbed } = require('discord.js');
 
