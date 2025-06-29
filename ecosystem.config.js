@@ -1,10 +1,14 @@
+// Read BOT_NAME from .env file dynamically
+require('dotenv').config();
+const botName = process.env.BOT_NAME || 'ChimpGPT';
+
 module.exports = {
   apps: [
     {
-      name: 'chimpGPT',
+      name: `chimpGPT-${botName}`,
       script: './src/core/combined.js',
       watch: false,
-      node_args: '--no-deprecation', // Suppress deprecation warnings including util.isArray
+      node_args: '--no-deprecation', // Suppress deprecation warnings - lodash issue from Discord.js dependency
       env: {
         NODE_ENV: 'development',
         PORT: 3006,
@@ -15,8 +19,8 @@ module.exports = {
       },
       max_memory_restart: '1G',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      error_file: './assets/logs/chimpGPT-error.log',
-      out_file: './assets/logs/chimpGPT-out.log',
+      error_file: `./assets/logs/chimpGPT-${botName}-error.log`,
+      out_file: `./assets/logs/chimpGPT-${botName}-out.log`,
       merge_logs: true,
       restart_delay: 5000,
     },

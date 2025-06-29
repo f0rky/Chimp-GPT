@@ -65,7 +65,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@discordjs/builders": "^1.11.2",
     "axios": "^1.9.0",
     "completions": "^2.7.0",
     "cors": "^2.8.5",

@@ -2229,26 +2229,41 @@ async function handleFunctionCall(
         // This was causing a double image generation issue
         const imageGeneration = require('../services/imageGeneration');
 
-        // Just check the environment variable directly instead of calling generateImage
-        // Simplified to avoid requiring non-existent config file
-        const isEnabled = process.env.ENABLE_IMAGE_GENERATION === 'true';
+        // Check image generation is enabled using both environment variable and config
+        // This matches the logic used in imageGeneration.js for consistency
+        const isEnabled =
+          process.env.ENABLE_IMAGE_GENERATION === 'true' || config.ENABLE_IMAGE_GENERATION === true;
         const testResult = {
           success: isEnabled,
           error: isEnabled ? null : 'Image generation is currently disabled',
           prompt: gptResponse.parameters.prompt,
         };
 
-        discordLogger.debug(
-          { isEnabled },
-          'Checked if image generation is enabled without generating an image'
+        discordLogger.info(
+          {
+            isEnabled,
+            envValue: process.env.ENABLE_IMAGE_GENERATION,
+            configValue: config.ENABLE_IMAGE_GENERATION,
+            prompt: gptResponse.parameters.prompt,
+            userId: userIdFromMessage,
+          },
+          'Image generation request - checking if enabled'
         );
 
         // If image generation is disabled, fall back to a natural language response
         if (!testResult.success && testResult.error === 'Image generation is currently disabled') {
           discordLogger.warn(
-            { prompt: gptResponse.parameters.prompt },
+            {
+              prompt: gptResponse.parameters.prompt,
+              userId: userIdFromMessage,
+              envValue: process.env.ENABLE_IMAGE_GENERATION,
+              configValue: config.ENABLE_IMAGE_GENERATION,
+            },
             'Image generation is disabled, falling back to natural language response'
           );
+
+          // Track denied image request for analytics
+          trackError('gptimage_disabled');
 
           // Inform the user that image generation is disabled but we'll provide a text response
           await feedbackMessage.edit(
