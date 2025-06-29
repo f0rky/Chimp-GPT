@@ -116,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Preserves conversation flow across multiple messages and users
   - Configurable via new environment variables (`ENABLE_REPLY_CONTEXT`, `MAX_REFERENCE_DEPTH`, `MAX_REFERENCE_CONTEXT`)
   - Added comprehensive documentation in `/docs/REPLY_CONTEXT.md`
-- Added a test script (`tools/testReplyContext.js`) for verifying reply context functionality
+- Added a test script (`src/tools/testReplyContext.js`) for verifying reply context functionality
 
 ### Changed
 

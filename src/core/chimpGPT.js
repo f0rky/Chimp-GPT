@@ -27,7 +27,7 @@ const { processVersionQuery } = require('../../utils/versionSelfQuery');
 const { sendChannelGreeting } = require('../../utils/greetingManager');
 const PFPManager = require('../../utils/pfpManager');
 const { stats: healthCheckStats } = require('./healthCheck'); // Moved from updateDiscordStats
-const commandHandler = require('../../commands/commandHandler');
+const commandHandler = require('../commands/commandHandler');
 
 // Import loggers
 const { logger, discord: discordLogger, openai: openaiLogger } = require('./logger');
@@ -72,7 +72,7 @@ const {
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
-const statsStorage = require('../../statsStorage');
+const statsStorage = require('./statsStorage');
 const { shouldDeploy, recordSuccessfulDeployment } = require('../../utils/deploymentManager');
 
 // Import malicious user manager for tracking suspicious behavior
@@ -1839,7 +1839,7 @@ async function handleImageGeneration(
 
     // Track the image generation for usage statistics
     try {
-      const imageUsageTracker = require('../../imageUsageTracker');
+      const imageUsageTracker = require('../services/imageUsageTracker');
       const userId = message.author?.id || 'unknown';
       const authorUsername = message.author?.username || 'unknown';
 

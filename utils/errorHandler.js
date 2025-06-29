@@ -10,7 +10,7 @@
  */
 
 const { createLogger } = require('../src/core/logger');
-const { ChimpError, wrapError } = require('../errors');
+const { ChimpError, wrapError } = require('../src/errors');
 const { trackError } = require('../src/core/healthCheck');
 
 // Create a logger for the error handler

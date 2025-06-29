@@ -31,7 +31,7 @@ You are tasked with continuing a thorough code review and implementation audit f
    - If you encounter blockers or ambiguities, document them clearly for human maintainers or future AI contributors.
 
 ## Checklist Location
-`/home/brett/Chimp-GPT-FES/CHECKLIST.md`
+`/home/brett/Chimp-GPT-FES/docs/CHECKLIST.md`
 
 ## Project Root
 `/home/brett/Chimp-GPT-FES/`

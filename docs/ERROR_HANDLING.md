@@ -39,7 +39,7 @@ ChimpGPT uses a structured error handling system with custom error classes that 
 You can create errors using the factory function:
 
 ```javascript
-const { createError } = require('../errors');
+const { createError } = require('../src/errors');
 
 // Create an API error
 const error = createError('api', 'Failed to call OpenAI API', {

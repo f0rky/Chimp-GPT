@@ -13,7 +13,7 @@
 const axios = require('axios');
 const { wolfram: wolframLogger } = require('../core/logger');
 const { sanitizeQuery } = require('../../utils/inputSanitizer');
-const functionResults = require('../../functionResults');
+const functionResults = require('../core/functionResults');
 const apiKeyManager = require('../../utils/apiKeyManager');
 const retryWithBreaker = require('../../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');

@@ -63,16 +63,16 @@ const path = require('path');
 const { createLogger } = require('../core/logger');
 const logger = createLogger('status');
 const os = require('os');
-const { getDetailedVersionInfo, formatUptime } = require('../../getBotVersion');
+const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
 const { getConversationStorageStatus } = require('../conversation/conversationManager');
 const config = require('../core/configValidator');
 const performanceMonitor = require('../middleware/performanceMonitor');
 
 // Import stats storage
-const statsStorage = require('../../statsStorage');
+const statsStorage = require('../core/statsStorage');
 
 // Import function results storage
-const functionResults = require('../../functionResults');
+const functionResults = require('../core/functionResults');
 
 // Import performance history
 const performanceHistory = require('./performanceHistory');
@@ -946,7 +946,7 @@ function initStatusServer(options = {}) {
       logger.info('Manual function results file repair requested');
 
       try {
-        const functionResultsModule = require('../../functionResults');
+        const functionResultsModule = require('../core/functionResults');
         const repairResult = await functionResultsModule.repairResultsFile();
 
         if (repairResult) {

@@ -30,7 +30,7 @@ module.exports = {
   },
   plugins: {
     validate: true,
-    pluginDir: 'plugins',
+    pluginDir: 'src/plugins',
     requireId: true,
     requireVersion: true,
     requireDescription: false,

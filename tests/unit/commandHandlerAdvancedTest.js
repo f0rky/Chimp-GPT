@@ -194,8 +194,8 @@ testRunner.describe('Basic Command Functionality', () => {
   // Get a fresh instance of commandHandler for this test suite
   testRunner.before(() => {
     // Clear the require cache to get a fresh instance
-    delete require.cache[require.resolve('../commands/commandHandler')];
-    commandHandler = require('../commands/commandHandler');
+    delete require.cache[require.resolve('../../src/commands/commandHandler')];
+    commandHandler = require('../../src/commands/commandHandler');
   });
 
   let testCommand;
@@ -253,8 +253,8 @@ testRunner.describe('Command Permissions', () => {
   // Get a fresh instance of commandHandler for this test suite
   testRunner.before(() => {
     // Clear the require cache to get a fresh instance
-    delete require.cache[require.resolve('../commands/commandHandler')];
-    commandHandler = require('../commands/commandHandler');
+    delete require.cache[require.resolve('../../src/commands/commandHandler')];
+    commandHandler = require('../../src/commands/commandHandler');
   });
 
   let adminCommand, ownerCommand, dmCommand;
@@ -355,8 +355,8 @@ testRunner.describe('Command Arguments', () => {
   // Get a fresh instance of commandHandler for this test suite
   testRunner.before(() => {
     // Clear the require cache to get a fresh instance
-    delete require.cache[require.resolve('../commands/commandHandler')];
-    commandHandler = require('../commands/commandHandler');
+    delete require.cache[require.resolve('../../src/commands/commandHandler')];
+    commandHandler = require('../../src/commands/commandHandler');
   });
 
   let argsCommand;

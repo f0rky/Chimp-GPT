@@ -218,7 +218,7 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 
 - Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
 - Improved maintainability, developer onboarding, and static analysis.
-- Please review and update the [`CHECKLIST.md`](./CHECKLIST.md) as you work on the project.
+- Please review and update the [`CHECKLIST.md`](./docs/CHECKLIST.md) as you work on the project.
 
 ## Code Quality & Linting
 
@@ -309,7 +309,7 @@ module.exports = {
 
 ## Implementation Checklist
 
-A detailed implementation checklist is maintained in [`CHECKLIST.md`](./CHECKLIST.md). This tracks high, medium, and low priority tasks for code structure, security, performance, testing, developer experience, and deployment. Please review and update this file as you work on the project.
+A detailed implementation checklist is maintained in [`CHECKLIST.md`](./docs/CHECKLIST.md). This tracks high, medium, and low priority tasks for code structure, security, performance, testing, developer experience, and deployment. Please review and update this file as you work on the project.
 
 ## Setup and Installation
 
@@ -662,7 +662,7 @@ chimp-gpt/
 │   ├── 📁 pfp/                      # Profile pictures
 │   └── 📁 logs/                     # Log files
 │
-├── 📁 public/                       # Web interface assets
+├── 📁 src/web/public/               # Web interface assets
 ├── 📁 plugins/                      # User plugins
 ├── 📁 data/                         # Runtime data
 ├── 📁 docs/                         # Documentation

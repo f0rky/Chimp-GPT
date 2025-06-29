@@ -12,7 +12,11 @@
 
 const { createLogger } = require('../src/core/logger');
 const logger = createLogger('versionQuery');
-const { getBotVersion, getDetailedVersionInfo, formatUptime } = require('../getBotVersion');
+const {
+  getBotVersion,
+  getDetailedVersionInfo,
+  formatUptime,
+} = require('../src/core/getBotVersion');
 const os = require('os');
 
 // Special triggers that will prompt a version response

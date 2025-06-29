@@ -1,6 +1,6 @@
 const moment = require('moment-timezone');
 const { time: timeLogger } = require('../core/logger');
-const functionResults = require('../../functionResults');
+const functionResults = require('../core/functionResults');
 const { sanitizeLocation } = require('../../utils/inputSanitizer');
 const retryWithBreaker = require('../../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChimpGPT - Performance Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/retro.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="logo">ChimpGPT</div>
+        <a href="/" class="back-link" title="Back to Status Page">
+          <span class="icon">←</span>
+          <span>Status Page</span>
+        </a>
+        <div class="cost-tracker" id="costTracker">
+          [API COST TRACKER] 24h: $1.23 | Today: $0.45 | Current: $0.02
+        </div>
+        <div id="conversation-mode-dashboard" class="conversation-mode">
+          <span class="mode-icon">💬</span>
+          <span class="mode-text" title="Conversation Mode">Loading...</span>
+        </div>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+          <span class="theme-icon">🌙</span>
+        </button>
+        <div class="time" id="currentTime">00:00:00</div>
+      </header>
+
+      <!-- Navigation Tabs -->
+      <nav class="dashboard-tabs">
+        <button class="tab-button active" data-tab="overview">Performance</button>
+        <button class="tab-button" data-tab="settings">Settings</button>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="tab-content">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-panel active">
+          <div class="dashboard-grid">
+            <!-- API Status Panel -->
+            <section class="card status-panel">
+              <h2>API STATUS</h2>
+              <div class="status-indicator online">● ONLINE</div>
+              <div class="status-grid">
+                <div class="status-item">
+                  <span class="label">OpenAI</span>
+                  <span class="value" id="openaiStatus">Operational</span>
+                </div>
+                <div class="status-item">
+                  <span class="label">Weather</span>
+                  <span class="value" id="weatherStatus">Operational</span>
+                </div>
+                <div class="status-item">
+                  <span class="label">Quake</span>
+                  <span class="value" id="quakeStatus">Operational</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Active Request -->
+            <section class="card active-request">
+              <h2>ACTIVE REQUEST</h2>
+              <div class="request-details">
+                <div class="progress-container">
+                  <div class="progress-bar" id="requestProgress" style="width: 0%"></div>
+                </div>
+                <div class="request-info">
+                  <span id="currentEndpoint">-</span>
+                  <span id="requestTime">0ms</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Memory Usage -->
+            <section class="card memory-usage">
+              <h2>MEMORY USAGE</h2>
+              <div class="memory-gauge">
+                <div class="gauge-fill" id="memoryGauge"></div>
+                <div class="gauge-text" id="memoryText">0MB / 0MB</div>
+              </div>
+            </section>
+
+            <!-- Latency Graph -->
+            <section class="card latency-graph">
+              <h2>API LATENCY (LAST 5 MIN)</h2>
+              <div class="chart-container">
+                <canvas id="latencyChart"></canvas>
+              </div>
+              <div class="latency-stats" id="latencyStats">
+                <span>OpenAI: <span id="openaiLatency">-</span></span>
+                <span>Weather: <span id="weatherLatency">-</span></span>
+                <span>ImageGen: <span id="imageLatency">-</span></span>
+              </div>
+            </section>
+
+            <!-- Function Performance -->
+            <section class="card function-performance">
+              <h2>SLOWEST FUNCTIONS</h2>
+              <ul class="function-list" id="slowFunctions">
+                <li class="function-item">
+                  <span class="function-name">generateImage</span>
+                  <span class="function-time">420ms</span>
+                  <span class="trend up">↑</span>
+                </li>
+                <li class="function-item">
+                  <span class="function-name">chatComplete</span>
+                  <span class="function-time">210ms</span>
+                  <span class="trend down">↓</span>
+                </li>
+                <li class="function-item">
+                  <span class="function-name">getWeather</span>
+                  <span class="function-time">156ms</span>
+                  <span class="trend up">↑</span>
+                </li>
+              </ul>
+            </section>
+
+            <!-- API Calls -->
+            <section class="card api-calls">
+              <h2>API CALLS (5m)</h2>
+              <div class="call-stats" id="callStats">
+                <div class="call-item">
+                  <span class="call-name">generateImage</span>
+                  <span class="call-bar">
+                    <span class="call-bar-fill" style="width: 80%"></span>
+                  </span>
+                  <span class="call-time">124ms (avg)</span>
+                </div>
+                <div class="call-item">
+                  <span class="call-name">chatComplete</span>
+                  <span class="call-bar">
+                    <span class="call-bar-fill" style="width: 60%"></span>
+                  </span>
+                  <span class="call-time">78ms (avg)</span>
+                </div>
+                <div class="call-item">
+                  <span class="call-name">getWeather</span>
+                  <span class="call-bar">
+                    <span class="call-bar-fill" style="width: 30%"></span>
+                  </span>
+                  <span class="call-time">45ms (avg)</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Blocked Users -->
+            <section class="card blocked-users">
+              <h2>BLOCKED USERS</h2>
+              <div id="blockedUsersContent">
+                <div class="loading-message">Loading blocked users...</div>
+              </div>
+              <div class="blocked-users-controls">
+                <button class="refresh-btn" id="refreshBlockedUsers" title="Refresh list">
+                  <span>⟳</span>
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-panel">
+          <div class="settings-grid">
+            <!-- Settings Summary -->
+            <section class="card settings-summary">
+              <h2>CONFIGURATION SUMMARY</h2>
+              <div class="summary-stats" id="settingsSummary">
+                <div class="stat-item">
+                  <span class="stat-label">Total Settings:</span>
+                  <span class="stat-value" id="totalSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Required:</span>
+                  <span class="stat-value" id="requiredSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Set:</span>
+                  <span class="stat-value" id="setSettings">-</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Valid:</span>
+                  <span class="stat-value" id="validSettings">-</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Environment Info -->
+            <section class="card environment-info">
+              <h2>ENVIRONMENT</h2>
+              <div class="env-details" id="environmentInfo">
+                <div class="env-item">
+                  <span class="env-label">Mode:</span>
+                  <span class="env-value" id="envMode">-</span>
+                </div>
+                <div class="env-item">
+                  <span class="env-label">Last Check:</span>
+                  <span class="env-value" id="lastCheck">-</span>
+                </div>
+              </div>
+              <button class="refresh-btn" id="refreshSettings" title="Refresh settings">
+                <span>⟳</span>
+              </button>
+            </section>
+
+            <!-- Settings Table -->
+            <section class="card settings-table">
+              <h2>CONFIGURATION VARIABLES</h2>
+              <div class="settings-filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="required">Required</button>
+                <button class="filter-btn" data-filter="optional">Optional</button>
+                <button class="filter-btn" data-filter="invalid">Issues</button>
+              </div>
+              <div class="table-container">
+                <table class="settings-data-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Description</th>
+                      <th>Required</th>
+                      <th>Status</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settingsTableBody">
+                    <tr>
+                      <td colspan="5" class="loading-cell">Loading settings...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      <!-- Scanline Overlay -->
+      <div class="scanlines"></div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+  </body>
+</html>

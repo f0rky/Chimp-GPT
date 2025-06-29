@@ -22,7 +22,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
-const { parseRunMode } = require('../../runModes');
+const { parseRunMode } = require('./runModes');
 
 // Parse run mode from command-line arguments
 const runConfig = parseRunMode();

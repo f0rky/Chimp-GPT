@@ -274,7 +274,7 @@ async function loadPlugins() {
     let hookCount = 0;
 
     // Get plugins directory path
-    const pluginsDir = path.join(__dirname, 'plugins');
+    const pluginsDir = __dirname;
 
     // Create plugins directory if it doesn't exist
     if (!fs.existsSync(pluginsDir)) {

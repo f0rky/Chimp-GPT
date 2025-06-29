@@ -18,7 +18,7 @@ const logger = createLogger('humanCircuitBreaker');
 const breakerManager = require('../src/middleware/breakerManager');
 const circuitBreaker = require('../src/middleware/circuitBreaker');
 const { Client } = require('discord.js');
-const { getBotVersion, getDetailedVersionInfo } = require('../getBotVersion');
+const { getBotVersion, getDetailedVersionInfo } = require('../src/core/getBotVersion');
 
 // Categories of operations that require approval
 const SENSITIVE_OPERATIONS = {

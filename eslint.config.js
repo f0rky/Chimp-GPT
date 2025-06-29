@@ -33,10 +33,10 @@ module.exports = [
       '**/Thumbs.db',
       'archive/',
       'docs/',
-      'public/dashboard/',
+      'src/web/public/dashboard/',
       '**/*.md',
       '**/*.css',
-      'public/*.css',
+      'src/web/public/*.css',
       '**/data/',
       '**/*.json',
       '**/*.jsonl',
@@ -192,7 +192,7 @@ module.exports = [
   // Node.js specific rules (excluding browser and test files)
   {
     files: ['**/*.js'],
-    ignores: ['public/**/*.js', '**/*.test.js'],
+    ignores: ['src/web/public/**/*.js', '**/*.test.js'],
     languageOptions: {
       sourceType: 'script',
     },
@@ -214,7 +214,7 @@ module.exports = [
 
   // Browser specific rules
   {
-    files: ['public/**/*.js'],
+    files: ['src/web/public/**/*.js'],
     languageOptions: {
       sourceType: 'module',
       globals: {

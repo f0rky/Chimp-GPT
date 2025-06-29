@@ -14,7 +14,7 @@
 
 const { expect } = require('chai');
 const sinon = require('sinon');
-const commandHandler = require('../commands/commandHandler');
+const commandHandler = require('../../src/commands/commandHandler');
 const { createLogger } = require('../logger');
 
 const logger = createLogger('tests:commandHandler');

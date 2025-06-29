@@ -16,7 +16,7 @@ async function testErrorClasses() {
 
   try {
     // Load the error classes
-    errors = require('../errors');
+    errors = require('../../src/errors');
 
     // Test 1: ChimpError base class
     try {

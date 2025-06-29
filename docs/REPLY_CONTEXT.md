@@ -87,7 +87,7 @@ These can be set in the `.env` file to customize the behavior of the reply conte
 
 ## Testing
 
-A test script is provided at `tools/testReplyContext.js` that simulates various message reference scenarios and verifies that the reference resolver and conversation manager handle them correctly.
+A test script is provided at `src/tools/testReplyContext.js` that simulates various message reference scenarios and verifies that the reference resolver and conversation manager handle them correctly.
 
 ## Limitations and Future Improvements
 

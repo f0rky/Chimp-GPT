@@ -90,7 +90,7 @@ const {
   runOpenAITests,
   runQuakeTests,
 } = require('../../tests/unit/testRunner');
-const statsStorage = require('../../statsStorage');
+const statsStorage = require('./statsStorage');
 
 /**
  * Statistics tracking object for monitoring bot health
@@ -299,7 +299,7 @@ function scheduleHealthReports(client) {
             // Import the greeting manager to get system information
             const greetingManager = require('../../utils/greetingManager');
             const report = generateHealthReport(true);
-            const botVersionInfo = require('../../getBotVersion').getBotVersion();
+            const botVersionInfo = require('./getBotVersion').getBotVersion();
 
             // Generate the system information embed
             try {
@@ -370,7 +370,7 @@ function scheduleHealthReports(client) {
 function generateHealthReport(isStartup = false) {
   const uptime = Math.floor((new Date() - stats.startTime) / 1000);
   const memoryUsage = process.memoryUsage();
-  const { getBotVersion: getVersion } = require('../../getBotVersion');
+  const { getBotVersion: getVersion } = require('./getBotVersion');
   const botVersion = getVersion();
   const osModule = require('os');
   const hostname = osModule.hostname();
@@ -587,7 +587,7 @@ async function handleStatsCommand(message) {
 
       // If the coordinator has a message reference, update it
       if (startupCoordinator.hasMessage && startupCoordinator.messageRef) {
-        const botVersion = require('../../getBotVersion').getBotVersion();
+        const botVersion = require('./getBotVersion').getBotVersion();
 
         // Update the health check embed with the latest report
         startupCoordinator.addEmbed('healthCheck', {
@@ -817,7 +817,7 @@ async function trackPluginFunctionCall(pluginId, functionName, params, result) {
     trackApiCall('plugins', pluginId);
 
     // Store in function results
-    const functionResults = require('../../functionResults');
+    const functionResults = require('./functionResults');
     try {
       return await functionResults.storeResult(
         `plugin.${pluginId}`,

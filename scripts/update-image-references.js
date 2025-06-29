@@ -77,7 +77,7 @@ filesToUpdate.forEach(filePath => {
 
 // Update specific UI text references to DALL-E
 try {
-  const htmlPath = path.resolve(__dirname, './public/index.html');
+  const htmlPath = path.resolve(__dirname, '../src/web/public/index.html');
   if (fs.existsSync(htmlPath)) {
     let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
