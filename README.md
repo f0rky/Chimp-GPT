@@ -639,14 +639,23 @@ chimp-gpt/
 │   └── 📁 plugins/                  # Plugin system
 │       └── pluginManager.js        # Plugin loading and management
 │
-├── 📁 commands/                     # Discord commands
+├── 📁 src/commands/                 # Discord commands  
 │   ├── commandHandler.js           # Command registration and routing
 │   ├── deploySlashCommands.js      # Slash command deployment
 │   └── modules/                    # Individual command implementations
 │
+├── 📁 src/errors/                   # Custom error classes
+│   ├── ChimpError.js               # Base error class
+│   ├── ApiError.js                 # API-related errors
+│   └── [other error types]
+│
+├── 📁 src/tools/                    # Development tools
+│   ├── testConversationStatus.js   # Conversation testing utility
+│   └── testReplyContext.js         # Reply context testing
+│
 ├── 📁 utils/                        # Utility functions
 │   ├── apiKeyManager.js            # API key management
-│   ├── performanceMonitor.js       # Performance monitoring
+│   ├── retryWithBreaker.js         # Retry logic with circuit breaker
 │   └── [other utilities]
 │
 ├── 📁 tests/                        # All test files
@@ -662,10 +671,13 @@ chimp-gpt/
 │   ├── 📁 pfp/                      # Profile pictures
 │   └── 📁 logs/                     # Log files
 │
-├── 📁 src/web/public/               # Web interface assets
-├── 📁 plugins/                      # User plugins
+├── 📁 docs/                         # Documentation (consolidated)
+│   ├── CLAUDE.md                   # Claude Code instructions
+│   ├── CHECKLIST.md                # Development checklist
+│   └── [other documentation]
+│
 ├── 📁 data/                         # Runtime data
-├── 📁 docs/                         # Documentation
+├── 📁 scripts/                      # Build & deployment scripts  
 └── 📁 archive/                      # Legacy/backup files
 ```
 

@@ -5,6 +5,62 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2025-06-29
+
+### Major Release - Complete Architecture Reorganization
+
+#### ✨ Features
+- **Root Directory Cleanup**: Complete reorganization of project structure for better maintainability
+- **Modular Architecture**: All source code now properly organized in `src/` directory with logical groupings
+- **Documentation Consolidation**: Moved all documentation files to centralized `docs/` directory
+
+#### 🏗️ Structural Changes
+- **File Moves (92 files)**: Preserved git history while reorganizing entire codebase
+  - `functionResults.js` → `src/core/functionResults.js`
+  - `getBotVersion.js` → `src/core/getBotVersion.js` 
+  - `statsStorage.js` → `src/core/statsStorage.js`
+  - `imageUsageTracker.js` → `src/services/imageUsageTracker.js`
+  - `commands/` → `src/commands/`
+  - `errors/` → `src/errors/`
+  - `tools/` → `src/tools/`
+  - `plugins/` → `src/plugins/`
+  - `public/` → `src/web/public/`
+  - Documentation files → `docs/`
+
+#### 🔧 Technical Improvements
+- **Import Path Fixes**: Updated 329+ import statements across entire codebase
+- **Clean Root Directory**: Reduced root directory clutter from 25+ items to 15 organized items
+- **Plugin System**: Unified plugin structure with all plugins in `src/plugins/`
+- **Web Assets**: Organized all web content under `src/web/public/`
+- **Error Handling**: Centralized custom error classes in `src/errors/`
+
+#### 📁 New Directory Structure
+```
+├── 📦 Package Management: package.json, package-lock.json
+├── ⚙️ Configuration: ecosystem.config.js, eslint.config.js
+├── 🐳 Deployment: Dockerfile, docker-compose.yml  
+├── 📚 Documentation: README.md, CHANGELOG.md, LICENSE
+├── 🏗️ Source Code: src/ (commands/, core/, services/, etc.)
+├── 📖 Docs: docs/ (consolidated documentation)
+├── 💾 Data: data/, assets/ (runtime data)
+├── 🧪 Development: tests/, utils/, scripts/
+└── 📁 Archive: archive/ (historical files)
+```
+
+#### ✅ Quality Assurance
+- **Zero Breaking Changes**: All functionality preserved and verified working
+- **Import Validation**: Bot starts successfully without any import errors
+- **Git History**: All file moves preserve complete git history
+- **Linting**: All code passes ESLint validation
+- **Testing**: Confirmed image generation, conversation management, and all features working
+
+#### 🎯 Benefits
+- **Developer Experience**: Easier navigation and file discovery
+- **Maintainability**: Clear separation of concerns and logical grouping
+- **Scalability**: Structure supports continued growth and new features
+- **Onboarding**: New developers can understand codebase structure quickly
+- **Standards**: Follows Node.js project best practices
+
 ## [1.7.2] - 2025-06-29
 
 ### Fixed
