@@ -1,6 +1,6 @@
 # Chimp-GPT Discord Bot
 
-**Bot Version:** 1.7.2 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
+**Bot Version:** 1.8.1 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
 
 Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
 
@@ -334,7 +334,7 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./docs/CHE
    - Before building or deploying, run the linter and fix all errors:
 
    ```bash
-   npx eslint . --ext .js --max-warnings=0
+   npm run lint
    ```
 
    - The build/deploy process requires a successful lint (no errors).

@@ -16,7 +16,7 @@ const logger = createLogger('commands:blocklist');
  * @param {Object} message - Discord message object
  * @param {Array} args - Command arguments
  */
-async function execute(message, args) {
+async function execute(message, _args) {
   try {
     if (!message.member?.permissions.has('Administrator')) {
       await message.reply('❌ This command requires administrator permissions.');

@@ -13,11 +13,11 @@
 const { createLogger } = require('../src/core/logger');
 const logger = createLogger('versionQuery');
 const {
-  getBotVersion,
+  // getBotVersion, // Unused import
   getDetailedVersionInfo,
   formatUptime,
 } = require('../src/core/getBotVersion');
-const os = require('os');
+// const os = require('os'); // Unused import
 
 // Special triggers that will prompt a version response
 const VERSION_TRIGGERS = [

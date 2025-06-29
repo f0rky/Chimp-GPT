@@ -1,7 +1,7 @@
 // breakerManager.js
 // Handles circuit breaker notifications and owner approvals
 
-const { Client, Events } = require('discord.js');
+// const { Client, Events } = require('discord.js'); // Unused imports
 const { OWNER_ID, CHANNEL_ID } = process.env;
 let discordClient = null;
 

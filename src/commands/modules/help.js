@@ -77,7 +77,7 @@ module.exports = {
 
     try {
       // Get all commands from the command handler
-      const allCommands = getCommands();
+      const _allCommands = getCommands();
       const isOwner = message.author.id === config.ownerId;
       const isAdmin =
         message.member?.permissions.has(PermissionsBitField.Flags.Administrator) || false;
@@ -116,7 +116,7 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {string} Formatted help message
    */
-  formatCommandHelp(command, config) {
+  formatCommandHelp(command, _config) {
     const primaryPrefix = getCurrentPrefixes()[0];
     let helpText = `**Command:** ${primaryPrefix}${command.name}\n`;
     helpText += `**Description:** ${command.description || 'No description'}\n\n`;
@@ -156,7 +156,7 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {string} Formatted help message
    */
-  formatHelpMessage(commands, config) {
+  formatHelpMessage(commands, _config) {
     const primaryPrefix = getCurrentPrefixes()[0];
     // Group commands by category
     const categories = {};

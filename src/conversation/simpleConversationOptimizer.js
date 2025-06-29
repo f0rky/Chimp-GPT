@@ -26,7 +26,7 @@ try {
 }
 
 const MAX_CONVERSATION_LENGTH = 8; // Maximum messages per conversation
-const MAX_CONVERSATION_AGE_DAYS = 7; // Prune conversations older than 7 days
+// const MAX_CONVERSATION_AGE_DAYS = 7; // Unused constant - Prune conversations older than 7 days
 const SAVE_INTERVAL_MS = 5 * 60 * 1000; // Save every 5 minutes
 const CONTEXT_REDUCTION_THRESHOLD = 4; // If over this many messages, reduce context for API calls
 

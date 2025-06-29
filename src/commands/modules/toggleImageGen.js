@@ -19,8 +19,7 @@ const config = require('../../core/configValidator');
 // Path to the .env file - use absolute path from project root
 const envPath = path.resolve(process.cwd(), '.env');
 
-// Get the image generation module
-const imageGenerationModule = require('../../services/imageGeneration');
+// const imageGenerationModule = require('../../services/imageGeneration'); // Unused import
 
 // Log the resolved path for debugging
 logger.debug({ envPath }, 'Resolved .env path');

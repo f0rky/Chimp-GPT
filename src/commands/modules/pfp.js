@@ -29,7 +29,7 @@ module.exports = {
    * @param {Object} config - The bot's configuration object
    * @returns {Promise<void>}
    */
-  async execute(message, args, client, config) {
+  async execute(message, _args, client, _config) {
     // Diagnostic log for pfpManager status at command execution
     if (client.pfpManager) {
       logger.info(

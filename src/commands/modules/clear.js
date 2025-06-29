@@ -8,7 +8,7 @@ const {
 } = require('../../conversation/conversationManager');
 const fs = require('fs').promises;
 const path = require('path');
-const { formatBytes, formatNumber } = require('../../utils/formatters');
+const { formatBytes } = require('../../utils/formatters');
 
 /**
  * Clear command - Clears the conversation history for the current channel
@@ -25,7 +25,7 @@ module.exports = {
   dmAllowed: true,
   adminOnly: false,
   ownerOnly: false,
-  async execute(message, args, config) {
+  async execute(message, args, _config) {
     const userId = message.author.id;
     const channelId = message.channelId;
     const username = message.author.username;

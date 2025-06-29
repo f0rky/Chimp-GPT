@@ -1294,7 +1294,7 @@ function initStatusServer(options = {}) {
     });
 
     // Check if this is a secondary deployment
-    const isSecondaryDeployment = process.env.SECONDARY_DEPLOYMENT === 'true';
+    const _isSecondaryDeployment = process.env.SECONDARY_DEPLOYMENT === 'true';
 
     // Use unified port configuration
     const port = config.PORT || 3001;

@@ -364,7 +364,7 @@ async function loadPlugins() {
  * @param {string} commandName - The name of the command to get
  * @returns {Object|null} The command object or null if not found
  */
-function getCommand(commandName) {
+function _getCommand(commandName) {
   return plugins.commands[commandName] || null;
 }
 

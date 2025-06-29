@@ -152,7 +152,7 @@ function executeDebugCommand(command) {
   logDebug(`> ${command}`, 'info');
 
   // Simple command parser
-  const [cmd, ...args] = command.toLowerCase().split(' ');
+  const [cmd, ..._args] = command.toLowerCase().split(' ');
 
   switch (cmd) {
     case 'clear':
@@ -508,7 +508,7 @@ function updateStatusResponseTime(data) {
       avgResponseTime = Math.round(data.summary.openai_api.avg);
     } else {
       // Fallback to any field with avg
-      for (const [key, value] of Object.entries(data.summary)) {
+      for (const [_key, value] of Object.entries(data.summary)) {
         if (value && value.avg) {
           avgResponseTime = Math.round(value.avg);
           break;
@@ -618,7 +618,7 @@ function updatePerformanceDisplay(data) {
   updateRequestHistory(data.detailed);
 }
 
-function updateApiStatus(data) {
+function updateApiStatus(_data) {
   // This would check circuit breaker states or recent errors
   // For now, just show as operational
   document.getElementById('openaiStatus').textContent = 'Operational';
@@ -862,6 +862,7 @@ async function runTests() {
 }
 
 async function resetStats() {
+  // eslint-disable-next-line no-alert
   if (!confirm('Are you sure you want to reset all statistics?')) return;
 
   try {
@@ -880,6 +881,7 @@ async function resetStats() {
 }
 
 async function unblockUser(userId) {
+  // eslint-disable-next-line no-alert
   const token = prompt('Enter owner token:');
   if (!token) return;
 

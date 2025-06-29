@@ -279,7 +279,9 @@ class PFPManager {
 
     // Initial update if enough time has passed
     if (this.canUpdatePFP()) {
-      this.updateBotAvatar().catch(() => {});
+      this.updateBotAvatar().catch(() => {
+        /* Ignore errors */
+      });
     } else {
       const nextUpdate = Math.ceil(
         (this.lastUpdateTime + this.minUpdateInterval - Date.now()) / 60000
@@ -291,7 +293,9 @@ class PFPManager {
     this.rotationTimer = setInterval(
       () => {
         if (this.canUpdatePFP()) {
-          this.updateBotAvatar().catch(() => {});
+          this.updateBotAvatar().catch(() => {
+            /* Ignore errors */
+          });
         }
       },
       Math.max(this.minUpdateInterval, 60000)

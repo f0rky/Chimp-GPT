@@ -14,7 +14,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const OpenAI = require('openai');
 const path = require('path');
-const fs = require('fs');
+// const fs = require('fs'); // Unused import
 const { lookupWeather, lookupExtendedForecast } = require('../services/weatherLookup');
 const simplifiedWeather = require('../services/simplified-weather');
 const lookupTime = require('../services/timeLookup');
@@ -68,7 +68,7 @@ const {
   trackRateLimit,
   isStatsCommand,
   handleStatsCommand,
-  addCustomStatsSource,
+  // addCustomStatsSource, // Unused function
 } = require('./healthCheck');
 
 // Import stats storage for graceful shutdown
@@ -132,10 +132,10 @@ const {
   manageConversation,
   loadConversationsFromStorage,
   saveConversationsToStorage,
-  stopPeriodicSaving, // Note: startPeriodicSaving is not needed with the optimized version
-  getActiveConversationCount,
-  getConversationStorageStatus,
-  clearConversation,
+  // stopPeriodicSaving, // Unused function
+  // getActiveConversationCount, // Unused function
+  // getConversationStorageStatus, // Unused function
+  // clearConversation, // Unused function
   removeMessageById,
   updateMessageById,
   shutdown: shutdownConversations,
@@ -944,14 +944,13 @@ client.on('messageCreate', async message => {
     addTiming('before_plugin_execution');
 
     // Check if plugins are disabled
-    let pluginPromise;
     const pluginTimerId = performanceMonitor.startTimer('plugin_execution', {
       hook: 'onMessageReceived',
     });
 
     if (DISABLE_PLUGINS) {
       // Skip plugin execution when disabled
-      pluginPromise = Promise.resolve([]);
+      const _pluginPromiseSkipped = Promise.resolve([]);
       const pluginDuration = addTiming('plugin_execution_skipped');
       performanceMonitor.stopTimer(pluginTimerId, {
         success: true,
@@ -962,7 +961,7 @@ client.on('messageCreate', async message => {
       discordLogger.info('Plugins disabled, skipping execution for better performance');
     } else {
       // Normal plugin execution path
-      pluginPromise = pluginManager
+      const _pluginPromise = pluginManager
         .executeHook('onMessageReceived', message)
         .then(hookResults => {
           const pluginDuration = addTiming('plugin_execution_complete', {
@@ -998,7 +997,9 @@ client.on('messageCreate', async message => {
     if (isStatsCommand(message)) {
       addTiming('stats_command_detected');
       const feedbackMessage = await feedbackPromise; // Make sure we have the feedback message first
-      await feedbackMessage.delete().catch(() => {}); // Delete the thinking message
+      await feedbackMessage.delete().catch(() => {
+        /* Ignore deletion errors */
+      }); // Delete the thinking message
       await handleStatsCommand(message);
       addTiming('stats_command_handled');
       return;
@@ -1012,7 +1013,9 @@ client.on('messageCreate', async message => {
     if (isCommand) {
       // If it was a command, delete the thinking message and exit
       const feedbackMessage = await feedbackPromise;
-      await feedbackMessage.delete().catch(() => {});
+      await feedbackMessage.delete().catch(() => {
+        /* Ignore deletion errors */
+      });
       return;
     }
 
@@ -1740,7 +1743,7 @@ async function handleImageGeneration(
       // Otherwise download from URL
       try {
         // Validate URL format
-        const urlObj = new URL(imageResult.url);
+        const _urlObj = new URL(imageResult.url); // Validate URL format
 
         // Check if it's a data URL
         if (imageResult.url.startsWith('data:')) {
@@ -1832,7 +1835,7 @@ async function handleImageGeneration(
     }
 
     // Format phase times for the final message
-    const phaseTimings = Object.entries(progress.phases)
+    const _phaseTimings = Object.entries(progress.phases)
       .filter(entry => entry[1].elapsed > 0)
       .map(([phaseName, timing]) => `${phaseName}: ${formatElapsed(timing.elapsed)}`)
       .join(' | ');
@@ -1867,7 +1870,7 @@ async function handleImageGeneration(
 
     // Send the image with information about the prompt, timing, and cost details
     // Include API call timing information in the footer
-    const apiCallInfo = result.apiCallDuration
+    const _apiCallInfo = result.apiCallDuration
       ? `\n🔄 API call: ${formatElapsed(result.apiCallDuration)} | Processing: ${formatElapsed(result.totalProcessingTime - result.apiCallDuration)}`
       : '';
 
@@ -2227,7 +2230,7 @@ async function handleFunctionCall(
       try {
         // First, check if image generation is disabled WITHOUT actually generating an image
         // This was causing a double image generation issue
-        const imageGeneration = require('../services/imageGeneration');
+        // const imageGeneration = require('../services/imageGeneration'); // Unused import
 
         // Check image generation is enabled using both environment variable and config
         // This matches the logic used in imageGeneration.js for consistency
@@ -2271,7 +2274,7 @@ async function handleFunctionCall(
           );
 
           // Get the original user message from the conversation log
-          const userMessage =
+          const _userMessage =
             conversationLog.find(msg => msg.role === 'user')?.content ||
             `Can you describe ${gptResponse.parameters.prompt}?`;
 
@@ -2358,7 +2361,7 @@ async function handleFunctionCall(
           );
 
           // Get the original user message from the conversation log
-          const userMessage =
+          const _userMessage =
             conversationLog.find(msg => msg.role === 'user')?.content ||
             `Can you describe ${gptResponse.parameters.prompt}?`;
 

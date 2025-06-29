@@ -6,7 +6,7 @@
 
 const { createLogger } = require('../../core/logger');
 const logger = createLogger('cmd-image-stats');
-const { MessageEmbed } = require('discord.js');
+// const { MessageEmbed } = require('discord.js'); // Unused import
 
 // Command definition
 module.exports = {

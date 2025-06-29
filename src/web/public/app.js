@@ -13,8 +13,8 @@
 // Charts for visualizing data
 let apiChart = null;
 let errorChart = null;
-const metricsChart = null;
-const historyChart = null;
+// const metricsChart = null; // Unused variable
+// const historyChart = null; // Unused variable
 
 // Update interval in milliseconds (optimized for bandwidth efficiency)
 const UPDATE_INTERVAL = 10000; // 10 seconds (was 5s)
@@ -901,7 +901,7 @@ function displaySummary(container, summary, functionName) {
 }
 
 // Function to load full results on demand
-async function loadFullResults(functionType, containerId) {
+async function _loadFullResults(functionType, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '<div class="loading">Loading full results...</div>';
 
@@ -1062,7 +1062,7 @@ function updateDalleResults(summary) {
  * Update the gallery with DALL-E images
  * @param {Array} results - DALL-E function results
  */
-function updateGallery(results) {
+function _updateGallery(results) {
   const container = document.querySelector('#gallery-results .gallery-container');
 
   if (!results || results.length === 0 || !container) {
@@ -1757,6 +1757,7 @@ function updateRateLimitedUsers(userDetailsArray) {
 async function resetStats() {
   try {
     // Show confirmation dialog
+    // eslint-disable-next-line no-alert
     if (!confirm('Are you sure you want to reset all statistics?')) {
       return;
     }
@@ -1770,12 +1771,15 @@ async function resetStats() {
     if (result.success) {
       // Update the UI immediately
       updateStatus();
+      // eslint-disable-next-line no-alert
       alert('Statistics reset successfully');
     } else {
+      // eslint-disable-next-line no-alert
       alert('Failed to reset statistics: ' + result.message);
     }
   } catch (error) {
     console.error('Error resetting stats:', error);
+    // eslint-disable-next-line no-alert
     alert('Error resetting statistics');
   }
 }
@@ -1787,6 +1791,7 @@ async function repairStats() {
   try {
     // Show confirmation dialog
     if (
+      // eslint-disable-next-line no-alert
       !confirm(
         'Are you sure you want to repair the stats file? This will attempt to fix any corruption issues.'
       )
@@ -1803,12 +1808,15 @@ async function repairStats() {
     if (result.success) {
       // Update the UI immediately
       updateStatus();
+      // eslint-disable-next-line no-alert
       alert('Stats file repaired successfully');
     } else {
+      // eslint-disable-next-line no-alert
       alert('Failed to repair stats file: ' + (result.error || result.message || 'Unknown error'));
     }
   } catch (error) {
     console.error('Error repairing stats:', error);
+    // eslint-disable-next-line no-alert
     alert('Error repairing stats file');
   }
 }

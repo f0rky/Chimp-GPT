@@ -17,7 +17,7 @@ const { createLogger } = require('../src/core/logger');
 const logger = createLogger('humanCircuitBreaker');
 const breakerManager = require('../src/middleware/breakerManager');
 const circuitBreaker = require('../src/middleware/circuitBreaker');
-const { Client } = require('discord.js');
+// const { Client } = require('discord.js'); // Unused import
 const { getBotVersion, getDetailedVersionInfo } = require('../src/core/getBotVersion');
 
 // Categories of operations that require approval
@@ -259,7 +259,7 @@ async function executeWithApproval(details, fn, client) {
  * @param {Object} [context] - Additional context
  * @returns {boolean} Whether approval is required
  */
-function requiresHumanApproval(operationType, context = {}) {
+function requiresHumanApproval(operationType, _context = {}) {
   // Always require approval for system changes
   if (operationType === SENSITIVE_OPERATIONS.SYSTEM_CHANGE) {
     return true;
@@ -282,7 +282,7 @@ function requiresHumanApproval(operationType, context = {}) {
  * @param {string} approvalId - The approval ID
  * @param {Client} client - Discord client
  */
-async function setupReactionCollector(message, approvalId, client) {
+async function setupReactionCollector(message, approvalId, _client) {
   try {
     // Add approval and denial reactions
     await message.react('✅');

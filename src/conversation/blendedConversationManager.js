@@ -142,7 +142,7 @@ function buildBlendedConversation(channelId) {
   // Collect all messages from all users with timestamps
   const allMessages = [];
 
-  for (const [userId, userMessages] of channelConvo.entries()) {
+  for (const [_userId, userMessages] of channelConvo.entries()) {
     allMessages.push(...userMessages);
   }
 
@@ -219,7 +219,7 @@ async function saveConversationsToStorage() {
     const conversationsToSave = new Map();
 
     // Save channel conversations as combined
-    for (const [channelId, userMap] of channelConversations.entries()) {
+    for (const [channelId, _userMap] of channelConversations.entries()) {
       const blended = buildBlendedConversation(channelId);
       conversationsToSave.set(`channel_${channelId}`, blended);
     }

@@ -66,30 +66,30 @@
 
 const { createLogger } = require('./logger');
 const logger = createLogger('health');
-const os = require('os');
+// const os = require('os'); // Unused import
 const { version } = require('../../package.json');
-const { getLastDeploymentTimestamp } = require('../../utils/deploymentManager');
+// const { getLastDeploymentTimestamp } = require('../../utils/deploymentManager'); // Unused import
 
 // Track response times for latency calculation
-const responseTimes = [];
-const MAX_RESPONSE_TIMES = 100; // Track last 100 response times
+// const responseTimes = []; // Unused variable
+// const MAX_RESPONSE_TIMES = 100; // Unused constant
 
 // Track system metrics over time
-const systemMetrics = {
-  memory: [],
-  cpu: [],
-  load: [],
-  timestamps: [],
-};
-const MAX_METRICS = 60; // Store last minute of data (assuming 1s interval)
+// const systemMetrics = { // Unused variable
+//   memory: [],
+//   cpu: [],
+//   load: [],
+//   timestamps: [],
+// };
+// const MAX_METRICS = 60; // Unused constant
 
 // Import configuration and test runners
 const config = require('./configValidator');
-const {
-  runConversationLogTests,
-  runOpenAITests,
-  runQuakeTests,
-} = require('../../tests/unit/testRunner');
+// const {
+//   runConversationLogTests,
+//   runOpenAITests,
+//   runQuakeTests,
+// } = require('../../tests/unit/testRunner'); // Unused imports
 const statsStorage = require('./statsStorage');
 
 /**
@@ -299,7 +299,7 @@ function scheduleHealthReports(client) {
             // Import the greeting manager to get system information
             const greetingManager = require('../../utils/greetingManager');
             const report = generateHealthReport(true);
-            const botVersionInfo = require('./getBotVersion').getBotVersion();
+            const _botVersionInfo = require('./getBotVersion').getBotVersion();
 
             // Generate the system information embed
             try {
@@ -409,15 +409,15 @@ function generateHealthReport(isStartup = false) {
     }
   };
 
-  let title = '📊 ChimpGPT Health Report';
+  let _title = '📊 ChimpGPT Health Report';
   if (isStartup) {
-    title = '🚀 ChimpGPT Started Successfully';
+    _title = '🚀 ChimpGPT Started Successfully';
   }
 
   const errorSum = calculateTotalErrors(stats.errors);
-  let statusEmoji = '✅';
+  let _statusEmoji = '✅';
   if (errorSum > 20 || stats.errors.openai > 10) {
-    statusEmoji = '⚠️';
+    _statusEmoji = '⚠️';
   }
 
   // Format plugin API calls if any exist

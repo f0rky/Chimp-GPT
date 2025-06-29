@@ -68,7 +68,7 @@ async function saveConversations(conversationsMap) {
     const TEMP_FILE = `${CONVERSATIONS_FILE}.temp`;
 
     // Load existing data to preserve timestamps
-    const existingData = DEFAULT_CONVERSATIONS;
+    const _existingData = DEFAULT_CONVERSATIONS;
 
     // Convert Map to plain object for JSON serialization
     const conversationsObj = {};
