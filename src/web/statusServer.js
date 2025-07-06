@@ -1364,20 +1364,57 @@ function initStatusServer(options = {}) {
         server.on('error', error => {
           if (error.code === 'EADDRINUSE' && maxAttempts > 0) {
             const nextPort = portNumber + 1;
-            logger.warn(`Port ${portNumber} is already in use, trying port ${nextPort}`);
-            startServer(nextPort, maxAttempts - 1);
+            logger.warn(
+              {
+                attemptedPort: portNumber,
+                nextPort,
+                attemptsRemaining: maxAttempts - 1,
+                botName: process.env.BOT_NAME || 'Unknown',
+              },
+              'Port conflict detected - trying next available port'
+            );
+            server.close(); // Ensure the failed server is closed
+            setTimeout(() => startServer(nextPort, maxAttempts - 1), 100); // Small delay before retry
           } else {
-            logger.error({ error }, 'Failed to start status server');
+            logger.error(
+              {
+                error: {
+                  code: error.code,
+                  message: error.message,
+                  port: portNumber,
+                  botName: process.env.BOT_NAME || 'Unknown',
+                },
+              },
+              'Failed to start status server'
+            );
             reject(error);
           }
         });
       } catch (error) {
         if (error.code === 'EADDRINUSE' && maxAttempts > 0) {
           const nextPort = parseInt(attemptPort, 10) + 1;
-          logger.warn(`Port ${attemptPort} is already in use, trying port ${nextPort}`);
-          startServer(nextPort, maxAttempts - 1);
+          logger.warn(
+            {
+              attemptedPort: attemptPort,
+              nextPort,
+              attemptsRemaining: maxAttempts - 1,
+              botName: process.env.BOT_NAME || 'Unknown',
+            },
+            'Port conflict in startup - trying next available port'
+          );
+          setTimeout(() => startServer(nextPort, maxAttempts - 1), 100);
         } else {
-          logger.error({ error }, 'Failed to start status server');
+          logger.error(
+            {
+              error: {
+                code: error.code,
+                message: error.message,
+                port: attemptPort,
+                botName: process.env.BOT_NAME || 'Unknown',
+              },
+            },
+            'Failed to start status server in catch block'
+          );
           reject(error);
         }
       }
