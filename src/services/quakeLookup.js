@@ -65,6 +65,8 @@ const retryWithBreaker = require('../../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 const apiKeyManager = require('../../utils/apiKeyManager');
 const OpenAI = require('openai');
+const { getServerDetails } = require('./qlSyncoreScraper');
+const { getEnhancedServerData } = require('./qlstatsScraper');
 
 /**
  * OpenAI client instance for AI-powered summaries
@@ -121,8 +123,8 @@ function initializeOpenAI() {
 
 // Circuit breaker configuration for Quake API calls
 const QUAKE_BREAKER_CONFIG = {
-  maxRetries: 2,
-  breakerLimit: 5, // Open breaker after 5 consecutive failures
+  maxRetries: 2, // Increased for better fault tolerance
+  breakerLimit: 8, // Increased from 5 to be more tolerant of occasional failures
   breakerTimeoutMs: 180000, // 3 minutes timeout
   onBreakerOpen: error => {
     quakeLogger.error({ error }, 'Quake API circuit breaker opened');
@@ -227,9 +229,9 @@ const CONFIG = {
   eloMode: 1,
   maxServers: 3,
   // Whether to show team emojis (🔴/🔵) next to player names
-  showTeamEmojis: process.env.SHOW_TEAM_EMOJIS === 'true',
+  showTeamEmojis: process.env.SHOW_TEAM_EMOJIS !== 'false', // Default to true unless explicitly set to false
   // Whether to show emojis in server stats output
-  showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS === 'true',
+  showServerStatsEmojis: process.env.SHOW_SERVER_STATS_EMOJIS !== 'false', // Default to true unless explicitly set to false
 };
 
 /**
@@ -286,23 +288,45 @@ function formatGameStatus(serverStats) {
       serverStats.players.every(p => p.score === 0);
 
     if (isWarmup) {
-      return `Warmup (First to ${serverStats.roundLimit})`;
+      return `⏸️ Warmup (First to ${serverStats.roundLimit})`;
     }
 
     let winningTeam = '';
     if (redScore > blueScore) {
-      winningTeam = 'RED leading';
+      winningTeam = '🔴 RED leading';
     } else if (blueScore > redScore) {
-      winningTeam = 'BLUE leading';
+      winningTeam = '🔵 BLUE leading';
     } else {
-      winningTeam = 'Teams tied';
+      winningTeam = '⚖️ Teams tied';
     }
 
-    return `${winningTeam} (First to ${serverStats.roundLimit})`;
+    // Check if game is close to ending
+    const maxScore = Math.max(redScore, blueScore);
+    const isCloseToEnd = maxScore >= serverStats.roundLimit - 2;
+    const emoji = isCloseToEnd ? '🔥' : '⚔️';
+
+    return `${emoji} ${winningTeam} (First to ${serverStats.roundLimit})`;
   }
-  return serverStats.gameType;
+
+  // Add emojis for other game types
+  const gameTypeEmojis = {
+    'Capture the Flag': '🏁',
+    'Team Deathmatch': '💀',
+    Duel: '⚔️',
+    'Free for All': '💥',
+    Instagib: '⚡',
+    'Freeze Tag': '❄️',
+  };
+
+  const emoji = gameTypeEmojis[serverStats.gameType] || '🎮';
+  return `${emoji} ${serverStats.gameType}`;
 }
 
+/**
+ * Get QLStats data for a single server (original working format)
+ * @param {string} serverAddress - Server address
+ * @returns {Promise<Object|null>} QLStats response data
+ */
 async function getQLStatsData(serverAddress) {
   try {
     // Validate server address before making API call
@@ -312,36 +336,37 @@ async function getQLStatsData(serverAddress) {
       return null;
     }
 
-    // Use retryWithBreaker to handle retries and circuit breaking
-    quakeLogger.debug('Using retryWithBreaker for QLStats API request');
-    const response = await retryWithBreaker(async () => {
-      quakeLogger.debug('Making QLStats API request');
-      return await axios.get(
-        `${QLSTATS_API_URL}?servers=${encodeURIComponent(validatedAddress.value)}`,
-        {
-          timeout: 5000,
-          validateStatus: status => status < 500, // Accept all responses except server errors
-        }
-      );
-    }, QUAKE_BREAKER_CONFIG);
+    // Use original working format: ?server= (singular) with fast timeout
+    const response = await axios.get(
+      `${QLSTATS_API_URL}?server=${encodeURIComponent(validatedAddress.value)}`,
+      {
+        timeout: 3000, // Original timeout that worked
+        validateStatus: status => status < 500, // Accept all responses except server errors
+      }
+    );
 
     // Log detailed response data for debugging
-    quakeLogger.info(
-      {
-        serverAddress: validatedAddress.value,
-        hasData: !!response.data,
-        playerCount: response.data?.rankedPlayers?.length || 0,
-        responseData: JSON.stringify(response.data),
-        players: response.data?.rankedPlayers
-          ? JSON.stringify(response.data.rankedPlayers)
-          : 'No players',
-      },
-      'QLStats API response (detailed)'
-    );
+    if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+      quakeLogger.info(
+        {
+          serverAddress: validatedAddress.value,
+          hasData: !!response.data,
+          playerCount: response.data?.rankedPlayers?.length || 0,
+          responseData: JSON.stringify(response.data),
+          players: response.data?.rankedPlayers
+            ? JSON.stringify(response.data.rankedPlayers)
+            : 'No players',
+        },
+        'QLStats API response (detailed)'
+      );
+    }
 
     return response.data;
   } catch (error) {
-    quakeLogger.error({ error, serverAddress }, 'Error fetching QLStats data');
+    // Don't log as error to reduce noise - QLStats is optional
+    if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+      quakeLogger.debug({ error, serverAddress }, 'QLStats data unavailable (non-critical)');
+    }
     return null;
   }
 }
@@ -350,22 +375,38 @@ function mergePlayerData(basicPlayers, qlstatsPlayers) {
   // If no QLStats data is available, try to extract team info from basic player data
   if (!qlstatsPlayers || qlstatsPlayers.length === 0) {
     quakeLogger.info('No QLStats data available, using basic player data only');
+
+    // Debug: Log the first player's full structure to see available properties
+    if (basicPlayers.length > 0 && process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+      quakeLogger.info(
+        {
+          firstPlayerStructure: JSON.stringify(basicPlayers[0]),
+          allPlayerProps: Object.keys(basicPlayers[0]),
+        },
+        'Debug: Raw player data structure'
+      );
+    }
+
     return basicPlayers.map(player => ({
       name: player.name,
       score: player.score,
       totalConnected: player.totalConnected,
-      // Try to determine team from player name (common in Quake Live)
-      team: player.name.toLowerCase().includes('red')
-        ? 1
-        : player.name.toLowerCase().includes('blue')
-          ? 2
-          : player.score < 0
-            ? 3
-            : 0, // Negative score often indicates spectator
+      // Check if the server data includes team information directly
+      team:
+        player.team !== undefined
+          ? player.team
+          : player.name.toLowerCase().includes('red')
+            ? 1
+            : player.name.toLowerCase().includes('blue')
+              ? 2
+              : player.score < 0
+                ? 3
+                : 0, // Negative score often indicates spectator
       rating: null,
     }));
   }
 
+  // Merge basic and QLStats data
   const playerMap = new Map();
 
   basicPlayers.forEach(player => {
@@ -423,7 +464,7 @@ function getEloCategory(rating) {
 }
 
 /**
- * Format player line with configurable ELO display.
+ * Format player line with optional ELO display.
  *
  * Creates a formatted string for a player entry in the server stats display. The format changes based on whether the player is active or spectating and includes ELO information according to the configured display mode.
  *
@@ -440,7 +481,7 @@ function formatPlayerLine(player, isSpectator = false) {
   }
 
   // For active players, show score and ELO based on config
-  const score = `${String(player.score || 0).padStart(2)}`;
+  const score = `${String(player.score || 0).padStart(3)}`;
 
   // Handle different ELO display modes
   let eloDisplay = '';
@@ -452,17 +493,10 @@ function formatPlayerLine(player, isSpectator = false) {
     eloDisplay = `(${String(player.rating).padStart(4)})`;
   }
 
-  // Add team indicator if enabled in config
-  let teamIndicator = '';
-  if (CONFIG.showTeamEmojis) {
-    if (player.team === 1) {
-      teamIndicator = '🔴 ';
-    } else if (player.team === 2) {
-      teamIndicator = '🔵 ';
-    }
-  }
+  // Add team indicator if enabled in config (but not here since we show team sections)
+  // Keep it simple in team sections - no individual player team emojis needed
 
-  return `${teamIndicator}${cleanName} ${score} ${eloDisplay}`;
+  return `${cleanName} ${score} ${eloDisplay}`.trim();
 }
 
 /**
@@ -509,7 +543,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
         p.team = 1;
       } else if (name.includes('blue')) {
         p.team = 2;
-      } else if (p.score < 0) {
+      } else if (p.score <= 0) {
         p.team = 3; // Spectator
       } else {
         // If we can't determine team, put them in a general list
@@ -560,19 +594,25 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
     }
   }
 
-  // Always use emojis for all team headings
-  const teamLabels = {
-    // Always show emojis for all team headers
-    red: '🔴',
-    blue: '🔵',
-    other: '⚪',
-    spec: '👁️',
-  };
+  // Use emojis for team headings based on config setting
+  const teamLabels = CONFIG.showTeamEmojis
+    ? {
+        red: '🔴',
+        blue: '🔵',
+        other: '⚪',
+        spec: '👁️',
+      }
+    : {
+        red: '',
+        blue: '',
+        other: '',
+        spec: '',
+      };
 
   // Display teams only if they have players
   if (teams.red.length) {
     lines.push(`${teamLabels.red} RED TEAM (${redScore})`);
-    lines.push('───────────────────────────');
+    lines.push('─────────────────────────────────────');
     teams.red.forEach(p => {
       lines.push(formatPlayerLine(p));
     });
@@ -585,7 +625,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
 
   if (teams.blue.length) {
     lines.push(`${teamLabels.blue} BLUE TEAM (${blueScore})`);
-    lines.push('───────────────────────────');
+    lines.push('─────────────────────────────────────');
     teams.blue.forEach(p => {
       lines.push(formatPlayerLine(p));
     });
@@ -599,14 +639,38 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
   // If there are players not assigned to a team, show them
   if (teams.other.length) {
     if (!teams.red.length && !teams.blue.length) {
-      // If no team players, just list all players without team headers
-      teams.other.forEach(p => {
-        lines.push(formatPlayerLine(p));
-      });
+      // If no team players, try to distribute them between red and blue teams
+      // Split players roughly evenly between teams for better display
+      const halfPoint = Math.ceil(teams.other.length / 2);
+
+      // Create temporary red and blue teams from unassigned players
+      const tempRed = teams.other.slice(0, halfPoint).map(p => ({ ...p, team: 1 }));
+      const tempBlue = teams.other.slice(halfPoint).map(p => ({ ...p, team: 2 }));
+
+      // Display as red and blue teams
+      if (tempRed.length) {
+        lines.push(`${teamLabels.red} RED TEAM (${redScore})`);
+        lines.push('─────────────────────────────────────');
+        tempRed.forEach(p => {
+          lines.push(formatPlayerLine(p));
+        });
+
+        if (tempBlue.length) {
+          lines.push('');
+        }
+      }
+
+      if (tempBlue.length) {
+        lines.push(`${teamLabels.blue} BLUE TEAM (${blueScore})`);
+        lines.push('─────────────────────────────────────');
+        tempBlue.forEach(p => {
+          lines.push(formatPlayerLine(p));
+        });
+      }
     } else {
       // Otherwise, show them under an 'Other Players' header
       lines.push(`${teamLabels.other} OTHER PLAYERS`);
-      lines.push('───────────────────────────');
+      lines.push('─────────────────────────────────────');
       teams.other.forEach(p => {
         lines.push(formatPlayerLine(p));
       });
@@ -622,7 +686,7 @@ function formatPlayerList(players, basicPlayers = [], serverStats = null) {
   if (teams.spec.length) {
     // Add a clear divider before spectators section
     lines.push('');
-    lines.push('═════════════════════════════════');
+    lines.push('═══════════════════════════════════════');
     lines.push(
       `${teamLabels.spec} SPECTATORS: ` +
         teams.spec
@@ -725,17 +789,17 @@ function formatServerResponse(serverStats, qlstatsData) {
   return {
     formatted: [
       '```',
-      '═════════════════════════════════',
+      '═══════════════════════════════════════',
       `${labels.server} ${serverStats.serverName}`,
-      '─────────────────────────────────',
+      '───────────────────────────────────────',
       `${labels.map} ${serverStats.currentMap}`,
       `${labels.status} ${formatGameStatus(serverStats)}`,
       `${labels.players} ${serverStats.playerCount}`,
       `${labels.uptime} ${serverStats.uptime}`,
       avgRating ? `${labels.rating} ${Math.round(qlstatsData.avg)}` : '',
-      '─────────────────────────────────',
+      '───────────────────────────────────────',
       formatPlayerList(qlstatsData?.rankedPlayers || [], serverStats.players, serverStats),
-      '═════════════════════════════════',
+      '═══════════════════════════════════════',
       '```',
     ]
       .filter(line => line !== '')
@@ -937,8 +1001,6 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
  *
  * Main function that retrieves server information, player stats, and formats the data for display in Discord. If the formatted output would exceed Discord's character limit, it uses AI to create a condensed summary.
  *
- * Implements the compact display format preferred by the user, with team scores next to team names, condensed spectator lists, and configurable ELO display modes.
- *
  * @param {string|null} [serverFilter=null] - Optional server name or IP to filter by
  * @param {number|null} [eloMode=null] - Optional ELO display mode override (0=Off, 1=Categorized, 2=Actual value)
  * @returns {Promise<string>} Formatted server statistics for display in Discord
@@ -1028,37 +1090,121 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
       return `# 🎯 Quake Live Server Status\n\n> 🚫 ${noServersMessage}`;
     }
 
-    // Process all servers to get their stats
-    const serverResponses = [];
+    // Process servers and optionally fetch QLStats data
     const allServerStats = [];
+    const serverResponses = [];
 
     for (const server of sortedServers) {
-      try {
-        // Validate server address before making API call
-        const validatedAddress = validateServerInput(server.address);
-        if (!validatedAddress.isValid) {
-          quakeLogger.warn({ address: server.address }, 'Invalid server address');
-          continue;
+      // Extract basic server stats
+      const serverStats = extractServerStats(server);
+      allServerStats.push(serverStats);
+
+      // Try to get enhanced server data with ELO/ratings (fast-fail, non-blocking)
+      let qlstatsData = null;
+
+      // First try QLStats API if enabled
+      if (CONFIG.eloMode > 0 && server.address && process.env.ENABLE_QLSTATS === 'true') {
+        try {
+          qlstatsData = await getQLStatsData(server.address);
+        } catch (error) {
+          // Silently ignore QLStats failures - they're optional
+          if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+            quakeLogger.debug(
+              { error, address: server.address },
+              'QLStats call failed (non-critical)'
+            );
+          }
         }
-
-        // Get server stats
-        const serverStats = extractServerStats(server);
-
-        // Get QLStats data for the server
-        const qlstatsData = await getQLStatsData(validatedAddress.value);
-
-        // Format the server response
-        const formattedResponse = formatServerResponse(serverStats, qlstatsData);
-        serverResponses.push(formattedResponse.formatted);
-        allServerStats.push(serverStats);
-      } catch (error) {
-        quakeLogger.error({ error, server: server.address }, 'Error getting QLStats data');
-        // If we can't get QLStats data, still include the server but without ELO info
-        const serverStats = extractServerStats(server);
-        const formattedResponse = formatServerResponse(serverStats, null);
-        serverResponses.push(formattedResponse.formatted);
-        allServerStats.push(serverStats);
       }
+
+      // If QLStats failed or disabled, try web scraper for enhanced data
+      if (
+        !qlstatsData &&
+        CONFIG.eloMode > 0 &&
+        server.address &&
+        process.env.ENABLE_SYNCORE_SCRAPING === 'true'
+      ) {
+        try {
+          const scrapedData = await getServerDetails(server.address);
+          if (scrapedData && scrapedData.rankedPlayers && scrapedData.rankedPlayers.length > 0) {
+            // Transform scraped data to QLStats format for compatibility
+            qlstatsData = {
+              rankedPlayers: scrapedData.rankedPlayers,
+              avg: 0, // Not available from scraper
+            };
+            if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+              quakeLogger.debug(
+                { address: server.address, playerCount: scrapedData.rankedPlayers.length },
+                'Enhanced data from web scraper'
+              );
+            }
+          }
+        } catch (error) {
+          // Silently ignore scraper failures - they're optional
+          if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+            quakeLogger.debug(
+              { error, address: server.address },
+              'Web scraper call failed (non-critical)'
+            );
+          }
+        }
+      }
+
+      // If still no QLStats data, try QLStats.net scraping for enhanced player data
+      if (
+        !qlstatsData &&
+        CONFIG.eloMode > 0 &&
+        server.address &&
+        process.env.ENABLE_QLSTATS_NET_SCRAPING === 'true'
+      ) {
+        try {
+          const enhancedData = await getEnhancedServerData(server.address, serverStats);
+          if (enhancedData && enhancedData.enhanced && enhancedData.qlstatsData) {
+            // Transform QLStats.net data to QLStats format for compatibility
+            qlstatsData = {
+              rankedPlayers: enhancedData.mergedPlayers.filter(p => p.hasQLStatsData),
+              avg:
+                enhancedData.qlstatsData.players.length > 0
+                  ? enhancedData.qlstatsData.players.reduce((sum, p) => sum + (p.rating || 0), 0) /
+                    enhancedData.qlstatsData.players.length
+                  : 0,
+            };
+            if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+              quakeLogger.debug(
+                { address: server.address, playerCount: qlstatsData.rankedPlayers.length },
+                'Enhanced data from QLStats.net scraper'
+              );
+            }
+          }
+        } catch (error) {
+          // Silently ignore QLStats.net scraper failures - they're optional
+          if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+            quakeLogger.debug(
+              { error, address: server.address },
+              'QLStats.net scraper call failed (non-critical)'
+            );
+          }
+        }
+      }
+
+      // Log if all methods are disabled
+      if (
+        CONFIG.eloMode > 0 &&
+        process.env.ENABLE_QLSTATS !== 'true' &&
+        process.env.ENABLE_SYNCORE_SCRAPING !== 'true' &&
+        process.env.ENABLE_QLSTATS_NET_SCRAPING !== 'true'
+      ) {
+        if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+          quakeLogger.debug(
+            { address: server.address },
+            'All QLStats methods (API, Syncore, and QLStats.net) disabled via environment variables'
+          );
+        }
+      }
+
+      // Format the server response with optional QLStats data
+      const formattedResponse = formatServerResponse(serverStats, qlstatsData);
+      serverResponses.push(formattedResponse.formatted);
     }
 
     // If we have no results at this point, return an error
@@ -1080,7 +1226,15 @@ async function lookupQuakeServer(serverFilter = null, eloMode = null) {
     // Return the sanitized formatted response
     return sanitizeOutput(serverResponses.join('\n\n'));
   } catch (error) {
-    quakeLogger.error({ error }, 'Server stats fetch error');
+    // Log based on debug level to reduce production log noise
+    if (process.env.ENABLE_QUAKE_DEBUG_LOGGING === 'true') {
+      quakeLogger.error({ error }, 'Server stats fetch error');
+    } else {
+      quakeLogger.warn(
+        { errorType: error.name, message: error.message },
+        'Quake server lookup failed'
+      );
+    }
     return sanitizeOutput(
       '# 🎯 Quake Live Server Status\n\n> ⚠️ Error retrieving server information.'
     );

@@ -1296,9 +1296,22 @@ async function handleQuakeStats(feedbackMessage) {
 
     // The AI processing in quakeLookup.js should ensure we're under the Discord character limit
     // but we'll still truncate if needed as a safety measure
-    await feedbackMessage.edit(
-      serverStats.slice(0, 1997) + (serverStats.length > 1997 ? '...' : '')
-    );
+    const finalMessage = serverStats.slice(0, 1997) + (serverStats.length > 1997 ? '...' : '');
+
+    // Log Discord message content if debug logging enabled
+    if (process.env.ENABLE_DISCORD_MESSAGE_LOGGING === 'true') {
+      logger.info(
+        {
+          messageLength: finalMessage.length,
+          messageContent: finalMessage,
+          originalLength: serverStats.length,
+          wasTruncated: serverStats.length > 1997,
+        },
+        'Discord message content for Quake stats'
+      );
+    }
+
+    await feedbackMessage.edit(finalMessage);
 
     // Count active servers for status update
     // Extract server count from response (improved parsing)
