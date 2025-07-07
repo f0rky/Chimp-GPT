@@ -141,7 +141,8 @@ class MessageProcessor {
         functions: [
           {
             name: 'lookupTime',
-            description: 'Look up the current time for a specific location',
+            description:
+              'Look up the current time and timezone information for a specific geographic location or city. Use for time zone queries, NOT for gaming or server statistics.',
             parameters: {
               type: 'object',
               properties: {
@@ -198,7 +199,7 @@ class MessageProcessor {
           {
             name: 'quakeLookup',
             description:
-              'Look up Quake Live server statistics and player information. Use this when users ask about quake servers, quake stats, server info, or Quake Live game data.',
+              'Look up Quake Live video game server statistics, player counts, and match information. Use this for gaming-related queries about Quake Live servers, NOT for location-based time or weather queries.',
             parameters: {
               type: 'object',
               properties: {},
