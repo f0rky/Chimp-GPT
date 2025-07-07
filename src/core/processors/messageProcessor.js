@@ -197,7 +197,8 @@ class MessageProcessor {
           },
           {
             name: 'quakeLookup',
-            description: 'Look up Quake server statistics',
+            description:
+              'Look up Quake Live server statistics and player information. Use this when users ask about quake servers, quake stats, server info, or Quake Live game data.',
             parameters: {
               type: 'object',
               properties: {},
