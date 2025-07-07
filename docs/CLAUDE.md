@@ -6,9 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversational AI, image generation, weather lookups, time zone information, and other features through a modular plugin system.
 
-## 🚨 Current Project State (v1.8.0)
+## 🚨 Current Project State (v1.9.1)
 
-**✅ MAJOR MILESTONE COMPLETED:**
+**✅ MAJOR MILESTONES COMPLETED:**
+
+**v1.9.1 - Modular Architecture Phase 3 & 4 Completion:**
+- **8 of 11 modules extracted** - Phase 3 & 4 modular refactoring completed successfully
+- **1,851 lines extracted** from the original 2,999-line monolithic chimpGPT.js file
+- **53% reduction achieved** - Main file reduced from 2,999 to ~1,400 lines
+- **Dependency injection patterns** - Established consistent patterns across all modules
+- **Feature handlers modularized** - Image generation, Quake stats, direct messages extracted
+- **Utility functions extracted** - Response formatting and message relationships modularized
+- **Clean separation of concerns** - Each module now has single responsibility
+- **New src/handlers/ directory** - Houses the extracted feature handlers and utilities
+
+**v1.9.0 - QLStats.net Integration:**
+- **QLStats.net API integration** - Complete replacement of deprecated Syncore QLStats API
+- **Three-tier data collection system** - QLStats API → Syncore scraping → QLStats.net scraping
+- **Enhanced team assignments and Glicko ratings** - Real-time player statistics with improved accuracy
+- **Playwright web scraping** - New dependencies for reliable fallback data collection
+- **Production deployment fixes** - Port conflict resolution for multi-bot environments
+- **New scraper modules** - `qlstatsScraper.js` and `qlSyncoreScraper.js` for comprehensive coverage
+
+**v1.8.0 - Project Structure Reorganization:**
 - **Complete root directory cleanup and reorganization** finished successfully
 - **92 files moved** with full git history preservation using `git mv`
 - **329 import statements updated** across entire codebase to fix all path issues
@@ -16,7 +36,6 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 - **Documentation consolidated** - moved key docs to `docs/` directory
 - **Plugin system unified** - all plugins now in `src/plugins/`
 - **Web assets organized** - moved `public/` to `src/web/public/`
-- **Version updated to v1.8.0** to reflect major architectural improvements
 
 **📂 Current Clean Folder Structure:**
 ```
@@ -73,12 +92,26 @@ node commands/deploySlashCommands.js  # Deploy Discord slash commands
 ## Architecture & Key Patterns
 
 ### Core Components
-- **src/core/chimpGPT.js**: Main bot initialization and Discord client setup
+- **src/core/chimpGPT.js**: Main bot initialization and Discord client setup (reduced from 2,999 to ~1,400 lines)
 - **src/conversation/conversationManager.js**: Manages conversation history and context with automatic pruning
 - **commands/commandHandler.js**: Processes Discord commands with alias support
 - **src/plugins/pluginManager.js**: Loads and manages plugins with event hooks
 - **src/middleware/circuitBreaker.js**: Implements circuit breaker pattern for API resilience
 - **utils/humanCircuitBreaker.js**: Discord reaction-based approval system for sensitive operations
+
+### Modular Architecture (New in v1.9.1)
+- **src/core/eventHandlers/** - Discord event processing modules
+  - `messageEventHandler.js` (740 lines) - Message lifecycle management
+  - `interactionEventHandler.js` (38 lines) - Slash command handling
+  - `clientEventHandler.js` (165 lines) - Client ready and reconnection handlers
+- **src/core/processors/** - Core processing logic
+  - `messageProcessor.js` (313 lines) - OpenAI message processing with conversation intelligence
+- **src/handlers/** - Feature handlers and utilities
+  - `imageGenerationHandler.js` (413 lines) - Complete image generation workflow
+  - `quakeStatsHandler.js` (67 lines) - Quake Live server statistics
+  - `directMessageHandler.js` (45 lines) - Direct message response handling
+  - `responseFormatter.js` (30 lines) - Response formatting utilities
+  - `messageRelationships.js` (36 lines) - Message relationship tracking
 
 ### External Service Integration
 All external services use the circuit breaker pattern for resilience:
@@ -86,7 +119,9 @@ All external services use the circuit breaker pattern for resilience:
 - **src/services/weatherLookup.js**: Weather data from weatherapi.com
 - **src/services/timeLookup.js**: Time zone information using worldtimeapi.io
 - **src/services/wolframLookup.js**: Wolfram Alpha computational queries
-- **src/services/quakeLookup.js**: Quake Live server statistics
+- **src/services/quakeLookup.js**: Quake Live server statistics with QLStats.net integration
+- **src/services/qlstatsScraper.js**: QLStats.net API integration for enhanced player data
+- **src/services/qlSyncoreScraper.js**: Playwright web scraping fallback for server discovery
 
 ### Storage & Persistence
 - Conversations saved to `data/conversations/` with automatic 30-day retention
@@ -143,6 +178,12 @@ BOT_PREFIX=!
 # Optional conversation settings
 USE_BLENDED_CONVERSATIONS=true  # Blend conversations from multiple users
 MAX_MESSAGES_PER_USER_BLENDED=5  # Max messages per user in blended mode
+
+# QLStats.net integration settings
+ENABLE_QLSTATS_NET_SCRAPING=true  # Enable QLStats.net API integration
+QLSTATS_CACHE_MINUTES=3  # Cache duration for QLStats.net data
+ENABLE_SYNCORE_SCRAPING=true  # Enable Syncore web scraping fallback
+SYNCORE_CACHE_MINUTES=5  # Cache duration for Syncore scraped data
 ```
 
 ## Testing Approach
@@ -163,6 +204,14 @@ MAX_MESSAGES_PER_USER_BLENDED=5  # Max messages per user in blended mode
 - Status dashboard available at http://localhost:3001 when running
 - All external API calls wrapped in circuit breakers with exponential backoff
 - Plugin system allows extending functionality without modifying core code
+
+### QLStats.net Integration Notes
+
+- **Playwright Dependencies**: Production deployments require Playwright browser dependencies
+- **Port Conflict Resolution**: Multiple bot instances automatically handle port conflicts
+- **Three-tier Fallback**: System gracefully degrades from QLStats API → Syncore scraping → QLStats.net scraping
+- **Cache Management**: Configurable cache durations prevent API rate limiting
+- **Browser Resource Management**: Playwright instances are properly cleaned up to prevent memory leaks
 
 ## 📋 Memory for Future Claude Sessions
 

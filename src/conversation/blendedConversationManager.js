@@ -14,6 +14,7 @@ const { createLogger } = require('../core/logger');
 const logger = createLogger('blendedConversationManager');
 const conversationStorage = require('./conversationStorage');
 const { sanitizeMessage, validateMessage } = require('../../utils/messageSanitizer');
+const conversationIntelligence = require('./conversationIntelligence');
 
 /**
  * Maximum messages to keep per user in blended mode
@@ -110,13 +111,23 @@ function addMessageToBlended(channelId, userId, message, isDM = false, messageId
 
   const userMessages = channelConvo.get(userId);
 
-  // Add message with metadata
+  // Add message with enhanced metadata for intelligent processing
   const messageWithMeta = {
     ...message,
     userId,
     timestamp: Date.now(),
     username: message.username || 'User',
     messageId: messageId, // Track Discord message ID if provided
+    // Enhanced metadata for conversation intelligence
+    relevanceScore: null, // Will be calculated when building context
+    isBotDirected: null, // Will be determined by intelligence system
+    conversationThread: null, // Thread grouping identifier
+    temporalWeight: null, // Time-based decay factor
+    semanticWeight: null, // Similarity to recent context
+    replyChainDepth: message.replyChainDepth || 0, // Depth in reply chain
+    isReply: message.isReply || false, // Whether this is a reply
+    replyToBotMessage: message.replyToBotMessage || false, // Reply to bot specifically
+    lastUserActivity: Date.now(), // Track user activity patterns
   };
 
   userMessages.push(messageWithMeta);
@@ -131,49 +142,105 @@ function addMessageToBlended(channelId, userId, message, isDM = false, messageId
 }
 
 /**
- * Build a blended conversation from all users in a channel
+ * Build an intelligently weighted blended conversation from all users in a channel
  * @param {string} channelId - The channel ID
- * @returns {Array<Object>} The blended conversation array
+ * @param {Object} options - Options for context building
+ * @returns {Array<Object>} The intelligently weighted blended conversation array
  */
-function buildBlendedConversation(channelId) {
+function buildBlendedConversation(channelId, options = {}) {
   const channelConvo = getChannelConversation(channelId);
   const blended = [{ role: 'system', content: config.BOT_PERSONALITY }];
 
-  // Collect all messages from all users with timestamps
+  // Collect all messages from all users
   const allMessages = [];
-
   for (const [_userId, userMessages] of channelConvo.entries()) {
     allMessages.push(...userMessages);
   }
 
-  // Sort by timestamp to maintain chronological order
-  allMessages.sort((a, b) => a.timestamp - b.timestamp);
+  if (allMessages.length === 0) {
+    logger.debug({ channelId }, 'No messages found for blended conversation');
+    return blended;
+  }
 
-  // Add to blended conversation with user identification
-  for (const msg of allMessages) {
-    // Format message to include username for context
+  // Get recent bot messages for semantic context (look for assistant role messages)
+  const recentBotMessages = allMessages
+    .filter(msg => msg.role === 'assistant')
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 3);
+
+  // Use conversation intelligence to build weighted context
+  const weightedMessages = conversationIntelligence.buildWeightedContext(allMessages, {
+    maxTokens: options.maxTokens || conversationIntelligence.CONFIG.MAX_WEIGHTED_CONTEXT_TOKENS,
+    minRelevance: options.minRelevance || conversationIntelligence.CONFIG.MIN_RELEVANCE_THRESHOLD,
+    ambientRatio: options.ambientRatio || conversationIntelligence.CONFIG.AMBIENT_CONTEXT_RATIO,
+    currentTimestamp: options.currentTimestamp || Date.now(),
+    recentBotMessages: recentBotMessages,
+  });
+
+  // Analyze conversation threads for better organization
+  const threadAnalysis = conversationIntelligence.analyzeConversationThreads(weightedMessages);
+
+  // Add weighted messages to blended conversation with user identification
+  for (const msg of weightedMessages) {
+    // Format message to include username and relevance indicators for debugging
+    let content = msg.content;
+    if (msg.role === 'user') {
+      content = `${msg.username}: ${content}`;
+
+      // Add relevance indicator in debug mode
+      if (process.env.ENABLE_CONVERSATION_DEBUG === 'true') {
+        const relevanceIcon =
+          msg.relevanceScore > 0.8
+            ? '🔥'
+            : msg.relevanceScore > 0.6
+              ? '⭐'
+              : msg.relevanceScore > 0.4
+                ? '💬'
+                : '💭';
+        content = `${relevanceIcon} ${content}`;
+      }
+    }
+
     const formattedMessage = {
       role: msg.role,
-      content: msg.role === 'user' ? `${msg.username}: ${msg.content}` : msg.content,
+      content: content,
+      // Preserve metadata for potential future use
+      metadata: {
+        relevanceScore: msg.relevanceScore,
+        isBotDirected: msg.relevanceMetadata?.botIntent,
+        timestamp: msg.timestamp,
+        userId: msg.userId,
+      },
     };
+
     blended.push(formattedMessage);
   }
 
-  // Limit total conversation length
+  // Ensure we don't exceed maximum conversation length (fallback safety)
   while (blended.length > MAX_BLENDED_CONVERSATION_LENGTH) {
     if (blended[1]) {
-      // Keep system message
+      // Keep system message, remove oldest non-system message
       blended.splice(1, 1);
     }
   }
 
-  logger.debug(
+  logger.info(
     {
       channelId,
-      totalMessages: blended.length,
+      totalAvailableMessages: allMessages.length,
+      selectedMessages: weightedMessages.length,
+      finalBlendedLength: blended.length,
       userCount: channelConvo.size,
+      threadsDetected: threadAnalysis.threads.length,
+      avgRelevanceScore:
+        weightedMessages.length > 0
+          ? (
+              weightedMessages.reduce((sum, msg) => sum + (msg.relevanceScore || 0), 0) /
+              weightedMessages.length
+            ).toFixed(3)
+          : 0,
     },
-    'Built blended conversation'
+    'Built intelligent blended conversation'
   );
 
   return blended;

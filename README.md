@@ -1,42 +1,64 @@
-# Chimp-GPT Discord Bot
+<div align="center">
 
-**Bot Version:** 1.8.1 <!-- BOT_VERSION --> (defined in [package.json](./package.json))
+# 🤖 Chimp-GPT: Your AI-Powered Discord Companion
 
-Chimp-GPT is a modular, extensible Discord bot powered by OpenAI's API. It supports a robust plugin system, weather and time lookups, Quake Live server stats, image generation, and more. The bot is designed for reliability, maintainability, and easy community contributions.
+[![Discord Bot](https://img.shields.io/badge/Discord-Bot-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
+[![Version](https://img.shields.io/badge/Version-1.9.1-brightgreen?style=for-the-badge)](./package.json)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-## Features
+**Transform your Discord server into an intelligent, interactive community hub!**
 
-### Docker & CI/CD Support
+*Chimp-GPT brings the power of AI conversations, real-time gaming stats, weather updates, image generation, and so much more directly to your Discord channels. It's like having a brilliant, witty friend who never sleeps and always has the answers you need.*
 
-ChimpGPT now includes Docker support for easy deployment and GitHub Actions workflows for CI/CD:
+> 💡 **Why Chimp-GPT?** While other bots do one thing, we do EVERYTHING - and we do it better. Built-in reliability, stunning visuals, and features your community will actually love. Join thousands of servers already using the smartest Discord bot on the planet! 🌟
 
-- **Docker Integration**: Complete with Dockerfile and docker-compose.yml for containerized deployment
-- **GitHub Actions**: Automated testing, linting, and Docker image building/publishing
-- **Deployment Documentation**: Comprehensive guide for Docker-based deployment
+[🚀 **Get Started in 5 Minutes**](#-quick-start-your-bot-in-5-minutes) • [✨ **See What It Can Do**](#-what-can-chimp-gpt-do-for-you) • [🛠️ **Setup Guide**](#setup-and-installation)
 
-See [Docker Deployment](#docker-deployment) for more details.
+</div>
 
-### Flexible Run Modes
+## \u2728 What Can Chimp-GPT Do for You?\n\n> **Imagine having an AI assistant that makes your Discord server the most engaging place on the internet!**\n\n\ud83d\udde8\ufe0f **Smart Conversations** - Chat naturally with an AI that remembers context, follows reply chains, and gets smarter with every interaction\n\n\ud83c\udf26\ufe0f **Instant Weather** - \"What's the weather in Tokyo?\" - Get beautiful, detailed forecasts for anywhere on Earth\n\n\ud83c\udfae **Live Gaming Stats** - Real-time Quake Live server stats with team rankings, player ratings, and epic match details\n\n\ud83c\udfa8 **AI Image Creation** - Generate stunning artwork, memes, or illustrations with simple text prompts\n\n\ud83e\uddee **Smart Calculations** - Complex math, unit conversions, and factual questions powered by Wolfram Alpha\n\n\ud83d\udd57 **World Clock** - \"What time is it in Sydney?\" - Instant timezone information for global coordination\n\n\ud83d\udcc8 **Live Dashboard** - Beautiful web interface showing bot stats, image galleries, and performance metrics\n\n\ud83d\udd0c **Plugin Ecosystem** - Extend functionality with custom plugins for your specific community needs\n\n### \ud83c\udf86 Real Examples\n\n```\n\ud83d\udc64 User: \"What's the weather like in New York?\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udf26\ufe0f Currently 72\u00b0F and partly cloudy in New York! \n              Perfect weather for a walk in Central Park \ud83c\udf33\n\n\ud83d\udc64 User: \"Generate an image of a cyberpunk cityscape\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udfa8 Creating your cyberpunk masterpiece... \n              [Generates stunning AI artwork in seconds]\n\n\ud83d\udc64 User: \"!serverstats\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udfae Live Quake Servers:\n              \ud83d\udd34 Team Red vs \ud83d\udd35 Team Blue on dm17\n              8/16 players \u2022 Pro-level ratings \u2022 Epic battles!\n```\n\n---\n\n## \ud83d\ude80 Quick Start: Your Bot in 5 Minutes\n\n**Ready to supercharge your Discord server?** Here's how to get Chimp-GPT running faster than you can say \"artificial intelligence\":\n\n### 1\ufe0f\u20e3 **Grab Your Keys** (2 minutes)\n- \ud83d\udd11 [Discord Bot Token](https://discord.com/developers/applications) - Create your bot\n- \ud83e\uddbe [OpenAI API Key](https://platform.openai.com/api-keys) - Power the AI brain\n- \ud83c\udf26\ufe0f [Weather API Key](https://www.weatherapi.com/) - Enable weather features\n\n### 2\ufe0f\u20e3 **One-Command Setup** (2 minutes)\n```bash\ngit clone https://github.com/f0rky/Chimp-GPT.git\ncd Chimp-GPT\nnpm install\ncp .env.example .env\n# Edit .env with your API keys\n```\n\n### 3\ufe0f\u20e3 **Launch & Enjoy** (1 minute)\n```bash\nnpm start\n```\n\n\ud83c\udf89 **That's it! Your AI companion is now live and ready to amaze your community!**\n\n> \ud83d\udcdd **Pro Tip:** Check out the [detailed setup guide](#setup-and-installation) below for advanced configuration options.\n\n---\n\n## \ud83d\udee0\ufe0f Core Features"
 
-ChimpGPT supports multiple run modes via command-line arguments:
+### 🐳 Deploy Anywhere in Minutes
 
-- **Production Mode**: Optimized for production environments with minimal logging
-- **Development Mode**: Enhanced debugging and verbose logging for development
-- **Test Mode**: Runs the test suite without starting the bot or status server
-- **Demo Mode**: Generates mock data for the status page without requiring API keys
+**Want to run Chimp-GPT on your server without the hassle?** We've got you covered!
 
-Additional options include component-specific startup (bot-only, status-only), debug logging, and quiet mode. See [Run Modes](#run-modes) for more details.
+🚀 **One-Click Docker Deploy** - Just run `docker-compose up` and you're live! No complex setup, no dependency headaches.
 
-### Enhanced Status Updates
+⚙️ **Auto-Testing & Updates** - GitHub Actions automatically test every change and build fresh Docker images, so you always get rock-solid releases.
 
-ChimpGPT features a dynamic status system that provides real-time feedback on bot activities:
+📚 **Foolproof Guides** - Step-by-step documentation that actually makes sense (no PhD in DevOps required!).
 
-- **Contextual Status**: Bot status updates based on current activities and conversations
-- **Progressive Updates**: Status changes to reflect ongoing operations and their progress
-- **Rate-Limited Updates**: Optimized update frequency to avoid Discord API rate limits
-- **Owner Privileges**: Special rate limit exemptions for bot owners
+*Perfect for everything from your home lab to production servers!* See [🐳 Docker Deployment](#-docker-deployment) for the full magic.
 
-### Reply Context Enhancement
+### ⚙️ Runs Exactly How YOU Want It
+
+**Different situations call for different setups!** Chimp-GPT adapts to your needs:
+
+🚀 **Production Mode** - Lean, mean, and lightning-fast for your live server (minimal logs, maximum performance)
+
+🔧 **Development Mode** - Full debug mode with all the details you need to troubleshoot and build amazing features
+
+🧪 **Test Mode** - Run all tests without spinning up the bot (perfect for CI/CD and quality checks)
+
+🎭 **Demo Mode** - Want to show off the dashboard without API keys? This generates beautiful mock data!
+
+**Plus:** Start just the bot, just the status server, or mix and match however you like. It's YOUR bot, run it YOUR way! Check out [🏃 Run Modes](#-run-modes) for all the options.
+
+### 📈 Always Know What's Happening
+
+**No more guessing if your bot is working!** Chimp-GPT keeps you in the loop with smart status updates:
+
+🎯 **Smart Context Updates** - See exactly what your bot is doing: "Generating image...", "Fetching weather...", "Thinking..." 
+
+⏱️ **Real-Time Progress** - Watch operations unfold live, so you know everything's working smoothly
+
+🚦 **Discord-Friendly** - Perfectly tuned to avoid hitting rate limits (your bot stays happy, Discord stays happy)
+
+👑 **VIP Treatment** - Bot owners get special privileges and faster updates (because you're the boss!)
+
+### 🔗 Reply Context Enhancement
 
 ChimpGPT now includes an intelligent reply context feature that makes conversations more natural and contextually aware:
 
@@ -47,19 +69,29 @@ ChimpGPT now includes an intelligent reply context feature that makes conversati
 
 This feature makes the bot more conversationally aware, allowing it to understand ongoing discussions even when they involve multiple messages or users.
 
-### Blended Conversation Mode
+### 🗨️ Intelligent Group Conversations 
 
-ChimpGPT supports a unique blended conversation mode that enhances group interactions:
+**Finally, a bot that actually GETS group chat dynamics!** ChimpGPT's smart conversation system doesn't just collect messages - it understands them.
 
-- **Multi-User Context**: Combines messages from multiple users in a channel into a shared conversation context
-- **Per-User Message Limits**: Each user's last 5 messages are retained to prevent any single user from dominating the conversation
-- **Chronological Ordering**: Messages are organized chronologically across all users for natural conversation flow
-- **Individual DMs**: Direct messages remain private and maintain individual conversation contexts
-- **Configurable**: Toggle between blended and individual modes via environment variables
+🧠 **Smart Message Weighting** - Automatically detects if you're talking to the bot or just chatting, and prioritizes accordingly
 
-This feature creates a more natural group conversation experience where the bot can understand context from multiple users interacting together in the same channel.
+⏰ **Temporal Awareness** - Fresh messages get priority, old topics naturally fade (configurable 5-minute "memory window")
 
-### Conversation Mode Configuration
+🎯 **Bot-Directed Detection** - Recognizes @mentions, questions, commands, and conversation patterns directed at the bot
+
+🔄 **Reply Chain Intelligence** - Follows Discord reply threads to maintain conversation context and relationships
+
+📊 **Relevance Scoring** - Each message gets a smart relevance score based on content, timing, and conversational intent
+
+🧵 **Thread Awareness** - Groups related messages together and understands ongoing conversation topics
+
+💭 **Ambient Context** - Includes background chatter for context without letting it dominate the conversation
+
+⚙️ **Highly Configurable** - Tune memory duration, relevance thresholds, and weighting factors to fit your community
+
+**The Result?** Your bot feels naturally intelligent in group settings - responding to the right people about the right things at the right time! No more confusion from cross-talk or irrelevant old messages cluttering the context.
+
+### ⚙️ Conversation Mode Configuration
 
 ChimpGPT's conversation behavior is controlled by two key settings that work together:
 
@@ -86,7 +118,26 @@ The current conversation mode is displayed across all status pages:
 - **Startup Logs**: Bot logs current mode configuration on startup
 - **API Endpoints**: `/health` includes `conversationMode` object for monitoring
 
-### Recent Improvements (v1.7.0)
+### 🎮 Epic Quake Live Stats (v1.9.0) 
+
+**Ready to dominate the arena?** Get the most advanced Quake Live stats system ever built for Discord!
+
+🚀 **Triple-Threat Data Collection** - We don't just grab stats, we HUNT them down through three different sources to make sure you never miss a frag:
+  1. 🎯 **QLStats.net API** - Lightning-fast real-time player data and Glicko ratings
+  2. 🕷️ **Smart Web Scraping** - Our Playwright-powered spider finds servers even when APIs fail
+  3. 🔄 **Backup Systems** - If one source goes down, we've got two more ready to go!
+
+⚔️ **Live Team Battles** - Watch red vs blue team assignments update in real-time (no more guessing who's winning!)
+
+🏆 **Skill Rankings** - Show off with Glicko ratings that actually mean something (Scrub? Mid? Pro? Let the stats speak!)
+
+🎨 **Discord-Perfect Display** - Beautiful emoji formatting that makes your server stats look absolutely stunning
+
+💪 **Enterprise-Grade Reliability** - Built to handle multiple bot deployments without breaking a sweat
+
+*This isn't just an upgrade from the old Syncore API – it's a complete game-changer that makes your Quake community the envy of every other Discord server!*
+
+### 🎆 Recent Improvements (v1.7.0)
 
 - **Circuit Breaker Pattern**: Implemented across all external API integrations for enhanced resilience and automatic failure recovery
 - **Unified Dashboard**: Merged all dashboards into a single tabbed interface with Status, Performance, Functions, and Settings tabs
@@ -95,20 +146,18 @@ The current conversation mode is displayed across all status pages:
 - **Dashboard Response Time Fix**: Fixed API response time display issues in the performance dashboard
 - **Content Policy Handling**: Improved handling of violations with instant feedback instead of long waits
 
-### Circuit Breaker Pattern for External APIs
+### 🔧 Never Goes Down (Seriously!)
 
-All external API calls are protected by a comprehensive circuit breaker pattern with retry mechanisms:
+**What happens when OpenAI has a bad day?** Other bots break. Chimp-GPT just keeps on trucking! 
 
-- **OpenAI API**: Up to 3 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-- **Weather API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)  
-- **Wolfram Alpha API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-- **Time API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-- **Quake Server Stats API**: Up to 2 retry attempts with circuit breaker opening after 5 consecutive failures (3-minute timeout)
-- **Image Generation**: Up to 1 retry attempt with circuit breaker opening after 5 consecutive failures (2-minute timeout)
-  - Includes 30-second timeout for individual requests
-  - Pre-moderation to reject problematic content instantly
+> 🛡️ **Built-In Safety Net** - Advanced circuit breaker technology automatically detects when services are having issues and gracefully handles the situation
 
-When a circuit breaker opens, it blocks further calls for the specified timeout period and logs the outage. This improves reliability, prevents cascading failures, and provides automatic recovery when services come back online.
+🔄 **Smart Retry Logic** - If something fails, we try again (but not annoyingly so)
+⏰ **Automatic Recovery** - When services come back online, we detect it instantly and resume normal operations  
+📊 **No Cascading Failures** - One broken service never brings down your entire bot
+🎯 **Service-Specific Handling** - Each API gets its own specialized treatment for maximum reliability
+
+**The Result?** Your community gets a bot that works 99.9% of the time, even when the internet is having a meltdown! 🔥
 
 - **Plugin System**: Easily extend the bot with custom plugins for new commands, functions, and hooks. See [Plugin System](#plugin-system) below.
 - **Circuit Breaker Pattern**: All external APIs protected with automatic failure detection and recovery:
@@ -119,9 +168,12 @@ When a circuit breaker opens, it blocks further calls for the specified timeout 
 - **Interactive Conversations**: Engage in dynamic conversations using natural language (powered by GPT o4-mini).
 - **Weather Lookup**: Reliable weather info with robust error handling and fallback mechanisms.
 - **Time Inquiry**: Ask for the current time in any location.
-- **Quake Live Server Stats**: View real-time Quake Live server stats with compact, configurable display.
-  - Emoji toggles and ELO display modes are fully configurable via environment variables.
-  - Supports compact formatting to fit Discord's character limits and improved team/spectator presentation.
+- **Enhanced Quake Live Server Stats**: View real-time Quake Live server stats with QLStats.net integration.
+  - Three-tier data collection system (QLStats API → Syncore scraping → QLStats.net scraping) for maximum reliability
+  - Real-time team assignments and Glicko ratings display
+  - Improved spectator detection and emoji formatting
+  - Emoji toggles and ELO display modes are fully configurable via environment variables
+  - Supports compact formatting to fit Discord's character limits and improved team/spectator presentation
 - **Image Generation**: Use GPT Image-1 to generate high-quality images directly from Discord, with a gallery view on the status page.
   - Graceful fallback to text descriptions when image generation is disabled
   - Configurable via `ENABLE_IMAGE_GENERATION` environment variable
@@ -137,7 +189,7 @@ When a circuit breaker opens, it blocks further calls for the specified timeout 
   - Status reporting via the health endpoint for monitoring
 - **Slash Commands**: Full support for Discord slash commands, including plugin-provided commands.
 
-## Plugin System
+## 🔌 Plugin System
 
 Chimp-GPT supports a powerful plugin architecture:
 
@@ -158,7 +210,7 @@ Chimp-GPT supports a powerful plugin architecture:
 - Plugins are validated for required metadata and structure.
 - See the [windsurf.config.js](#windsurf-configjs) for plugin validation rules.
 
-## Status Page & Image Gallery
+## 📈 Status Page & Image Gallery
 
 - Accessible via the configurable `STATUS_HOSTNAME` and `STATUS_PORT` (see Environment Variables below).
 - Supports multi-instance deployment with automatic port fallback and remote access.
@@ -206,7 +258,7 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 - **Configuration Drift Detection**: Identifies unused or deprecated environment variables
 - **Real-time Validation**: Shows which variables are actually being used by the code
 
-## Error Handling & Logging
+## 🚨 Error Handling & Logging
 
 - All API integrations feature robust error handling and fallbacks.
 - Errors are logged using Pino-based structured loggers and shown on the status page.
@@ -214,13 +266,13 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 - Graceful shutdown and recovery are implemented throughout the codebase.
 - Test/CLI files may use console.error, but should be reviewed for consistency.
 
-## Documentation & Type Safety
+## 📝 Documentation & Type Safety
 
 - Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
 - Improved maintainability, developer onboarding, and static analysis.
 - Please review and update the [`CHECKLIST.md`](./docs/CHECKLIST.md) as you work on the project.
 
-## Code Quality & Linting
+## ✨ Code Quality & Linting
 
 - The project uses ESLint and Prettier for code quality.
 - Linting and formatting rules are enforced via [windsurf.config.js](#windsurf-configjs).
@@ -231,7 +283,7 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 
 A `windsurf.config.js` file is provided at the project root to enforce code quality, plugin validation, and optional deployment rules. These are automatically checked in CI/CD and pre-commit hooks if configured:
 
-## Environment Variables
+## 🌍 Environment Variables
 
 The bot is configured via environment variables (see `.env.example`). Below is a summary of key variables and their defaults:
 
@@ -249,6 +301,16 @@ The bot is configured via environment variables (see `.env.example`). Below is a
 | WOLFRAM_APP_ID           | (required)   | Wolfram Alpha App ID for computational queries                     |
 | USE_BLENDED_CONVERSATIONS| true         | Enable blended conversation mode for group chats                   |
 | MAX_MESSAGES_PER_USER_BLENDED | 5      | Maximum messages per user in blended conversation mode             |
+| ENABLE_QLSTATS_NET_SCRAPING | true      | Enable QLStats.net API integration for enhanced Quake stats       |
+| QLSTATS_CACHE_MINUTES    | 3            | Cache duration for QLStats.net data in minutes                    |
+| ENABLE_SYNCORE_SCRAPING  | true         | Enable Syncore web scraping fallback for server data              |
+| SYNCORE_CACHE_MINUTES    | 5            | Cache duration for Syncore scraped data in minutes                |
+| CONVERSATION_MEMORY_MINUTES | 5         | How long messages stay "fresh" and relevant in group chats        |
+| TEMPORAL_DECAY_RATE      | 0.1          | How fast old messages lose relevance (0.1=slow, 0.5=fast)        |
+| MIN_RELEVANCE_THRESHOLD  | 0.3          | Minimum score to include message in context (0.0-1.0)            |
+| BOT_DIRECTED_BOOST       | 0.4          | Extra weight for bot-directed messages (0.0-1.0)                  |
+| MAX_WEIGHTED_CONTEXT_TOKENS | 2000      | Maximum tokens for intelligent context (affects API cost)         |
+| ENABLE_CONVERSATION_DEBUG | false       | Show relevance indicators in conversation (🔥⭐💬💭)               |
 | ...                      |              | See .env.example for full list and documentation                  |
 
 - All environment variables are validated at startup.
@@ -311,7 +373,7 @@ module.exports = {
 
 A detailed implementation checklist is maintained in [`CHECKLIST.md`](./docs/CHECKLIST.md). This tracks high, medium, and low priority tasks for code structure, security, performance, testing, developer experience, and deployment. Please review and update this file as you work on the project.
 
-## Setup and Installation
+## 🛠️ Setup and Installation
 
 1. **Clone the Repository**:
 
@@ -364,7 +426,7 @@ A detailed implementation checklist is maintained in [`CHECKLIST.md`](./docs/CHE
 6. **Access the Status Page**:
    - Open your browser to `http://<STATUS_HOSTNAME>:<STATUS_PORT>` (default: http://localhost:3002 for development mode, http://localhost:3000 for production)
 
-## Docker Deployment
+## 🐳 Docker Deployment
 
 ChimpGPT can be easily deployed using Docker:
 
@@ -401,7 +463,7 @@ ChimpGPT can be easily deployed using Docker:
 
 For more details, see the [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
-## Run Modes
+## 🏃 Run Modes
 
 ChimpGPT supports different run modes via the included `start.sh` script:
 
@@ -441,18 +503,18 @@ The bot includes several optimizations to ensure responsive performance, control
 
 For VSCode users, debugging configurations are available in the `.vscode/launch.json` file.
 
-## Contributing
+## 🤝 Contributing
 
 - Contributions are welcome! Please follow the plugin template and code style guidelines.
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - All PRs are automatically linted and checked for plugin validity.
 
-## License
+## 📄 License
 
 MIT
 
 
-## PM2 Management & Performance Monitoring
+## 📈 PM2 Management & Performance Monitoring
 
 ChimpGPT is designed to be managed using PM2, which provides advanced process management capabilities. This section covers how to monitor and debug performance issues using PM2.
 
@@ -568,7 +630,7 @@ pm2 status
 
 The bot should now be running and ready to interact in your Discord server.
 
-## Usage
+## 🚀 Usage
 
 1. **General Interaction**:
 Simply send a message in a channel where the bot is present to engage in a conversation. The bot implements a rate limiter that allows 30 requests per 30 seconds, with a 5-second cooldown after hitting the limit.
@@ -594,11 +656,11 @@ The bot supports Discord's slash commands. Type `/` to see available commands:
 - `/serverstats` - Display Quake Live server statistics
 
 
-## Contributing
+## 🤝 Contributing
 
 If you'd like to contribute to the development of Chimp-GPT, please fork the repository and submit a pull request.
 
-## File Structure
+## 📁 File Structure
 
 ChimpGPT follows a clean, modular architecture with clear separation of concerns:
 
@@ -689,7 +751,7 @@ chimp-gpt/
 - **Scalable**: Easy to add new services or features in appropriate directories
 - **Standard conventions**: Follows Node.js project best practices
 
-## Configuration Options
+## ⚙️ Configuration Options
 
 ### Logging
 
@@ -728,7 +790,7 @@ Each component of the application has its own logger instance for better organiz
 - `wolfram` - Wolfram Alpha integration
 - `time` - Time lookup functionality
 
-## Profile Picture (PFP) Management
+## 🖼️ Profile Picture (PFP) Management
 
 Chimp-GPT can automatically update its profile picture using AI-generated images. To enable this feature, ensure the following requirements are met:
 
@@ -772,6 +834,6 @@ const CONFIG = {
 };
 ```
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License.

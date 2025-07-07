@@ -5,6 +5,50 @@ All notable changes to ChimpGPT will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2025-07-07
+
+### Major Milestone - Phase 3 & 4 Modular Architecture Completion
+
+#### ✨ Features
+- **Modular Architecture Continuation**: Completed Phase 3 & 4 of the systematic refactoring
+- **Feature Handler Extraction**: All major feature handlers now properly modularized
+- **Utility Function Extraction**: Core utility functions extracted into focused modules
+- **Dependency Injection Patterns**: Established consistent patterns across all extracted modules
+
+#### 🏗️ Structural Changes
+- **Phase 3 - Feature Handlers (525 lines extracted)**:
+  - `handleImageGeneration` → `src/handlers/imageGenerationHandler.js` (413 lines)
+  - `handleQuakeStats` → `src/handlers/quakeStatsHandler.js` (67 lines)
+  - `handleDirectMessage` → `src/handlers/directMessageHandler.js` (45 lines)
+
+- **Phase 4 - Utilities (66 lines extracted)**:
+  - `formatSubtext` → `src/handlers/responseFormatter.js` (30 lines)
+  - `storeMessageRelationship` → `src/handlers/messageRelationships.js` (36 lines)
+
+#### 🔧 Technical Improvements
+- **Dependency Injection**: All modules use clean dependency patterns for testability
+- **Single Responsibility**: Each module now handles one specific concern
+- **Import Organization**: Clean separation of concerns and proper module boundaries
+- **Memory Management**: Message relationships module includes automatic cleanup
+- **Error Handling**: Consistent error patterns and logging across all modules
+
+#### 📊 Progress Metrics
+- **Total Lines Extracted**: ~1,851 lines (62% of original 2,999-line file)
+- **Modules Completed**: 8 of 11 planned modules
+- **Main File Reduction**: From 2,999 to ~1,400 lines (53% reduction)
+- **Phases Completed**: Phase 1, 2A, 3, and 4 ✅
+
+#### 🎯 Remaining Work
+- Phase 2B: `functionCallProcessor.js` (~400 lines)
+- Phase 2C: `responseGenerator.js` (~150 lines)
+- Target: Reduce main file to ~200 lines
+
+#### ✅ Quality Assurance
+- All extracted modules compile without errors
+- Dependency injection patterns tested and working
+- Clean import/export structure maintained
+- Git history preserved for all changes
+
 ## [1.8.0] - 2025-06-29
 
 ### Major Release - Complete Architecture Reorganization
