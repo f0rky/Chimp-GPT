@@ -18,6 +18,7 @@ const {
 const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
 const MessageProcessor = require('../processors/messageProcessor');
+const { generateNaturalResponse } = require('../processors/responseGenerator');
 
 class MessageEventHandler {
   constructor(client, config, dependencies) {
@@ -419,7 +420,19 @@ class MessageEventHandler {
             message.author.id,
             timings.startTime,
             timings,
-            message // Pass the original user message for relationship tracking
+            message, // Pass the original user message for relationship tracking
+            this.loadingEmoji,
+            this.statusManager,
+            (functionResult, conversationLog, functionName, functionTimings) =>
+              generateNaturalResponse(
+                functionResult,
+                conversationLog,
+                functionName,
+                functionTimings,
+                this.openai
+              ),
+            this.formatSubtext,
+            this.storeMessageRelationship
           );
           // Safe access to function name with fallback to prevent TypeError
           addTiming('after_function_call_handling', {
