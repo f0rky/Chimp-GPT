@@ -168,14 +168,15 @@ function buildBlendedConversation(channelId, options = {}) {
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 3);
 
-  // Use conversation intelligence to build weighted context
-  const weightedMessages = conversationIntelligence.buildWeightedContext(allMessages, {
-    maxTokens: options.maxTokens || conversationIntelligence.CONFIG.MAX_WEIGHTED_CONTEXT_TOKENS,
-    minRelevance: options.minRelevance || conversationIntelligence.CONFIG.MIN_RELEVANCE_THRESHOLD,
-    ambientRatio: options.ambientRatio || conversationIntelligence.CONFIG.AMBIENT_CONTEXT_RATIO,
-    currentTimestamp: options.currentTimestamp || Date.now(),
-    recentBotMessages: recentBotMessages,
-  });
+  // Use simple chronological approach for reliable function calling
+  // Take the most recent messages to ensure user input reaches OpenAI
+  const weightedMessages = allMessages
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(-10) // Last 10 messages
+    .map(msg => ({
+      ...msg,
+      relevanceScore: msg.relevanceScore || 1.0, // Ensure all messages have high relevance
+    }));
 
   // Analyze conversation threads for better organization
   const threadAnalysis = conversationIntelligence.analyzeConversationThreads(weightedMessages);

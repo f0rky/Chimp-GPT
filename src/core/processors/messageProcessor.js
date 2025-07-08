@@ -11,6 +11,16 @@ class MessageProcessor {
   }
 
   async processOpenAIMessage(content, conversationLog, timings = {}) {
+    // Debug: Log the conversation log to understand what's being passed
+    openaiLogger.debug('processOpenAIMessage called with:', {
+      contentParam: content,
+      conversationLogLength: conversationLog.length,
+      conversationLogPreview: conversationLog.map(msg => ({
+        role: msg.role,
+        contentPreview: msg.content ? msg.content.substring(0, 50) : 'N/A',
+      })),
+    });
+
     // Get the latest user message from the conversation log
     const latestUserMessage = [...conversationLog].reverse().find(msg => msg.role === 'user');
     const currentContent = latestUserMessage ? latestUserMessage.content : content;
@@ -64,7 +74,7 @@ class MessageProcessor {
       let optimizedConversationLog = conversationLog;
 
       try {
-        if (conversationLog.length > 3) {
+        if (conversationLog.length > 10) {
           // Only optimize if we have enough context
           openaiLogger.debug('Applying conversation intelligence to optimize context', {
             originalLength: conversationLog.length,
@@ -138,99 +148,118 @@ class MessageProcessor {
       const response = await this.openai.chat.completions.create({
         model: this.config.OPENAI_MODEL || 'gpt-4.1-nano',
         messages: optimizedConversationLog,
-        functions: [
+        tool_choice: 'auto',
+        tools: [
           {
-            name: 'lookupTime',
-            description:
-              'Look up the current time and timezone information for a specific geographic location or city. Use for time zone queries, NOT for gaming or server statistics.',
-            parameters: {
-              type: 'object',
-              properties: {
-                location: {
-                  type: 'string',
-                  description: 'The location to look up the time for',
-                },
+            type: 'function',
+            function: {
+              name: 'quakeLookup',
+              description:
+                'ONLY use when user says "quake stats" - retrieves Quake Live server data',
+              parameters: {
+                type: 'object',
+                properties: {},
               },
-              required: ['location'],
             },
           },
           {
-            name: 'lookupWeather',
-            description: 'Look up the current weather for a specific location',
-            parameters: {
-              type: 'object',
-              properties: {
-                location: {
-                  type: 'string',
-                  description: 'The location to look up the weather for',
+            type: 'function',
+            function: {
+              name: 'lookupTime',
+              description:
+                'Look up the current time and timezone information for a specific geographic location or city. Use for time zone queries, NOT for gaming or server statistics.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  location: {
+                    type: 'string',
+                    description: 'The location to look up the time for',
+                  },
                 },
+                required: ['location'],
               },
-              required: ['location'],
             },
           },
           {
-            name: 'lookupExtendedForecast',
-            description: 'Look up the extended weather forecast for a specific location',
-            parameters: {
-              type: 'object',
-              properties: {
-                location: {
-                  type: 'string',
-                  description: 'The location to look up the forecast for',
+            type: 'function',
+            function: {
+              name: 'lookupWeather',
+              description: 'Look up the current weather for a specific location',
+              parameters: {
+                type: 'object',
+                properties: {
+                  location: {
+                    type: 'string',
+                    description: 'The location to look up the weather for',
+                  },
                 },
+                required: ['location'],
               },
-              required: ['location'],
             },
           },
           {
-            name: 'getWolframShortAnswer',
-            description: 'Get a short answer from Wolfram Alpha',
-            parameters: {
-              type: 'object',
-              properties: {
-                query: {
-                  type: 'string',
-                  description: 'The query to send to Wolfram Alpha',
+            type: 'function',
+            function: {
+              name: 'lookupExtendedForecast',
+              description: 'Look up the extended weather forecast for a specific location',
+              parameters: {
+                type: 'object',
+                properties: {
+                  location: {
+                    type: 'string',
+                    description: 'The location to look up the forecast for',
+                  },
                 },
+                required: ['location'],
               },
-              required: ['query'],
             },
           },
           {
-            name: 'quakeLookup',
-            description:
-              'Look up Quake Live video game server statistics, player counts, and match information. Use this for gaming-related queries about Quake Live servers, NOT for location-based time or weather queries.',
-            parameters: {
-              type: 'object',
-              properties: {},
+            type: 'function',
+            function: {
+              name: 'getWolframShortAnswer',
+              description: 'Get a short answer from Wolfram Alpha',
+              parameters: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description: 'The query to send to Wolfram Alpha',
+                  },
+                },
+                required: ['query'],
+              },
             },
           },
           {
-            name: 'generateImage',
-            description: 'Generate an image using GPT Image-1 based on a text prompt',
-            parameters: {
-              type: 'object',
-              properties: {
-                prompt: {
-                  type: 'string',
-                  description: 'The text prompt describing the image to generate',
+            type: 'function',
+            function: {
+              name: 'generateImage',
+              description: 'Generate an image using GPT Image-1 based on a text prompt',
+              parameters: {
+                type: 'object',
+                properties: {
+                  prompt: {
+                    type: 'string',
+                    description: 'The text prompt describing the image to generate',
+                  },
+                  model: {
+                    type: 'string',
+                    enum: ['gpt-image-1'],
+                    description: 'The image generation model to use (gpt-image-1 is the default)',
+                  },
+                  size: {
+                    type: 'string',
+                    enum: ['1024x1024', '1024x1536', '1536x1024'],
+                    description: 'The size of the generated image',
+                  },
+                  enhance: {
+                    type: 'boolean',
+                    description: 'Whether to enhance the prompt with AI for better results',
+                  },
                 },
-                model: {
-                  type: 'string',
-                  enum: ['gpt-image-1'],
-                  description: 'The image generation model to use (gpt-image-1 is the default)',
-                },
-                size: {
-                  type: 'string',
-                  enum: ['1024x1024', '1024x1536', '1536x1024'],
-                  description: 'The size of the generated image',
-                },
-                enhance: {
-                  type: 'boolean',
-                  description: 'Whether to enhance the prompt with AI for better results',
-                },
+                required: ['prompt'],
               },
-              required: ['prompt'],
             },
           },
         ],
@@ -241,11 +270,12 @@ class MessageProcessor {
       // Extract token usage information
       const usage = response.usage || {};
 
-      if (responseMessage.function_call) {
+      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+        const toolCall = responseMessage.tool_calls[0];
         const result = {
           type: 'functionCall',
-          functionName: responseMessage.function_call.name,
-          parameters: JSON.parse(responseMessage.function_call.arguments),
+          functionName: toolCall.function.name,
+          parameters: JSON.parse(toolCall.function.arguments),
           usage: {
             promptTokens: usage.prompt_tokens,
             completionTokens: usage.completion_tokens,
@@ -255,7 +285,7 @@ class MessageProcessor {
 
         performanceMonitor.stopTimer(timerId, {
           responseType: 'functionCall',
-          functionName: responseMessage.function_call.name,
+          functionName: toolCall.function.name,
           success: true,
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
