@@ -1,6 +1,6 @@
 # 🤖 Chimp-GPT Project Status
 
-## Current Version: **v1.9.2**
+## Current Version: **v1.9.3**
 
 ### 🏆 Project State: **PRODUCTION READY**
 
@@ -9,6 +9,13 @@ Chimp-GPT is a fully functional, production-ready Discord bot with a clean modul
 ---
 
 ## ✅ Major Milestones Completed
+
+### **v1.9.3 - Stability & Reliability Improvements**
+- **PFP Manager Fix** - Resolved TypeError causing periodic bot crashes every ~2 hours
+- **Enhanced Selective Response** - Improved bot responsiveness to questions and commands with better confidence scoring
+- **Debug Logging Enhancement** - Added comprehensive message processing tracing for better troubleshooting
+- **Question Detection Improvements** - Fixed regex patterns and increased confidence for interactive messages
+- **Discord @mention Handling** - Added special handling for Discord mentions with maximum confidence
 
 ### **v1.9.2 - Final Architecture & Reliability**
 - **OpenAI Function Calling** - Resolved reliability issues with function selection

@@ -6,9 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversational AI, image generation, weather lookups, time zone information, and other features through a modular plugin system.
 
-## 🚨 Current Project State (v1.9.1)
+## 🚨 Current Project State (v1.9.3)
 
 **✅ MAJOR MILESTONES COMPLETED:**
+
+**v1.9.3 - Stability & Reliability Improvements:**
+- **PFP Manager Logger Fix** - Resolved `TypeError: logger.debug is not a function` causing periodic crashes
+- **Enhanced Selective Response System** - Improved bot responsiveness with better confidence scoring for questions
+- **Debug Logging Enhancement** - Added comprehensive message processing tracing for troubleshooting
+- **Question Detection Improvements** - Fixed regex patterns to catch "what's" contractions and increased confidence
+- **Discord @mention Handling** - Added special handling for Discord mentions with maximum confidence (1.0)
+
+**v1.9.2 - Final Architecture & Reliability:**
+- **OpenAI Function Calling** - Resolved reliability issues with function selection
+- **Quake Stats Optimization** - Enhanced function descriptions for better AI understanding
+- **Parameter Handling** - Fixed shouldDeploy() function call issues
+- **Function Call Debugging** - Improved function descriptions to prevent AI confusion
 
 **v1.9.1 - Modular Architecture Phase 3 & 4 Completion:**
 - **8 of 11 modules extracted** - Phase 3 & 4 modular refactoring completed successfully
@@ -204,6 +217,23 @@ SYNCORE_CACHE_MINUTES=5  # Cache duration for Syncore scraped data
 - Status dashboard available at http://localhost:3001 when running
 - All external API calls wrapped in circuit breakers with exponential backoff
 - Plugin system allows extending functionality without modifying core code
+
+### Debugging & Troubleshooting (v1.9.3+)
+
+**Enhanced Debug Logging:**
+- `shouldRespondToMessage()` logs all command detection decisions
+- In-progress operations logging shows blocked messages with previews
+- Selective response system logs confidence scoring for message analysis
+
+**Common Issues:**
+- **PFP Manager Errors**: Fixed in v1.9.3 - logger properly initialized with `createLogger('pfpManager')`
+- **Commands Not Responding**: Check logs for "Skipping message" entries to see filtering reasons
+- **Low Confidence Detection**: Questions should get 0.5+ confidence, commands get 0.8+ confidence
+
+**Log Analysis:**
+- Look for `Bot will respond - message is a direct command` for successful command detection
+- Check `operation already in progress` messages for channel blocking issues
+- Monitor `confidence` scores in selective response logging for tuning
 
 ### QLStats.net Integration Notes
 
