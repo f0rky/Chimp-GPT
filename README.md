@@ -18,7 +18,75 @@
 
 </div>
 
-## \u2728 What Can Chimp-GPT Do for You?\n\n> **Imagine having an AI assistant that makes your Discord server the most engaging place on the internet!**\n\n\ud83d\udde8\ufe0f **Smart Conversations** - Chat naturally with an AI that remembers context, follows reply chains, and gets smarter with every interaction\n\n\ud83c\udf26\ufe0f **Instant Weather** - \"What's the weather in Tokyo?\" - Get beautiful, detailed forecasts for anywhere on Earth\n\n\ud83c\udfae **Live Gaming Stats** - Real-time Quake Live server stats with team rankings, player ratings, and epic match details\n\n\ud83c\udfa8 **AI Image Creation** - Generate stunning artwork, memes, or illustrations with simple text prompts\n\n\ud83e\uddee **Smart Calculations** - Complex math, unit conversions, and factual questions powered by Wolfram Alpha\n\n\ud83d\udd57 **World Clock** - \"What time is it in Sydney?\" - Instant timezone information for global coordination\n\n\ud83d\udcc8 **Live Dashboard** - Beautiful web interface showing bot stats, image galleries, and performance metrics\n\n\ud83d\udd0c **Plugin Ecosystem** - Extend functionality with custom plugins for your specific community needs\n\n### \ud83c\udf86 Real Examples\n\n```\n\ud83d\udc64 User: \"What's the weather like in New York?\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udf26\ufe0f Currently 72\u00b0F and partly cloudy in New York! \n              Perfect weather for a walk in Central Park \ud83c\udf33\n\n\ud83d\udc64 User: \"Generate an image of a cyberpunk cityscape\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udfa8 Creating your cyberpunk masterpiece... \n              [Generates stunning AI artwork in seconds]\n\n\ud83d\udc64 User: \"!serverstats\"\n\ud83e\udd16 Chimp-GPT: \ud83c\udfae Live Quake Servers:\n              \ud83d\udd34 Team Red vs \ud83d\udd35 Team Blue on dm17\n              8/16 players \u2022 Pro-level ratings \u2022 Epic battles!\n```\n\n---\n\n## \ud83d\ude80 Quick Start: Your Bot in 5 Minutes\n\n**Ready to supercharge your Discord server?** Here's how to get Chimp-GPT running faster than you can say \"artificial intelligence\":\n\n### 1\ufe0f\u20e3 **Grab Your Keys** (2 minutes)\n- \ud83d\udd11 [Discord Bot Token](https://discord.com/developers/applications) - Create your bot\n- \ud83e\uddbe [OpenAI API Key](https://platform.openai.com/api-keys) - Power the AI brain\n- \ud83c\udf26\ufe0f [Weather API Key](https://www.weatherapi.com/) - Enable weather features\n\n### 2\ufe0f\u20e3 **One-Command Setup** (2 minutes)\n```bash\ngit clone https://github.com/f0rky/Chimp-GPT.git\ncd Chimp-GPT\nnpm install\ncp .env.example .env\n# Edit .env with your API keys\n```\n\n### 3\ufe0f\u20e3 **Launch & Enjoy** (1 minute)\n```bash\nnpm start\n```\n\n\ud83c\udf89 **That's it! Your AI companion is now live and ready to amaze your community!**\n\n> \ud83d\udcdd **Pro Tip:** Check out the [detailed setup guide](#setup-and-installation) below for advanced configuration options.\n\n---\n\n## \ud83d\udee0\ufe0f Core Features"
+## ✨ What Can Chimp-GPT Do for You?
+
+> **Imagine having an AI assistant that makes your Discord server the most engaging place on the internet!**
+
+🗨️ **Smart Conversations** - Chat naturally with an AI that remembers context, follows reply chains, and gets smarter with every interaction
+
+🌦️ **Instant Weather** - "What's the weather in Tokyo?" - Get beautiful, detailed forecasts for anywhere on Earth
+
+🎮 **Live Gaming Stats** - Real-time Quake Live server stats with team rankings, player ratings, and epic match details
+
+🎨 **AI Image Creation** - Generate stunning artwork, memes, or illustrations with simple text prompts
+
+🧮 **Smart Calculations** - Complex math, unit conversions, and factual questions powered by Wolfram Alpha
+
+🕗 **World Clock** - "What time is it in Sydney?" - Instant timezone information for global coordination
+
+📈 **Live Dashboard** - Beautiful web interface showing bot stats, image galleries, and performance metrics
+
+🔌 **Plugin Ecosystem** - Extend functionality with custom plugins for your specific community needs
+
+### 🎆 Real Examples
+
+```
+👤 User: "What's the weather like in New York?"
+🤖 Chimp-GPT: 🌦️ Currently 72°F and partly cloudy in New York! 
+              Perfect weather for a walk in Central Park 🌳
+
+👤 User: "Generate an image of a cyberpunk cityscape"
+🤖 Chimp-GPT: 🎨 Creating your cyberpunk masterpiece... 
+              [Generates stunning AI artwork in seconds]
+
+👤 User: "!serverstats"
+🤖 Chimp-GPT: 🎮 Live Quake Servers:
+              🔴 Team Red vs 🔵 Team Blue on dm17
+              8/16 players • Pro-level ratings • Epic battles!
+```
+
+---
+
+## 🚀 Quick Start: Your Bot in 5 Minutes
+
+**Ready to supercharge your Discord server?** Here's how to get Chimp-GPT running faster than you can say "artificial intelligence":
+
+### 1️⃣ **Grab Your Keys** (2 minutes)
+- 🔑 [Discord Bot Token](https://discord.com/developers/applications) - Create your bot
+- 🧮 [OpenAI API Key](https://platform.openai.com/api-keys) - Power the AI brain
+- 🌦️ [Weather API Key](https://www.weatherapi.com/) - Enable weather features
+
+### 2️⃣ **One-Command Setup** (2 minutes)
+```bash
+git clone https://github.com/f0rky/Chimp-GPT.git
+cd Chimp-GPT
+npm install
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+### 3️⃣ **Launch & Enjoy** (1 minute)
+```bash
+npm start
+```
+
+🎉 **That's it! Your AI companion is now live and ready to amaze your community!**
+
+> 📝 **Pro Tip:** Check out the [detailed setup guide](#setup-and-installation) below for advanced configuration options.
+
+---
+
+## 🛠️ Core Features
 
 ### 🐳 Deploy Anywhere in Minutes
 
@@ -91,32 +159,10 @@ This feature makes the bot more conversationally aware, allowing it to understan
 
 **The Result?** Your bot feels naturally intelligent in group settings - responding to the right people about the right things at the right time! No more confusion from cross-talk or irrelevant old messages cluttering the context.
 
-### ⚙️ Conversation Mode Configuration
+### ⚙️ Conversation Configuration
 
-ChimpGPT's conversation behavior is controlled by two key settings that work together:
-
-#### **Setting Interaction Matrix**
-
-| `USE_BLENDED_CONVERSATIONS` | `ENABLE_REPLY_CONTEXT` | **Result Mode** | **Description** |
-|------------------------------|------------------------|-----------------|-----------------|
-| `true` | `true` | **Blended with Reply Context** | Group conversations + reply chain following |
-| `true` | `false` | **Blended Only** | Group conversations without reply context |
-| `false` | `true` | **Individual with Reply Context** | 1-on-1 conversations + reply chains |
-| `false` | `false` | **Individual Only** | Traditional individual bot conversations |
-
-#### **Setting Details**
-
-- **`USE_BLENDED_CONVERSATIONS`**: When enabled, combines messages from ALL users in a channel into shared context (max 5 messages per user to prevent dominance)
-- **`ENABLE_REPLY_CONTEXT`**: When enabled, bot follows Discord reply chains to understand conversation context and thread relationships
-
-#### **Mode Visibility**
-
-The current conversation mode is displayed across all status pages:
-- **Main Status Page**: Header shows mode with hover details (e.g., "💬 Blended with Reply Context")
-- **Performance Dashboard**: Header displays mode with configuration tooltip
-- **Settings Dashboard**: Shows detailed conversation configuration
-- **Startup Logs**: Bot logs current mode configuration on startup
-- **API Endpoints**: `/health` includes `conversationMode` object for monitoring
+- **`USE_BLENDED_CONVERSATIONS`**: Enable group conversation mode with shared context
+- **`ENABLE_REPLY_CONTEXT`**: Follow Discord reply chains for better context understanding
 
 ### 🎮 Epic Quake Live Stats (v1.9.0) 
 
@@ -137,14 +183,6 @@ The current conversation mode is displayed across all status pages:
 
 *This isn't just an upgrade from the old Syncore API – it's a complete game-changer that makes your Quake community the envy of every other Discord server!*
 
-### 🎆 Recent Improvements (v1.7.0)
-
-- **Circuit Breaker Pattern**: Implemented across all external API integrations for enhanced resilience and automatic failure recovery
-- **Unified Dashboard**: Merged all dashboards into a single tabbed interface with Status, Performance, Functions, and Settings tabs
-- **Pre-moderation for Images**: Client-side content filtering prevents waiting for slow API moderation responses
-- **Image Generation Timeout**: Added 30-second timeout to prevent indefinite waiting on slow image generation
-- **Dashboard Response Time Fix**: Fixed API response time display issues in the performance dashboard
-- **Content Policy Handling**: Improved handling of violations with instant feedback instead of long waits
 
 ### 🔧 Never Goes Down (Seriously!)
 
@@ -208,7 +246,7 @@ Chimp-GPT supports a powerful plugin architecture:
 ### Plugin Validation
 
 - Plugins are validated for required metadata and structure.
-- See the [windsurf.config.js](#windsurf-configjs) for plugin validation rules.
+- Plugins are validated for required metadata and structure.
 
 ## 📈 Status Page & Image Gallery
 
@@ -221,42 +259,13 @@ Chimp-GPT supports a powerful plugin architecture:
   - Quake server stats, including emoji and ELO display options
 - Responsive design and mobile-friendly, with robust error handling for all UI elements.
 
-### Dashboard Features & Performance Optimizations
+### Dashboard Features
 
-The status dashboard has been extensively optimized for bandwidth efficiency and user experience:
-
-#### **Bandwidth Optimization (99.99% Reduction)**
-- **Before**: ~300 Mbps bandwidth usage (47MB data transfers every 2-5 seconds)
-- **After**: ~6 Kbps bandwidth usage (efficient summary data every 10 seconds)
-- **Function Results**: Smart summary display with on-demand detail loading
-- **Update Intervals**: Optimized from 2-5 seconds to 10-15 seconds
-
-#### **Unified Dashboard (`/dashboard/`)**
-- **Single tabbed interface** combining all dashboards:
-  - **Status Tab**: Bot uptime, API statistics, and system health
-  - **Performance Tab**: Real-time metrics with interactive charts  
-  - **Functions Tab**: Function call summaries and image gallery
-  - **Settings Tab**: Configuration validation with security masking
-- **Mobile-responsive design** with optimized touch interactions
-- **Dark/light theme toggle** with persistent user preferences
-- **Blocked user management** with owner-authenticated unblock functionality
-- **Smart polling**: Different update frequencies for different data types
-- **Debug console** at bottom left for troubleshooting
-- **Conversation mode display** across all pages with detailed tooltips
-
-#### **Efficient Data Display**
-- **Summary View**: Shows function call counts and last usage times by default
-- **Details on Demand**: "📋 View Details" buttons load full data only when needed
-- **Image Gallery**: Optimized image loading with modal viewer
-- **Performance History**: Hourly and daily aggregated performance data
-
-#### **Settings Dashboard (`/dashboard/` → Settings Tab)**
-- **Configuration Validation**: Shows all environment variables with validation status
-- **Security Masking**: Sensitive data (API keys, tokens) displayed as `●●●●●●●●` but shows if valid
-- **Status Indicators**: Required vs Optional badges, Set/Missing/Invalid/Default status
-- **Interactive Filtering**: Filter by All/Required/Optional/Issues for focused troubleshooting
-- **Configuration Drift Detection**: Identifies unused or deprecated environment variables
-- **Real-time Validation**: Shows which variables are actually being used by the code
+The status dashboard provides:
+- **Unified interface** with Status, Performance, Functions, and Settings tabs
+- **Mobile-responsive design** with dark/light theme toggle
+- **Real-time monitoring** of bot performance and API statistics
+- **Configuration validation** with security masking for sensitive data
 
 ## 🚨 Error Handling & Logging
 
@@ -270,108 +279,28 @@ The status dashboard has been extensively optimized for bandwidth efficiency and
 
 - Comprehensive JSDoc/type coverage across all major modules and plugin interfaces.
 - Improved maintainability, developer onboarding, and static analysis.
-- Please review and update the [`CHECKLIST.md`](./docs/CHECKLIST.md) as you work on the project.
+- See [`STATUS.md`](./docs/STATUS.md) for current project state and completed milestones.
 
 ## ✨ Code Quality & Linting
 
 - The project uses ESLint and Prettier for code quality.
-- Linting and formatting rules are enforced via [windsurf.config.js](#windsurf-configjs).
+- Linting and formatting rules are enforced via ESLint and Prettier configurations.
 - Security checks prevent secrets from being committed.
 - Husky/pre-commit hooks and Prettier config are recommended (see checklist).
 
-## windsurf.config.js
-
-A `windsurf.config.js` file is provided at the project root to enforce code quality, plugin validation, and optional deployment rules. These are automatically checked in CI/CD and pre-commit hooks if configured:
-
 ## 🌍 Environment Variables
 
-The bot is configured via environment variables (see `.env.example`). Below is a summary of key variables and their defaults:
+Key configuration variables (see `.env.example` for complete list):
 
-| Variable                 | Default      | Description                                                       |
-| ------------------------ | ------------ | ----------------------------------------------------------------- |
-| BOT_NAME                 | CircuitChimp | Name displayed on the status page and in Discord                  |
-| STATUS_HOSTNAME          | localhost    | Hostname for the status page server                               |
-| STATUS_PORT              | 3000         | Port for the status page server (auto-fallback for multiple bots) |
-| SHOW_TEAM_EMOJIS         | false        | Show team emojis in Quake stats player names                      |
-| SHOW_SERVER_STATS_EMOJIS | false        | Show emojis in Quake server info headers                          |
-| ELO_DISPLAY_MODE         | 0            | ELO display: 0=off, 1=categorized, 2=actual values                |
-| ENABLE_IMAGE_GENERATION  | true         | Enable/disable image generation (falls back to text descriptions)  |
-| DISABLE_PLUGINS          | true         | Set to 'false' to enable plugins or 'true' to disable them        |
-| WEATHER_API_KEY          | (required)   | API key for weather lookups via weatherapi.com                    |
-| WOLFRAM_APP_ID           | (required)   | Wolfram Alpha App ID for computational queries                     |
-| USE_BLENDED_CONVERSATIONS| true         | Enable blended conversation mode for group chats                   |
-| MAX_MESSAGES_PER_USER_BLENDED | 5      | Maximum messages per user in blended conversation mode             |
-| ENABLE_QLSTATS_NET_SCRAPING | true      | Enable QLStats.net API integration for enhanced Quake stats       |
-| QLSTATS_CACHE_MINUTES    | 3            | Cache duration for QLStats.net data in minutes                    |
-| ENABLE_SYNCORE_SCRAPING  | true         | Enable Syncore web scraping fallback for server data              |
-| SYNCORE_CACHE_MINUTES    | 5            | Cache duration for Syncore scraped data in minutes                |
-| CONVERSATION_MEMORY_MINUTES | 5         | How long messages stay "fresh" and relevant in group chats        |
-| TEMPORAL_DECAY_RATE      | 0.1          | How fast old messages lose relevance (0.1=slow, 0.5=fast)        |
-| MIN_RELEVANCE_THRESHOLD  | 0.3          | Minimum score to include message in context (0.0-1.0)            |
-| BOT_DIRECTED_BOOST       | 0.4          | Extra weight for bot-directed messages (0.0-1.0)                  |
-| MAX_WEIGHTED_CONTEXT_TOKENS | 2000      | Maximum tokens for intelligent context (affects API cost)         |
-| ENABLE_CONVERSATION_DEBUG | false       | Show relevance indicators in conversation (🔥⭐💬💭)               |
-| ...                      |              | See .env.example for full list and documentation                  |
-
-- All environment variables are validated at startup.
-- For multi-instance deployments, ports are automatically selected and hostname can be set for remote access.
-- Emoji toggles and ELO display modes are configurable for Quake stats.
-
-```js
-// windsurf.config.js
-module.exports = {
-  lint: {
-    enabled: true,
-    tool: 'eslint',
-    configFile: '.eslintrc.js',
-    failOnError: true,
-    include: ['**/*.js'],
-    exclude: ['node_modules', 'archive', 'plugins/README.md'],
-  },
-  prettier: {
-    enabled: true,
-    configFile: '.prettierrc',
-    include: ['**/*.js', '**/*.json', '**/*.md'],
-    exclude: ['node_modules', 'archive'],
-  },
-  security: {
-    checkSecrets: true,
-    failOnSecret: true,
-    exclude: ['.env.example', 'archive'],
-  },
-  deploy: {
-    enabled: false, // Set to true if using Windsurf for deployment
-    provider: '', // e.g., 'netlify', 'vercel', or leave blank
-    buildCommand: 'npm run build',
-    publishDir: 'dist',
-    env: [
-      'DISCORD_TOKEN',
-      'OPENAI_API_KEY',
-      'X_RAPIDAPI_KEY',
-      'BOT_PERSONALITY',
-      'STATUS_HOSTNAME',
-      'STATUS_PORT',
-    ],
-  },
-  plugins: {
-    validate: true,
-    pluginDir: 'plugins',
-    requireId: true,
-    requireVersion: true,
-    requireDescription: false,
-  },
-};
-```
-
-- **Linting**: ESLint is enforced on all JS files except excluded folders/files.
-- **Formatting**: Prettier is run on JS, JSON, and Markdown files.
-- **Security**: Checks for secrets in the codebase (excluding `.env.example` and `archive`).
-- **Plugin Validation**: All plugins in the `plugins/` directory are checked for required fields and structure.
-- **Deployment**: (Optional) Can be enabled for CI/CD deployment with supported providers.
-
-## Implementation Checklist
-
-A detailed implementation checklist is maintained in [`CHECKLIST.md`](./docs/CHECKLIST.md). This tracks high, medium, and low priority tasks for code structure, security, performance, testing, developer experience, and deployment. Please review and update this file as you work on the project.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| DISCORD_TOKEN | ✅ | Your Discord bot token |
+| OPENAI_API_KEY | ✅ | OpenAI API key for AI features |
+| WEATHER_API_KEY | ✅ | WeatherAPI.com key for weather lookup |
+| WOLFRAM_APP_ID | ⚠️ | Wolfram Alpha App ID for calculations |
+| STATUS_PORT | ❌ | Status page port (default: 3000) |
+| ENABLE_IMAGE_GENERATION | ❌ | Enable AI image generation (default: true) |
+| USE_BLENDED_CONVERSATIONS | ❌ | Group conversation mode (default: true) |
 
 ## 🛠️ Setup and Installation
 
@@ -514,121 +443,6 @@ For VSCode users, debugging configurations are available in the `.vscode/launch.
 MIT
 
 
-## 📈 PM2 Management & Performance Monitoring
-
-ChimpGPT is designed to be managed using PM2, which provides advanced process management capabilities. This section covers how to monitor and debug performance issues using PM2.
-
-### Basic PM2 Commands
-
-```bash
-# View all running processes
-pm2 status
-
-# Start ChimpGPT
-pm2 start combined.js --name chimpGPT
-
-# Restart the bot
-pm2 restart chimpGPT
-
-# Stop the bot
-pm2 stop chimpGPT
-
-# View logs (most recent 100 lines)
-pm2 logs chimpGPT --lines 100
-
-# Monitor resource usage in real-time
-pm2 monit
-```
-
-### Troubleshooting Slow Reaction Times
-
-If you experience slow reactions from ChimpGPT, use these steps to diagnose and resolve the issue:
-
-1. **Check Resource Usage**:
-
-   ```bash
-   # View real-time resource metrics
-   pm2 monit
-   ```
-
-   Look for high CPU or memory usage which may indicate bottlenecks.
-
-2. **Examine Logs for Delays**:
-
-   ```bash
-   # View error logs
-   pm2 logs chimpGPT --err --lines 100
-
-   # Search logs for timeout errors
-   pm2 logs chimpGPT --lines 1000 | grep -i "timeout"
-   ```
-
-3. **Monitor API Response Times**:
-   Access the performance dashboard at `http://localhost:3000/performance.html` to view detailed timing metrics for all operations.
-
-4. **Identify API Bottlenecks**:
-   The most common causes of slow reactions are:
-
-   - OpenAI API delays (most common)
-   - External API timeouts (weather, Wolfram Alpha)
-   - Large conversation context sizes
-   - Plugin execution overhead
-
-5. **Adjust Timeouts**:
-   You can modify timeouts in `.env`:
-
-   ```
-   # Add these to your .env file
-   OPENAI_TIMEOUT_MS=15000
-   EXTERNAL_API_TIMEOUT_MS=10000
-   ```
-
-6. **Reset the Bot**:
-   If ChimpGPT becomes unresponsive:
-   ```bash
-   pm2 reload chimpGPT --update-env
-   ```
-   This will restart the process and reload environment variables.
-
-### PM2 Log Management
-
-Logs are stored in the `~/.pm2/logs/` directory:
-
-- `chimpGPT-out.log` - Standard output logs
-- `chimpGPT-error.log` - Error logs
-
-```bash
-# View only error logs
-tail -f ~/.pm2/logs/chimpGPT-error.log
-
-# Search logs for specific error patterns
-grep -i "error" ~/.pm2/logs/chimpGPT-out.log
-```
-
-### Performance Monitoring Dashboard
-
-The built-in performance monitoring dashboard provides insights into bot operations:
-
-1. **Access**: Navigate to `http://localhost:3002/performance.html` (development mode) or `http://localhost:3000/performance.html` (production mode)
-2. **Features**:
-   - API response time charts
-   - Processing time breakdowns
-   - Detailed operation metrics
-   - Recent calls with timing information
-
-This dashboard is particularly useful for identifying which operations are causing slow reactions.
-
-# Save the PM2 configuration
-
-pm2 save
-
-# Check status
-
-pm2 status
-
-````
-
-The bot should now be running and ready to interact in your Discord server.
 
 ## 🚀 Usage
 
@@ -655,184 +469,6 @@ The bot supports Discord's slash commands. Type `/` to see available commands:
 - `/ping` - Check if the bot is responding
 - `/serverstats` - Display Quake Live server statistics
 
-
-## 🤝 Contributing
-
-If you'd like to contribute to the development of Chimp-GPT, please fork the repository and submit a pull request.
-
-## 📁 File Structure
-
-ChimpGPT follows a clean, modular architecture with clear separation of concerns:
-
-```
-chimp-gpt/
-├── 📁 src/                          # Core application source code
-│   ├── 📁 core/                     # Main bot components
-│   │   ├── chimpGPT.js              # Core Discord bot implementation
-│   │   ├── combined.js              # Main entry point (bot + status server)
-│   │   ├── logger.js                # Structured logging configuration
-│   │   ├── configValidator.js       # Environment variable validation
-│   │   └── healthCheck.js           # Bot health monitoring system
-│   │
-│   ├── 📁 services/                 # External API integrations
-│   │   ├── openaiConfig.js          # OpenAI API configuration
-│   │   ├── weatherLookup.js         # Weather API service
-│   │   ├── timeLookup.js           # Time lookup functionality
-│   │   ├── wolframLookup.js        # Wolfram Alpha integration
-│   │   ├── quakeLookup.js          # Quake Live server stats
-│   │   └── imageGeneration.js      # GPT Image-1 generation
-│   │
-│   ├── 📁 conversation/             # Conversation management
-│   │   ├── conversationManager.js
-│   │   ├── blendedConversationManager.js
-│   │   ├── conversationStorage.js
-│   │   └── optimizationPatch.js
-│   │
-│   ├── 📁 middleware/               # Bot middleware & utilities
-│   │   ├── rateLimiter.js          # Rate limiting for API calls
-│   │   ├── circuitBreaker.js       # Circuit breaker pattern
-│   │   └── performanceMonitor.js   # Performance tracking
-│   │
-│   ├── 📁 web/                      # Web interface & status server
-│   │   ├── statusServer.js         # Status page HTTP server
-│   │   ├── statusManager.js        # Status management
-│   │   └── performanceHistory.js   # Performance data storage
-│   │
-│   └── 📁 plugins/                  # Plugin system
-│       └── pluginManager.js        # Plugin loading and management
-│
-├── 📁 src/commands/                 # Discord commands  
-│   ├── commandHandler.js           # Command registration and routing
-│   ├── deploySlashCommands.js      # Slash command deployment
-│   └── modules/                    # Individual command implementations
-│
-├── 📁 src/errors/                   # Custom error classes
-│   ├── ChimpError.js               # Base error class
-│   ├── ApiError.js                 # API-related errors
-│   └── [other error types]
-│
-├── 📁 src/tools/                    # Development tools
-│   ├── testConversationStatus.js   # Conversation testing utility
-│   └── testReplyContext.js         # Reply context testing
-│
-├── 📁 utils/                        # Utility functions
-│   ├── apiKeyManager.js            # API key management
-│   ├── retryWithBreaker.js         # Retry logic with circuit breaker
-│   └── [other utilities]
-│
-├── 📁 tests/                        # All test files
-│   ├── 📁 unit/                     # Unit tests
-│   ├── 📁 integration/              # Integration tests
-│   └── 📁 fixtures/                 # Test fixtures
-│
-├── 📁 scripts/                      # Build & deployment scripts
-│   ├── start.sh                    # Main startup script
-│   └── [other scripts]
-│
-├── 📁 assets/                       # Generated content & resources
-│   ├── 📁 pfp/                      # Profile pictures
-│   └── 📁 logs/                     # Log files
-│
-├── 📁 docs/                         # Documentation (consolidated)
-│   ├── CLAUDE.md                   # Claude Code instructions
-│   ├── CHECKLIST.md                # Development checklist
-│   └── [other documentation]
-│
-├── 📁 data/                         # Runtime data
-├── 📁 scripts/                      # Build & deployment scripts  
-└── 📁 archive/                      # Legacy/backup files
-```
-
-### Architecture Benefits
-
-- **Clear separation of concerns**: Core, services, web, middleware are logically separated
-- **Easier navigation**: Related files are grouped together
-- **Better maintainability**: New developers can quickly understand the structure
-- **Scalable**: Easy to add new services or features in appropriate directories
-- **Standard conventions**: Follows Node.js project best practices
-
-## ⚙️ Configuration Options
-
-### Logging
-
-The bot uses Pino for structured JSON logging. You can configure the logging level in the `.env` file:
-
-```env
-# Available log levels: fatal, error, warn, info, debug, trace
-LOG_LEVEL="info"
-
-# Environment mode - set to 'production' or 'development'
-NODE_ENV="development"
-````
-
-In development, logs are formatted with colors for better readability. In production (when `NODE_ENV` is set to "production"), logs are output as JSON for better integration with log management systems.
-
-### Port Configuration
-
-The bot uses different ports for its status and health endpoints based on the environment:
-
-```env
-# Server port configuration
-# Production port (used when NODE_ENV=production)
-PROD_PORT=3000
-# Development port (used when NODE_ENV=development)
-DEV_PORT=3001
-```
-
-This allows you to run multiple instances (development and production) on the same machine without port conflicts. The status page and health check endpoints will automatically use the appropriate port based on the `NODE_ENV` setting.
-
-Each component of the application has its own logger instance for better organization and filtering:
-
-- `discord` - Discord client events and interactions
-- `openai` - OpenAI API requests and responses
-- `quake` - Quake server stats functionality
-- `weather` - Weather lookup functionality
-- `wolfram` - Wolfram Alpha integration
-- `time` - Time lookup functionality
-
-## 🖼️ Profile Picture (PFP) Management
-
-Chimp-GPT can automatically update its profile picture using AI-generated images. To enable this feature, ensure the following requirements are met:
-
-### Bot Permissions
-1. **OAuth2 Scopes**: The bot must be invited with these scopes:
-   - `bot`
-   - `applications.commands`
-
-2. **Server Permissions**: The bot's role needs:
-   - `Change Nickname` permission
-
-3. **Discord Limitations**:
-   - The bot can only change its avatar if it's in fewer than 100 servers
-   - Avatar changes are rate-limited by Discord (recommended: no more than 1-2 changes per 10 minutes)
-
-### Configuration
-By default, the bot will:
-- Save generated images to the `pfp/` directory (not tracked in git)
-- Rotate the profile picture every 10 minutes
-- Keep a maximum of 50 most recent images
-
-### Troubleshooting
-If the bot doesn't update its avatar:
-1. Check the logs for permission-related errors
-2. Verify the bot has the correct permissions in the server
-3. Ensure the bot is not in more than 100 servers
-4. Check if the `pfp/` directory exists and is writable
-
-### Quake Server Stats
-
-You can configure the ELO display mode in `quakeLookup.js` by changing the `eloMode` value in the CONFIG object:
-
-```javascript
-const CONFIG = {
-  // ELO display mode:
-  // 0 = Off (don't show ELO)
-  // 1 = Categorized (Scrub/Mid/Pro)
-  // 2 = Actual ELO value
-  eloMode: 1,
-  maxServers: 3,
-};
-```
 
 ## 📄 License
 

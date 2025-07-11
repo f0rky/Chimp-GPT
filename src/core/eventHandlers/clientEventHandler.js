@@ -142,7 +142,7 @@ class ClientEventHandler {
     try {
       if (await shouldDeploy(this.config)) {
         discordLogger.info('Deploying slash commands...');
-        await commandHandler.deploySlashCommands(this.client, this.config);
+        await commandHandler.deployCommands(this.client, this.config);
         await recordSuccessfulDeployment();
         discordLogger.info('Slash commands deployed successfully');
       } else {

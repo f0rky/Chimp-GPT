@@ -1,11 +1,12 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-// Mock logger for testing
+// Logger setup
 let logger;
 try {
   // Try to use the real logger if available
-  logger = require('../src/core/logger');
+  const { createLogger } = require('../src/core/logger');
+  logger = createLogger('pfpManager');
 } catch (error) {
   // Fallback to a simple console logger for testing
   logger = {

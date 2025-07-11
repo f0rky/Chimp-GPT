@@ -59,7 +59,7 @@ const BOT_DIRECTED_PATTERNS = [
 
   // Direct questions
   /\?$/, // Ends with question mark
-  /^(?:what|where|when|how|why|who)\s/i,
+  /^(?:what|where|when|how|why|who)(?:\s|'s\s)/i, // Questions starting with wh-words
 ];
 
 /**
@@ -118,11 +118,33 @@ function detectBotIntent(content, context = {}) {
   const matchedPatterns = [];
   let confidence = 0;
 
-  // Check for bot-directed patterns
-  for (const pattern of BOT_DIRECTED_PATTERNS) {
-    if (pattern.test(normalizedContent)) {
-      matchedPatterns.push(pattern.source);
-      confidence += 0.3;
+  // Special handling for explicit bot interactions (highest confidence)
+
+  // Discord @mentions should get maximum confidence
+  if (/<@\d+>/.test(content)) {
+    confidence = 1.0; // Maximum confidence for direct Discord mentions
+    matchedPatterns.push('discord_mention');
+  }
+
+  // Commands should also get very high confidence
+  else if (/^[!/]/.test(normalizedContent)) {
+    confidence = 0.8; // Very high confidence for explicit commands
+    matchedPatterns.push('command');
+  }
+
+  // If not a mention or command, check other bot-directed patterns
+  else {
+    for (const pattern of BOT_DIRECTED_PATTERNS) {
+      if (pattern.test(normalizedContent)) {
+        matchedPatterns.push(pattern.source);
+
+        // Give questions higher confidence since they're interactive
+        if (pattern.source.includes('?') || pattern.source.includes('what|where|when')) {
+          confidence += 0.5; // Higher confidence for questions
+        } else {
+          confidence += 0.3; // Standard confidence for other patterns
+        }
+      }
     }
   }
 

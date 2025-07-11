@@ -19,6 +19,7 @@ const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
 const MessageProcessor = require('../processors/messageProcessor');
 const { generateNaturalResponse } = require('../processors/responseGenerator');
+const { detectBotIntent } = require('../../conversation/conversationIntelligence');
 
 class MessageEventHandler {
   constructor(client, config, dependencies) {
@@ -42,6 +43,56 @@ class MessageEventHandler {
     this.setupEventHandlers();
   }
 
+  /**
+   * Determine if the bot should respond to a message based on existing conversation intelligence
+   * @param {Object} message - Discord message object
+   * @returns {boolean} Whether the bot should respond
+   */
+  shouldRespondToMessage(message) {
+    // Always respond to direct commands (! or /) - these are explicit bot interactions
+    if (/^[!/]/.test(message.content.trim())) {
+      discordLogger.debug(
+        {
+          messagePreview: message.content.substring(0, 50),
+          messageId: message.id,
+          userId: message.author.id,
+        },
+        'Bot will respond - message is a direct command'
+      );
+      return true;
+    }
+
+    // Check for bot-directed intent using existing conversation intelligence
+    const intentResult = detectBotIntent(message.content, {
+      isReply: message.reference !== null,
+      replyToBotMessage: false, // We'll enhance this later if needed
+    });
+
+    // Use the same threshold as conversation intelligence (0.4 confidence)
+    const shouldRespond = intentResult.isBotDirected;
+
+    if (shouldRespond) {
+      discordLogger.debug(
+        {
+          messagePreview: message.content.substring(0, 50),
+          confidence: intentResult.confidence,
+          patterns: intentResult.patterns,
+        },
+        'Bot will respond - message appears directed at bot'
+      );
+    } else {
+      discordLogger.debug(
+        {
+          messagePreview: message.content.substring(0, 50),
+          confidence: intentResult.confidence,
+        },
+        'Bot will not respond - message appears to be general chat'
+      );
+    }
+
+    return shouldRespond;
+  }
+
   setupEventHandlers() {
     this.client.on('messageCreate', this.handleMessageCreate.bind(this));
     this.client.on('messageDelete', this.handleMessageDelete.bind(this));
@@ -63,7 +114,12 @@ class MessageEventHandler {
     // Skip if there's already an operation in progress for this channel
     if (this.inProgressOperations.has(message.channelId)) {
       discordLogger.debug(
-        { channelId: message.channelId, messageId: message.id },
+        {
+          channelId: message.channelId,
+          messageId: message.id,
+          messagePreview: message.content.substring(0, 50),
+          userId: message.author.id,
+        },
         'Skipping message - operation already in progress for this channel'
       );
       return;
@@ -148,6 +204,22 @@ class MessageEventHandler {
         return;
       }
       addTiming('malicious_user_check', { result: 'allowed' });
+
+      // Check if this message warrants a response using conversation intelligence
+      if (!this.shouldRespondToMessage(message)) {
+        addTiming('response_decision_check', { result: 'no_response_needed' });
+        discordLogger.debug(
+          {
+            userId: message.author.id,
+            channelId: message.channelId,
+            messageId: message.id,
+            messagePreview: message.content.substring(0, 50),
+          },
+          'Skipping message - not directed at bot'
+        );
+        return;
+      }
+      addTiming('response_decision_check', { result: 'response_needed' });
 
       // Start the performance timer now that we know we'll process this message
       messageTimerId = performanceMonitor.startTimer('message_processing', {
