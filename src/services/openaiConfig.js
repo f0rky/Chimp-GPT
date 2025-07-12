@@ -309,8 +309,9 @@ async function processMessage(userMessage, conversationLog) {
               {
                 type: 'function',
                 function: {
-                  name: 'lookupQuakeServer',
-                  description: 'get information about Quake Live servers',
+                  name: 'quakeLookup',
+                  description:
+                    'Get current Quake Live server statistics and player information for active servers. Only use when specifically asked about Quake servers, server stats, or gaming server information.',
                   parameters: {
                     type: 'object',
                     properties: {

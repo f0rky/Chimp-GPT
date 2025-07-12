@@ -393,7 +393,22 @@ async function handleFunctionCall(
         return;
       }
     default:
-      discordLogger.warn({ functionName: gptResponse.functionName }, 'Unknown function name');
+      discordLogger.warn(
+        {
+          functionName: gptResponse.functionName,
+          availableFunctions: [
+            'lookupTime',
+            'lookupWeather',
+            'lookupExtendedForecast',
+            'getWolframShortAnswer',
+            'quakeLookup',
+            'generateImage',
+            'getVersion',
+          ],
+          parameters: gptResponse.parameters,
+        },
+        'Unknown function name - this may indicate a mismatch between OpenAI function definitions and processor'
+      );
       functionResult = { error: `Unknown function: ${gptResponse.functionName}` };
   }
 
