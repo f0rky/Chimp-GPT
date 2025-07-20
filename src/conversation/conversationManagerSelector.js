@@ -1,26 +1,18 @@
 /**
  * Conversation Manager Selector
  *
- * This module dynamically selects between blended and individual conversation managers
- * based on the configuration setting USE_BLENDED_CONVERSATIONS.
+ * This module provides the PocketFlow conversation system as the sole conversation manager.
+ * Legacy conversation systems have been removed in favor of PocketFlow's graph-based architecture.
  *
  * @module ConversationManagerSelector
  */
 
-const config = require('../core/configValidator');
 const { createLogger } = require('../core/logger');
 const logger = createLogger('conversationManagerSelector');
 
-// Dynamically load the appropriate conversation manager
-let conversationManager;
+// PocketFlow is now the only conversation system
+logger.info('Using PocketFlow conversation system (graph-based architecture)');
+const conversationManager = require('./pocketFlowAdapter');
 
-if (config.USE_BLENDED_CONVERSATIONS) {
-  logger.info('Using blended conversation manager');
-  conversationManager = require('./useBlendedConversations');
-} else {
-  logger.info('Using individual conversation manager');
-  conversationManager = require('./useSimpleOptimizer');
-}
-
-// Export all functions from the selected manager
+// Export all functions from PocketFlow adapter
 module.exports = conversationManager;

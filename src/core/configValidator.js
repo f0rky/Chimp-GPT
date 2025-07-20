@@ -213,9 +213,22 @@ const CONFIG_SCHEMA = {
       return Number(value);
     },
   },
-  USE_BLENDED_CONVERSATIONS: {
+  MAX_MESSAGES_PER_USER_BLENDED: {
     required: false,
-    description: 'Whether to use blended conversations (combines messages from multiple users)',
+    description: 'Maximum messages to keep per user in blended mode',
+    default: '5',
+    validate: value => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: value => {
+      return Number(value);
+    },
+  },
+
+  // PocketFlow Configuration - Now the only conversation system
+  ENABLE_POCKETFLOW: {
+    required: false,
+    description: 'Enable PocketFlow conversation system (graph-based architecture)',
     default: 'true',
     validate: value => {
       return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
@@ -224,10 +237,75 @@ const CONFIG_SCHEMA = {
       return value.toLowerCase() === 'true';
     },
   },
-  MAX_MESSAGES_PER_USER_BLENDED: {
+  POCKETFLOW_TEST_PERCENTAGE: {
     required: false,
-    description: 'Maximum messages to keep per user in blended mode',
-    default: '5',
+    description: 'Percentage of messages to test with PocketFlow when parallel testing is enabled',
+    default: '10',
+    validate: value => {
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0 && num <= 100;
+    },
+    transform: value => {
+      return parseFloat(value);
+    },
+  },
+  POCKETFLOW_TEST_USERS: {
+    required: false,
+    description:
+      'Comma-separated list of user IDs to include in PocketFlow testing (empty = all users)',
+    default: '',
+    validate: value => typeof value === 'string',
+    transform: value => (value ? value.split(',').map(id => id.trim()) : []),
+  },
+  POCKETFLOW_LOG_COMPARISONS: {
+    required: false,
+    description: 'Enable detailed logging of PocketFlow vs legacy comparisons',
+    default: 'false',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  POCKETFLOW_INTENT_CONFIDENCE_THRESHOLD: {
+    required: false,
+    description: 'Confidence threshold for PocketFlow intent detection (0.0-1.0)',
+    default: '0.4',
+    validate: value => {
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0 && num <= 1;
+    },
+    transform: value => {
+      return parseFloat(value);
+    },
+  },
+  POCKETFLOW_CONTEXT_MAX_TOKENS: {
+    required: false,
+    description: 'Maximum tokens for PocketFlow context management',
+    default: '2000',
+    validate: value => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: value => {
+      return Number(value);
+    },
+  },
+  POCKETFLOW_MAX_CONCURRENT_FLOWS: {
+    required: false,
+    description: 'Maximum number of concurrent PocketFlow conversations',
+    default: '10',
+    validate: value => {
+      return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
+    },
+    transform: value => {
+      return Number(value);
+    },
+  },
+  POCKETFLOW_CLEANUP_INTERVAL: {
+    required: false,
+    description: 'PocketFlow cleanup interval in milliseconds',
+    default: '300000',
     validate: value => {
       return typeof value === 'string' && !isNaN(Number(value)) && Number(value) > 0;
     },

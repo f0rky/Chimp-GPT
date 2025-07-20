@@ -14,7 +14,7 @@ const { createLogger } = require('../src/core/logger');
 const config = require('../src/core/configValidator');
 const { version: botVersion } = require('../package.json');
 const { getOpenAIModel } = require('../src/services/openaiConfig');
-const { getConversationStorageStatus } = require('../src/conversation/conversationStorage');
+const { getConversationStorageStatus } = require('../src/conversation/conversationManagerSelector');
 const { getHealthStatus } = require('../src/core/healthCheck');
 
 // Create a logger for this module

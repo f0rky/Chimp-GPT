@@ -512,6 +512,7 @@ function getOpenAIModel() {
 // openaiConfig.js
 
 module.exports = {
+  client: openaiWithLogging, // Export the OpenAI client for PocketFlow
   processMessage,
   generateResponse,
   getOpenAIModel,

@@ -64,7 +64,7 @@ const { createLogger } = require('../core/logger');
 const logger = createLogger('status');
 const os = require('os');
 const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
-const { getConversationStorageStatus } = require('../conversation/conversationManager');
+const { getConversationStorageStatus } = require('../conversation/conversationManagerSelector');
 const config = require('../core/configValidator');
 const performanceMonitor = require('../middleware/performanceMonitor');
 
@@ -488,18 +488,24 @@ function initStatusServer(options = {}) {
       // Get conversation mode information
       const blendedConversations = config.USE_BLENDED_CONVERSATIONS;
       const replyContext = config.ENABLE_REPLY_CONTEXT;
+      const pocketFlow = config.ENABLE_POCKETFLOW;
+      const parallelTesting = config.POCKETFLOW_PARALLEL_TESTING;
       const maxMessagesPerUser = parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5;
 
-      // Determine mode description
+      // Determine mode description with PocketFlow support
       let mode;
-      if (blendedConversations === true && replyContext === true) {
-        mode = 'Blended with Reply Context';
+      if (pocketFlow) {
+        mode = 'PocketFlow (Graph-based Architecture)';
+      } else if (parallelTesting) {
+        mode = 'Parallel Testing (PocketFlow + Legacy)';
+      } else if (blendedConversations === true && replyContext === true) {
+        mode = 'Legacy: Blended with Reply Context';
       } else if (blendedConversations === true && replyContext === false) {
-        mode = 'Blended Only';
+        mode = 'Legacy: Blended Only';
       } else if (blendedConversations === false && replyContext === true) {
-        mode = 'Individual with Reply Context';
+        mode = 'Legacy: Individual with Reply Context';
       } else if (blendedConversations === false && replyContext === false) {
-        mode = 'Individual Only';
+        mode = 'Legacy: Individual Only';
       } else {
         mode = `Unknown (blended: ${blendedConversations}, reply: ${replyContext})`;
       }

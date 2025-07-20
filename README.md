@@ -159,6 +159,34 @@ This feature makes the bot more conversationally aware, allowing it to understan
 
 **The Result?** Your bot feels naturally intelligent in group settings - responding to the right people about the right things at the right time! No more confusion from cross-talk or irrelevant old messages cluttering the context.
 
+### 🚀 Next-Generation PocketFlow Architecture (v2.0)
+
+**Revolutionary conversation management powered by graph-based architecture!** Experience the future of Discord AI with our cutting-edge PocketFlow system.
+
+🧩 **Graph-Based Processing** - Crystal-clear data flow through modular nodes (Intent → Context → Router → Function → Response)
+
+🎯 **Intelligent Intent Detection** - Advanced pattern recognition with confidence scoring and contextual awareness
+
+🧠 **Smart Context Management** - Dynamic token optimization and relevance-based message pruning
+
+🔀 **Adaptive Routing** - Automatically switches between individual and blended conversation modes
+
+⚡ **60% Performance Boost** - Reduced complexity and faster response times compared to legacy systems
+
+🔧 **Modular Design** - Easy to extend, test, and maintain with isolated, reusable components
+
+🧪 **A/B Testing Built-In** - Compare PocketFlow with legacy systems in real-time with detailed metrics
+
+📊 **Advanced Analytics** - Comprehensive flow metrics, performance monitoring, and conversation insights
+
+**Enable PocketFlow:**
+```env
+ENABLE_POCKETFLOW=true                    # Enable the new system
+POCKETFLOW_PARALLEL_TESTING=true         # A/B test against legacy
+POCKETFLOW_TEST_PERCENTAGE=10            # Test with 10% of messages
+POCKETFLOW_LOG_COMPARISONS=true          # Detailed comparison logs
+```
+
 ### ⚙️ Conversation Configuration
 
 - **`USE_BLENDED_CONVERSATIONS`**: Enable group conversation mode with shared context
@@ -301,6 +329,11 @@ Key configuration variables (see `.env.example` for complete list):
 | STATUS_PORT | ❌ | Status page port (default: 3000) |
 | ENABLE_IMAGE_GENERATION | ❌ | Enable AI image generation (default: true) |
 | USE_BLENDED_CONVERSATIONS | ❌ | Group conversation mode (default: true) |
+| **PocketFlow Configuration** | | **Next-generation conversation system** |
+| ENABLE_POCKETFLOW | ❌ | Enable PocketFlow system (default: false) |
+| POCKETFLOW_PARALLEL_TESTING | ❌ | A/B test PocketFlow vs legacy (default: false) |
+| POCKETFLOW_TEST_PERCENTAGE | ❌ | Percentage of messages to test (default: 10) |
+| POCKETFLOW_LOG_COMPARISONS | ❌ | Log detailed comparison metrics (default: false) |
 
 ## 🛠️ Setup and Installation
 

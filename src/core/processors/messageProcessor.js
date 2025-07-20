@@ -1,8 +1,7 @@
 const { openai: openaiLogger } = require('../logger');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { trackApiCall, trackError } = require('../healthCheck');
-const conversationIntelligence = require('../../conversation/conversationIntelligence');
-const contextOptimizer = require('../../conversation/contextOptimizer');
+// Legacy conversation intelligence removed - PocketFlow handles all conversation logic
 
 class MessageProcessor {
   constructor(openaiClient, config) {
@@ -69,56 +68,21 @@ class MessageProcessor {
         };
       }
 
-      // CONVERSATION INTELLIGENCE INTEGRATION
-      // Apply intelligent context optimization before OpenAI API call
+      // SIMPLE CONTEXT OPTIMIZATION
+      // PocketFlow handles intelligent conversation processing, this is just a fallback
       let optimizedConversationLog = conversationLog;
 
-      try {
-        if (conversationLog.length > 10) {
-          // Only optimize if we have enough context
-          openaiLogger.debug('Applying conversation intelligence to optimize context', {
-            originalLength: conversationLog.length,
-            currentMessage: currentContent.substring(0, 100),
-          });
-
-          // Get recent bot messages for context
-          const recentBotMessages = conversationLog
-            .filter(msg => msg.role === 'assistant')
-            .slice(-3);
-
-          // Build intelligent weighted context
-          const intelligentContext = conversationIntelligence.buildWeightedContext(
-            conversationLog,
-            {
-              maxMessages: 15, // Reasonable limit for context window
-              currentTimestamp: Date.now(),
-              recentBotMessages,
-              userMessage: currentContent,
-            }
-          );
-
-          // Optimize the context for token efficiency
-          const optimizedContext = await contextOptimizer.optimizeContext(intelligentContext, {
-            maxTokens: 3000, // Leave room for response and function definitions
-            preserveSystemMessage: true,
-            summarizeOlderMessages: true,
-          });
-
-          optimizedConversationLog = optimizedContext;
-
-          openaiLogger.info('Conversation intelligence applied', {
-            originalMessages: conversationLog.length,
-            intelligentMessages: intelligentContext.length,
-            optimizedMessages: optimizedContext.length,
-            tokenSavings:
-              this.estimateTokens(conversationLog) - this.estimateTokens(optimizedContext),
-          });
-        }
-      } catch (error) {
-        openaiLogger.warn('Conversation intelligence failed, using original context', {
-          error: error.message,
+      // Simple fallback: limit to last 15 messages if too long
+      if (conversationLog.length > 15) {
+        openaiLogger.debug('Applying simple context truncation for fallback processing', {
+          originalLength: conversationLog.length,
+          truncatedLength: 15,
         });
-        // Fall back to original conversation log if intelligence fails
+
+        // Keep system message (if present) and last 14 messages
+        const systemMessages = conversationLog.filter(msg => msg.role === 'system');
+        const nonSystemMessages = conversationLog.filter(msg => msg.role !== 'system').slice(-14);
+        optimizedConversationLog = [...systemMessages, ...nonSystemMessages];
       }
 
       // Log detailed token estimation for debugging
@@ -144,6 +108,17 @@ class MessageProcessor {
         },
         'Sending request to OpenAI with intelligent context'
       );
+
+      // Safety check: Ensure we never send empty messages array
+      if (!optimizedConversationLog || optimizedConversationLog.length === 0) {
+        openaiLogger.error('Empty conversation log detected, cannot send to OpenAI', {
+          originalConversationLogLength: conversationLog ? conversationLog.length : 0,
+          optimizedConversationLogLength: optimizedConversationLog
+            ? optimizedConversationLog.length
+            : 0,
+        });
+        throw new Error('Cannot send empty messages array to OpenAI API');
+      }
 
       const response = await this.openai.chat.completions.create({
         model: this.config.OPENAI_MODEL || 'gpt-4.1-nano',

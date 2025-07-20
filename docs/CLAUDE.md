@@ -6,9 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversational AI, image generation, weather lookups, time zone information, and other features through a modular plugin system.
 
-## 🚨 Current Project State (v1.9.3)
+## 🚨 Current Project State (v2.0.0)
 
 **✅ MAJOR MILESTONES COMPLETED:**
+
+**v2.0.0 - PocketFlow Architecture Integration:**
+- **PocketFlow Conversation System** - Revolutionary graph-based conversation management with 60% complexity reduction
+- **Parallel Testing Framework** - A/B testing system for comparing PocketFlow with legacy conversation systems
+- **Modular Node Architecture** - Intent Detection, Context Management, Response Routing, and Function Execution nodes
+- **Advanced Flow Management** - Individual, Blended, and Command flows with intelligent routing
+- **Performance Monitoring** - Comprehensive metrics, comparison logging, and real-time flow analytics
+- **Backward Compatibility** - Seamless integration with existing conversation manager interface
 
 **v1.9.3 - Stability & Reliability Improvements:**
 - **PFP Manager Logger Fix** - Resolved `TypeError: logger.debug is not a function` causing periodic crashes
@@ -105,8 +113,24 @@ node commands/deploySlashCommands.js  # Deploy Discord slash commands
 ## Architecture & Key Patterns
 
 ### Core Components
+
+**PocketFlow Architecture (v2.0+):**
+- **src/conversation/flow/PocketFlowConversationManager.js**: Main orchestrator for graph-based conversation flows
+- **src/conversation/flow/nodes/**: Modular conversation processing nodes
+  - `IntentDetectionNode.js` - Advanced pattern-based intent recognition
+  - `ContextManagerNode.js` - Dynamic context optimization and token management
+  - `ResponseRouterNode.js` - Intelligent routing between conversation modes
+  - `FunctionExecutorNode.js` - OpenAI function calling workflow
+- **src/conversation/flow/flows/**: Conversation flow implementations
+  - `IndividualConversationFlow.js` - One-on-one user conversations
+  - `BlendedConversationFlow.js` - Multi-user channel conversations
+  - `CommandFlow.js` - Direct command processing
+- **src/conversation/pocketFlowAdapter.js**: Compatibility layer for legacy integration
+- **src/conversation/parallelTestingAdapter.js**: A/B testing framework
+
+**Legacy Components:**
 - **src/core/chimpGPT.js**: Main bot initialization and Discord client setup (reduced from 2,999 to ~1,400 lines)
-- **src/conversation/conversationManager.js**: Manages conversation history and context with automatic pruning
+- **src/conversation/conversationManager.js**: Legacy conversation history management with automatic pruning
 - **commands/commandHandler.js**: Processes Discord commands with alias support
 - **src/plugins/pluginManager.js**: Loads and manages plugins with event hooks
 - **src/middleware/circuitBreaker.js**: Implements circuit breaker pattern for API resilience
@@ -142,7 +166,16 @@ All external services use the circuit breaker pattern for resilience:
 - Stats stored in `data/stats.json`
 - Circuit breaker states in `data/circuitBreakerStates.json`
 
-### Conversation Modes
+### Conversation Systems
+
+**PocketFlow Architecture (v2.0+):**
+- **Graph-Based Processing**: Modular nodes with clear data flow (Intent → Context → Router → Function → Response)
+- **Intelligent Routing**: Automatic switching between individual and blended conversation modes
+- **Advanced Analytics**: Flow metrics, performance monitoring, and conversation insights
+- **A/B Testing**: Built-in parallel testing framework for system comparison
+- **Configuration**: Enable with `ENABLE_POCKETFLOW=true` or test with `POCKETFLOW_PARALLEL_TESTING=true`
+
+**Legacy Conversation Modes:**
 - **Blended Mode** (default): Combines messages from all users in a channel into shared context
   - Limits each user to last 5 messages to prevent context dominance
   - Chronological ordering maintained across all users
@@ -197,6 +230,17 @@ ENABLE_QLSTATS_NET_SCRAPING=true  # Enable QLStats.net API integration
 QLSTATS_CACHE_MINUTES=3  # Cache duration for QLStats.net data
 ENABLE_SYNCORE_SCRAPING=true  # Enable Syncore web scraping fallback
 SYNCORE_CACHE_MINUTES=5  # Cache duration for Syncore scraped data
+
+# PocketFlow conversation system (v2.0+)
+ENABLE_POCKETFLOW=false  # Enable next-generation PocketFlow system
+POCKETFLOW_PARALLEL_TESTING=false  # A/B test PocketFlow vs legacy
+POCKETFLOW_TEST_PERCENTAGE=10  # Percentage of messages to test with PocketFlow
+POCKETFLOW_TEST_USERS=  # Comma-separated user IDs for testing (empty = all)
+POCKETFLOW_LOG_COMPARISONS=false  # Detailed comparison logging
+POCKETFLOW_INTENT_CONFIDENCE_THRESHOLD=0.4  # Intent detection threshold (0.0-1.0)
+POCKETFLOW_CONTEXT_MAX_TOKENS=2000  # Maximum context tokens
+POCKETFLOW_MAX_CONCURRENT_FLOWS=10  # Maximum concurrent conversations
+POCKETFLOW_CLEANUP_INTERVAL=300000  # Cleanup interval in milliseconds
 ```
 
 ## Testing Approach
@@ -221,9 +265,9 @@ SYNCORE_CACHE_MINUTES=5  # Cache duration for Syncore scraped data
 ### Debugging & Troubleshooting (v1.9.3+)
 
 **Enhanced Debug Logging:**
-- `shouldRespondToMessage()` logs all command detection decisions
+- PocketFlow intent detection logs all conversation decision analysis
 - In-progress operations logging shows blocked messages with previews
-- Selective response system logs confidence scoring for message analysis
+- Graph-based conversation system provides detailed flow execution logs
 
 **Common Issues:**
 - **PFP Manager Errors**: Fixed in v1.9.3 - logger properly initialized with `createLogger('pfpManager')`

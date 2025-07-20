@@ -1,28 +1,26 @@
 /**
  * Test Conversation Status Tool
  *
- * This script tests the conversation storage functionality by:
- * 1. Creating test conversations
- * 2. Saving them to disk
- * 3. Loading them from disk
- * 4. Displaying the conversation storage status
+ * This script tests the PocketFlow conversation system by:
+ * 1. Checking PocketFlow status
+ * 2. Testing conversation management
+ * 3. Displaying storage status
  *
  * @module TestConversationStatus
  * @author Brett
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 require('dotenv').config();
 const { createLogger } = require('../core/logger');
 const logger = createLogger('testConversationStatus');
-const conversationStorage = require('../conversation/conversationStorage');
 const {
   manageConversation,
   clearConversation,
   loadConversationsFromStorage,
   saveConversationsToStorage,
   getConversationStorageStatus,
-} = require('../conversation/conversationManager');
+} = require('../conversation/conversationManagerSelector');
 
 /**
  * Test conversation storage functionality
@@ -31,9 +29,9 @@ async function testConversationStorage() {
   try {
     logger.info('Starting conversation storage test...');
 
-    // First, ensure we have a clean state
-    await conversationStorage.clearAllConversations();
-    logger.info('Cleared all existing conversations');
+    // Test PocketFlow status
+    const initialStatus = getConversationStorageStatus();
+    logger.info({ status: initialStatus }, 'PocketFlow initial status');
 
     // Create test conversations
     const testUserId1 = 'test-user-1';
