@@ -286,8 +286,7 @@ async function handleImageGeneration(
         'Starting image generation'
       );
 
-      const imageResult = await generateImage({
-        prompt: enhancedPrompt,
+      const imageResult = await generateImage(enhancedPrompt, {
         model,
         size,
         username,

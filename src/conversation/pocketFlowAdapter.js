@@ -13,7 +13,7 @@ const PocketFlowConversationManager = require('./flow/PocketFlowConversationMana
 
 // Import existing services that PocketFlow needs
 const openaiConfig = require('../services/openaiConfig');
-const functionCallProcessor = require('../core/processors/functionCallProcessor');
+const PocketFlowFunctionProcessor = require('../core/processors/pocketFlowFunctionProcessor');
 
 const logger = createLogger('pocketFlowAdapter');
 
@@ -60,9 +60,12 @@ function initializePocketFlow() {
       },
     };
 
+    // Create PocketFlow function processor instance
+    const pocketFlowFunctionProcessor = new PocketFlowFunctionProcessor();
+
     pocketFlowManager = new PocketFlowConversationManager(
       openaiConfig.client,
-      functionCallProcessor,
+      pocketFlowFunctionProcessor,
       mockCommandHandler,
       pocketFlowOptions
     );

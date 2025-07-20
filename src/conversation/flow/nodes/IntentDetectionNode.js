@@ -39,6 +39,19 @@ class IntentDetectionNode extends BaseConversationNode {
       /^(?:what|where|when|how|why|who)(?:\s|'s\s)/i,
     ];
 
+    // High-confidence patterns for specific actions
+    this.highConfidencePatterns = [
+      // Image generation patterns
+      /(?:draw|create|generate|make).*(?:image|picture|photo|artwork|art)/i,
+      /(?:can you|could you|please).*(?:draw|create|generate|make)/i,
+      /(?:show me|give me).*(?:image|picture|photo)/i,
+      // Time and weather patterns
+      /(?:what.*time|current time|time.*in)/i,
+      /(?:weather|forecast|temperature).*(?:in|for|at)/i,
+      // Question patterns
+      /(?:what.*server|server.*stats|quake.*stats)/i,
+    ];
+
     this.continuationPatterns = [
       /^(?:and|also|but|however|though|still|yet)\s/i,
       /^(?:no|yes|yeah|nah|yep|sure|ok|okay)\s?$/i,
@@ -110,21 +123,37 @@ class IntentDetectionNode extends BaseConversationNode {
     const matchedPatterns = [];
     let confidence = 0;
 
+    // Check for Discord mentions (highest priority)
     if (/<@\d+>/.test(content)) {
       confidence = 1.0;
       matchedPatterns.push('discord_mention');
-    } else if (/^[!/]/.test(normalizedContent)) {
+    }
+    // Check for command prefixes (high priority)
+    else if (/^[!/]/.test(normalizedContent)) {
       confidence = 0.8;
       matchedPatterns.push('command');
-    } else {
+    }
+    // Check high-confidence patterns first
+    else {
+      let hasHighConfidenceMatch = false;
+
+      for (const pattern of this.highConfidencePatterns) {
+        if (pattern.test(normalizedContent)) {
+          matchedPatterns.push(`high_confidence:${pattern.source}`);
+          confidence += 0.7; // High confidence boost
+          hasHighConfidenceMatch = true;
+        }
+      }
+
+      // Then check regular bot-directed patterns
       for (const pattern of this.botDirectedPatterns) {
         if (pattern.test(normalizedContent)) {
           matchedPatterns.push(pattern.source);
 
           if (pattern.source.includes('?') || pattern.source.includes('what|where|when')) {
-            confidence += 0.5;
+            confidence += hasHighConfidenceMatch ? 0.2 : 0.5;
           } else {
-            confidence += 0.3;
+            confidence += hasHighConfidenceMatch ? 0.1 : 0.3;
           }
         }
       }
