@@ -74,7 +74,14 @@ class ClientEventHandler {
     this.statusManager.instance = initStatusManager(this.client);
     discordLogger.info('Status manager initialized');
 
-    // Initialize message event handler
+    // Initialize PFP Manager FIRST to ensure it's available for other components
+    const pfpManager = new PFPManager(this.client, {
+      pfpDir: path.join(__dirname, '../../../pfp'),
+      maxImages: 50,
+      rotateIntervalMs: 30 * 60 * 1000, // 30 minutes
+    });
+
+    // Initialize message event handler with PFPManager
     const _messageEventHandler = new MessageEventHandler(this.client, this.config, {
       openai: this.openai,
       statusManager: this.statusManager.instance,
@@ -87,6 +94,7 @@ class ClientEventHandler {
       handleDirectMessage: this.handleDirectMessage,
       formatSubtext: this.formatSubtext,
       storeMessageRelationship: this.storeMessageRelationship,
+      pfpManager: pfpManager,
     });
     discordLogger.info('Message event handler initialized');
 
@@ -115,13 +123,6 @@ class ClientEventHandler {
       discordLogger.error({ error }, 'Error loading conversations from persistent storage');
     }
 
-    // Initialize PFP Manager EARLIER to ensure it's available for commands
-    const pfpManager = new PFPManager(this.client, {
-      pfpDir: path.join(__dirname, '../pfp'),
-      maxImages: 50,
-      rotateIntervalMs: 30 * 60 * 1000, // 30 minutes
-    });
-
     try {
       await pfpManager.startRotation();
       discordLogger.info('PFP Manager initialized and rotation started');
@@ -131,8 +132,7 @@ class ClientEventHandler {
 
     // Register command prefixes for traditional commands
     try {
-      commandHandler.addPrefix('!');
-      commandHandler.addPrefix('?');
+      commandHandler.setPrefixes(['!', '?', '/']);
       discordLogger.info('Command prefixes registered');
     } catch (error) {
       discordLogger.error({ error }, 'Error registering command prefixes');

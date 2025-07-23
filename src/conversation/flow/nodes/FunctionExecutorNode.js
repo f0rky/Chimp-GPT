@@ -10,7 +10,7 @@ class FunctionExecutorNode extends BaseConversationNode {
     };
 
     super('function_executor', action, {
-      timeout: 15000,
+      timeout: 120000, // 2 minutes for image generation
       logLevel: 'debug',
       ...options,
     });

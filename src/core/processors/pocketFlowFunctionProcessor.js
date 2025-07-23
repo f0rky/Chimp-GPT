@@ -46,7 +46,7 @@ class PocketFlowFunctionProcessor {
    * @param {Object} params.store - PocketFlow conversation store
    * @returns {Promise<Object>} Function execution result
    */
-  async processFunction({ functionName, functionArgs, message, store }) {
+  async processFunction({ functionName, functionArgs, message, store: _store }) {
     try {
       logger.debug(`Processing function call: ${functionName}`, { functionArgs });
 
@@ -208,7 +208,7 @@ class PocketFlowFunctionProcessor {
    * Handle quake server stats lookup
    * Note: This needs to be adapted since the original expects Discord message objects
    */
-  async handleQuakeLookup(args, message) {
+  async handleQuakeLookup(_args, _message) {
     // Create a minimal mock feedback message for the legacy handler
     const mockFeedback = {
       edit: async content => {
@@ -218,7 +218,10 @@ class PocketFlowFunctionProcessor {
     };
 
     const mockStatusManager = {
-      trackQuakeStatsLookup: () => {},
+      trackQuakeStatsLookup: () => {
+        // Track quake stats lookup - placeholder for legacy compatibility
+        return null;
+      },
     };
 
     try {
@@ -249,25 +252,48 @@ class PocketFlowFunctionProcessor {
     const mockFeedback = {
       edit: async content => {
         finalContent = content;
-        // Extract image URL if present in the content
-        const urlMatch = content.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)/i);
-        if (urlMatch) {
-          imageUrl = urlMatch[0];
+        // Extract image URL if present in the content (improved patterns)
+        const urlPatterns = [
+          /https?:\/\/[^\s\n]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s\n]*)?/gi, // Image URLs with extensions
+          /https?:\/\/oaidalleapiprodscus\.blob\.core\.windows\.net\/[^\s\n]+/gi, // OpenAI DALL-E URLs
+          /https?:\/\/[^\s\n]+/gi, // Any complete URL
+        ];
+
+        for (const pattern of urlPatterns) {
+          const urlMatch = content.match(pattern);
+          if (urlMatch && urlMatch.length > 0) {
+            // Take the first URL found
+            imageUrl = urlMatch[0];
+            // Clean up any trailing characters that might have been captured
+            imageUrl = imageUrl.replace(/[.,;!?\\s]*$/, '');
+            break;
+          }
         }
         return { content };
       },
     };
 
+    // Use bot personality in mock conversation
+    const config = require('../configValidator');
     const mockConversationLog = [
-      { role: 'system', content: 'You are a helpful AI assistant.' },
+      { role: 'system', content: config.BOT_PERSONALITY || 'You are a helpful AI assistant.' },
       { role: 'user', content: `Generate an image: ${prompt}` },
     ];
 
     const mockTimings = { apiCalls: {} };
-    const mockFormatSubtext = () => '';
-    const mockStoreMessageRelationship = () => {};
+    const mockFormatSubtext = (startTime, _usage, _timings) => {
+      const elapsed = Date.now() - startTime;
+      return `\n\n⏱️ Generated in ${Math.round(elapsed / 1000)}s`;
+    };
+    const mockStoreMessageRelationship = () => {
+      // Store message relationship - placeholder for legacy compatibility
+      return null;
+    };
     const mockStatusManager = {
-      trackImageGeneration: () => {},
+      trackImageGeneration: () => {
+        // Track image generation - placeholder for legacy compatibility
+        return null;
+      },
     };
 
     try {
@@ -285,9 +311,11 @@ class PocketFlowFunctionProcessor {
 
       return {
         prompt,
-        imageUrl: imageUrl || 'Image generation completed',
+        imageUrl: imageUrl,
         content: finalContent,
-        formatted: imageUrl ? `Generated image: ${imageUrl}` : 'Image generation completed',
+        formatted: imageUrl
+          ? `Generated image: ${imageUrl}`
+          : finalContent || 'Image generation completed',
       };
     } catch (error) {
       throw new Error(`Image generation failed: ${error.message}`);

@@ -16,8 +16,8 @@ const thresholds = {
   weather_api: 1000, // Weather API calls (1 second)
   wolfram_api: 1500, // Wolfram API calls (1.5 seconds)
   quake_api: 1000, // Quake server stats (1 second)
-  image_generation: 5000, // Image generation (5 seconds)
-  message_processing: 3000, // Overall message processing (3 seconds)
+  image_generation: 65000, // Image generation (65 seconds) - accounts for 20-60s API load
+  message_processing: 65000, // Overall message processing (65 seconds) - to handle image gen
   function_call: 2000, // Function call handling (2 seconds)
   plugin_execution: 500, // Plugin execution (0.5 seconds)
   conversation_management: 300, // Conversation management (0.3 seconds)

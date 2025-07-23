@@ -9,35 +9,32 @@ const {
   handleStatsCommand,
 } = require('../healthCheck');
 const { processVersionQuery } = require('../../../utils/versionSelfQuery');
-const {
-  manageConversation,
-  saveConversationsToStorage,
-  removeMessageById,
-  updateMessageById,
-} = require('../../conversation/conversationManagerSelector');
 const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
-const MessageProcessor = require('../processors/messageProcessor');
-const { generateNaturalResponse } = require('../processors/responseGenerator');
+const SimpleChimpGPTFlow = require('../../conversation/flow/SimpleChimpGPTFlow');
+const {
+  removeMessageById,
+  updateMessageById,
+  saveConversationsToStorage,
+} = require('../../conversation/conversationManagerSelector');
 
 class MessageEventHandler {
   constructor(client, config, dependencies) {
     this.client = client;
     this.config = config;
     this.openai = dependencies.openai;
-    this.statusManager = dependencies.statusManager;
     this.allowedChannelIDs = dependencies.allowedChannelIDs;
-    this.loadingEmoji = dependencies.loadingEmoji;
     this.DISABLE_PLUGINS = dependencies.DISABLE_PLUGINS;
     this.inProgressOperations = dependencies.inProgressOperations;
-    this.messageRelationships = dependencies.messageRelationships;
-    this.handleFunctionCall = dependencies.handleFunctionCall;
-    this.handleDirectMessage = dependencies.handleDirectMessage;
-    this.formatSubtext = dependencies.formatSubtext;
-    this.storeMessageRelationship = dependencies.storeMessageRelationship;
+    this.loadingEmoji = dependencies.loadingEmoji;
+    this.statusManager = dependencies.statusManager;
+    this.pfpManager = dependencies.pfpManager;
 
-    // Initialize message processor with conversation intelligence
-    this.messageProcessor = new MessageProcessor(this.openai, this.config);
+    // Initialize message relationships map for legacy compatibility
+    this.messageRelationships = new Map();
+
+    // Initialize PocketFlow for conversation processing with PFPManager
+    this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
 
     this.setupEventHandlers();
   }
@@ -92,16 +89,30 @@ class MessageEventHandler {
       },
     };
 
-    // Helper function to add timing data
+    // Helper function to add timing data (optimized for performance)
     const addTiming = (step, extraData = {}) => {
       const now = Date.now();
       const elapsed = now - timings.start;
-      timings.steps.push({
-        step,
-        time: now,
-        elapsed,
-        ...extraData,
-      });
+
+      // Only track critical timing points to reduce overhead
+      const criticalSteps = [
+        'start',
+        'before_conversation_load',
+        'after_conversation_load',
+        'before_openai_api_call',
+        'after_openai_api_call',
+        'before_function_call_handling',
+        'after_function_call_handling',
+      ];
+
+      if (criticalSteps.includes(step)) {
+        timings.steps.push({
+          step,
+          elapsed,
+          ...extraData,
+        });
+      }
+
       return elapsed;
     };
 
@@ -318,22 +329,13 @@ class MessageEventHandler {
       const feedbackMessage = await feedbackPromise;
       addTiming('feedback_message_confirmed');
 
-      // Track conversation for status updates AFTER sending the thinking message
+      // Mark channel as having an operation in progress
+      this.inProgressOperations.add(message.channelId);
+
+      // Track conversation for status updates
       addTiming('before_status_update');
       this.statusManager.trackConversation(message.author.username, message.content);
       addTiming('after_status_update');
-
-      // Start the conversation storage save operation (but don't await it)
-      // This makes it happen in the background without blocking the main processing flow
-      addTiming('before_conversation_save');
-      const savePromise = saveConversationsToStorage();
-      savePromise
-        .then(() => {
-          addTiming('conversation_save_completed');
-        })
-        .catch(error => {
-          addTiming('conversation_save_error', { error: error.message });
-        });
 
       // Check if this is a version query
       const versionResponse = processVersionQuery(message.content, this.config);
@@ -341,29 +343,12 @@ class MessageEventHandler {
         // Track this as a successful API call for stats
         // trackApiCall is imported from healthCheck but not used here - keeping for consistency
 
-        // Update the feedback message with the version response and standardized subtext
-        const subtext = this.formatSubtext(timings.startTime, {}, {});
-        const maxLength = 2000 - subtext.length - 3;
-        let finalResponse = versionResponse.content;
-        if (finalResponse.length > maxLength) {
-          finalResponse = finalResponse.slice(0, maxLength) + '...';
-        }
-        finalResponse += subtext;
-        await feedbackMessage.edit(finalResponse);
+        // Update the feedback message with the version response
+        await feedbackMessage.edit(versionResponse.content);
 
-        // Store message relationship for context preservation
-        if (message) {
-          const contextContent =
-            versionResponse.content.slice(0, 100) +
-            (versionResponse.content.length > 100 ? '...' : '');
-          this.storeMessageRelationship(message, feedbackMessage, 'version', contextContent);
-        }
+        // Context preservation handled by PocketFlow conversation state
 
-        // Add the response to the conversation log
-        await manageConversation(message.author.id, {
-          role: 'assistant',
-          content: versionResponse.content,
-        });
+        // Version responses are handled by PocketFlow conversation state
 
         return;
       }
@@ -379,110 +364,46 @@ class MessageEventHandler {
         );
       }
 
-      // Get conversation context (last 5 messages for better context)
-      addTiming('before_conversation_load');
-      const fullConversationLog = await manageConversation(
-        message.author.id,
-        {
-          role: 'user',
-          content: message.content,
-        },
-        message // Pass the entire Discord message to extract references
-      );
-      addTiming('after_conversation_load', { logLength: fullConversationLog.length });
+      // Use PocketFlow for conversation processing
+      addTiming('before_pocketflow_processing');
 
-      // Process message with OpenAI
-      addTiming('before_openai_api_call');
-      const openaiTimerId = performanceMonitor.startTimer('openai_api', {
-        userId: message.author.id,
-        messageLength: message.content.length,
-        operation: 'processMessage',
+      // Process message with PocketFlow
+      const flowResult = await this.pocketFlow.processMessage(message);
+      addTiming('after_pocketflow_processing', {
+        success: flowResult.success,
+        type: flowResult.type,
       });
 
-      // Mark this channel as having an operation in progress
-      this.inProgressOperations.add(message.channelId);
-      let gptResponse;
-
-      try {
-        // Process the message with OpenAI using intelligent conversation processing
-        gptResponse = await this.messageProcessor.processOpenAIMessage(
-          message.content,
-          fullConversationLog,
-          timings
-        );
-        const apiDuration = addTiming('after_openai_api_call', { responseType: gptResponse.type });
-
-        performanceMonitor.stopTimer(openaiTimerId, {
-          responseType: gptResponse.type,
-          success: true,
-          duration: apiDuration,
-        });
-
-        // Handle different response types
-        addTiming('before_response_handling', { responseType: gptResponse.type });
-        if (gptResponse.type === 'functionCall') {
-          await this.handleFunctionCall(
-            gptResponse,
-            feedbackMessage,
-            fullConversationLog,
-            message.author.id,
-            timings.startTime,
-            timings,
-            message, // Pass the original user message for relationship tracking
-            this.loadingEmoji,
-            this.statusManager,
-            (functionResult, conversationLog, functionName, functionTimings) =>
-              generateNaturalResponse(
-                functionResult,
-                conversationLog,
-                functionName,
-                functionTimings,
-                this.openai
-              ),
-            this.formatSubtext,
-            this.storeMessageRelationship
-          );
-          // Safe access to function name with fallback to prevent TypeError
-          addTiming('after_function_call_handling', {
-            functionName: gptResponse.function?.name || 'unknown',
-          });
-        } else if (gptResponse.type === 'message') {
-          await this.handleDirectMessage(
-            gptResponse,
-            feedbackMessage,
-            fullConversationLog,
-            message.author.id,
-            timings.startTime, // Use the original start time from when message was received
-            gptResponse.usage, // Pass token usage information
-            timings.apiCalls, // Pass API call counts
-            message, // Pass the original user message for relationship tracking
-            this.formatSubtext,
-            this.storeMessageRelationship,
-            manageConversation
-          );
-          addTiming('after_direct_message_handling');
-        } else {
-          await feedbackMessage.edit(gptResponse.content);
-
-          // Store message relationship for context preservation
-          if (message) {
-            const contextContent =
-              gptResponse.content.slice(0, 100) + (gptResponse.content.length > 100 ? '...' : '');
-            this.storeMessageRelationship(message, feedbackMessage, 'conversation', contextContent);
+      // Send PocketFlow response back to Discord
+      if (flowResult.response) {
+        const responseFeedbackMessage = await feedbackPromise;
+        if (responseFeedbackMessage) {
+          // Check if this is an image response with attachment
+          if (flowResult.type === 'image' && flowResult.attachment) {
+            await responseFeedbackMessage.edit({
+              content: flowResult.response,
+              files: [
+                {
+                  attachment: flowResult.attachment.buffer,
+                  name: flowResult.attachment.name,
+                },
+              ],
+            });
+            addTiming('after_image_attachment_message');
+          } else {
+            await responseFeedbackMessage.edit(flowResult.response);
+            addTiming('after_edit_message');
           }
-
-          addTiming('after_edit_message');
         }
-      } catch (error) {
-        // Log the error
-        discordLogger.error(
-          { error, messageId: message.id, channelId: message.channelId },
-          'Error processing message'
-        );
-        throw error; // Re-throw to maintain existing error handling
-      } finally {
-        // Always clear the in-progress flag when done, even if there was an error
-        this.inProgressOperations.delete(message.channelId);
+      } else {
+        // If no response, provide fallback message
+        const responseFeedbackMessage = await feedbackPromise;
+        if (responseFeedbackMessage) {
+          await responseFeedbackMessage.edit(
+            '❌ I encountered an issue processing your message. Please try again.'
+          );
+          addTiming('after_fallback_message');
+        }
       }
 
       // Log complete timing data
@@ -500,7 +421,7 @@ class MessageEventHandler {
               .filter(([key]) => !['step', 'time', 'elapsed'].includes(key))
               .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
           })),
-          response_type: gptResponse?.type || 'error_or_unknown',
+          response_type: flowResult?.type || 'error_or_unknown',
         },
         `Message processing completed in ${totalDuration}ms with ${timings.steps.length} steps tracked`
       );
@@ -544,6 +465,9 @@ class MessageEventHandler {
         });
       }
     } finally {
+      // Always clear the in-progress flag when done
+      this.inProgressOperations.delete(message.channelId);
+
       // Always stop the timer if it was started and hasn't been stopped yet
       if (messageTimerId) {
         const addFinalTiming = (step, extraData = {}) => {
@@ -621,26 +545,7 @@ class MessageEventHandler {
       // Determine if this is a DM
       const isDM = message.channel?.isDMBased() || false;
 
-      // Remove from conversation history
-      if (isDM) {
-        // For DMs, try to remove using the author's user ID as the key
-        const removed = await removeMessageById(message.author?.id, message.id);
-        if (removed) {
-          discordLogger.debug(
-            { messageId: message.id },
-            'Removed deleted message from DM conversation'
-          );
-        }
-      } else {
-        // For channels, remove using channel ID
-        const removed = await removeMessageById(message.channelId, message.id, isDM);
-        if (removed) {
-          discordLogger.debug(
-            { messageId: message.id },
-            'Removed deleted message from channel conversation'
-          );
-        }
-      }
+      // PocketFlow manages conversation state internally
 
       // Check if we have a bot response for this deleted message
       const relationship = this.messageRelationships.get(message.id);
