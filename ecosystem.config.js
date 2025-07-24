@@ -9,6 +9,7 @@ module.exports = {
       script: './src/core/combined.js',
       watch: false,
       node_args: '--no-deprecation', // Suppress deprecation warnings - lodash issue from Discord.js dependency
+      env_file: '.env', // Tell PM2 to load .env file
       env: {
         NODE_ENV: 'development',
         PORT: 3006,
