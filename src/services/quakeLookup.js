@@ -237,54 +237,7 @@ const CONFIG = {
     process.env.SHOW_SERVER_STATS_EMOJIS === undefined, // Default to true unless explicitly set to false
 };
 
-// Debug logging for environment variable settings
-console.log('🔧 [QUAKE CONFIG DEBUG] Environment Variables:');
-console.log('  SHOW_TEAM_EMOJIS (raw):', process.env.SHOW_TEAM_EMOJIS);
-console.log('  SHOW_TEAM_EMOJIS type:', typeof process.env.SHOW_TEAM_EMOJIS);
-console.log('  SHOW_SERVER_STATS_EMOJIS (raw):', process.env.SHOW_SERVER_STATS_EMOJIS);
-console.log('  SHOW_SERVER_STATS_EMOJIS type:', typeof process.env.SHOW_SERVER_STATS_EMOJIS);
-console.log('  NODE_ENV:', process.env.NODE_ENV);
-console.log('  BOT_NAME:', process.env.BOT_NAME);
-// Check ALL environment variables containing EMOJI
-console.log('🔧 [QUAKE CONFIG DEBUG] All EMOJI-related env vars:');
-Object.keys(process.env)
-  .filter(key => key.includes('EMOJI'))
-  .forEach(key => {
-    console.log(`  ${key}: "${process.env[key]}" (${typeof process.env[key]})`);
-  });
-// Check if dotenv was loaded
-console.log('🔧 [QUAKE CONFIG DEBUG] Checking .env loading:');
-const fs = require('fs');
-try {
-  const envContent = fs.readFileSync('.env', 'utf8');
-  const teamEmojiLine = envContent.split('\n').find(line => line.includes('SHOW_TEAM_EMOJIS'));
-  const serverEmojiLine = envContent
-    .split('\n')
-    .find(line => line.includes('SHOW_SERVER_STATS_EMOJIS'));
-  console.log('  .env SHOW_TEAM_EMOJIS line:', teamEmojiLine);
-  console.log('  .env SHOW_SERVER_STATS_EMOJIS line:', serverEmojiLine);
-} catch (err) {
-  console.log('  .env file read error:', err.message);
-}
-// Check if these values are being set somewhere else
-console.log('🔧 [QUAKE CONFIG DEBUG] Value analysis:');
-console.log('  process.env.SHOW_TEAM_EMOJIS === "true":', process.env.SHOW_TEAM_EMOJIS === 'true');
-console.log(
-  '  process.env.SHOW_TEAM_EMOJIS === "false":',
-  process.env.SHOW_TEAM_EMOJIS === 'false'
-);
-console.log('  process.env.SHOW_TEAM_EMOJIS === true:', process.env.SHOW_TEAM_EMOJIS === true);
-console.log('🔧 [QUAKE CONFIG DEBUG] Parsed Settings:');
-console.log('  CONFIG.showTeamEmojis:', CONFIG.showTeamEmojis);
-console.log('  CONFIG.showServerStatsEmojis:', CONFIG.showServerStatsEmojis);
-console.log('  CONFIG.eloMode:', CONFIG.eloMode);
-console.log('  CONFIG.maxServers:', CONFIG.maxServers);
-console.log('🔧 [QUAKE CONFIG DEBUG] Test Emojis:');
-console.log('  Red team emoji:', CONFIG.showTeamEmojis ? '🔴' : 'DISABLED');
-console.log('  Blue team emoji:', CONFIG.showTeamEmojis ? '🔵' : 'DISABLED');
-console.log('🔧 [QUAKE CONFIG DEBUG] Logic Test:');
-console.log('  Boolean comparison tests completed');
-console.log('🔧 [QUAKE CONFIG DEBUG] Config loaded successfully\n');
+// Configuration loaded - debug logging removed for production
 
 /**
  * Calculate server uptime from level start time.

@@ -13,6 +13,7 @@ app.get('/dashboard', (req, res) => {
 
 // Start the server
 app.listen(port, () => {
+  // Server startup messages for standalone dashboard server
   console.log(`Dashboard server running at http://localhost:${port}/dashboard`);
   console.log('Press Ctrl+C to stop the server');
 });

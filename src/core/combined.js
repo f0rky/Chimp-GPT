@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
 const { parseRunMode } = require('./runModes');
+const { sanitizePath } = require('../../utils/inputSanitizer');
 
 // Parse run mode from command-line arguments
 const runConfig = parseRunMode();
@@ -43,10 +44,21 @@ function ensureDirectories() {
   const directories = ['assets/logs', 'data', 'data/conversations', 'assets/pfp'];
 
   directories.forEach(dir => {
-    const dirPath = path.join(__dirname, '..', '..', dir);
+    // Sanitize the directory path to prevent path traversal
+    const sanitizedDir = sanitizePath(dir);
+    const dirPath = path.join(__dirname, '..', '..', sanitizedDir);
+
+    // Validate that the resolved path stays within the project directory
+    const resolvedPath = path.resolve(dirPath);
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    if (!resolvedPath.startsWith(projectRoot)) {
+      logger.error(`Path traversal attempt blocked for directory: ${dir}`);
+      return;
+    }
+
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
-      logger.info(`Created directory: ${dir}`);
+      logger.info(`Created directory: ${sanitizedDir}`);
     }
   });
 }

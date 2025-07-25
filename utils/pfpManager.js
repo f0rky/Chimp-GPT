@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const { sanitizePath } = require('./inputSanitizer');
 
 // Logger setup
 let logger;
@@ -231,7 +232,28 @@ class PFPManager {
             ['.png', '.jpg', '.jpeg', '.gif'].includes(path.extname(file).toLowerCase())
           )
           .map(async file => {
-            const filePath = path.join(this.pfpDir, file);
+            // Sanitize filename to prevent path traversal attacks
+            const sanitizedFile = sanitizePath(file);
+            if (sanitizedFile !== file) {
+              logger.warn(
+                { originalFile: file, sanitizedFile },
+                'PFP file name sanitized for security'
+              );
+            }
+
+            const filePath = path.join(this.pfpDir, sanitizedFile);
+
+            // Additional security: verify the resolved path is within the PFP directory
+            const resolvedPath = path.resolve(filePath);
+            const resolvedPfpDir = path.resolve(this.pfpDir);
+            if (!resolvedPath.startsWith(resolvedPfpDir)) {
+              logger.error(
+                { file: sanitizedFile, resolvedPath, resolvedPfpDir },
+                'Path traversal attempt blocked in PFP loading'
+              );
+              return null;
+            }
+
             try {
               const stats = await fs.stat(filePath);
               return {

@@ -1,13 +1,25 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { createLogger } = require('../core/logger');
+const { sanitizePath } = require('../../utils/inputSanitizer');
 
 const logger = createLogger('performanceHistory');
 
 class PerformanceHistory {
   constructor(dataDir = './data') {
-    this.dataDir = dataDir;
-    this.historyFile = path.join(dataDir, 'performance-history.json');
+    // Sanitize the data directory path to prevent path traversal
+    const sanitizedDataDir = sanitizePath(dataDir);
+    this.dataDir = sanitizedDataDir;
+
+    // Validate that the resolved path stays within safe boundaries
+    const resolvedDataDir = path.resolve(sanitizedDataDir);
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    if (!resolvedDataDir.startsWith(projectRoot)) {
+      logger.error(`Path traversal attempt blocked for dataDir: ${dataDir}`);
+      throw new Error('Invalid data directory path');
+    }
+
+    this.historyFile = path.join(sanitizedDataDir, 'performance-history.json');
     this.currentData = {
       metrics: [],
       hourlyAggregates: {},
@@ -22,6 +34,14 @@ class PerformanceHistory {
 
   async initialize() {
     try {
+      // Validate data directory path before creating
+      const resolvedDataDir = path.resolve(this.dataDir);
+      const projectRoot = path.resolve(__dirname, '..', '..');
+      if (!resolvedDataDir.startsWith(projectRoot)) {
+        logger.error(`Path traversal attempt blocked in initialize for: ${this.dataDir}`);
+        throw new Error('Invalid data directory path');
+      }
+
       // Ensure data directory exists
       await fs.mkdir(this.dataDir, { recursive: true });
 
@@ -39,6 +59,14 @@ class PerformanceHistory {
 
   async loadHistory() {
     try {
+      // Validate history file path before reading
+      const resolvedHistoryFile = path.resolve(this.historyFile);
+      const projectRoot = path.resolve(__dirname, '..', '..');
+      if (!resolvedHistoryFile.startsWith(projectRoot)) {
+        logger.error(`Path traversal attempt blocked in loadHistory for: ${this.historyFile}`);
+        throw new Error('Invalid history file path');
+      }
+
       const data = await fs.readFile(this.historyFile, 'utf8');
       this.currentData = JSON.parse(data);
       logger.info(`Loaded ${this.currentData.metrics.length} historical data points`);
@@ -53,6 +81,14 @@ class PerformanceHistory {
 
   async saveHistory() {
     try {
+      // Validate history file path before writing
+      const resolvedHistoryFile = path.resolve(this.historyFile);
+      const projectRoot = path.resolve(__dirname, '..', '..');
+      if (!resolvedHistoryFile.startsWith(projectRoot)) {
+        logger.error(`Path traversal attempt blocked in saveHistory for: ${this.historyFile}`);
+        throw new Error('Invalid history file path');
+      }
+
       await fs.writeFile(this.historyFile, JSON.stringify(this.currentData, null, 2), 'utf8');
     } catch (error) {
       logger.error('Error saving performance history:', error);

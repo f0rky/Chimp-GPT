@@ -120,32 +120,19 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     });
 
     if (result.success && result.result && result.result.response) {
-      // Convert PocketFlow result back to legacy format
-      const conversationLog = [];
-
-      // Add the user message
-      if (newMessage) {
-        conversationLog.push({
-          role: 'user',
-          content: newMessage.content || discordMessage.content,
-          timestamp: discordMessage.createdTimestamp,
-          username: discordMessage.author.username,
-        });
-      }
-
-      // Add the bot response
-      conversationLog.push({
-        role: 'assistant',
-        content: result.result.response,
-        timestamp: Date.now(),
-        flowType: result.flowType,
-        executionTime: result.executionTime,
-      });
-
+      // Return PocketFlow result directly with special flag
       logger.debug(
         `PocketFlow processed message successfully: ${result.flowType} in ${result.executionTime}ms`
       );
-      return conversationLog;
+
+      return {
+        isPocketFlowResponse: true,
+        response: result.result.response,
+        flowType: result.flowType,
+        executionTime: result.executionTime,
+        functionCall: result.result.functionCall,
+        type: result.result.type || 'direct_response',
+      };
     }
 
     logger.warn(
@@ -156,10 +143,11 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     // Provide basic conversation context for legacy fallback processing
     const fallbackConversationLog = [];
 
-    // Add system message for context
+    // Add system message for context using bot personality
+    const configValidator = require('../core/configValidator');
     fallbackConversationLog.push({
       role: 'system',
-      content: 'You are a helpful AI assistant.',
+      content: configValidator.BOT_PERSONALITY || 'You are a helpful AI assistant.',
       timestamp: Date.now(),
     });
 
@@ -180,10 +168,11 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     // Provide minimal conversation context for error fallback
     const errorFallbackLog = [];
 
-    // Add system message
+    // Add system message using bot personality
+    const configValidator2 = require('../core/configValidator');
     errorFallbackLog.push({
       role: 'system',
-      content: 'You are a helpful AI assistant.',
+      content: configValidator2.BOT_PERSONALITY || 'You are a helpful AI assistant.',
       timestamp: Date.now(),
     });
 

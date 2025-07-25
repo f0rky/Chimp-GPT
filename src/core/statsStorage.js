@@ -45,6 +45,51 @@ const path = require('path');
 const { createLogger } = require('./logger');
 const logger = createLogger('stats');
 
+// Dangerous keys that could lead to prototype pollution
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Validates that a key is safe to use for object property access
+ * @param {string} key - The key to validate
+ * @returns {boolean} True if the key is safe, false otherwise
+ */
+function isSafeKey(key) {
+  if (typeof key !== 'string') {
+    return false;
+  }
+
+  // Check if the key is in the dangerous keys list
+  if (DANGEROUS_KEYS.has(key.toLowerCase())) {
+    return false;
+  }
+
+  // Additional checks for variations of dangerous keys
+  const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, '');
+  if (DANGEROUS_KEYS.has(normalizedKey)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Safely sets a property on an object, preventing prototype pollution
+ * @param {Object} obj - The target object
+ * @param {string} key - The property key
+ * @param {*} value - The value to set
+ * @returns {boolean} True if the property was set, false if blocked for security
+ */
+function _safeSetProperty(obj, key, value) {
+  if (!isSafeKey(key)) {
+    logger.warn({ key }, 'Blocked potentially dangerous key from being set');
+    return false;
+  }
+
+  // Use Object.prototype.hasOwnProperty.call for safe property checking
+  obj[key] = value;
+  return true;
+}
+
 // Path to the stats file
 const STATS_FILE = path.join(__dirname, '../../data', 'stats.json');
 
@@ -106,7 +151,7 @@ const DEFAULT_STATS = {
   rateLimits: {
     hit: 0,
     users: [],
-    userCounts: {},
+    userCounts: Object.create(null), // Use prototype-less object for dynamic keys
   },
   lastRestart: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
@@ -448,6 +493,25 @@ async function loadStats() {
         logger.warn('Stats file missing rateLimits, using default value');
         stats.rateLimits = { ...DEFAULT_STATS.rateLimits };
       }
+
+      // Ensure userCounts is prototype-less for security
+      if (
+        stats.rateLimits &&
+        stats.rateLimits.userCounts &&
+        Object.getPrototypeOf(stats.rateLimits.userCounts) !== null
+      ) {
+        const safeUserCounts = Object.create(null);
+        // Only copy safe keys
+        for (const key in stats.rateLimits.userCounts) {
+          if (
+            Object.prototype.hasOwnProperty.call(stats.rateLimits.userCounts, key) &&
+            isSafeKey(key)
+          ) {
+            safeUserCounts[key] = stats.rateLimits.userCounts[key];
+          }
+        }
+        stats.rateLimits.userCounts = safeUserCounts;
+      }
     } catch (parseError) {
       logger.error({ error: parseError }, 'JSON parse error in stats file');
 
@@ -498,22 +562,52 @@ async function updateStat(key, value, increment = false) {
   try {
     const stats = await loadStats();
 
+    // Validate the main key for safety
+    if (!isSafeKey(key)) {
+      logger.warn({ key }, 'Blocked update to potentially dangerous key');
+      return false;
+    }
+
     // Handle nested keys (e.g., 'apiCalls.openai')
     const keys = key.split('.');
     let current = stats;
 
-    // Navigate to the nested property
+    // Navigate to the nested property with safety checks
     for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) {
-        current[keys[i]] = {};
+      const currentKey = keys[i];
+
+      // Validate each key in the path
+      if (!isSafeKey(currentKey)) {
+        logger.warn(
+          { key: currentKey, fullPath: key },
+          'Blocked navigation to potentially dangerous nested key'
+        );
+        return false;
       }
-      current = current[keys[i]];
+
+      // Safe property access using hasOwnProperty check
+      if (!Object.prototype.hasOwnProperty.call(current, currentKey)) {
+        current[currentKey] = {};
+      }
+      current = current[currentKey];
     }
 
-    // Update the value
+    // Update the value with final key validation
     const lastKey = keys[keys.length - 1];
+    if (!isSafeKey(lastKey)) {
+      logger.warn(
+        { key: lastKey, fullPath: key },
+        'Blocked update to potentially dangerous final key'
+      );
+      return false;
+    }
+
     if (increment) {
-      current[lastKey] = (current[lastKey] || 0) + value;
+      // Safe property access for increment
+      const currentValue = Object.prototype.hasOwnProperty.call(current, lastKey)
+        ? current[lastKey] || 0
+        : 0;
+      current[lastKey] = currentValue + value;
     } else {
       current[lastKey] = value;
     }
@@ -545,6 +639,15 @@ async function incrementStat(key, amount = 1) {
  */
 async function addRateLimitedUser(userId) {
   try {
+    // Validate userId to prevent prototype pollution
+    if (!userId || typeof userId !== 'string' || !isSafeKey(userId)) {
+      logger.warn(
+        { userId },
+        'Blocked potentially dangerous user ID from being added to rate limits'
+      );
+      return false;
+    }
+
     const stats = await loadStats();
 
     // Increment the hit counter
@@ -556,13 +659,16 @@ async function addRateLimitedUser(userId) {
     }
     stats.rateLimits.users.add(userId);
 
-    // Initialize userCounts if it doesn't exist
+    // Initialize userCounts if it doesn't exist or ensure it's prototype-less
     if (!stats.rateLimits.userCounts) {
-      stats.rateLimits.userCounts = {};
+      stats.rateLimits.userCounts = Object.create(null);
     }
 
-    // Increment the count for this user
-    stats.rateLimits.userCounts[userId] = (stats.rateLimits.userCounts[userId] || 0) + 1;
+    // Safely increment the count for this user
+    const currentCount = Object.prototype.hasOwnProperty.call(stats.rateLimits.userCounts, userId)
+      ? stats.rateLimits.userCounts[userId] || 0
+      : 0;
+    stats.rateLimits.userCounts[userId] = currentCount + 1;
 
     // Save the updated stats
     return await saveStats(stats);
@@ -662,6 +768,27 @@ async function repairStatsFile() {
         logger.warn('Stats file missing rateLimits, needs repair');
         needsRepair = true;
         stats.rateLimits = { ...DEFAULT_STATS.rateLimits };
+      }
+
+      // Ensure userCounts is prototype-less during repair
+      if (
+        stats.rateLimits &&
+        stats.rateLimits.userCounts &&
+        Object.getPrototypeOf(stats.rateLimits.userCounts) !== null
+      ) {
+        logger.warn('Converting userCounts to prototype-less object for security');
+        needsRepair = true;
+        const safeUserCounts = Object.create(null);
+        // Only copy safe keys
+        for (const key in stats.rateLimits.userCounts) {
+          if (
+            Object.prototype.hasOwnProperty.call(stats.rateLimits.userCounts, key) &&
+            isSafeKey(key)
+          ) {
+            safeUserCounts[key] = stats.rateLimits.userCounts[key];
+          }
+        }
+        stats.rateLimits.userCounts = safeUserCounts;
       }
     } catch (error) {
       logger.error({ error }, 'Stats file is corrupted, attempting repair');

@@ -21,7 +21,7 @@ const BACKGROUND = imageGeneration.BACKGROUND;
 const { createLogger } = require('../../core/logger');
 const logger = createLogger('commands:image');
 const axios = require('axios');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const retryWithBreaker = require('../../../utils/retryWithBreaker');
 const breakerManager = require('../../middleware/breakerManager');
 
 // Circuit breaker configuration for image downloads

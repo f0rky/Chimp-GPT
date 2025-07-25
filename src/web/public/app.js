@@ -877,33 +877,80 @@ async function updateFunctionResults() {
 // Generic function to display summary data
 function displaySummary(container, summary, functionName) {
   if (!summary || summary.count === 0) {
-    container.innerHTML = `<div class="no-data">No recent ${functionName} calls</div>`;
+    // Clear container and add no-data message
+    container.innerHTML = '';
+    const noDataDiv = document.createElement('div');
+    noDataDiv.className = 'no-data';
+    noDataDiv.textContent = `No recent ${functionName} calls`;
+    container.appendChild(noDataDiv);
     return;
   }
 
-  container.innerHTML = `
-    <div class="result-summary">
-      <div class="summary-stat">
-        <span class="stat-label">Total Calls:</span>
-        <span class="stat-value">${summary.count}</span>
-      </div>
-      <div class="summary-stat">
-        <span class="stat-label">Last Used:</span>
-        <span class="stat-value">${summary.latest ? new Date(summary.latest).toLocaleString() : 'Never'}</span>
-      </div>
-      <div class="summary-actions">
-        <button class="view-details-btn" onclick="loadFullResults('${functionName}', '${container.id}')">
-          📋 View Details
-        </button>
-      </div>
-    </div>
-  `;
+  // Clear container
+  container.innerHTML = '';
+
+  // Create result summary container
+  const resultSummaryDiv = document.createElement('div');
+  resultSummaryDiv.className = 'result-summary';
+
+  // Create total calls stat
+  const totalCallsDiv = document.createElement('div');
+  totalCallsDiv.className = 'summary-stat';
+
+  const totalCallsLabel = document.createElement('span');
+  totalCallsLabel.className = 'stat-label';
+  totalCallsLabel.textContent = 'Total Calls:';
+
+  const totalCallsValue = document.createElement('span');
+  totalCallsValue.className = 'stat-value';
+  totalCallsValue.textContent = summary.count;
+
+  totalCallsDiv.appendChild(totalCallsLabel);
+  totalCallsDiv.appendChild(totalCallsValue);
+
+  // Create last used stat
+  const lastUsedDiv = document.createElement('div');
+  lastUsedDiv.className = 'summary-stat';
+
+  const lastUsedLabel = document.createElement('span');
+  lastUsedLabel.className = 'stat-label';
+  lastUsedLabel.textContent = 'Last Used:';
+
+  const lastUsedValue = document.createElement('span');
+  lastUsedValue.className = 'stat-value';
+  lastUsedValue.textContent = summary.latest ? new Date(summary.latest).toLocaleString() : 'Never';
+
+  lastUsedDiv.appendChild(lastUsedLabel);
+  lastUsedDiv.appendChild(lastUsedValue);
+
+  // Create actions
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'summary-actions';
+
+  const viewDetailsBtn = document.createElement('button');
+  viewDetailsBtn.className = 'view-details-btn';
+  viewDetailsBtn.textContent = '📋 View Details';
+  viewDetailsBtn.onclick = () => loadFullResults(functionName, container.id);
+
+  actionsDiv.appendChild(viewDetailsBtn);
+
+  // Assemble the summary
+  resultSummaryDiv.appendChild(totalCallsDiv);
+  resultSummaryDiv.appendChild(lastUsedDiv);
+  resultSummaryDiv.appendChild(actionsDiv);
+
+  container.appendChild(resultSummaryDiv);
 }
 
 // Function to load full results on demand
-async function _loadFullResults(functionType, containerId) {
+async function loadFullResults(functionType, containerId) {
   const container = document.getElementById(containerId);
-  container.innerHTML = '<div class="loading">Loading full results...</div>';
+  container.innerHTML = '';
+
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'loading';
+  loadingDiv.textContent = 'Loading full results...';
+  container.appendChild(loadingDiv);
 
   try {
     const response = await fetch(`/function-results?limit=5`);
@@ -918,103 +965,210 @@ async function _loadFullResults(functionType, containerId) {
     } else if (functionType === 'Wolfram Alpha' && data.wolfram) {
       displayWolframDetails(container, data.wolfram);
     } else {
-      container.innerHTML = `<div class="no-data">No ${functionType} results available</div>`;
+      container.innerHTML = '';
+      const noDataDiv = document.createElement('div');
+      noDataDiv.className = 'no-data';
+      noDataDiv.textContent = `No ${functionType} results available`;
+      container.appendChild(noDataDiv);
     }
   } catch (error) {
-    container.innerHTML = `<div class="error">Error loading ${functionType} results</div>`;
+    container.innerHTML = '';
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error';
+    errorDiv.textContent = `Error loading ${functionType} results`;
+    container.appendChild(errorDiv);
   }
 }
 
 function displayWeatherDetails(container, results) {
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No weather results</div>';
+    container.innerHTML = '';
+    const noDataDiv = document.createElement('div');
+    noDataDiv.className = 'no-data';
+    noDataDiv.textContent = 'No weather results';
+    container.appendChild(noDataDiv);
     return;
   }
 
-  container.innerHTML = results
-    .slice(0, 3)
-    .map(
-      item => `
-    <div class="function-call">
-      <div class="function-header">
-        <span class="function-location">${item.result?.location?.name || item.params.location || 'Unknown'}</span>
-        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="function-details">${item.result?.formatted || 'Weather data'}</div>
-    </div>
-  `
-    )
-    .join('');
+  container.innerHTML = '';
+
+  results.slice(0, 3).forEach(item => {
+    const functionCallDiv = document.createElement('div');
+    functionCallDiv.className = 'function-call';
+
+    // Create header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'function-header';
+
+    const locationSpan = document.createElement('span');
+    locationSpan.className = 'function-location';
+    locationSpan.textContent = item.result?.location?.name || item.params.location || 'Unknown';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'function-time';
+    timeSpan.textContent = new Date(item.timestamp).toLocaleString();
+
+    headerDiv.appendChild(locationSpan);
+    headerDiv.appendChild(timeSpan);
+
+    // Create details
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'function-details';
+    detailsDiv.textContent = item.result?.formatted || 'Weather data';
+
+    functionCallDiv.appendChild(headerDiv);
+    functionCallDiv.appendChild(detailsDiv);
+    container.appendChild(functionCallDiv);
+  });
 }
 
 function displayImageDetails(container, results) {
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No image results</div>';
+    container.innerHTML = '';
+    const noDataDiv = document.createElement('div');
+    noDataDiv.className = 'no-data';
+    noDataDiv.textContent = 'No image results';
+    container.appendChild(noDataDiv);
     return;
   }
 
-  container.innerHTML = results
-    .slice(0, 3)
-    .map(
-      item => `
-    <div class="function-call">
-      <div class="function-header">
-        <span class="function-location">GPT Image-1</span>
-        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="function-params">Prompt: "${item.params?.prompt || 'Unknown'}"</div>
-      <div class="function-details">
-        ${item.result?.success ? '✅ Generated successfully' : '❌ Generation failed'}
-        ${item.result?.images?.[0] ? `<br><img src="${item.result.images[0]}" style="max-width: 200px; margin-top: 8px;" alt="Generated image">` : ''}
-      </div>
-    </div>
-  `
-    )
-    .join('');
+  container.innerHTML = '';
+
+  results.slice(0, 3).forEach(item => {
+    const functionCallDiv = document.createElement('div');
+    functionCallDiv.className = 'function-call';
+
+    // Create header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'function-header';
+
+    const locationSpan = document.createElement('span');
+    locationSpan.className = 'function-location';
+    locationSpan.textContent = 'GPT Image-1';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'function-time';
+    timeSpan.textContent = new Date(item.timestamp).toLocaleString();
+
+    headerDiv.appendChild(locationSpan);
+    headerDiv.appendChild(timeSpan);
+
+    // Create params
+    const paramsDiv = document.createElement('div');
+    paramsDiv.className = 'function-params';
+    paramsDiv.textContent = `Prompt: "${item.params?.prompt || 'Unknown'}"`;
+
+    // Create details
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'function-details';
+
+    const statusText = document.createTextNode(
+      item.result?.success ? '✅ Generated successfully' : '❌ Generation failed'
+    );
+    detailsDiv.appendChild(statusText);
+
+    // Add image if available
+    if (item.result?.images?.[0]) {
+      const lineBreak = document.createElement('br');
+      detailsDiv.appendChild(lineBreak);
+
+      const img = document.createElement('img');
+      img.src = item.result.images[0];
+      img.style.maxWidth = '200px';
+      img.style.marginTop = '8px';
+      img.alt = 'Generated image';
+      detailsDiv.appendChild(img);
+    }
+
+    functionCallDiv.appendChild(headerDiv);
+    functionCallDiv.appendChild(paramsDiv);
+    functionCallDiv.appendChild(detailsDiv);
+    container.appendChild(functionCallDiv);
+  });
 }
 
 function displayTimeDetails(container, results) {
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No time results</div>';
+    container.innerHTML = '';
+    const noDataDiv = document.createElement('div');
+    noDataDiv.className = 'no-data';
+    noDataDiv.textContent = 'No time results';
+    container.appendChild(noDataDiv);
     return;
   }
 
-  container.innerHTML = results
-    .slice(0, 3)
-    .map(
-      item => `
-    <div class="function-call">
-      <div class="function-header">
-        <span class="function-location">${item.result?.location || item.params.location || 'Unknown'}</span>
-        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="function-details">${item.result?.formatted || 'Time data'}</div>
-    </div>
-  `
-    )
-    .join('');
+  container.innerHTML = '';
+
+  results.slice(0, 3).forEach(item => {
+    const functionCallDiv = document.createElement('div');
+    functionCallDiv.className = 'function-call';
+
+    // Create header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'function-header';
+
+    const locationSpan = document.createElement('span');
+    locationSpan.className = 'function-location';
+    locationSpan.textContent = item.result?.location || item.params.location || 'Unknown';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'function-time';
+    timeSpan.textContent = new Date(item.timestamp).toLocaleString();
+
+    headerDiv.appendChild(locationSpan);
+    headerDiv.appendChild(timeSpan);
+
+    // Create details
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'function-details';
+    detailsDiv.textContent = item.result?.formatted || 'Time data';
+
+    functionCallDiv.appendChild(headerDiv);
+    functionCallDiv.appendChild(detailsDiv);
+    container.appendChild(functionCallDiv);
+  });
 }
 
 function displayWolframDetails(container, results) {
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="no-data">No Wolfram results</div>';
+    container.innerHTML = '';
+    const noDataDiv = document.createElement('div');
+    noDataDiv.className = 'no-data';
+    noDataDiv.textContent = 'No Wolfram results';
+    container.appendChild(noDataDiv);
     return;
   }
 
-  container.innerHTML = results
-    .slice(0, 3)
-    .map(
-      item => `
-    <div class="function-call">
-      <div class="function-header">
-        <span class="function-location">${item.params?.query || 'Unknown query'}</span>
-        <span class="function-time">${new Date(item.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="function-details">${item.result?.formatted || JSON.stringify(item.result, null, 2)}</div>
-    </div>
-  `
-    )
-    .join('');
+  container.innerHTML = '';
+
+  results.slice(0, 3).forEach(item => {
+    const functionCallDiv = document.createElement('div');
+    functionCallDiv.className = 'function-call';
+
+    // Create header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'function-header';
+
+    const locationSpan = document.createElement('span');
+    locationSpan.className = 'function-location';
+    locationSpan.textContent = item.params?.query || 'Unknown query';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'function-time';
+    timeSpan.textContent = new Date(item.timestamp).toLocaleString();
+
+    headerDiv.appendChild(locationSpan);
+    headerDiv.appendChild(timeSpan);
+
+    // Create details
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'function-details';
+    detailsDiv.textContent = item.result?.formatted || JSON.stringify(item.result, null, 2);
+
+    functionCallDiv.appendChild(headerDiv);
+    functionCallDiv.appendChild(detailsDiv);
+    container.appendChild(functionCallDiv);
+  });
 }
 
 function updateWeatherResults(summary) {
@@ -1494,13 +1648,19 @@ function updateErrors(errors) {
 
       // Create table header
       const thead = document.createElement('thead');
-      thead.innerHTML = `
-                <tr>
-                    <th>Plugin ID</th>
-                    <th>Total Errors</th>
-                    <th>Hook Details</th>
-                </tr>
-            `;
+      const headerRow = document.createElement('tr');
+
+      const pluginIdHeader = document.createElement('th');
+      pluginIdHeader.textContent = 'Plugin ID';
+      const totalErrorsHeader = document.createElement('th');
+      totalErrorsHeader.textContent = 'Total Errors';
+      const hookDetailsHeader = document.createElement('th');
+      hookDetailsHeader.textContent = 'Hook Details';
+
+      headerRow.appendChild(pluginIdHeader);
+      headerRow.appendChild(totalErrorsHeader);
+      headerRow.appendChild(hookDetailsHeader);
+      thead.appendChild(headerRow);
       table.appendChild(thead);
 
       // Create table body
@@ -1518,27 +1678,44 @@ function updateErrors(errors) {
         const hookErrors =
           pluginError.hooks && typeof pluginError.hooks === 'object' ? pluginError.hooks : {};
 
-        // Create hook details HTML
-        let hookDetailsHtml = '';
+        // Create plugin ID cell
+        const pluginIdCell = document.createElement('td');
+        const pluginIdCode = document.createElement('code');
+        pluginIdCode.textContent = pluginId;
+        pluginIdCell.appendChild(pluginIdCode);
+
+        // Create error count cell
+        const errorCountCell = document.createElement('td');
+        errorCountCell.textContent = errorCount;
+
+        // Create hook details cell
+        const hookDetailsCell = document.createElement('td');
         const hookNames = Object.keys(hookErrors);
 
         if (hookNames.length > 0) {
-          hookDetailsHtml = '<ul class="mb-0">';
+          const hookList = document.createElement('ul');
+          hookList.className = 'mb-0';
+
           hookNames.forEach(hookName => {
-            hookDetailsHtml += `<li><strong>${hookName}</strong>: ${hookErrors[hookName]} errors</li>`;
+            const listItem = document.createElement('li');
+            const strongElement = document.createElement('strong');
+            strongElement.textContent = hookName;
+            listItem.appendChild(strongElement);
+            listItem.appendChild(document.createTextNode(`: ${hookErrors[hookName]} errors`));
+            hookList.appendChild(listItem);
           });
-          hookDetailsHtml += '</ul>';
+
+          hookDetailsCell.appendChild(hookList);
         } else {
-          hookDetailsHtml = '<span class="text-muted">No detailed hook information</span>';
+          const noInfoSpan = document.createElement('span');
+          noInfoSpan.className = 'text-muted';
+          noInfoSpan.textContent = 'No detailed hook information';
+          hookDetailsCell.appendChild(noInfoSpan);
         }
 
-        // Set row content
-        row.innerHTML = `
-                    <td><code>${pluginId}</code></td>
-                    <td>${errorCount}</td>
-                    <td>${hookDetailsHtml}</td>
-                `;
-
+        row.appendChild(pluginIdCell);
+        row.appendChild(errorCountCell);
+        row.appendChild(hookDetailsCell);
         tbody.appendChild(row);
       });
 
@@ -1647,10 +1824,17 @@ function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
     sortedPlugins.forEach(([pluginId, count]) => {
       const pluginItem = document.createElement('div');
       pluginItem.className = 'plugin-item';
-      pluginItem.innerHTML = `
-            <span class="plugin-name">${pluginId}</span>
-            <span class="plugin-value">${count.toLocaleString()} calls</span>
-        `;
+
+      const pluginName = document.createElement('span');
+      pluginName.className = 'plugin-name';
+      pluginName.textContent = pluginId;
+
+      const pluginValue = document.createElement('span');
+      pluginValue.className = 'plugin-value';
+      pluginValue.textContent = `${count.toLocaleString()} calls`;
+
+      pluginItem.appendChild(pluginName);
+      pluginItem.appendChild(pluginValue);
       apiCallsContainer.appendChild(pluginItem);
     });
   } else {
@@ -1673,10 +1857,17 @@ function updatePluginStats(plugins, pluginApiCalls, pluginErrors) {
     sortedPlugins.forEach(([pluginId, count]) => {
       const pluginItem = document.createElement('div');
       pluginItem.className = 'plugin-item';
-      pluginItem.innerHTML = `
-            <span class="plugin-name">${pluginId}</span>
-            <span class="plugin-value">${count.toLocaleString()} errors</span>
-        `;
+
+      const pluginName = document.createElement('span');
+      pluginName.className = 'plugin-name';
+      pluginName.textContent = pluginId;
+
+      const pluginValue = document.createElement('span');
+      pluginValue.className = 'plugin-value';
+      pluginValue.textContent = `${count.toLocaleString()} errors`;
+
+      pluginItem.appendChild(pluginName);
+      pluginItem.appendChild(pluginValue);
       errorsContainer.appendChild(pluginItem);
     });
   } else {
@@ -1715,13 +1906,19 @@ function updateRateLimitedUsers(userDetailsArray) {
 
     // Create table header
     const thead = document.createElement('thead');
-    thead.innerHTML = `
-      <tr>
-        <th>User ID</th>
-        <th>Count</th>
-        <th>Last Updated</th>
-      </tr>
-    `;
+    const headerRow = document.createElement('tr');
+
+    const userIdHeader = document.createElement('th');
+    userIdHeader.textContent = 'User ID';
+    const countHeader = document.createElement('th');
+    countHeader.textContent = 'Count';
+    const lastUpdatedHeader = document.createElement('th');
+    lastUpdatedHeader.textContent = 'Last Updated';
+
+    headerRow.appendChild(userIdHeader);
+    headerRow.appendChild(countHeader);
+    headerRow.appendChild(lastUpdatedHeader);
+    thead.appendChild(headerRow);
 
     // Create table body
     const tbody = document.createElement('tbody');
@@ -1731,11 +1928,21 @@ function updateRateLimitedUsers(userDetailsArray) {
       if (!user) return;
 
       const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${user.userId || 'Unknown'}</td>
-        <td>${typeof user.count !== 'undefined' ? user.count : 0}</td>
-        <td>${user.timestamp ? new Date(user.timestamp).toLocaleString() : 'N/A'}</td>
-      `;
+
+      const userIdCell = document.createElement('td');
+      userIdCell.textContent = user.userId || 'Unknown';
+
+      const countCell = document.createElement('td');
+      countCell.textContent = typeof user.count !== 'undefined' ? user.count : 0;
+
+      const timestampCell = document.createElement('td');
+      timestampCell.textContent = user.timestamp
+        ? new Date(user.timestamp).toLocaleString()
+        : 'N/A';
+
+      row.appendChild(userIdCell);
+      row.appendChild(countCell);
+      row.appendChild(timestampCell);
       tbody.appendChild(row);
     });
 

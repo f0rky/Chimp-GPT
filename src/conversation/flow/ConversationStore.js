@@ -1,4 +1,5 @@
 const { SharedStore } = require('./PocketFlow');
+const config = require('../../core/configValidator');
 
 class ConversationStore extends SharedStore {
   constructor() {
@@ -13,6 +14,13 @@ class ConversationStore extends SharedStore {
     this.set('botIntentCache', new Map());
     this.set('rateLimits', new Map());
     this.set('activeFlows', new Map());
+
+    // Initialize bot personality from configuration
+    this.set(
+      'botPersonality',
+      config.BOT_PERSONALITY ||
+        'You are a helpful AI assistant. Respond naturally and helpfully to user messages.'
+    );
   }
 
   getConversation(userId) {

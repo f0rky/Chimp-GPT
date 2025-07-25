@@ -12,14 +12,19 @@ class Node {
 
   async execute(store, data) {
     const result = await this.action(store, data);
+    let finalResult = result;
 
     for (const connection of this.connections) {
       if (connection.condition(result, store)) {
-        await connection.node.execute(store, result);
+        const connectedResult = await connection.node.execute(store, result);
+        // Use the result from the connected node as the final result
+        if (connectedResult) {
+          finalResult = connectedResult;
+        }
       }
     }
 
-    return result;
+    return finalResult;
   }
 }
 

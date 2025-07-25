@@ -103,13 +103,27 @@ function updateSummaryTable(summary) {
       .replace(/openai/g, 'OpenAI')
       .replace(/\b\w/g, c => c.toUpperCase());
 
-    row.innerHTML = `
-      <td>${formattedOp}</td>
-      <td>${metrics.count}</td>
-      <td>${metrics.avg}ms</td>
-      <td>${metrics.p95}ms</td>
-      <td>${metrics.max}ms</td>
-    `;
+    // Create cells with secure DOM methods
+    const opCell = document.createElement('td');
+    opCell.textContent = formattedOp;
+
+    const countCell = document.createElement('td');
+    countCell.textContent = metrics.count;
+
+    const avgCell = document.createElement('td');
+    avgCell.textContent = `${metrics.avg}ms`;
+
+    const p95Cell = document.createElement('td');
+    p95Cell.textContent = `${metrics.p95}ms`;
+
+    const maxCell = document.createElement('td');
+    maxCell.textContent = `${metrics.max}ms`;
+
+    row.appendChild(opCell);
+    row.appendChild(countCell);
+    row.appendChild(avgCell);
+    row.appendChild(p95Cell);
+    row.appendChild(maxCell);
 
     tableBody.appendChild(row);
   }
@@ -294,94 +308,170 @@ function updateDetailedMetrics(detailed) {
       .replace(/openai/g, 'OpenAI')
       .replace(/\b\w/g, c => c.toUpperCase());
 
-    accordionItem.innerHTML = `
-      <h2 class="accordion-header">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${op}">
-          ${formattedOp} (${metrics.count} calls)
-        </button>
-      </h2>
-      <div id="collapse-${op}" class="accordion-collapse collapse">
-        <div class="accordion-body">
-          <table class="table table-sm">
-            <tr>
-              <th>Metric</th>
-              <th>Value</th>
-            </tr>
-            <tr><td>Count</td><td>${metrics.count}</td></tr>
-            <tr><td>Minimum</td><td>${Math.round(metrics.min)}ms</td></tr>
-            <tr><td>Maximum</td><td>${Math.round(metrics.max)}ms</td></tr>
-            <tr><td>Average</td><td>${Math.round(metrics.avg)}ms</td></tr>
-            <tr><td>Median</td><td>${Math.round(metrics.median)}ms</td></tr>
-            <tr><td>95th Percentile</td><td>${Math.round(metrics.p95)}ms</td></tr>
-            <tr><td>99th Percentile</td><td>${Math.round(metrics.p99)}ms</td></tr>
-          </table>
-          <h6>Recent Calls</h6>
-          <div class="recent-calls-container">
-            <table class="table table-sm table-striped">
-              <tr>
-                <th>Time</th>
-                <th>Duration</th>
-                <th>Details</th>
-              </tr>
-              ${getRecentCallsRows(metrics.recentTimings)}
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
+    // Create accordion header
+    const accordionHeader = document.createElement('h2');
+    accordionHeader.className = 'accordion-header';
+
+    const accordionButton = document.createElement('button');
+    accordionButton.className = 'accordion-button collapsed';
+    accordionButton.type = 'button';
+    accordionButton.setAttribute('data-bs-toggle', 'collapse');
+    accordionButton.setAttribute('data-bs-target', `#collapse-${op}`);
+    accordionButton.textContent = `${formattedOp} (${metrics.count} calls)`;
+
+    accordionHeader.appendChild(accordionButton);
+
+    // Create accordion collapse div
+    const accordionCollapse = document.createElement('div');
+    accordionCollapse.id = `collapse-${op}`;
+    accordionCollapse.className = 'accordion-collapse collapse';
+
+    // Create accordion body
+    const accordionBody = document.createElement('div');
+    accordionBody.className = 'accordion-body';
+
+    // Create metrics table
+    const metricsTable = document.createElement('table');
+    metricsTable.className = 'table table-sm';
+
+    // Create table header
+    const tableHeaderRow = document.createElement('tr');
+    const metricHeader = document.createElement('th');
+    metricHeader.textContent = 'Metric';
+    const valueHeader = document.createElement('th');
+    valueHeader.textContent = 'Value';
+    tableHeaderRow.appendChild(metricHeader);
+    tableHeaderRow.appendChild(valueHeader);
+    metricsTable.appendChild(tableHeaderRow);
+
+    // Create metric rows
+    const metricData = [
+      ['Count', metrics.count],
+      ['Minimum', `${Math.round(metrics.min)}ms`],
+      ['Maximum', `${Math.round(metrics.max)}ms`],
+      ['Average', `${Math.round(metrics.avg)}ms`],
+      ['Median', `${Math.round(metrics.median)}ms`],
+      ['95th Percentile', `${Math.round(metrics.p95)}ms`],
+      ['99th Percentile', `${Math.round(metrics.p99)}ms`],
+    ];
+
+    metricData.forEach(([metric, value]) => {
+      const row = document.createElement('tr');
+      const metricCell = document.createElement('td');
+      metricCell.textContent = metric;
+      const valueCell = document.createElement('td');
+      valueCell.textContent = value;
+      row.appendChild(metricCell);
+      row.appendChild(valueCell);
+      metricsTable.appendChild(row);
+    });
+
+    accordionBody.appendChild(metricsTable);
+
+    // Create Recent Calls section
+    const recentCallsHeader = document.createElement('h6');
+    recentCallsHeader.textContent = 'Recent Calls';
+    accordionBody.appendChild(recentCallsHeader);
+
+    const recentCallsContainer = document.createElement('div');
+    recentCallsContainer.className = 'recent-calls-container';
+
+    const recentCallsTable = document.createElement('table');
+    recentCallsTable.className = 'table table-sm table-striped';
+
+    // Create recent calls table header
+    const recentHeaderRow = document.createElement('tr');
+    const timeHeader = document.createElement('th');
+    timeHeader.textContent = 'Time';
+    const durationHeader = document.createElement('th');
+    durationHeader.textContent = 'Duration';
+    const detailsHeader = document.createElement('th');
+    detailsHeader.textContent = 'Details';
+    recentHeaderRow.appendChild(timeHeader);
+    recentHeaderRow.appendChild(durationHeader);
+    recentHeaderRow.appendChild(detailsHeader);
+    recentCallsTable.appendChild(recentHeaderRow);
+
+    // Add recent timing rows
+    createRecentCallsRows(metrics.recentTimings, recentCallsTable);
+
+    recentCallsContainer.appendChild(recentCallsTable);
+    accordionBody.appendChild(recentCallsContainer);
+
+    accordionCollapse.appendChild(accordionBody);
+    accordionItem.appendChild(accordionHeader);
+    accordionItem.appendChild(accordionCollapse);
 
     detailedBody.appendChild(accordionItem);
   }
 }
 
 /**
- * Generate HTML rows for recent calls
+ * Create DOM rows for recent calls
  *
  * @param {Array} recentTimings - Array of recent timing data
- * @returns {string} HTML for the table rows
+ * @param {HTMLElement} table - Table element to append rows to
  */
-function getRecentCallsRows(recentTimings) {
+function createRecentCallsRows(recentTimings, table) {
   if (!recentTimings || recentTimings.length === 0) {
-    return '<tr><td colspan="3">No recent calls</td></tr>';
+    const noDataRow = document.createElement('tr');
+    const noDataCell = document.createElement('td');
+    noDataCell.colSpan = 3;
+    noDataCell.textContent = 'No recent calls';
+    noDataRow.appendChild(noDataCell);
+    table.appendChild(noDataRow);
+    return;
   }
 
-  return recentTimings
-    .map(timing => {
-      const timestamp = new Date(timing.timestamp).toLocaleTimeString();
-      const duration = Math.round(timing.duration);
+  recentTimings.forEach(timing => {
+    const timestamp = new Date(timing.timestamp).toLocaleTimeString();
+    const duration = Math.round(timing.duration);
 
-      // Format metadata as a string
-      let metadata = '';
-      if (timing.metadata) {
-        metadata = Object.entries(timing.metadata)
-          .map(([key, value]) => {
-            // Truncate long values
-            const displayValue =
-              typeof value === 'string' && value.length > 50
-                ? value.substring(0, 47) + '...'
-                : value;
-            return `<strong>${key}:</strong> ${displayValue}`;
-          })
-          .join('<br>');
-      }
+    const row = document.createElement('tr');
 
-      // Add warning class for slow operations
-      let rowClass = '';
-      if (duration > 3000) {
-        rowClass = 'table-danger';
-      } else if (duration > 1000) {
-        rowClass = 'table-warning';
-      }
+    // Add warning class for slow operations
+    if (duration > 3000) {
+      row.className = 'table-danger';
+    } else if (duration > 1000) {
+      row.className = 'table-warning';
+    }
 
-      return `
-      <tr class="${rowClass}">
-        <td>${timestamp}</td>
-        <td>${duration}ms</td>
-        <td>${metadata}</td>
-      </tr>
-    `;
-    })
-    .join('');
+    // Time cell
+    const timeCell = document.createElement('td');
+    timeCell.textContent = timestamp;
+
+    // Duration cell
+    const durationCell = document.createElement('td');
+    durationCell.textContent = `${duration}ms`;
+
+    // Details cell
+    const detailsCell = document.createElement('td');
+
+    if (timing.metadata) {
+      // Create metadata elements
+      Object.entries(timing.metadata).forEach(([key, value], index) => {
+        if (index > 0) {
+          detailsCell.appendChild(document.createElement('br'));
+        }
+
+        const strongElement = document.createElement('strong');
+        strongElement.textContent = `${key}:`;
+        detailsCell.appendChild(strongElement);
+
+        // Truncate long values
+        const displayValue =
+          typeof value === 'string' && value.length > 50 ? value.substring(0, 47) + '...' : value;
+
+        detailsCell.appendChild(document.createTextNode(` ${displayValue}`));
+      });
+    }
+
+    row.appendChild(timeCell);
+    row.appendChild(durationCell);
+    row.appendChild(detailsCell);
+
+    table.appendChild(row);
+  });
 }
 
 // Clean up on page unload

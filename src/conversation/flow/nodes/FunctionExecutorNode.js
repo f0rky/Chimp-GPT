@@ -183,7 +183,8 @@ class FunctionExecutorNode extends BaseConversationNode {
         const naturalResponse = await this.generateNaturalResponse(
           context,
           toolCall,
-          functionResult
+          functionResult,
+          store
         );
 
         return {
@@ -260,9 +261,18 @@ class FunctionExecutorNode extends BaseConversationNode {
     }
   }
 
-  async generateNaturalResponse(context, toolCall, functionResult) {
+  async generateNaturalResponse(context, toolCall, functionResult, store) {
     try {
+      // Get bot personality from SharedStore if available
+      const botPersonality =
+        store?.get('botPersonality') ||
+        'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
+
       const responseContext = [
+        {
+          role: 'system',
+          content: botPersonality,
+        },
         ...context,
         {
           role: 'assistant',

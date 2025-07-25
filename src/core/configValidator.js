@@ -237,6 +237,76 @@ const CONFIG_SCHEMA = {
       return value.toLowerCase() === 'true';
     },
   },
+
+  // Knowledge System Configuration
+  ENABLE_KNOWLEDGE_SYSTEM: {
+    required: false,
+    description: 'Enable the multi-agent knowledge system with web search and documentation fetch',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  KNOWLEDGE_OWNER_ONLY_CODE: {
+    required: false,
+    description: 'Restrict code generation in knowledge system to bot owner only',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  KNOWLEDGE_WEB_SEARCH_ENABLED: {
+    required: false,
+    description: 'Enable web search functionality in knowledge system',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  KNOWLEDGE_MCP_FETCH_ENABLED: {
+    required: false,
+    description: 'Enable MCP-style web fetch functionality for documentation',
+    default: 'true',
+    validate: value => {
+      return typeof value === 'string' && ['true', 'false'].includes(value.toLowerCase());
+    },
+    transform: value => {
+      return value.toLowerCase() === 'true';
+    },
+  },
+  KNOWLEDGE_CONFIDENCE_THRESHOLD: {
+    required: false,
+    description: 'Minimum confidence threshold for knowledge verification (0-100)',
+    default: '60',
+    validate: value => {
+      const num = parseInt(value, 10);
+      return !isNaN(num) && num >= 0 && num <= 100;
+    },
+    transform: value => {
+      return parseInt(value, 10);
+    },
+  },
+  KNOWLEDGE_MAX_SEARCH_RESULTS: {
+    required: false,
+    description: 'Maximum number of search results to process per query',
+    default: '5',
+    validate: value => {
+      const num = parseInt(value, 10);
+      return !isNaN(num) && num >= 1 && num <= 20;
+    },
+    transform: value => {
+      return parseInt(value, 10);
+    },
+  },
   POCKETFLOW_TEST_PERCENTAGE: {
     required: false,
     description: 'Percentage of messages to test with PocketFlow when parallel testing is enabled',

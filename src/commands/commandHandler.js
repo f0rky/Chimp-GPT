@@ -18,6 +18,7 @@ const path = require('path');
 const { Collection } = require('discord.js');
 const { trackError } = require('../core/healthCheck');
 const { executeWithApproval, SENSITIVE_OPERATIONS } = require('../../utils/humanCircuitBreaker');
+const { sanitizePath } = require('../../utils/inputSanitizer');
 
 // Import slash command deployment function
 const deploySlashCommands = require('./deploySlashCommands');
@@ -121,7 +122,28 @@ async function loadCommands(commandsPath = path.join(__dirname, 'modules')) {
 
       for (const file of commandFiles) {
         try {
-          const filePath = path.join(commandsPath, file);
+          // Sanitize filename to prevent path traversal attacks
+          const sanitizedFile = sanitizePath(file);
+          if (sanitizedFile !== file) {
+            logger.warn(
+              { originalFile: file, sanitizedFile },
+              'Command file name sanitized for security'
+            );
+          }
+
+          const filePath = path.join(commandsPath, sanitizedFile);
+
+          // Additional security: verify the resolved path is within the commands directory
+          const resolvedPath = path.resolve(filePath);
+          const resolvedCommandsPath = path.resolve(commandsPath);
+          if (!resolvedPath.startsWith(resolvedCommandsPath)) {
+            logger.error(
+              { file: sanitizedFile, resolvedPath, resolvedCommandsPath },
+              'Path traversal attempt blocked in command loading'
+            );
+            continue;
+          }
+
           // Clear cache to ensure we get the latest version
           delete require.cache[require.resolve(filePath)];
 

@@ -312,8 +312,11 @@ async function handleImageGeneration(
       }
 
       // Prepare the response with the image
-      const imageUrl = imageResult.url;
-      const revisedPrompt = imageResult.revised_prompt || enhancedPrompt;
+      const imageResult_firstImage =
+        imageResult.images && imageResult.images[0] ? imageResult.images[0] : imageResult;
+      const imageUrl = imageResult_firstImage.url;
+      const revisedPrompt =
+        imageResult_firstImage.revisedPrompt || imageResult.revised_prompt || enhancedPrompt;
 
       // Create subtext with performance information
       const subtext = formatSubtext(actualStartTime, usage, apiCalls);
@@ -325,11 +328,65 @@ async function handleImageGeneration(
       }
       finalMessage += `**Model:** ${model} | **Size:** ${size}\n`;
       finalMessage += `**Generation Time:** ${formatElapsed(totalElapsed)}\n\n`;
-      finalMessage += `${imageUrl}`;
       finalMessage += subtext;
 
-      // Update the message with the final result
-      await feedbackMessage.edit(finalMessage);
+      // Check if we have base64 data to send as attachment
+      if (imageResult_firstImage.b64_json) {
+        // Convert base64 to buffer and send as attachment
+        const imageBuffer = Buffer.from(imageResult_firstImage.b64_json, 'base64');
+        const fileExtension = model === 'gpt-image-1' ? 'png' : 'png'; // Default to PNG
+        const fileName = `generated_image_${Date.now()}.${fileExtension}`;
+
+        // Update the message with the final result and attachment
+        await feedbackMessage.edit({
+          content: finalMessage,
+          files: [
+            {
+              attachment: imageBuffer,
+              name: fileName,
+            },
+          ],
+        });
+      } else if (imageUrl && !imageUrl.startsWith('data:')) {
+        // Regular URL - include it in the message
+        finalMessage += `${imageUrl}`;
+        await feedbackMessage.edit(finalMessage);
+      } else {
+        // If we still have a data URL but no b64_json, extract the base64 part
+        if (imageUrl && imageUrl.startsWith('data:')) {
+          const base64Match = imageUrl.match(/data:([^;]+);base64,(.+)/);
+          if (base64Match) {
+            const mimeType = base64Match[1];
+            const base64Data = base64Match[2];
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+
+            // Determine file extension from MIME type
+            let fileExtension = 'png';
+            if (mimeType.includes('jpeg')) fileExtension = 'jpg';
+            else if (mimeType.includes('webp')) fileExtension = 'webp';
+
+            const fileName = `generated_image_${Date.now()}.${fileExtension}`;
+
+            await feedbackMessage.edit({
+              content: finalMessage,
+              files: [
+                {
+                  attachment: imageBuffer,
+                  name: fileName,
+                },
+              ],
+            });
+          } else {
+            // Fallback if we can't parse the data URL
+            await feedbackMessage.edit(
+              finalMessage + '\n⚠️ Image generated but could not be displayed properly.'
+            );
+          }
+        } else {
+          // No image URL available
+          await feedbackMessage.edit(finalMessage + '\n⚠️ Image generated but no URL available.');
+        }
+      }
 
       // Store message relationship for context preservation
       if (storeMessageRelationship && message.originalMessage) {

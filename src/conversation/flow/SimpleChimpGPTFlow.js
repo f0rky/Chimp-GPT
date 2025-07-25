@@ -8,6 +8,7 @@
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
+const KnowledgeFlow = require('./KnowledgeFlow');
 
 const logger = createLogger('SimpleChimpGPTFlow');
 
@@ -20,6 +21,16 @@ class SimpleChimpGPTFlow {
       maxTokens: 2000,
       ...options,
     };
+
+    // Initialize knowledge system if enabled
+    if (config.ENABLE_KNOWLEDGE_SYSTEM) {
+      this.knowledgeFlow = new KnowledgeFlow(openaiClient, {
+        maxSearchResults: config.KNOWLEDGE_MAX_SEARCH_RESULTS,
+        confidenceThreshold: config.KNOWLEDGE_CONFIDENCE_THRESHOLD,
+        maxResponseTokens: this.options.maxTokens,
+      });
+      logger.info('Knowledge system initialized with multi-agent PocketFlow');
+    }
 
     this.initializeFlow();
   }
@@ -51,6 +62,26 @@ class SimpleChimpGPTFlow {
 
       // Detect intent and process accordingly
 
+      // Check for knowledge system patterns first (if enabled)
+      if (config.ENABLE_KNOWLEDGE_SYSTEM && this.knowledgeFlow) {
+        const knowledgePatterns = [
+          /(?:search|look\s+up|lookup|find|confirm|verify|check)/i,
+          /is\s+(?:it\s+)?true\s+that/i,
+          /can\s+you\s+(?:confirm|verify|search|lookup|look\s+up|find)/i,
+          /what\s+(?:is|are|does)/i,
+          /give\s+me\s+(?:the\s+)?(?:pocketflow\s+)?code/i,
+          /show\s+me\s+(?:the\s+)?code/i,
+          /how\s+to\s+(?:implement|code|build)/i,
+          /documentation|docs/i,
+          /pocketflow/i, // Any mention of pocketflow should trigger knowledge system
+        ];
+
+        if (knowledgePatterns.some(pattern => pattern.test(content))) {
+          logger.info('Processing as knowledge system request');
+          return await this.handleKnowledgeRequest(store, data);
+        }
+      }
+
       // Check for image generation patterns
       const imagePatterns = [
         /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
@@ -73,7 +104,12 @@ class SimpleChimpGPTFlow {
       logger.info('Processing as conversation request');
       return await this.handleConversation(store, data);
     } catch (error) {
-      logger.error('Error in unified processing:', error);
+      logger.error('Error in unified processing:', {
+        error: error.message,
+        stack: error.stack,
+        messageContent: data?.message?.content || 'unknown',
+        userId: data?.message?.author?.id || 'unknown',
+      });
       return {
         success: false,
         error: error.message,
@@ -182,6 +218,60 @@ class SimpleChimpGPTFlow {
         success: false,
         error: error.message,
         response: "I'm having trouble generating that image right now. Please try again.",
+      };
+    }
+  }
+
+  async handleKnowledgeRequest(store, data) {
+    try {
+      if (!this.knowledgeFlow) {
+        return {
+          success: false,
+          error: 'Knowledge system not available',
+          response: 'The knowledge system is currently disabled.',
+        };
+      }
+
+      const { message } = data;
+
+      logger.info(`Processing knowledge request: ${message.content.substring(0, 50)}...`);
+
+      // Use the multi-agent KnowledgeFlow to process the request
+      const knowledgeResult = await this.knowledgeFlow.processKnowledgeRequest(message);
+
+      logger.debug(`[KNOWLEDGE_RESULT_DEBUG] KnowledgeFlow returned:`, {
+        success: knowledgeResult.success,
+        hasResponse: !!knowledgeResult.response,
+        responseLength: knowledgeResult.response ? knowledgeResult.response.length : 0,
+        responsePreview: knowledgeResult.response
+          ? knowledgeResult.response.substring(0, 100) + '...'
+          : 'no response',
+        confidence: knowledgeResult.confidence,
+        hasCode: knowledgeResult.hasCode,
+        error: knowledgeResult.error,
+      });
+
+      return {
+        success: knowledgeResult.success,
+        response: knowledgeResult.response,
+        type: 'knowledge',
+        confidence: knowledgeResult.confidence,
+        hasCode: knowledgeResult.hasCode,
+        attachments: knowledgeResult.attachments || [],
+        error: knowledgeResult.error,
+      };
+    } catch (error) {
+      logger.error('Error in knowledge request handling:', {
+        error: error.message,
+        stack: error.stack,
+        messageContent: data?.message?.content || 'unknown',
+        userId: data?.message?.author?.id || 'unknown',
+      });
+      return {
+        success: false,
+        error: error.message,
+        response:
+          "I'm having trouble processing your knowledge request right now. Please try again.",
       };
     }
   }

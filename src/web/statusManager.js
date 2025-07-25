@@ -24,7 +24,6 @@
  * @version 1.0.0
  */
 
-// const axios = require('axios'); // Removed unused import
 const { createLogger } = require('../core/logger');
 const { ActivityType } = require('discord.js');
 const logger = createLogger('status');

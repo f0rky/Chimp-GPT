@@ -7,7 +7,7 @@
  */
 
 const { createLogger } = require('../../core/logger');
-const maliciousUserManager = require('../../utils/maliciousUserManager');
+const maliciousUserManager = require('../../../utils/maliciousUserManager');
 
 const logger = createLogger('commands:unblockuser');
 

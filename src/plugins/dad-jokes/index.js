@@ -11,8 +11,8 @@
 
 const { SlashCommandBuilder } = require('discord.js');
 const axios = require('axios');
-const { createLogger } = require('../../logger');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const { createLogger } = require('../../core/logger');
+const retryWithBreaker = require('../../../utils/retryWithBreaker');
 
 // Create a logger for this plugin
 const logger = createLogger('dad-jokes-plugin');

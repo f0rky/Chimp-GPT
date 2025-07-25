@@ -62,7 +62,7 @@ module.exports = {
         // Get loaded plugins from global plugin manager if available
         let loadedPlugins = 'None';
         try {
-          const pluginManager = require('../../pluginManager');
+          const pluginManager = require('../pluginManager');
           if (pluginManager && pluginManager.getPluginMetadata) {
             loadedPlugins =
               Object.values(pluginManager.getPluginMetadata())

@@ -550,28 +550,62 @@ function updateApiStats(apiCalls) {
 
     const item = document.createElement('div');
     item.className = 'api-stat-item';
-    item.innerHTML = `
-      <span class="name">${api.charAt(0).toUpperCase() + api.slice(1)}</span>
-      <span class="count">${count}</span>
-    `;
+    // Secure DOM creation to prevent XSS
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'name';
+    nameSpan.textContent = api.charAt(0).toUpperCase() + api.slice(1);
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'count';
+    countSpan.textContent = count;
+
+    item.appendChild(nameSpan);
+    item.appendChild(countSpan);
     container.appendChild(item);
   }
 }
 
 function updateRateLimits(rateLimits) {
   const container = document.getElementById('rate-limits');
-  container.innerHTML = `
-    <div class="stat-grid">
-      <div class="stat">
-        <span class="label">Total Hits</span>
-        <span class="value">${rateLimits?.count || 0}</span>
-      </div>
-      <div class="stat">
-        <span class="label">Unique Users</span>
-        <span class="value">${rateLimits?.uniqueUsers || 0}</span>
-      </div>
-    </div>
-  `;
+  // Secure DOM creation to prevent XSS
+  container.innerHTML = ''; // Clear existing content safely
+
+  const statGrid = document.createElement('div');
+  statGrid.className = 'stat-grid';
+
+  // Total Hits stat
+  const totalHitsStat = document.createElement('div');
+  totalHitsStat.className = 'stat';
+
+  const totalHitsLabel = document.createElement('span');
+  totalHitsLabel.className = 'label';
+  totalHitsLabel.textContent = 'Total Hits';
+
+  const totalHitsValue = document.createElement('span');
+  totalHitsValue.className = 'value';
+  totalHitsValue.textContent = rateLimits?.count || 0;
+
+  totalHitsStat.appendChild(totalHitsLabel);
+  totalHitsStat.appendChild(totalHitsValue);
+
+  // Unique Users stat
+  const uniqueUsersStat = document.createElement('div');
+  uniqueUsersStat.className = 'stat';
+
+  const uniqueUsersLabel = document.createElement('span');
+  uniqueUsersLabel.className = 'label';
+  uniqueUsersLabel.textContent = 'Unique Users';
+
+  const uniqueUsersValue = document.createElement('span');
+  uniqueUsersValue.className = 'value';
+  uniqueUsersValue.textContent = rateLimits?.uniqueUsers || 0;
+
+  uniqueUsersStat.appendChild(uniqueUsersLabel);
+  uniqueUsersStat.appendChild(uniqueUsersValue);
+
+  statGrid.appendChild(totalHitsStat);
+  statGrid.appendChild(uniqueUsersStat);
+  container.appendChild(statGrid);
 }
 
 function updatePerformanceDisplay(data) {
@@ -1011,9 +1045,16 @@ function updateImageGallery(images) {
     const imagePrompt = img.params?.prompt || img.prompt || 'Generated image';
 
     if (imageUrl) {
-      item.innerHTML = `<img src="${imageUrl}" alt="${imagePrompt}" onclick="openImageModal('${imageUrl}', '${imagePrompt.replace(/'/g, "\\'")}')">`;
+      const imgElement = document.createElement('img');
+      imgElement.src = imageUrl;
+      imgElement.alt = imagePrompt;
+      imgElement.onclick = () => openImageModal(imageUrl, imagePrompt);
+      item.appendChild(imgElement);
     } else {
-      item.innerHTML = '<div class="error">Image URL not available</div>';
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error';
+      errorDiv.textContent = 'Image URL not available';
+      item.appendChild(errorDiv);
     }
 
     gallery.appendChild(item);
@@ -1035,9 +1076,24 @@ function updateWeatherResults(weatherData) {
     const div = document.createElement('div');
     div.className = 'result-item';
     if (item.error) {
-      div.innerHTML = `<strong>${item.location}</strong>: <span class="error">${item.errorMessage}</span>`;
+      const strongElement = document.createElement('strong');
+      strongElement.textContent = item.location;
+
+      const errorSpan = document.createElement('span');
+      errorSpan.className = 'error';
+      errorSpan.textContent = item.errorMessage;
+
+      div.appendChild(strongElement);
+      div.appendChild(document.createTextNode(': '));
+      div.appendChild(errorSpan);
     } else {
-      div.innerHTML = `<strong>${item.location}</strong>: ${item.temperature}°${item.unit}, ${item.condition}`;
+      const strongElement = document.createElement('strong');
+      strongElement.textContent = item.location;
+
+      div.appendChild(strongElement);
+      div.appendChild(
+        document.createTextNode(`: ${item.temperature}°${item.unit}, ${item.condition}`)
+      );
     }
     container.appendChild(div);
   });

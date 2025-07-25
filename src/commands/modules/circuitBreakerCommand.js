@@ -14,7 +14,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { trackApiCall } = require('../../core/healthCheck');
 const circuitBreaker = require('../../middleware/circuitBreaker');
 const breakerManager = require('../../middleware/breakerManager');
-const { getVersionInfo } = require('../../utils/humanCircuitBreaker');
+const { getVersionInfo } = require('../../../utils/humanCircuitBreaker');
 const { formatUptime } = require('../../core/getBotVersion');
 
 // Create the command definition

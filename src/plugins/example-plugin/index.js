@@ -10,8 +10,8 @@
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const { createLogger } = require('../../logger');
-const config = require('../../configValidator');
+const { createLogger } = require('../../core/logger');
+const config = require('../../core/configValidator');
 const os = require('os');
 
 // Create a logger for this plugin
@@ -153,7 +153,7 @@ module.exports = {
 
       // Use the startup message coordinator
       try {
-        const startupCoordinator = require('../../utils/startupMessageCoordinator');
+        const startupCoordinator = require('../../../utils/startupMessageCoordinator');
 
         // Register example plugin as a component
         startupCoordinator.registerComponent('example-plugin');

@@ -6,7 +6,7 @@
 
 const { SlashCommandBuilder } = require('discord.js');
 const axios = require('axios');
-const { createLogger } = require('../../logger');
+const { createLogger } = require('../../core/logger');
 const logger = createLogger('weather-plugin');
 
 // Helper: Get API key from env

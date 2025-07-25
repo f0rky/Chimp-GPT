@@ -77,10 +77,17 @@ function handleAPIError(endpoint, error) {
   // Add visual indication of error
   const errorMessage = document.createElement('div');
   errorMessage.className = 'api-error';
-  errorMessage.innerHTML = `
-    <span class="error-icon">⚠️</span>
-    <span class="error-text">Failed to fetch ${endpoint}: ${error.message}</span>
-  `;
+
+  const errorIcon = document.createElement('span');
+  errorIcon.className = 'error-icon';
+  errorIcon.textContent = '⚠️';
+
+  const errorText = document.createElement('span');
+  errorText.className = 'error-text';
+  errorText.textContent = `Failed to fetch ${endpoint}: ${error.message}`;
+
+  errorMessage.appendChild(errorIcon);
+  errorMessage.appendChild(errorText);
 
   // Find or create error container
   let errorContainer = document.getElementById('errorContainer');
@@ -669,18 +676,30 @@ function updateFunctionPerformanceFromData(summary) {
   functions.sort((a, b) => b.avgTime - a.avgTime);
 
   // Update the slow functions list
-  elements.slowFunctions.innerHTML = functions
-    .slice(0, 3)
-    .map(
-      func => `
-            <li class="function-item">
-                <span class="function-name">${func.name}</span>
-                <span class="function-time">${func.avgTime}ms</span>
-                <span class="trend">(${func.count} calls)</span>
-            </li>
-        `
-    )
-    .join('');
+  elements.slowFunctions.innerHTML = '';
+
+  functions.slice(0, 3).forEach(func => {
+    const listItem = document.createElement('li');
+    listItem.className = 'function-item';
+
+    const functionName = document.createElement('span');
+    functionName.className = 'function-name';
+    functionName.textContent = func.name;
+
+    const functionTime = document.createElement('span');
+    functionTime.className = 'function-time';
+    functionTime.textContent = `${func.avgTime}ms`;
+
+    const trend = document.createElement('span');
+    trend.className = 'trend';
+    trend.textContent = `(${func.count} calls)`;
+
+    listItem.appendChild(functionName);
+    listItem.appendChild(functionTime);
+    listItem.appendChild(trend);
+
+    elements.slowFunctions.appendChild(listItem);
+  });
 }
 
 // Update active requests display
@@ -733,26 +752,38 @@ function updateBlockedUsersDisplay(data) {
     return;
   }
 
-  // Create HTML for blocked users list
-  const usersHTML = data.users
-    .map(
-      user => `
-    <div class="blocked-user-item">
-      <div class="user-info">
-        <span class="user-id">${user.userId}</span>
-        <span class="deletion-stats">
-          ${user.totalDeletions} deletions (${user.rapidDeletions} rapid)
-        </span>
-      </div>
-      <button class="unblock-btn" data-user-id="${user.userId}" title="Unblock user">
-        ✖
-      </button>
-    </div>
-  `
-    )
-    .join('');
+  // Create blocked users list using secure DOM methods
+  elements.blockedUsersContent.innerHTML = '';
 
-  elements.blockedUsersContent.innerHTML = usersHTML;
+  data.users.forEach(user => {
+    const userItem = document.createElement('div');
+    userItem.className = 'blocked-user-item';
+
+    const userInfo = document.createElement('div');
+    userInfo.className = 'user-info';
+
+    const userId = document.createElement('span');
+    userId.className = 'user-id';
+    userId.textContent = user.userId;
+
+    const deletionStats = document.createElement('span');
+    deletionStats.className = 'deletion-stats';
+    deletionStats.textContent = `${user.totalDeletions} deletions (${user.rapidDeletions} rapid)`;
+
+    userInfo.appendChild(userId);
+    userInfo.appendChild(deletionStats);
+
+    const unblockBtn = document.createElement('button');
+    unblockBtn.className = 'unblock-btn';
+    unblockBtn.setAttribute('data-user-id', user.userId);
+    unblockBtn.title = 'Unblock user';
+    unblockBtn.textContent = '✖';
+
+    userItem.appendChild(userInfo);
+    userItem.appendChild(unblockBtn);
+
+    elements.blockedUsersContent.appendChild(userItem);
+  });
 
   // Add event listeners to unblock buttons
   const unblockButtons = elements.blockedUsersContent.querySelectorAll('.unblock-btn');
@@ -844,8 +875,16 @@ async function fetchSettings() {
     }
   } catch (error) {
     console.error('Error fetching settings:', error);
-    document.getElementById('settingsTableBody').innerHTML =
-      '<tr><td colspan="5" class="error-cell">Error loading settings</td></tr>';
+    const settingsTableBody = document.getElementById('settingsTableBody');
+    settingsTableBody.innerHTML = '';
+
+    const errorRow = document.createElement('tr');
+    const errorCell = document.createElement('td');
+    errorCell.colSpan = 5;
+    errorCell.className = 'error-cell';
+    errorCell.textContent = 'Error loading settings';
+    errorRow.appendChild(errorCell);
+    settingsTableBody.appendChild(errorRow);
   }
 }
 
@@ -868,38 +907,90 @@ function updateSettingsTable(settings) {
   const tbody = document.getElementById('settingsTableBody');
   const filteredSettings = filterSettings(settings, currentFilter);
 
+  tbody.innerHTML = '';
+
   if (filteredSettings.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="5" class="no-data-cell">No settings match the current filter</td></tr>';
+    const noDataRow = document.createElement('tr');
+    const noDataCell = document.createElement('td');
+    noDataCell.colSpan = 5;
+    noDataCell.className = 'no-data-cell';
+    noDataCell.textContent = 'No settings match the current filter';
+    noDataRow.appendChild(noDataCell);
+    tbody.appendChild(noDataRow);
     return;
   }
 
-  tbody.innerHTML = filteredSettings
-    .map(setting => {
-      const statusClass = getStatusClass(setting);
-      const statusText = getStatusText(setting);
+  filteredSettings.forEach(setting => {
+    const statusClass = getStatusClass(setting);
+    const statusText = getStatusText(setting);
 
-      return `
-      <tr class="setting-row ${statusClass}">
-        <td class="setting-key">
-          ${setting.key}
-          ${setting.isSensitive ? '<span class="sensitive-badge">🔒</span>' : ''}
-        </td>
-        <td class="setting-description">${setting.description}</td>
-        <td class="setting-required">
-          ${setting.required ? '<span class="required-badge">Required</span>' : '<span class="optional-badge">Optional</span>'}
-        </td>
-        <td class="setting-status">
-          <span class="status-indicator ${statusClass}">${statusText}</span>
-        </td>
-        <td class="setting-value">
-          <span class="value-display">${setting.displayValue}</span>
-          ${setting.hasDefault && !setting.isSet ? `<span class="default-badge">Default: ${setting.defaultValue}</span>` : ''}
-        </td>
-      </tr>
-    `;
-    })
-    .join('');
+    const row = document.createElement('tr');
+    row.className = `setting-row ${statusClass}`;
+
+    // Setting key cell
+    const keyCell = document.createElement('td');
+    keyCell.className = 'setting-key';
+    keyCell.textContent = setting.key;
+
+    if (setting.isSensitive) {
+      const sensitiveBadge = document.createElement('span');
+      sensitiveBadge.className = 'sensitive-badge';
+      sensitiveBadge.textContent = '🔒';
+      keyCell.appendChild(sensitiveBadge);
+    }
+
+    // Description cell
+    const descCell = document.createElement('td');
+    descCell.className = 'setting-description';
+    descCell.textContent = setting.description;
+
+    // Required cell
+    const reqCell = document.createElement('td');
+    reqCell.className = 'setting-required';
+
+    const reqBadge = document.createElement('span');
+    if (setting.required) {
+      reqBadge.className = 'required-badge';
+      reqBadge.textContent = 'Required';
+    } else {
+      reqBadge.className = 'optional-badge';
+      reqBadge.textContent = 'Optional';
+    }
+    reqCell.appendChild(reqBadge);
+
+    // Status cell
+    const statusCell = document.createElement('td');
+    statusCell.className = 'setting-status';
+
+    const statusIndicator = document.createElement('span');
+    statusIndicator.className = `status-indicator ${statusClass}`;
+    statusIndicator.textContent = statusText;
+    statusCell.appendChild(statusIndicator);
+
+    // Value cell
+    const valueCell = document.createElement('td');
+    valueCell.className = 'setting-value';
+
+    const valueDisplay = document.createElement('span');
+    valueDisplay.className = 'value-display';
+    valueDisplay.textContent = setting.displayValue;
+    valueCell.appendChild(valueDisplay);
+
+    if (setting.hasDefault && !setting.isSet) {
+      const defaultBadge = document.createElement('span');
+      defaultBadge.className = 'default-badge';
+      defaultBadge.textContent = `Default: ${setting.defaultValue}`;
+      valueCell.appendChild(defaultBadge);
+    }
+
+    row.appendChild(keyCell);
+    row.appendChild(descCell);
+    row.appendChild(reqCell);
+    row.appendChild(statusCell);
+    row.appendChild(valueCell);
+
+    tbody.appendChild(row);
+  });
 }
 
 // Filter settings based on current filter

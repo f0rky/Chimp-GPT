@@ -8,7 +8,7 @@ const {
 } = require('../../conversation/conversationManager');
 const fs = require('fs').promises;
 const path = require('path');
-const { formatBytes } = require('../../utils/formatters');
+const { formatBytes } = require('../../../utils/formatters');
 
 /**
  * Clear command - Clears the conversation history for the current channel

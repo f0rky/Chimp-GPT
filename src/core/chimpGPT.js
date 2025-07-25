@@ -235,14 +235,24 @@ async function startBot() {
       blended: config.USE_BLENDED_CONVERSATIONS,
       replyContext: config.ENABLE_REPLY_CONTEXT,
       maxPerUser: config.MAX_MESSAGES_PER_USER_BLENDED,
+      pocketFlow: config.ENABLE_POCKETFLOW,
+      parallelTesting: config.POCKETFLOW_PARALLEL_TESTING,
     };
-    const modeDescription = conversationMode.blended
-      ? conversationMode.replyContext
-        ? 'Blended with Reply Context'
-        : 'Blended Only'
-      : conversationMode.replyContext
-        ? 'Individual with Reply Context'
-        : 'Individual Only';
+
+    let modeDescription;
+    if (config.ENABLE_POCKETFLOW) {
+      modeDescription = 'PocketFlow (Graph-based Architecture)';
+    } else if (config.POCKETFLOW_PARALLEL_TESTING) {
+      modeDescription = 'Parallel Testing (PocketFlow + Legacy)';
+    } else {
+      modeDescription = conversationMode.blended
+        ? conversationMode.replyContext
+          ? 'Legacy: Blended with Reply Context'
+          : 'Legacy: Blended Only'
+        : conversationMode.replyContext
+          ? 'Legacy: Individual with Reply Context'
+          : 'Legacy: Individual Only';
+    }
 
     discordLogger.info(
       {

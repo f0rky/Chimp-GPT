@@ -1,5 +1,6 @@
 const BaseConversationNode = require('./BaseNode');
 const { createLogger } = require('../../../core/logger');
+const config = require('../../../core/configValidator');
 
 const logger = createLogger('ContextManagerNode');
 
@@ -15,8 +16,10 @@ class ContextManagerNode extends BaseConversationNode {
       ...options,
     });
 
+    const TokenManager = require('../../../utils/tokenManager');
+    this.tokenConfig = TokenManager.getConfig();
+
     this.config = {
-      charsPerToken: 4,
       defaultMaxTokens: 2000,
       emergencyMaxTokens: 4000,
       minContextTokens: 200,
@@ -32,9 +35,11 @@ class ContextManagerNode extends BaseConversationNode {
     const maxTokens = data.maxTokens;
 
     if (!message) {
+      const error = new Error('No message provided for context management');
+      logger.error('Context management failed: missing message', { data });
       return {
         success: false,
-        error: 'No message provided for context management',
+        error: error.message,
         originalData: data,
       };
     }
@@ -72,11 +77,18 @@ class ContextManagerNode extends BaseConversationNode {
         confidence: data.confidence,
       };
     } catch (error) {
-      logger.error('Error managing context:', error);
+      logger.error('Error managing context:', {
+        error: error.message,
+        stack: error.stack,
+        conversationType,
+        messageId: message?.id,
+        userId: message?.author?.id,
+      });
       return {
         success: false,
-        error: error.message,
+        error: `Context management failed: ${error.message}`,
         context: [],
+        originalData: data,
       };
     }
   }
@@ -147,114 +159,33 @@ class ContextManagerNode extends BaseConversationNode {
   }
 
   optimizeContext(messages, options = {}) {
+    const TokenManager = require('../../../utils/tokenManager');
     const {
       maxTokens = this.config.defaultMaxTokens,
       emergencyMaxTokens = this.config.emergencyMaxTokens,
       preserveRecentMessages = this.config.preserveRecentMessages,
     } = options;
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return {
-        optimizedMessages: [],
-        originalTokenCount: 0,
-        finalTokenCount: 0,
-        messagesRemoved: 0,
-        optimizationStrategy: 'none',
-      };
-    }
-
-    const originalTokenCount = this.calculateTotalTokens(messages);
-
-    if (originalTokenCount <= maxTokens) {
-      return {
-        optimizedMessages: [...messages],
-        originalTokenCount,
-        finalTokenCount: originalTokenCount,
-        messagesRemoved: 0,
-        optimizationStrategy: 'none',
-      };
-    }
-
-    let optimizedMessages = [...messages];
-    let strategy = 'pruning';
-    let messagesRemoved = 0;
-
-    const systemMessages = optimizedMessages.filter(msg => msg.role === 'system');
-    const nonSystemMessages = optimizedMessages.filter(msg => msg.role !== 'system');
-
-    const recentMessages = nonSystemMessages.slice(-preserveRecentMessages);
-    const olderMessages = nonSystemMessages.slice(0, -preserveRecentMessages);
-
-    olderMessages.sort((a, b) => {
-      const scoreA = a.relevanceScore || a.metadata?.relevanceScore || 0;
-      const scoreB = b.relevanceScore || b.metadata?.relevanceScore || 0;
-
-      if (scoreA !== scoreB) {
-        return scoreB - scoreA;
-      }
-
-      return (b.timestamp || 0) - (a.timestamp || 0);
+    const result = TokenManager.optimizeForTokenLimit(messages, {
+      maxTokens,
+      emergencyMaxTokens,
+      preserveRecentMessages,
     });
 
-    let currentTokens = this.calculateTotalTokens([...systemMessages, ...recentMessages]);
-    const selectedOlderMessages = [];
-
-    for (const message of olderMessages) {
-      const messageTokens = this.estimateTokenCount(message);
-      if (currentTokens + messageTokens <= maxTokens) {
-        selectedOlderMessages.push(message);
-        currentTokens += messageTokens;
-      } else {
-        messagesRemoved++;
-      }
-    }
-
-    const allSelectedMessages = [...selectedOlderMessages, ...recentMessages];
-    allSelectedMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    optimizedMessages = [...systemMessages, ...allSelectedMessages];
-
-    const finalTokenCount = this.calculateTotalTokens(optimizedMessages);
-
-    if (finalTokenCount > emergencyMaxTokens) {
-      logger.warn(
-        {
-          originalTokens: originalTokenCount,
-          currentTokens: finalTokenCount,
-          emergencyLimit: emergencyMaxTokens,
-        },
-        'Applying emergency context pruning'
-      );
-
-      const emergencyMessages = [
-        ...systemMessages,
-        ...recentMessages.slice(-Math.max(1, Math.floor(preserveRecentMessages / 2))),
-      ];
-
-      optimizedMessages = emergencyMessages;
-      strategy = 'emergency_pruning';
-      messagesRemoved = messages.length - emergencyMessages.length;
-    }
-
     return {
-      optimizedMessages,
-      originalTokenCount,
-      finalTokenCount: this.calculateTotalTokens(optimizedMessages),
-      messagesRemoved,
-      optimizationStrategy: strategy,
+      ...result,
+      optimizationStrategy: result.messagesRemoved > 0 ? 'token_optimization' : 'none',
     };
   }
 
-  estimateTokenCount(text) {
-    if (!text) return 0;
-    const content = typeof text === 'string' ? text : text.content || '';
-    return Math.ceil(content.length / this.config.charsPerToken);
+  estimateTokenCount(message) {
+    const TokenManager = require('../../../utils/tokenManager');
+    return TokenManager.estimateMessageTokens(message);
   }
 
   calculateTotalTokens(messages) {
-    if (!Array.isArray(messages)) return 0;
-    return messages.reduce((total, message) => {
-      return total + this.estimateTokenCount(message);
-    }, 0);
+    const TokenManager = require('../../../utils/tokenManager');
+    return TokenManager.estimateConversationTokens(messages);
   }
 
   updateConversationStore(store, message, optimizedContext) {
@@ -275,7 +206,11 @@ class ContextManagerNode extends BaseConversationNode {
   }
 
   getSystemPrompt() {
-    return `You are a helpful AI assistant. Respond naturally and helpfully to user messages.`;
+    // Use the bot's personality from configuration
+    const personality =
+      config.BOT_PERSONALITY ||
+      'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
+    return personality;
   }
 }
 

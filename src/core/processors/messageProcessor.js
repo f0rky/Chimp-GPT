@@ -306,14 +306,10 @@ class MessageProcessor {
     }
   }
 
-  // Helper method to estimate token usage
+  // Helper method to estimate token usage - delegated to TokenManager
   estimateTokens(conversationLog) {
-    return conversationLog.reduce((sum, msg) => {
-      const contentLength = msg.content ? msg.content.length : 0;
-      // Function definitions also consume tokens
-      const roleTokens = msg.role === 'system' ? 10 : 5;
-      return sum + Math.ceil(contentLength / 4) + roleTokens;
-    }, 0);
+    const TokenManager = require('../../utils/tokenManager');
+    return TokenManager.estimateConversationTokens(conversationLog);
   }
 }
 

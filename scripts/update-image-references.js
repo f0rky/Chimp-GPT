@@ -5,6 +5,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { sanitizePath } = require('../utils/inputSanitizer');
+const { createLogger } = require('../src/core/logger');
+
+const logger = createLogger('update-image-references');
 
 // Files that need to be updated
 const filesToUpdate = [
@@ -21,7 +25,17 @@ let totalReplacements = 0;
 
 // Process each file
 filesToUpdate.forEach(filePath => {
-  const fullPath = path.resolve(__dirname, filePath);
+  // Sanitize the file path to prevent path traversal
+  const sanitizedPath = sanitizePath(filePath);
+  const fullPath = path.resolve(__dirname, sanitizedPath);
+
+  // Validate that the resolved path stays within the project directory
+  const projectRoot = path.resolve(__dirname, '..');
+  if (!fullPath.startsWith(projectRoot)) {
+    logger.error(`Path traversal attempt blocked for: ${filePath}`);
+    console.error(`Security: Path traversal attempt blocked for: ${filePath}`);
+    return;
+  }
 
   if (!fs.existsSync(fullPath)) {
     console.error(`File not found: ${fullPath}`);
@@ -77,18 +91,28 @@ filesToUpdate.forEach(filePath => {
 
 // Update specific UI text references to DALL-E
 try {
-  const htmlPath = path.resolve(__dirname, '../src/web/public/index.html');
-  if (fs.existsSync(htmlPath)) {
-    let htmlContent = fs.readFileSync(htmlPath, 'utf8');
+  // Sanitize and validate the HTML file path
+  const sanitizedHtmlPath = sanitizePath('../src/web/public/index.html');
+  const htmlPath = path.resolve(__dirname, sanitizedHtmlPath);
 
-    // Replace DALL-E tab button text with GPT Image-1
-    htmlContent = htmlContent.replace(
-      /<button class="tab-button" data-tab="dalle">DALL-E<\/button>/,
-      '<button class="tab-button" data-tab="gptimage">GPT Image-1</button>'
-    );
+  // Validate that the resolved path stays within the project directory
+  const projectRoot = path.resolve(__dirname, '..');
+  if (!htmlPath.startsWith(projectRoot)) {
+    logger.error('Path traversal attempt blocked for HTML file');
+    console.error('Security: Path traversal attempt blocked for HTML file');
+  } else {
+    if (fs.existsSync(htmlPath)) {
+      let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
-    fs.writeFileSync(htmlPath, htmlContent, 'utf8');
-    console.log('Updated HTML references from DALL-E to GPT Image-1');
+      // Replace DALL-E tab button text with GPT Image-1
+      htmlContent = htmlContent.replace(
+        /<button class="tab-button" data-tab="dalle">DALL-E<\/button>/,
+        '<button class="tab-button" data-tab="gptimage">GPT Image-1</button>'
+      );
+
+      fs.writeFileSync(htmlPath, htmlContent, 'utf8');
+      console.log('Updated HTML references from DALL-E to GPT Image-1');
+    }
   }
 } catch (error) {
   console.error('Error updating HTML:', error);

@@ -17,7 +17,7 @@ const {
   validateServerInput,
   validateEloMode,
   sanitizeDiscordMessage,
-} = require('../../utils/inputValidator');
+} = require('../../../utils/inputValidator');
 const logger = createLogger('commands:serverstats');
 const { SlashCommandBuilder } = require('discord.js');
 

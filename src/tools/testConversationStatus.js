@@ -134,11 +134,13 @@ async function testConversationStorage() {
 if (require.main === module) {
   testConversationStorage()
     .then(result => {
+      // Test results logged to stdout for CLI usage
       console.log('Conversation Storage Test Results:');
       console.log(JSON.stringify(result, null, 2));
       process.exit(result.success ? 0 : 1);
     })
     .catch(error => {
+      // Test error logged to stderr for CLI usage
       console.error('Error running conversation storage test:', error);
       process.exit(1);
     });

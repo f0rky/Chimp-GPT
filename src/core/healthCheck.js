@@ -205,6 +205,7 @@ function scheduleHealthReports(client) {
 
   // Register health check as a component that will contribute to the startup message
   startupCoordinator.registerComponent('healthCheck');
+  startupCoordinator.registerComponent('conversationSystem');
 
   // Send the startup message after a short delay
   // Use a retry mechanism to wait for client to be ready
@@ -320,6 +321,49 @@ function scheduleHealthReports(client) {
               footer: {
                 text: `ChimpGPT v${version}`,
               },
+            });
+
+            // Add conversation system information embed
+            const configValidator = require('./configValidator');
+            let conversationDescription;
+            let conversationColor;
+
+            if (configValidator.ENABLE_POCKETFLOW) {
+              conversationDescription = `🚀 **PocketFlow Architecture**
+• Graph-based conversation system
+• Advanced intent detection with confidence scoring
+• Dynamic context management with token optimization
+• Intelligent response routing (individual/blended modes)
+• Enhanced function execution with OpenAI integration`;
+              conversationColor = 0x00ff88; // Bright green-blue for new system
+            } else if (config.POCKETFLOW_PARALLEL_TESTING) {
+              conversationDescription = `🧪 **Parallel Testing Mode**
+• Running both PocketFlow and Legacy systems
+• ${config.POCKETFLOW_TEST_PERCENTAGE}% of messages tested with PocketFlow
+• Comparison logging: ${config.POCKETFLOW_LOG_COMPARISONS ? 'Enabled' : 'Disabled'}
+• Gradual migration to graph-based architecture`;
+              conversationColor = 0xffaa00; // Orange for testing mode
+            } else {
+              const legacyMode = config.USE_BLENDED_CONVERSATIONS
+                ? config.ENABLE_REPLY_CONTEXT
+                  ? 'Blended with Reply Context'
+                  : 'Blended Only'
+                : config.ENABLE_REPLY_CONTEXT
+                  ? 'Individual with Reply Context'
+                  : 'Individual Only';
+              conversationDescription = `📞 **Legacy Conversation System**
+• Mode: ${legacyMode}
+• Max messages per user (blended): ${config.MAX_MESSAGES_PER_USER_BLENDED}
+• Max reference depth: ${config.MAX_REFERENCE_DEPTH}
+• Traditional conversation management`;
+              conversationColor = 0x6666ff; // Blue for legacy system
+            }
+
+            startupCoordinator.addEmbed('conversationSystem', {
+              title: '💬 Conversation System',
+              description: conversationDescription,
+              color: conversationColor,
+              timestamp: new Date(),
             });
 
             // Update the startup message with all embeds

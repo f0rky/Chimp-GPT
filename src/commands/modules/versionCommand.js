@@ -12,7 +12,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { EmbedBuilder } = require('discord.js');
 const { getDetailedVersionInfo } = require('../../core/getBotVersion');
-const { generateVersionResponse } = require('../../utils/versionSelfQuery');
+const { generateVersionResponse } = require('../../../utils/versionSelfQuery');
 const { trackApiCall } = require('../../core/healthCheck');
 const { formatUptime } = require('../../core/getBotVersion');
 
