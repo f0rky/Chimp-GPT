@@ -1,0 +1,145 @@
+name: Security Audit & Auto-Fix
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security audit daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force_fix:
+        description: 'Force security fixes even if breaking'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run security audit
+      id: audit
+      run: |
+        echo "Running security audit..."
+        npm run security:auto
+        echo "audit_result=$?" >> $GITHUB_OUTPUT
+      continue-on-error: true
+      
+    - name: Check for vulnerabilities
+      run: |
+        VULN_COUNT=$(npm audit --json | jq '.metadata.vulnerabilities.total')
+        echo "Vulnerabilities found: $VULN_COUNT"
+        echo "vuln_count=$VULN_COUNT" >> $GITHUB_ENV
+        
+    - name: Apply security fixes
+      if: env.vuln_count > 0
+      run: |
+        echo "Applying security fixes..."
+        if [ "${{ github.event.inputs.force_fix }}" = "true" ]; then
+          npm audit fix --force
+        else
+          npm audit fix
+        fi
+        
+    - name: Run tests after fixes
+      if: env.vuln_count > 0
+      run: npm test
+      
+    - name: Check if fixes were applied
+      if: env.vuln_count > 0
+      id: check_fixes
+      run: |
+        NEW_VULN_COUNT=$(npm audit --json | jq '.metadata.vulnerabilities.total')
+        echo "Vulnerabilities after fix: $NEW_VULN_COUNT"
+        if [ "$NEW_VULN_COUNT" -lt "${{ env.vuln_count }}" ]; then
+          echo "fixes_applied=true" >> $GITHUB_OUTPUT
+          echo "new_vuln_count=$NEW_VULN_COUNT" >> $GITHUB_OUTPUT
+        else
+          echo "fixes_applied=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Commit security fixes
+      if: steps.check_fixes.outputs.fixes_applied == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add package-lock.json
+        git commit -m "fix: apply automated security fixes
+        
+        - Resolved ${{ env.vuln_count }} vulnerabilities
+        - Remaining vulnerabilities: ${{ steps.check_fixes.outputs.new_vuln_count }}
+        - Applied via GitHub Actions security workflow
+        
+        🤖 Generated with GitHub Actions" || exit 0
+        
+    - name: Push security fixes
+      if: steps.check_fixes.outputs.fixes_applied == 'true'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
+        
+    - name: Create security report
+      if: always()
+      run: |
+        echo "## Security Audit Report" > security-report.md
+        echo "**Date:** $(date)" >> security-report.md
+        echo "**Branch:** ${{ github.ref_name }}" >> security-report.md
+        echo "" >> security-report.md
+        
+        if [ "${{ env.vuln_count }}" = "0" ]; then
+          echo "✅ **Status:** No vulnerabilities found" >> security-report.md
+        else
+          echo "⚠️ **Status:** ${{ env.vuln_count }} vulnerabilities found" >> security-report.md
+          if [ "${{ steps.check_fixes.outputs.fixes_applied }}" = "true" ]; then
+            echo "🔧 **Action:** Fixes applied automatically" >> security-report.md
+            echo "📊 **Result:** ${{ steps.check_fixes.outputs.new_vuln_count }} vulnerabilities remaining" >> security-report.md
+          else
+            echo "❌ **Action:** Manual intervention required" >> security-report.md
+          fi
+        fi
+        
+        echo "" >> security-report.md
+        echo "### Detailed Audit" >> security-report.md
+        echo '```json' >> security-report.md
+        npm audit --json | jq '.metadata.vulnerabilities' >> security-report.md
+        echo '```' >> security-report.md
+        
+    - name: Upload security report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report-${{ github.sha }}
+        path: security-report.md
+        
+    - name: Fail on critical vulnerabilities
+      if: always()
+      run: |
+        CRITICAL=$(npm audit --json | jq '.metadata.vulnerabilities.critical')
+        HIGH=$(npm audit --json | jq '.metadata.vulnerabilities.high')
+        
+        if [ "$CRITICAL" -gt "0" ] || [ "$HIGH" -gt "0" ]; then
+          echo "❌ Critical or high severity vulnerabilities found!"
+          echo "Critical: $CRITICAL, High: $HIGH"
+          exit 1
+        fi
+        
+        echo "✅ No critical or high severity vulnerabilities"

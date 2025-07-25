@@ -10,7 +10,13 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prestart": "echo 'Starting the app...'",
+    "security:audit": "npm audit --audit-level moderate",
+    "security:fix": "npm audit fix",
+    "security:fix-force": "npm audit fix --force",
+    "security:check": "npm audit --json | jq '.metadata.vulnerabilities.total'",
+    "security:auto": "node scripts/security-check.js",
+    "postinstall": "npm run security:auto",
+    "prestart": "npm run security:check && echo 'Starting the app...'",
     "start": "nodemon --ignore data/ --ignore assets/logs/ src/core/combined.js",
     "prepare": "husky install"
   },
@@ -21,6 +27,9 @@
     ],
     "*.{json,md,html,css}": [
       "prettier --write"
+    ],
+    "package-lock.json": [
+      "npm run security:check"
     ]
   },
   "repository": {
