@@ -12,7 +12,7 @@
 
 *Chimp-GPT brings the power of AI conversations, real-time gaming stats, weather updates, image generation, and so much more directly to your Discord channels. It's like having a brilliant, witty friend who never sleeps and always has the answers you need.*
 
-> 💡 **Why Chimp-GPT?** While other bots do one thing, we do EVERYTHING - and we do it better. Built-in reliability, stunning visuals, and features your community will actually love. Join thousands of servers already using the smartest Discord bot on the planet! 🌟
+> 💡 **Why Chimp-GPT?** While other bots do one thing, we do EVERYTHING - and we do it better. Built-in reliability, stunning visuals, and features your community will actually love. Join others already using the smartest Discord bot on the planet! 🌟
 
 [🚀 **Get Started in 5 Minutes**](#-quick-start-your-bot-in-5-minutes) • [✨ **See What It Can Do**](#-what-can-chimp-gpt-do-for-you) • [🛠️ **Setup Guide**](#setup-and-installation)
 
