@@ -33,6 +33,8 @@ let state = {
   performanceData: null,
   functionResults: [],
   apiEndpoints: ['openai', 'weather', 'time', 'wolfram', 'quake', 'gptimage'],
+  discoveredBots: [],
+  selectedBotUrl: window.location.origin, // Current bot by default
 };
 
 // DOM Elements
@@ -55,18 +57,21 @@ const elements = {
   themeIcon: document.querySelector('.theme-icon'),
   blockedUsersContent: document.getElementById('blockedUsersContent'),
   refreshBlockedUsers: document.getElementById('refreshBlockedUsers'),
+  botSelector: document.getElementById('botSelector'),
+  botSelect: document.getElementById('botSelect'),
+  refreshBots: document.getElementById('refreshBots'),
 };
 
 // API Functions
-async function fetchData(endpoint) {
+async function fetchData(endpoint, botUrl = CONFIG.apiBaseUrl) {
   try {
-    const response = await fetch(CONFIG.apiBaseUrl + endpoint);
+    const response = await fetch(botUrl + endpoint);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     return await response.json();
   } catch (error) {
-    console.error(`Error fetching ${endpoint}:`, error);
+    console.error(`Error fetching ${endpoint} from ${botUrl}:`, error);
     handleAPIError(endpoint, error);
     return null;
   }
@@ -123,7 +128,7 @@ function handleAPIError(endpoint, error) {
 }
 
 async function fetchHealthData() {
-  const data = await fetchData(CONFIG.endpoints.health);
+  const data = await fetchData(CONFIG.endpoints.health, state.selectedBotUrl);
   if (data) {
     state.healthData = data;
     updateHealthDisplay(data);
@@ -131,10 +136,18 @@ async function fetchHealthData() {
 }
 
 async function fetchPerformanceData() {
-  const data = await fetchData(CONFIG.endpoints.performance);
+  const data = await fetchData(CONFIG.endpoints.performance, state.selectedBotUrl);
   if (data) {
     state.performanceData = data;
     updatePerformanceDisplay(data);
+  }
+}
+
+async function fetchDiscoveredBots() {
+  const data = await fetchData('/api/discover-bots');
+  if (data && data.success) {
+    state.discoveredBots = data.bots || [];
+    updateBotSelector(data);
   }
 }
 
@@ -148,10 +161,96 @@ async function fetchFunctionResults() {
 }
 
 async function fetchBlockedUsers() {
-  const data = await fetchData('/blocked-users');
+  const data = await fetchData('/blocked-users', state.selectedBotUrl);
   if (data && data.success) {
     updateBlockedUsersDisplay(data);
   }
+}
+
+function updateBotSelector(discoveryData) {
+  if (!elements.botSelect) return;
+
+  // Clear existing options
+  elements.botSelect.innerHTML = '<option value="">Select Bot Instance...</option>';
+
+  // Add current bot option
+  if (discoveryData.currentBot) {
+    const currentOption = document.createElement('option');
+    currentOption.value = discoveryData.currentBot.url;
+    currentOption.textContent = `${discoveryData.currentBot.name} (Current) - Port ${discoveryData.currentBot.port}`;
+    currentOption.selected = state.selectedBotUrl === discoveryData.currentBot.url;
+    elements.botSelect.appendChild(currentOption);
+  }
+
+  // Add discovered bots
+  discoveryData.bots.forEach(bot => {
+    const option = document.createElement('option');
+    option.value = bot.url;
+    option.textContent = `${bot.botName} (${bot.instanceName}) - Port ${bot.port} - ${bot.status}`;
+    option.selected = state.selectedBotUrl === bot.url;
+    elements.botSelect.appendChild(option);
+  });
+
+  // Show selector if we have multiple bots
+  if (discoveryData.bots.length > 0) {
+    elements.botSelector.style.display = 'flex';
+  }
+
+  // Update bot name in header
+  const selectedBot =
+    discoveryData.bots.find(bot => bot.url === state.selectedBotUrl) || discoveryData.currentBot;
+  if (selectedBot) {
+    document.querySelector('.logo').textContent =
+      selectedBot.botName || selectedBot.name || 'ChimpGPT';
+  }
+}
+
+function switchBot(newBotUrl) {
+  if (newBotUrl && newBotUrl !== state.selectedBotUrl) {
+    state.selectedBotUrl = newBotUrl;
+
+    // Clear existing data
+    state.healthData = null;
+    state.performanceData = null;
+
+    // Reset chart data
+    state.apiEndpoints.forEach(endpoint => {
+      state.latencyData[endpoint] = Array(CONFIG.maxDataPoints).fill(null);
+    });
+
+    if (state.chart) {
+      state.chart.update('none');
+    }
+
+    // Fetch new data immediately
+    fetchAllData();
+
+    // Show switching indicator
+    showBotSwitchIndicator();
+  }
+}
+
+function showBotSwitchIndicator() {
+  const indicator = document.createElement('div');
+  indicator.className = 'bot-switch-indicator';
+  indicator.innerHTML = '<span>🔄</span> Switching bot...';
+  indicator.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+  `;
+  document.body.appendChild(indicator);
+
+  setTimeout(() => {
+    indicator.remove();
+  }, 2000);
 }
 
 // Initialize the dashboard
@@ -172,6 +271,7 @@ function initDashboard() {
 
   // Start updates
   updateTime();
+  fetchDiscoveredBots(); // Discover bots first
   fetchAllData();
 
   // Set up periodic updates
@@ -180,6 +280,9 @@ function initDashboard() {
 
   // Update blocked users less frequently (every 30 seconds)
   setInterval(fetchBlockedUsers, 30000);
+
+  // Update bot discovery less frequently (every 60 seconds)
+  setInterval(fetchDiscoveredBots, 60000);
 }
 
 // Theme Management
@@ -200,6 +303,24 @@ function initTheme() {
       elements.refreshBlockedUsers.style.transform = 'rotate(360deg)';
       setTimeout(() => {
         elements.refreshBlockedUsers.style.transform = '';
+      }, 500);
+    });
+  }
+
+  // Add bot selector event listeners
+  if (elements.botSelect) {
+    elements.botSelect.addEventListener('change', e => {
+      switchBot(e.target.value);
+    });
+  }
+
+  if (elements.refreshBots) {
+    elements.refreshBots.addEventListener('click', () => {
+      fetchDiscoveredBots();
+      // Visual feedback
+      elements.refreshBots.style.transform = 'rotate(360deg)';
+      setTimeout(() => {
+        elements.refreshBots.style.transform = '';
       }, 500);
     });
   }
