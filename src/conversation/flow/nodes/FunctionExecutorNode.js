@@ -1,5 +1,6 @@
 const BaseConversationNode = require('./BaseNode');
 const { createLogger } = require('../../../core/logger');
+const ImageGenerationFlow = require('../ImageGenerationFlow');
 
 const logger = createLogger('FunctionExecutorNode');
 
@@ -17,6 +18,13 @@ class FunctionExecutorNode extends BaseConversationNode {
 
     this.openaiClient = openaiClient;
     this.functionCallProcessor = functionCallProcessor;
+
+    // Initialize PocketFlow image generation
+    this.imageGenerationFlow = new ImageGenerationFlow({
+      enableStatusUpdates: true,
+      updateInterval: 3000,
+      maxExecutionTime: 180000,
+    });
 
     this.config = {
       model: 'gpt-4.1-nano',
@@ -311,6 +319,46 @@ class FunctionExecutorNode extends BaseConversationNode {
 
   async handleDirectImageRequest(store, message) {
     try {
+      logger.info('Handling direct image request with enhanced PocketFlow system');
+
+      // Create a mock feedback message for the PocketFlow system
+      // In a real implementation, this would come from the Discord message handling
+      const feedbackMessage = this.createMockFeedbackMessage(message);
+
+      // Use the new PocketFlow image generation system
+      const result = await this.imageGenerationFlow.generateImage(message, feedbackMessage);
+
+      if (result.success) {
+        return {
+          success: true,
+          type: 'pocketflow_image_generation',
+          functionName: 'generateImage',
+          result: result.result,
+          response: result.result?.responseText || 'Image generated successfully with PocketFlow!',
+          executionTime: result.executionTime,
+          flowMetadata: {
+            phases: result.phases,
+            flowType: 'image_generation',
+          },
+        };
+      }
+      return {
+        success: false,
+        error: result.error,
+        type: 'pocketflow_image_generation',
+        executionTime: result.executionTime,
+      };
+    } catch (error) {
+      logger.error('Error handling direct image request with PocketFlow:', error);
+
+      // Fallback to original method if PocketFlow fails
+      return await this.handleDirectImageRequestFallback(store, message);
+    }
+  }
+
+  // Fallback method using the original image generation approach
+  async handleDirectImageRequestFallback(store, message) {
+    try {
       const content = message.content;
       const imagePhrases = [
         /^draw (?:me |us |a |an |the )?/i,
@@ -336,7 +384,7 @@ class FunctionExecutorNode extends BaseConversationNode {
 
       return {
         success: true,
-        type: 'direct_image_generation',
+        type: 'fallback_image_generation',
         functionName: 'generateImage',
         functionResult: functionResult,
         response: functionResult.success
@@ -344,13 +392,30 @@ class FunctionExecutorNode extends BaseConversationNode {
           : `I couldn't generate the image: ${functionResult.error}`,
       };
     } catch (error) {
-      logger.error('Error handling direct image request:', error);
+      logger.error('Error in fallback image request handler:', error);
       return {
         success: false,
         error: error.message,
-        type: 'direct_image_generation',
+        type: 'fallback_image_generation',
       };
     }
+  }
+
+  // Create a mock feedback message for testing PocketFlow integration
+  createMockFeedbackMessage(message) {
+    return {
+      id: `mock_${Date.now()}`,
+      edit: async content => {
+        logger.debug('Mock feedback message edit:', {
+          messageId: message.id,
+          content: typeof content === 'string' ? content.substring(0, 100) : 'Complex content',
+        });
+        // In a real implementation, this would update the actual Discord message
+        return Promise.resolve();
+      },
+      channel: message.channel,
+      author: message.author,
+    };
   }
 }
 
