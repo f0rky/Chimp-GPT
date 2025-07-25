@@ -7,7 +7,7 @@
  * @module ApiKeyManagerTest
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('apiKeyManagerTest');
 const fs = require('fs').promises;
 const path = require('path');
@@ -34,7 +34,7 @@ async function testApiKeyManager() {
     const originalDataDir = path.join(process.cwd(), 'data');
 
     // Load the API key manager module
-    apiKeyManager = require('../utils/apiKeyManager');
+    apiKeyManager = require('../../utils/apiKeyManager');
 
     // Test 1: Get API key
     try {

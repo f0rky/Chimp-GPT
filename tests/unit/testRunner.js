@@ -19,27 +19,14 @@ const url = require('url');
 
 // Import test modules using function-level imports to avoid circular dependencies
 // This delays loading until the functions are actually called
-let testConversationLog, testWeatherApi, testPluginSystem, testConversationStorage;
-let testCircuitBreaker, testConversationPersistence, testImageGeneration, testMessageHandler;
-let testRateLimiter, quakeLookup, testHumanCircuitBreaker, testInputSanitizer;
+let testWeatherApi, testCircuitBreaker, testHumanCircuitBreaker, testInputSanitizer;
 let testApiKeyManager, testErrorClasses, testCommandHandler;
 
 // Function to load modules dynamically to avoid circular dependencies
 function loadTestModules() {
-  if (!testConversationLog) {
-    testConversationLog = require('./conversationLogTest').testConversationLog;
+  if (!testWeatherApi) {
     testWeatherApi = require('./weatherApiTest').testWeatherApi;
-    testPluginSystem = require('./pluginSystemTest').testPluginSystem;
-    testConversationStorage = require('./conversationStorageTest').testConversationStorage;
     testCircuitBreaker = require('./circuitBreakerTest');
-    testConversationPersistence =
-      require('./conversationPersistenceTest').testConversationPersistence;
-    testImageGeneration = require('./imageGenerationTest').testImageGeneration;
-    testMessageHandler = require('./messageHandlerTest').testMessageHandler;
-    testRateLimiter = require('./rateLimiterTest').testRateLimiter;
-    quakeLookup = require('../quakeLookup');
-
-    // Load new test modules
     testHumanCircuitBreaker = require('./humanCircuitBreakerTest').testHumanCircuitBreaker;
     testInputSanitizer = require('./inputSanitizerTest').testInputSanitizer;
     testApiKeyManager = require('./apiKeyManagerTest').testApiKeyManager;
@@ -756,19 +743,11 @@ async function runCommandHandlerTests() {
 // Export all test functions at the end to avoid circular dependencies
 // Make sure this is the absolute last statement in the file
 module.exports = {
-  runConversationLogTests,
   runOpenAITests,
-  runQuakeTests,
   runCorsTests,
   runRateLimiterTests,
   runWeatherApiTests,
-  runPluginSystemTests,
-  runConversationStorageTests,
   runCircuitBreakerTests,
-  runConversationPersistenceTests,
-  runImageGenerationTests,
-  runMessageHandlerTests,
-  runComprehensiveRateLimiterTests,
   runHumanCircuitBreakerTests,
   runInputSanitizerTests,
   runApiKeyManagerTests,

@@ -10,7 +10,7 @@ const assert = require('assert');
 const fs = require('fs').promises;
 const path = require('path');
 const { createLogger } = require('../logger');
-const maliciousUserManager = require('../utils/maliciousUserManager');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
 
 const logger = createLogger('maliciousUserTest');
 

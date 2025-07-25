@@ -10,9 +10,9 @@
  */
 
 // Import required modules
-const { lookupWeather, lookupExtendedForecast } = require('../weatherLookup');
-const simplifiedWeather = require('../simplified-weather');
-const { createLogger } = require('../logger');
+const { lookupWeather, lookupExtendedForecast } = require('../../src/services/weatherLookup');
+const simplifiedWeather = require('../../src/services/simplified-weather');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('weatherTest');
 
 /**

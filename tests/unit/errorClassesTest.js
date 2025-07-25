@@ -7,7 +7,7 @@
  * @module ErrorClassesTest
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('errorClassesTest');
 
 async function testErrorClasses() {

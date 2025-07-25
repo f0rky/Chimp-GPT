@@ -7,7 +7,7 @@
  * @module InputSanitizerTest
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('inputSanitizerTest');
 
 async function testInputSanitizer() {
@@ -16,7 +16,7 @@ async function testInputSanitizer() {
 
   try {
     // Load the input sanitizer module
-    inputSanitizer = require('../utils/inputSanitizer');
+    inputSanitizer = require('../../utils/inputSanitizer');
 
     // Test 1: Basic text sanitization
     try {

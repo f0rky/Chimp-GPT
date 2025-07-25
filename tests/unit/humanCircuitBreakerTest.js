@@ -7,7 +7,7 @@
  * @module HumanCircuitBreakerTest
  */
 
-const { createLogger } = require('../logger');
+const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('humanCircuitBreakerTest');
 
 async function testHumanCircuitBreaker() {
@@ -15,7 +15,7 @@ async function testHumanCircuitBreaker() {
 
   try {
     // Load the module
-    const humanCircuitBreaker = require('../utils/humanCircuitBreaker');
+    const humanCircuitBreaker = require('../../utils/humanCircuitBreaker');
 
     // Test 1: Check sensitive operations constants
     try {
