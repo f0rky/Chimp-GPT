@@ -36,6 +36,137 @@ pm2 logs chimpGPT-Solvis --lines 20
 - The bot uses PocketFlow architecture (v2.0) for advanced conversation management
 - Image generation functionality should be tested after restarts to ensure it's working properly
 
+## Debug Skip Functionality (NEW)
+- **Purpose**: Allows skipping log checking operations to save tokens and time during debugging
+- **How to use**: React with ⏭️ emoji to any bot message to activate debug skip mode
+- **Who can use**: Bot owner only (configured via OWNER_ID)
+- **Behavior**: Next Claude Code operation will skip `pm2 logs` commands and continue with available information
+- **Auto-reset**: Skip mode automatically deactivates after 15 minutes or after one use
+- **Integration**: Use `shouldSkipLogChecking()` function before running log commands
+
+### Debug Skip Usage Example
+1. Bot posts a troubleshooting message
+2. Owner reacts with ⏭️ emoji
+3. Bot confirms with 🤖 reaction and message
+4. Next Claude operation skips log checking
+5. Skip mode automatically resets
+
+## Claude Code Integration
+
+### Quick Integration for Log Checking
+**IMPORTANT**: Always check for debug skip before running `pm2 logs` commands!
+
+```javascript
+// At the top of your Claude Code logic:
+const { checkPM2LogsSkip, formatSkipMessage } = require('./src/utils/claudeDebugHelper');
+
+// Before running pm2 logs:
+const skipCheck = checkPM2LogsSkip();
+if (skipCheck.shouldSkip) {
+    return formatSkipMessage(skipCheck);
+}
+
+// Otherwise proceed with:
+// Bash("pm2 logs chimpGPT-Solvis --lines 15", "Check recent bot logs")
+```
+
+### Function Reference
+
+#### `checkPM2LogsSkip(instanceName?, lines?)`
+- **Purpose**: Check if PM2 log checking should be skipped
+- **Parameters**: 
+  - `instanceName` (optional): PM2 instance name (default: 'chimpGPT-Solvis')
+  - `lines` (optional): Number of log lines (default: 15)
+- **Returns**: Object with `shouldSkip`, `message`, `nextStep`, `suggestion`
+
+#### `checkBashCommandSkip(command, description)`
+- **Purpose**: Check if any bash command should be skipped
+- **Parameters**:
+  - `command`: The bash command string
+  - `description`: Human-readable description
+- **Returns**: Skip information object
+
+#### `checkDebugSkip(operation)`
+- **Purpose**: Generic skip check for any operation
+- **Parameters**: `operation` - Description of the operation
+- **Returns**: Skip decision object
+
+#### `formatSkipMessage(skipInfo)`
+- **Purpose**: Format skip information for display
+- **Parameters**: Skip info object from check functions
+- **Returns**: Formatted message string
+
+### Integration Examples
+
+#### Example 1: PM2 Log Checking
+```javascript
+const { checkPM2LogsSkip, formatSkipMessage } = require('./src/utils/claudeDebugHelper');
+
+// In your troubleshooting function:
+async function checkBotLogs() {
+    const skipCheck = checkPM2LogsSkip();
+    
+    if (skipCheck.shouldSkip) {
+        // Skip the logs and continue with next step
+        return formatSkipMessage(skipCheck);
+    }
+    
+    // Proceed with log checking
+    const logs = await Bash("pm2 logs chimpGPT-Solvis --lines 15", "Check recent bot logs");
+    // ... process logs
+}
+```
+
+#### Example 2: Any Bash Command
+```javascript
+const { checkBashCommandSkip, formatSkipMessage } = require('./src/utils/claudeDebugHelper');
+
+async function checkSystemStatus() {
+    const skipCheck = checkBashCommandSkip(
+        'systemctl status nginx', 
+        'checking nginx service status'
+    );
+    
+    if (skipCheck.shouldSkip) {
+        return formatSkipMessage(skipCheck);
+    }
+    
+    // Proceed with the command
+    const status = await Bash("systemctl status nginx", "Check nginx status");
+    // ... process status
+}
+```
+
+#### Example 3: Generic Operation
+```javascript
+const { checkDebugSkip, formatSkipMessage } = require('./src/utils/claudeDebugHelper');
+
+async function analyzeErrorPatterns() {
+    const skipCheck = checkDebugSkip('error pattern analysis');
+    
+    if (skipCheck.shouldSkip) {
+        return formatSkipMessage(skipCheck) + "\n\nProceeding with alternative troubleshooting approach.";
+    }
+    
+    // Proceed with analysis
+    // ... complex analysis logic
+}
+```
+
+### Best Practices for Claude Code
+
+1. **Always Check Before Logs**: Call `checkPM2LogsSkip()` before any `pm2 logs` command
+2. **Use Descriptive Operations**: Provide clear descriptions for `checkDebugSkip()`
+3. **Format Messages**: Use `formatSkipMessage()` for consistent display
+4. **Continue Logic**: When skipping, always provide alternative next steps
+5. **Import Once**: Import helper functions at the beginning of your logic
+
+### Skip Behavior
+- **One-Time Use**: Skip activates for exactly ONE operation, then auto-resets
+- **15-Minute Timeout**: Skip automatically deactivates after 15 minutes if unused
+- **Owner Only**: Only the bot owner (OWNER_ID) can activate skip mode
+- **Visual Feedback**: Owner sees 🤖 reaction and confirmation message when activated
+
 ## Development Commands
 ```bash
 # Install dependencies

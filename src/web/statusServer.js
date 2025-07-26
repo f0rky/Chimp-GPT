@@ -1346,6 +1346,122 @@ function initStatusServer(options = {}) {
     });
 
     /**
+     * GET /api/discover-services
+     * Comprehensive service discovery across ports 3000-3020
+     *
+     * @route GET /api/discover-services
+     * @query {number} startPort - Starting port (default: 3000)
+     * @query {number} endPort - Ending port (default: 3020)
+     * @query {boolean} botsOnly - Return only bot services (default: false)
+     * @returns {Object} Comprehensive service discovery results
+     */
+    app.get('/api/discover-services', async (req, res) => {
+      logger.info('Starting comprehensive service discovery');
+
+      try {
+        // Import service discovery utility
+        const { discoverServices, getCurrentBotInfo } = require('../utils/serviceDiscovery');
+
+        // Parse query parameters
+        const startPort = parseInt(req.query.startPort, 10) || 3000;
+        const endPort = parseInt(req.query.endPort, 10) || 3020;
+        const botsOnly = req.query.botsOnly === 'true';
+
+        // Validate port range
+        if (startPort < 1 || endPort > 65535 || startPort > endPort) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid port range. Ports must be between 1-65535 and startPort <= endPort',
+          });
+        }
+
+        // Limit port range to prevent abuse
+        if (endPort - startPort > 100) {
+          return res.status(400).json({
+            success: false,
+            error: 'Port range too large. Maximum range is 100 ports.',
+          });
+        }
+
+        // Perform service discovery
+        const discoveryResults = await discoverServices({
+          startPort,
+          endPort,
+          maxParallel: 5, // Limit concurrency to prevent overwhelming
+        });
+
+        // Get current bot information
+        const currentPort = config.PORT || process.env.PORT || 3001;
+        const currentBot = getCurrentBotInfo(currentPort);
+
+        // Filter results if botsOnly is requested
+        const services = botsOnly ? discoveryResults.botServices : discoveryResults.services;
+
+        // Add legacy PM2/Docker discovery for comparison
+        let legacyBots = [];
+        try {
+          const pm2Bots = await discoverPM2Bots();
+          const dockerBots = await discoverDockerBots();
+
+          const allLegacyBots = [...pm2Bots, ...dockerBots];
+          const legacyHealthChecks = await Promise.allSettled(
+            allLegacyBots.map(bot => checkBotHealth(bot.port, bot.botName, bot.name))
+          );
+
+          legacyBots = legacyHealthChecks
+            .filter(result => result.status === 'fulfilled' && result.value.accessible)
+            .map(result => result.value);
+        } catch (legacyError) {
+          logger.warn({ error: legacyError }, 'Legacy discovery failed');
+        }
+
+        // Combine and deduplicate results
+        const allBots = [...services.filter(s => s.isBotService), ...legacyBots];
+        const uniqueBots = allBots.reduce((unique, bot) => {
+          const existing = unique.find(b => b.port === bot.port);
+          if (!existing) {
+            unique.push(bot);
+          } else {
+            // Merge information, preferring more detailed data
+            Object.assign(existing, {
+              ...existing,
+              ...bot,
+              // Combine confidence scores
+              botConfidence: Math.max(existing.botConfidence || 0, bot.botConfidence || 0),
+            });
+          }
+          return unique;
+        }, []);
+
+        return res.json({
+          success: true,
+          ...discoveryResults,
+          services: services,
+          botServices: uniqueBots,
+          currentBot: {
+            ...currentBot,
+            url: `${req.protocol}://${req.get('host')}`,
+          },
+          discovery: {
+            portRange: { start: startPort, end: endPort },
+            botsOnly,
+            legacyBotsFound: legacyBots.length,
+            totalUniqueServices: services.length,
+            totalUniqueBots: uniqueBots.length,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        logger.error({ error }, 'Error in comprehensive service discovery');
+        return res.status(500).json({
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    /**
      * GET /settings
      * Returns application settings/configuration information
      *
@@ -1832,9 +1948,8 @@ if (require.main === module) {
     });
 } else {
   // If imported as a module, just export the functions
-  initStatusServer().catch(error => {
-    logger.error({ error }, 'Error initializing status server as module');
-  });
+  // Server will be initialized by the importing module (combined.js)
+  logger.info('Status server module loaded, waiting for explicit initialization');
 }
 
 module.exports = {

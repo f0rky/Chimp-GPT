@@ -6,6 +6,7 @@ const MessageEventHandler = require('./messageEventHandler');
 const InteractionEventHandler = require('./interactionEventHandler');
 const maliciousUserManager = require('../../../utils/maliciousUserManager');
 const { loadConversationsFromStorage } = require('../../conversation/conversationManagerSelector');
+const { initDebugSkip } = require('../../utils/debugSkipManager');
 const PFPManager = require('../../../utils/pfpManager');
 const commandHandler = require('../../commands/commandHandler');
 const { shouldDeploy, recordSuccessfulDeployment } = require('../../../utils/deploymentManager');
@@ -45,11 +46,50 @@ class ClientEventHandler {
       const users = this.client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
       const channels = this.client.channels.cache.size;
 
-      // Update the health check stats
-      healthCheckStats.discord = { guilds, users, channels };
-      discordLogger.debug({ guilds, users, channels }, 'Updated Discord stats');
+      // Get Discord connection status and ping
+      const isReady = this.client.isReady();
+      const hasGuilds = guilds > 0;
+      const hasWebSocket = this.client.ws && this.client.ws.status === 0; // WebSocketManager.READY = 0
+
+      // More intelligent status detection - if we have guilds, we're likely connected
+      // even if isReady() returns false due to timing issues
+      const status = isReady || hasGuilds ? 'ok' : 'offline';
+      const ping = this.client.ws ? this.client.ws.ping : 0;
+
+      // Update the health check stats with complete Discord information
+      healthCheckStats.discord = {
+        guilds,
+        users,
+        channels,
+        status,
+        ping,
+      };
+
+      discordLogger.debug(
+        {
+          guilds,
+          users,
+          channels,
+          status,
+          ping,
+          isReady,
+          hasGuilds,
+          hasWebSocket,
+          wsStatus: this.client.ws ? this.client.ws.status : 'no-ws',
+        },
+        'Updated Discord stats'
+      );
     } catch (err) {
       discordLogger.error({ err }, 'Failed to update Discord stats');
+
+      // Set offline status on error
+      healthCheckStats.discord = {
+        guilds: 0,
+        users: 0,
+        channels: 0,
+        status: 'offline',
+        ping: 0,
+      };
     }
   }
 
@@ -159,6 +199,14 @@ class ClientEventHandler {
       discordLogger.info('Channel greetings sent successfully');
     } catch (error) {
       discordLogger.error({ error }, 'Error sending startup greetings');
+    }
+
+    // Initialize debug skip functionality
+    try {
+      initDebugSkip(this.client, this.config);
+      discordLogger.info('Debug skip functionality initialized');
+    } catch (error) {
+      discordLogger.error({ error }, 'Error initializing debug skip functionality');
     }
   }
 }
