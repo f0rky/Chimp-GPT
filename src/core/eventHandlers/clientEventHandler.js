@@ -12,6 +12,7 @@ const commandHandler = require('../../commands/commandHandler');
 const { shouldDeploy, recordSuccessfulDeployment } = require('../../../utils/deploymentManager');
 const { sendChannelGreeting } = require('../../../utils/greetingManager');
 const { stats: healthCheckStats } = require('../healthCheck');
+const statsStorage = require('../statsStorage');
 
 class ClientEventHandler {
   constructor(client, config, dependencies) {
@@ -65,6 +66,18 @@ class ClientEventHandler {
         ping,
       };
 
+      // Persist Discord status to statsStorage for health endpoint
+      try {
+        await statsStorage.updateStat('discord', {
+          status,
+          ping,
+          guilds,
+          channels,
+        });
+      } catch (persistError) {
+        discordLogger.warn({ error: persistError }, 'Failed to persist Discord status to storage');
+      }
+
       discordLogger.debug(
         {
           guilds,
@@ -90,6 +103,21 @@ class ClientEventHandler {
         status: 'offline',
         ping: 0,
       };
+
+      // Persist offline status to statsStorage
+      try {
+        await statsStorage.updateStat('discord', {
+          status: 'offline',
+          ping: 0,
+          guilds: 0,
+          channels: 0,
+        });
+      } catch (persistError) {
+        discordLogger.warn(
+          { error: persistError },
+          'Failed to persist offline Discord status to storage'
+        );
+      }
     }
   }
 

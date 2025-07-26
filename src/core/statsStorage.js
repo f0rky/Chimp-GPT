@@ -20,12 +20,19 @@
  * @property {Array<string>|Set<string>} users
  * @property {Object} userCounts
  *
+ * @typedef {Object} DiscordStatus
+ * @property {string} status - Connection status ('ok', 'offline')
+ * @property {number} ping - WebSocket ping in milliseconds
+ * @property {number} guilds - Number of guilds connected to
+ * @property {number} channels - Number of channels accessible
+ *
  * @typedef {Object} StatsData
  * @property {string} startTime
  * @property {number} messageCount
  * @property {ApiCalls} apiCalls
  * @property {Errors} errors
  * @property {RateLimits} rateLimits
+ * @property {DiscordStatus} discord
  * @property {string} lastRestart
  * @property {string} lastUpdated
  */
@@ -152,6 +159,12 @@ const DEFAULT_STATS = {
     hit: 0,
     users: [],
     userCounts: Object.create(null), // Use prototype-less object for dynamic keys
+  },
+  discord: {
+    status: 'offline',
+    ping: 0,
+    guilds: 0,
+    channels: 0,
   },
   lastRestart: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
