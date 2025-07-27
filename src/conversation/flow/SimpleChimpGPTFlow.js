@@ -102,6 +102,18 @@ class SimpleChimpGPTFlow {
         return await this.handleImageGeneration(store, data);
       }
 
+      // Check for weather patterns
+      const weatherPatterns = [
+        /(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
+        /(?:what'?s|how'?s|tell me)\s+(?:the\s+)?(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
+        /(?:weather|forecast|temperature)\s+(.+)/i,
+      ];
+
+      if (weatherPatterns.some(pattern => pattern.test(content))) {
+        logger.info('Processing as weather request');
+        return await this.handleWeatherRequest(store, data);
+      }
+
       // Check for quake stats patterns
       if (content.includes('quake') && (content.includes('stats') || content.includes('server'))) {
         logger.info('Processing as quake stats request');
@@ -280,6 +292,70 @@ class SimpleChimpGPTFlow {
         error: error.message,
         response:
           "I'm having trouble processing your knowledge request right now. Please try again.",
+      };
+    }
+  }
+
+  async handleWeatherRequest(_store, data) {
+    try {
+      const { message } = data;
+      const content = message.content.toLowerCase();
+
+      logger.info(`Processing weather request: ${message.content.substring(0, 50)}...`);
+
+      // Extract location from the message using regex patterns
+      let location = null;
+      const weatherPatterns = [
+        /(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
+        /(?:what'?s|how'?s|tell me)\s+(?:the\s+)?(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
+        /(?:weather|forecast|temperature)\s+(.+)/i,
+      ];
+
+      for (const pattern of weatherPatterns) {
+        const match = message.content.match(pattern);
+        if (match && match[1]) {
+          location = match[1].trim();
+          // Remove common trailing words
+          location = location
+            .replace(/\?+$/, '')
+            .replace(/\s+(please|today|now|currently)$/i, '')
+            .trim();
+          break;
+        }
+      }
+
+      if (!location) {
+        return {
+          success: false,
+          error: 'Location not found',
+          response:
+            "I'd be happy to help with the weather! Please specify a location, like 'What's the weather in Auckland?'",
+        };
+      }
+
+      logger.info(`Extracted location: ${location}`);
+
+      // Use the simplified weather service for natural responses
+      const { getWeatherResponse } = require('../../services/simplified-weather');
+      const weatherResponse = await getWeatherResponse(location, message.content);
+
+      return {
+        success: true,
+        response: weatherResponse,
+        type: 'weather',
+        location: location,
+      };
+    } catch (error) {
+      logger.error('Error in weather request handling:', {
+        error: error.message,
+        stack: error.stack,
+        messageContent: data?.message?.content || 'unknown',
+        userId: data?.message?.author?.id || 'unknown',
+      });
+      return {
+        success: false,
+        error: error.message,
+        response: "I'm having trouble getting the weather right now. Please try again in a moment.",
       };
     }
   }
