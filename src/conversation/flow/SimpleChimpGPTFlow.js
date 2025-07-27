@@ -114,6 +114,19 @@ class SimpleChimpGPTFlow {
         return await this.handleWeatherRequest(store, data);
       }
 
+      // Check for time patterns
+      const timePatterns = [
+        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
+        /(?:current\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
+        /(?:what\s+time\s+is\s+it)\s+(?:in|for|at|of)\s+(.+)/i,
+        /time\s+(.+)/i,
+      ];
+
+      if (timePatterns.some(pattern => pattern.test(content))) {
+        logger.info('Processing as time request');
+        return await this.handleTimeRequest(store, data);
+      }
+
       // Check for quake stats patterns
       if (content.includes('quake') && (content.includes('stats') || content.includes('server'))) {
         logger.info('Processing as quake stats request');
@@ -296,7 +309,8 @@ class SimpleChimpGPTFlow {
     }
   }
 
-  async handleWeatherRequest(_store, data) {
+  async handleWeatherRequest(store, data) {
+    let weatherData = null;
     try {
       const { message } = data;
       const content = message.content.toLowerCase();
@@ -335,18 +349,175 @@ class SimpleChimpGPTFlow {
 
       logger.info(`Extracted location: ${location}`);
 
-      // Use the simplified weather service for natural responses
+      // Use the simplified weather service for structured data
       const { getWeatherResponse } = require('../../services/simplified-weather');
-      const weatherResponse = await getWeatherResponse(location, message.content);
+      weatherData = await getWeatherResponse(location, message.content);
 
+      // If we got structured weather data, format it with the bot's personality
+      if (weatherData && weatherData.formattedSummary) {
+        // Create a conversation context with the weather data for the bot to respond with personality
+        const botPersonality = store.get('botPersonality');
+        const weatherContext = `The user asked: "${message.content}"\n\nWeather data: ${weatherData.formattedSummary}\n\nRespond naturally with your personality while providing this weather information.`;
+
+        try {
+          // Generate response with bot personality
+          const completion = await this.openaiClient.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: botPersonality,
+              },
+              {
+                role: 'user',
+                content: weatherContext,
+              },
+            ],
+            max_tokens: 500,
+            temperature: 0.7,
+          });
+
+          const personalizedResponse = completion.choices[0].message.content;
+
+          return {
+            success: true,
+            response: personalizedResponse,
+            type: 'weather',
+            location: location,
+            weatherData: weatherData.weatherData,
+          };
+        } catch (personalityError) {
+          logger.warn(
+            'Failed to apply personality to weather response, using formatted summary',
+            personalityError
+          );
+          // Fallback to the formatted summary if personality application fails
+          return {
+            success: true,
+            response: weatherData.formattedSummary,
+            type: 'weather',
+            location: location,
+            weatherData: weatherData.weatherData,
+          };
+        }
+      }
+
+      // Fallback if structured data is not available
       return {
-        success: true,
-        response: weatherResponse,
-        type: 'weather',
-        location: location,
+        success: false,
+        error: 'Weather data formatting error',
+        response:
+          "I'm having trouble formatting the weather information right now. Please try again.",
       };
     } catch (error) {
       logger.error('Error in weather request handling:', {
+        error: error.message,
+        stack: error.stack,
+        messageContent: data?.message?.content || 'unknown',
+        userId: data?.message?.author?.id || 'unknown',
+        weatherDataReceived: !!weatherData,
+        weatherDataType: weatherData?.type || 'unknown',
+        hasFormattedSummary: !!weatherData?.formattedSummary,
+      });
+      return {
+        success: false,
+        error: error.message,
+        response: "I'm having trouble getting the weather right now. Please try again in a moment.",
+      };
+    }
+  }
+
+  async handleTimeRequest(store, data) {
+    try {
+      const { message } = data;
+      const content = message.content.toLowerCase();
+
+      logger.info(`Processing time request: ${message.content.substring(0, 50)}...`);
+
+      // Extract location from the message using regex patterns
+      let location = null;
+      const timePatterns = [
+        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
+        /(?:current\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
+        /(?:what\s+time\s+is\s+it)\s+(?:in|for|at|of)\s+(.+)/i,
+        /time\s+(.+)/i,
+      ];
+
+      for (const pattern of timePatterns) {
+        const match = message.content.match(pattern);
+        if (match && match[1]) {
+          location = match[1].trim();
+          // Remove common trailing words
+          location = location
+            .replace(/\?+$/, '')
+            .replace(/\s+(please|now|currently|right\s+now)$/i, '')
+            .trim();
+          break;
+        }
+      }
+
+      if (!location) {
+        return {
+          success: false,
+          error: 'Location not found',
+          response:
+            "I'd be happy to help with the time! Please specify a location, like 'What time is it in Tokyo?'",
+        };
+      }
+
+      logger.info(`Extracted location for time lookup: ${location}`);
+
+      // Use the existing time lookup service
+      const lookupTime = require('../../services/timeLookup');
+      const timeData = await lookupTime(location);
+
+      // Format response with bot personality
+      const botPersonality = store.get('botPersonality');
+      const timeContext = `The user asked: "${message.content}"\n\nTime information: ${timeData}\n\nRespond naturally with your personality while providing this time information.`;
+
+      try {
+        // Generate response with bot personality
+        const completion = await this.openaiClient.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: botPersonality,
+            },
+            {
+              role: 'user',
+              content: timeContext,
+            },
+          ],
+          max_tokens: 300,
+          temperature: 0.7,
+        });
+
+        const personalizedResponse = completion.choices[0].message.content;
+
+        return {
+          success: true,
+          response: personalizedResponse,
+          type: 'time',
+          location: location,
+          rawTimeData: timeData,
+        };
+      } catch (personalityError) {
+        logger.warn(
+          'Failed to apply personality to time response, using raw data',
+          personalityError
+        );
+        // Fallback to the raw time data if personality application fails
+        return {
+          success: true,
+          response: timeData,
+          type: 'time',
+          location: location,
+          rawTimeData: timeData,
+        };
+      }
+    } catch (error) {
+      logger.error('Error in time request handling:', {
         error: error.message,
         stack: error.stack,
         messageContent: data?.message?.content || 'unknown',
@@ -355,7 +526,7 @@ class SimpleChimpGPTFlow {
       return {
         success: false,
         error: error.message,
-        response: "I'm having trouble getting the weather right now. Please try again in a moment.",
+        response: "I'm having trouble getting the time right now. Please try again in a moment.",
       };
     }
   }
