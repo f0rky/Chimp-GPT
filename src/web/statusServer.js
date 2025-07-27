@@ -58,6 +58,19 @@
  */
 
 require('dotenv').config();
+
+// Validate environment variables early if running as standalone server
+if (require.main === module) {
+  const { validateEnvironmentVariables } = require('../../utils/securityUtils');
+  try {
+    validateEnvironmentVariables();
+    console.log('✅ Environment variables validated successfully');
+  } catch (error) {
+    console.error('❌ Environment validation failed:', error.message);
+    process.exit(1);
+  }
+}
+
 const express = require('express');
 const path = require('path');
 const { createLogger } = require('../core/logger');
@@ -136,9 +149,17 @@ module.exports.requireOwnerToken = requireOwnerToken;
  */
 async function discoverPM2Bots() {
   const { spawn } = require('child_process');
+  const { validateCommandArguments } = require('../../utils/securityUtils');
 
   return new Promise((resolve, reject) => {
-    const pm2Process = spawn('pm2', ['jlist'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    try {
+      // Validate command arguments for security
+      const args = validateCommandArguments(['pm2', 'jlist'], ['pm2']);
+      
+      const pm2Process = spawn(args[0], args.slice(1), { 
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 10000 // 10 second timeout
+      });
     let output = '';
     let error = '';
 
@@ -193,6 +214,9 @@ async function discoverPM2Bots() {
     pm2Process.on('error', err => {
       reject(new Error(`Failed to execute PM2 command: ${err.message}`));
     });
+    } catch (spawnError) {
+      reject(new Error(`Failed to spawn PM2 process: ${spawnError.message}`));
+    }
   });
 }
 
@@ -213,11 +237,17 @@ function extractPortFromEnv(env) {
  */
 async function discoverDockerBots() {
   const { spawn } = require('child_process');
+  const { validateCommandArguments } = require('../../utils/securityUtils');
 
   return new Promise(resolve => {
-    const dockerProcess = spawn('docker', ['ps', '--format', 'json'], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    try {
+      // Validate command arguments for security
+      const args = validateCommandArguments(['docker', 'ps', '--format', 'json'], ['docker']);
+      
+      const dockerProcess = spawn(args[0], args.slice(1), {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 10000 // 10 second timeout
+      });
     let output = '';
     let error = '';
 
@@ -275,6 +305,10 @@ async function discoverDockerBots() {
       logger.warn({ error: err }, 'Docker command execution failed');
       resolve([]); // Don't fail if Docker isn't available
     });
+    } catch (validationError) {
+      logger.warn({ error: validationError }, 'Docker command validation failed');
+      resolve([]); // Don't fail if command validation fails
+    }
   });
 }
 

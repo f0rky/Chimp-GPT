@@ -47,9 +47,18 @@
  * @version 1.0.0
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
 const path = require('path');
 const { createLogger } = require('./logger');
+
+// Configuration constants
+const STATS_CONFIG = {
+  MAX_FILE_SIZE: 2 * 1024 * 1024, // 2MB max file size
+  BACKUP_RETENTION: 3, // Keep 3 backup files
+  WRITE_TIMEOUT: 5000, // 5 second timeout for write operations
+};
 const logger = createLogger('stats');
 
 // Dangerous keys that could lead to prototype pollution
@@ -103,27 +112,34 @@ const STATS_FILE = path.join(__dirname, '../../data', 'stats.json');
 /**
  * Ensures the data directory exists and is writable
  *
- * @returns {boolean} True if the directory exists and is writable, false otherwise
+ * @returns {Promise<boolean>} True if the directory exists and is writable, false otherwise
  */
-function ensureDataDir() {
+async function ensureDataDir() {
   const dataDir = path.join(__dirname, '../../data');
   try {
+    // Validate directory path for security
+    const validatedPath = validateFilePath(dataDir);
+    
     // Check if directory exists
-    if (!fs.existsSync(dataDir)) {
-      logger.info(`Creating data directory: ${dataDir}`);
-      fs.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
+    try {
+      await fs.access(validatedPath);
+    } catch (error) {
+      // Directory doesn't exist, create it
+      logger.info(`Creating data directory: ${validatedPath}`);
+      await fs.mkdir(validatedPath, { recursive: true, mode: 0o755 });
     }
 
-    // Verify the directory exists after creation attempt
-    if (!fs.existsSync(dataDir)) {
-      logger.error(`Failed to create data directory: ${dataDir}`);
+    // Verify the directory exists and is accessible
+    const stats = await fs.stat(validatedPath);
+    if (!stats.isDirectory()) {
+      logger.error(`Path exists but is not a directory: ${validatedPath}`);
       return false;
     }
 
     // Check if directory is writable by trying to write a test file
-    const testFile = path.join(dataDir, '.write-test');
-    fs.writeFileSync(testFile, 'test', { flag: 'w' });
-    fs.unlinkSync(testFile); // Clean up test file
+    const testFile = path.join(validatedPath, '.write-test');
+    await fs.writeFile(testFile, 'test', { flag: 'w' });
+    await fs.unlink(testFile); // Clean up test file
 
     return true;
   } catch (error) {
@@ -178,22 +194,13 @@ const DEFAULT_STATS = {
  * @throws {Error} If an error occurs while saving
  */
 async function saveStats(stats) {
+  const startTime = Date.now();
+  
   try {
-    // Create data directory synchronously to ensure it exists before any async operations
-    const dataDir = path.join(__dirname, '../../data');
-    if (!fs.existsSync(dataDir)) {
-      try {
-        logger.info(`Creating data directory: ${dataDir}`);
-        fs.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
-      } catch (mkdirError) {
-        logger.error({ error: mkdirError }, 'Failed to create data directory');
-        return false;
-      }
-    }
-
-    // Double-check that the directory exists
-    if (!fs.existsSync(dataDir)) {
-      logger.error(`Data directory does not exist and could not be created: ${dataDir}`);
+    // Ensure data directory exists
+    const dirExists = await ensureDataDir();
+    if (!dirExists) {
+      logger.error('Cannot save stats: data directory is not accessible');
       return false;
     }
 
@@ -216,74 +223,32 @@ async function saveStats(stats) {
       return false;
     }
 
-    // Create a backup of the current stats file before writing
-    if (fs.existsSync(STATS_FILE)) {
-      try {
-        await fs.promises.copyFile(STATS_FILE, STATS_FILE + '.bak');
-        logger.debug('Created backup of stats file');
-      } catch (backupError) {
-        logger.warn({ error: backupError }, 'Failed to create backup of stats file');
-        // Continue with the save operation even if backup fails
-      }
+    // Check file size before writing
+    if (Buffer.byteLength(jsonString, 'utf8') > STATS_CONFIG.MAX_FILE_SIZE) {
+      logger.error({ size: Buffer.byteLength(jsonString, 'utf8'), max: STATS_CONFIG.MAX_FILE_SIZE }, 'Stats file too large');
+      return false;
     }
 
-    // Use a more reliable approach for writing files
+    // Use atomic write operation for safety
     try {
-      // Write to a completely new file first
-      const tempFile = STATS_FILE + '.new';
-
-      // Use synchronous file writing to ensure the file is completely written
-      fs.writeFileSync(tempFile, jsonString, { encoding: 'utf8', flag: 'w' });
-
-      // Verify the file was written correctly by reading it back synchronously
-      try {
-        const verifyData = fs.readFileSync(tempFile, 'utf8');
-        JSON.parse(verifyData); // This will throw if the JSON is invalid
-
-        // If verification passes, create a backup of the current file if it exists
-        if (fs.existsSync(STATS_FILE)) {
-          try {
-            fs.copyFileSync(STATS_FILE, STATS_FILE + '.bak');
-            logger.debug('Created backup of stats file');
-          } catch (backupError) {
-            logger.warn({ error: backupError }, 'Failed to create backup of stats file');
-            // Continue with the save operation even if backup fails
-          }
-        }
-
-        // Move the new file to the real file location
-        fs.renameSync(tempFile, STATS_FILE);
-        return true;
-      } catch (verifyError) {
-        logger.error({ error: verifyError }, 'Verification of written stats file failed');
-
-        // Try to clean up the temporary file
-        try {
-          if (fs.existsSync(tempFile)) {
-            fs.unlinkSync(tempFile);
-          }
-        } catch (cleanupError) {
-          logger.warn({ error: cleanupError }, 'Failed to clean up temporary stats file');
-        }
-
-        // Try to restore from backup if verification fails
-        if (fs.existsSync(STATS_FILE + '.bak')) {
-          try {
-            fs.copyFileSync(STATS_FILE + '.bak', STATS_FILE);
-            logger.info('Restored stats file from backup after failed verification');
-            return true;
-          } catch (restoreError) {
-            logger.error({ error: restoreError }, 'Failed to restore stats file from backup');
-          }
-        }
-        return false;
-      }
+      await atomicWriteFile(STATS_FILE, jsonString);
+      
+      const duration = Date.now() - startTime;
+      logger.debug({ 
+        duration, 
+        size: Buffer.byteLength(jsonString, 'utf8') 
+      }, 'Stats saved successfully');
+      
+      return true;
     } catch (writeError) {
-      logger.error({ error: writeError }, 'Failed to write stats file');
+      logger.error(
+        { error: writeError, duration: Date.now() - startTime },
+        'Failed to write stats file'
+      );
       return false;
     }
   } catch (error) {
-    logger.error({ error }, 'Failed to save stats');
+    logger.error({ error, duration: Date.now() - startTime }, 'Error saving stats');
     return false;
   }
 }
@@ -297,22 +262,28 @@ async function saveStats(stats) {
 async function loadStats() {
   try {
     // Ensure data directory exists and is writable
-    const dirReady = ensureDataDir();
+    const dirReady = await ensureDataDir();
     if (!dirReady) {
       logger.error('Cannot load stats: data directory not available or not writable');
       return { ...DEFAULT_STATS };
     }
 
-    if (!fs.existsSync(STATS_FILE)) {
-      // If the file doesn't exist, return the default stats
+    // Check if file exists
+    try {
+      await fs.access(STATS_FILE);
+    } catch (error) {
+      // File doesn't exist, return default stats
+      logger.debug('Stats file does not exist, returning defaults');
       return { ...DEFAULT_STATS };
     }
 
     // Try to read the main stats file
     let data;
     try {
-      // Use synchronous file reading for more reliability
-      data = fs.readFileSync(STATS_FILE, 'utf8');
+      // Use secure async file reading
+      data = await safeReadFile(STATS_FILE, { 
+        maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+      });
 
       // Trim any whitespace or unexpected characters that might be at the end of the file
       data = data.trim();
@@ -334,11 +305,12 @@ async function loadStats() {
       logger.error({ error: readError }, 'Failed to read stats file');
 
       // Try to recover from backup immediately
-      if (fs.existsSync(STATS_FILE + '.bak')) {
+      try {
         logger.info('Attempting to recover stats file from backup');
-        try {
-          data = fs.readFileSync(STATS_FILE + '.bak', 'utf8');
-          data = data.trim();
+        data = await safeReadFile(STATS_FILE + '.bak', { 
+          maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+        });
+        data = data.trim();
 
           // Verify the backup file structure
           if (!data.startsWith('{') || !data.endsWith('}')) {
@@ -355,26 +327,9 @@ async function loadStats() {
             );
             throw new Error('Backup stats file has mismatched braces - likely truncated');
           }
-        } catch (backupReadError) {
-          logger.error({ error: backupReadError }, 'Failed to read backup stats file');
-          logger.warn('Creating new stats file with default values');
-
-          // Create a new stats file with default values
-          const defaultStats = { ...DEFAULT_STATS };
-          defaultStats.lastUpdated = new Date().toISOString();
-
-          try {
-            const jsonString = JSON.stringify(defaultStats, null, 2);
-            fs.writeFileSync(STATS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
-            logger.info('Created new stats file with default values');
-            return defaultStats;
-          } catch (writeError) {
-            logger.error({ error: writeError }, 'Failed to create new stats file');
-            return defaultStats;
-          }
-        }
-      } else {
-        logger.warn('No backup stats file found, using default stats');
+      } catch (backupReadError) {
+        logger.error({ error: backupReadError }, 'Failed to read backup stats file');
+        logger.warn('Creating new stats file with default values');
 
         // Create a new stats file with default values
         const defaultStats = { ...DEFAULT_STATS };
@@ -382,13 +337,13 @@ async function loadStats() {
 
         try {
           const jsonString = JSON.stringify(defaultStats, null, 2);
-          fs.writeFileSync(STATS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+          await atomicWriteFile(STATS_FILE, jsonString);
           logger.info('Created new stats file with default values');
+          return defaultStats;
         } catch (writeError) {
           logger.error({ error: writeError }, 'Failed to create new stats file');
+          return defaultStats;
         }
-
-        return defaultStats;
       }
     }
 
@@ -411,7 +366,7 @@ async function loadStats() {
 
           try {
             const jsonString = JSON.stringify(defaultStats, null, 2);
-            fs.writeFileSync(STATS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+            await atomicWriteFile(STATS_FILE, jsonString);
             logger.info('Created new stats file with default values after truncation error');
             return defaultStats;
           } catch (writeError) {
@@ -440,7 +395,9 @@ async function loadStats() {
           logger.info('Attempting to recover stats from backup file');
           if (fs.existsSync(STATS_FILE + '.bak')) {
             try {
-              const backupData = fs.readFileSync(STATS_FILE + '.bak', 'utf8');
+              const backupData = await safeReadFile(STATS_FILE + '.bak', { 
+                maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+              });
               stats = JSON.parse(backupData.trim());
               logger.info('Successfully recovered stats from backup');
             } catch (backupError) {
@@ -452,7 +409,7 @@ async function loadStats() {
 
               try {
                 const jsonString = JSON.stringify(defaultStats, null, 2);
-                fs.writeFileSync(STATS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+                await atomicWriteFile(STATS_FILE, jsonString);
                 logger.info('Created new stats file with default values as last resort');
               } catch (writeError) {
                 logger.error(
@@ -472,7 +429,7 @@ async function loadStats() {
 
             try {
               const jsonString = JSON.stringify(defaultStats, null, 2);
-              fs.writeFileSync(STATS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+              await atomicWriteFile(STATS_FILE, jsonString);
               logger.info('Created new stats file with default values when no backup exists');
             } catch (writeError) {
               logger.error(

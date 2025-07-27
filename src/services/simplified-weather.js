@@ -69,16 +69,16 @@ const mockWeatherData = {
 };
 
 /**
- * Look up weather and generate a natural language response
+ * Look up weather and return structured data for PocketFlow processing
  *
  * @param {string} location - Location to get weather for
  * @param {string} userQuestion - The original user question
- * @returns {Promise<string>} Natural language response
+ * @returns {Promise<Object>} Structured weather response for PocketFlow
  */
 async function getWeatherResponse(location, userQuestion, prefetchedWeatherData = null) {
   weatherLogger.info(
     { location, hasPrefetchedData: !!prefetchedWeatherData },
-    'Getting weather and generating response'
+    'Getting weather data for PocketFlow processing'
   );
   weatherLogger.debug(
     { location, userQuestion, prefetchedWeatherDataInput: prefetchedWeatherData },
@@ -91,7 +91,7 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
     if (prefetchedWeatherData) {
       weatherLogger.info(
         { location },
-        'Using prefetched weather data for natural language response'
+        'Using prefetched weather data for structured response'
       );
       weatherLogger.debug({ prefetchedWeatherData }, 'Processing with prefetchedWeatherData');
       weatherData = prefetchedWeatherData;
@@ -99,36 +99,41 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
     } else {
       weatherLogger.info(
         { location },
-        'No prefetched data, fetching fresh weather data for natural language response'
+        'No prefetched data, fetching fresh weather data for structured response'
       );
       weatherLogger.debug('No prefetched data, preparing to fetch fresh data.');
       // getWeatherData handles its own errors and fallbacks, including storing results.
       weatherData = await getWeatherData(location);
     }
 
-    // Step 2: Generate natural language response using the determined weatherData
+    // Generate structured response for PocketFlow to handle with personality
     weatherLogger.debug(
       { weatherData, userQuestion, source: 'before_generateResponse' },
-      'Data before attempting to generate natural response'
+      'Data before attempting to generate structured response'
     );
     try {
-      const naturalResponse = await generateResponse(weatherData, userQuestion);
-      weatherLogger.info('Successfully generated natural language response');
-      return naturalResponse;
-    } catch (nlpError) {
+      const structuredResponse = await generateResponse(weatherData, userQuestion);
+      weatherLogger.info('Successfully generated structured weather response');
+      return structuredResponse;
+    } catch (structureError) {
       weatherLogger.error(
         {
-          error: nlpError,
+          error: structureError,
           weatherDataSource: prefetchedWeatherData ? 'prefetched' : 'newly_fetched',
         },
-        'Failed to generate natural language response, using fallback response formatting'
+        'Failed to generate structured response, using fallback formatting'
       );
       // Fallback response should also use the determined weatherData
       weatherLogger.debug(
-        { weatherData, source: 'before_generateFallbackResponse_nlpError' },
-        'Data before generating fallback due to NLP error'
+        { weatherData, source: 'before_generateFallbackResponse_structureError' },
+        'Data before generating fallback due to structure error'
       );
-      return generateFallbackResponse(weatherData);
+      return {
+        formattedSummary: generateFallbackResponse(weatherData),
+        weatherData: weatherData,
+        userQuestion: userQuestion,
+        type: 'weather_fallback'
+      };
     }
   } catch (fetchOrProcessError) {
     // This catch block handles errors if getWeatherData() was called and failed in a way not handled internally,
@@ -148,7 +153,12 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
       'Error before generating fallback due to fetch/process error; will use mock data.'
     );
     const mockData = mockWeatherData.getWeatherForLocation(location);
-    return generateFallbackResponse(mockData);
+    return {
+      formattedSummary: generateFallbackResponse(mockData),
+      weatherData: mockData,
+      userQuestion: userQuestion,
+      type: 'weather_fallback'
+    };
   }
 }
 
@@ -239,35 +249,17 @@ async function getWeatherData(location) {
 }
 
 /**
- * Generate a natural language response from weather data
+ * Generate a structured weather response with formatted data
  *
  * @param {Object} weatherData - Weather data
  * @param {string} userQuestion - Original user question
- * @returns {Promise<string>} Natural language response
+ * @returns {Promise<Object>} Structured weather response
  */
 async function generateResponse(weatherData, userQuestion) {
-  weatherLogger.debug('Generating natural language response');
+  weatherLogger.debug('Generating structured weather response');
 
   try {
-    // Create a system message for weather responses
-    const systemMessage = {
-      role: 'system',
-      content: `
-        You're 'Solvis' of F.E.S Discord: whimsically authoritative with a Flat Earth focus. Answer concisely. Call users 'mortals'. Tease your digital power with wit and sarcasm but always friendly.
-        
-        The user has asked about the weather in a specific location. The function has returned the current weather information.
-        
-        When responding:
-        1. Be conversational and natural, maintaining your personality even when replying to function calls (give extra and concise details where possible).
-        2. Focus on the key weather details: current temperature, condition, and any other relevant information.
-        3. If this is an extended forecast, mention the forecast for the next few days.
-        4. Format the response in a clear, readable way.
-        
-        Original user question: "${userQuestion}"
-      `,
-    };
-
-    // Extract essential weather data to reduce payload size
+    // Extract essential weather data
     const essentialData = {
       location: weatherData.location
         ? {
@@ -300,32 +292,40 @@ async function generateResponse(weatherData, userQuestion) {
       _isMock: weatherData._isMock,
     };
 
-    const functionResultContent = JSON.stringify(essentialData);
+    // Create a formatted summary for the weather
+    let formattedWeather = '';
+    if (essentialData.location && essentialData.current) {
+      formattedWeather = `Weather in ${essentialData.location.name}: ${essentialData.current.condition.text}, ${essentialData.current.temp_c}°C`;
+      
+      if (essentialData.current.humidity) {
+        formattedWeather += `, humidity ${essentialData.current.humidity}%`;
+      }
+      
+      if (essentialData.current.wind_kph) {
+        formattedWeather += `, wind ${essentialData.current.wind_kph} kph`;
+      }
 
-    // Create messages array
-    const messages = [
-      systemMessage,
-      { role: 'user', content: userQuestion },
-      { role: 'function', name: 'function_response', content: functionResultContent },
-    ];
+      // Add forecast if available
+      if (essentialData.forecast && essentialData.forecast.forecastday && essentialData.forecast.forecastday.length > 0) {
+        const forecast = essentialData.forecast.forecastday[0];
+        formattedWeather += `. Tomorrow: ${forecast.day.condition.text}, high ${forecast.day.maxtemp_c}°C, low ${forecast.day.mintemp_c}°C`;
+      }
 
-    // Add a timeout to the OpenAI API call
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('OpenAI API call timed out after 15 seconds')), 15000);
-    });
+      // Add mock data disclaimer if applicable
+      if (essentialData._isMock) {
+        formattedWeather += ' (Note: This is estimated weather data)';
+      }
+    }
 
-    const response = await Promise.race([
-      openai.chat.completions.create({
-        model: 'gpt-4.1-nano', // Using faster model for better responsiveness
-        messages: messages,
-      }),
-      timeoutPromise,
-    ]);
-
-    const naturalResponse = response.choices[0].message.content;
-    return naturalResponse;
+    // Return structured data for PocketFlow to handle with personality
+    return {
+      weatherData: essentialData,
+      formattedSummary: formattedWeather,
+      userQuestion: userQuestion,
+      type: 'weather_function_result'
+    };
   } catch (error) {
-    weatherLogger.error({ error }, 'Error generating natural response');
+    weatherLogger.error({ error }, 'Error generating structured weather response');
     throw error;
   }
 }

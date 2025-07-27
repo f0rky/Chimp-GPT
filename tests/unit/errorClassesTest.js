@@ -16,7 +16,7 @@ async function testErrorClasses() {
 
   try {
     // Load the error classes
-    errors = require('../../src/errors');
+    errors = require('../../src/utils/errorHandler');
 
     // Test 1: ChimpError base class
     try {
@@ -251,7 +251,6 @@ async function testErrorClasses() {
       originalError.code = 'ENOENT';
 
       const wrappedError = errors.wrapError(originalError, 'File not found', {
-        code: 'FILE_ERROR',
         context: { path: '/test/file.txt' },
       });
 
@@ -261,15 +260,14 @@ async function testErrorClasses() {
       const success =
         wrappedError instanceof errors.ChimpError &&
         wrappedError.message === 'File not found' &&
-        wrappedError.cause === originalError &&
-        wrappedError.code === 'FILE_ERROR' &&
+        wrappedError.originalError === originalError &&
         wrappedError.context.path === '/test/file.txt' &&
         doubleWrapped === wrappedError; // Should return the same error
 
       results.push({
         name: 'wrapError Helper',
         success,
-        hasCause: !!wrappedError.cause,
+        hasOriginalError: !!wrappedError.originalError,
         sameOnDoubleWrap: doubleWrapped === wrappedError,
       });
     } catch (error) {

@@ -5,43 +5,83 @@
  * to help monitor costs and usage patterns over time.
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
+
+// Configuration constants
+const IMAGE_USAGE_CONFIG = {
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB max file size for usage history
+  MAX_ENTRIES: 10000, // Maximum number of entries to keep
+};
 
 // Create a dedicated logger for the image usage tracker
 const logger = createLogger('imageUsage');
 
 // Path to the usage history file
-const USAGE_HISTORY_FILE = path.join(__dirname, 'data', 'image_usage_history.json');
+const USAGE_HISTORY_FILE = path.join(__dirname, '..', '..', 'data', 'image_usage_history.json');
 
 // Ensure the data directory exists
-function ensureDataDirectory() {
-  const dataDir = path.join(__dirname, 'data');
-  if (!fs.existsSync(dataDir)) {
+async function ensureDataDirectory() {
+  const dataDir = path.join(__dirname, '..', '..', 'data');
+  try {
+    // Validate directory path for security
+    const validatedPath = validateFilePath(dataDir);
+    
+    // Check if directory exists
     try {
-      fs.mkdirSync(dataDir, { recursive: true });
-      logger.info(`Created data directory at ${dataDir}`);
+      await fs.access(validatedPath);
     } catch (error) {
-      logger.error({ error }, 'Failed to create data directory');
+      // Directory doesn't exist, create it
+      logger.info(`Creating data directory at ${validatedPath}`);
+      await fs.mkdir(validatedPath, { recursive: true, mode: 0o755 });
     }
+
+    return true;
+  } catch (error) {
+    logger.error({ error, path: dataDir }, 'Failed to create data directory');
+    return false;
   }
 }
 
 // Load the usage history from file
-function loadUsageHistory() {
-  ensureDataDirectory();
-
-  try {
-    if (fs.existsSync(USAGE_HISTORY_FILE)) {
-      const data = fs.readFileSync(USAGE_HISTORY_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    logger.error({ error }, 'Error loading usage history');
+async function loadUsageHistory() {
+  const dirReady = await ensureDataDirectory();
+  if (!dirReady) {
+    logger.error('Cannot load usage history: data directory not accessible');
+    return getDefaultHistory();
   }
 
-  // Return empty history if file doesn't exist or there's an error
+  try {
+    // Check if file exists
+    await fs.access(USAGE_HISTORY_FILE);
+    
+    // Read file securely
+    const data = await safeReadFile(USAGE_HISTORY_FILE, {
+      maxSize: IMAGE_USAGE_CONFIG.MAX_FILE_SIZE
+    });
+    
+    const history = JSON.parse(data);
+    
+    // Trim entries if we have too many
+    if (history.entries && history.entries.length > IMAGE_USAGE_CONFIG.MAX_ENTRIES) {
+      logger.info(`Trimming usage history from ${history.entries.length} to ${IMAGE_USAGE_CONFIG.MAX_ENTRIES} entries`);
+      history.entries = history.entries
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, IMAGE_USAGE_CONFIG.MAX_ENTRIES);
+    }
+    
+    return history;
+  } catch (error) {
+    logger.error({ error }, 'Error loading usage history');
+    return getDefaultHistory();
+  }
+}
+
+// Get default history object
+function getDefaultHistory() {
   return {
     entries: [],
     totalCost: 0,
@@ -51,18 +91,33 @@ function loadUsageHistory() {
 }
 
 // Save the usage history to file
-function saveUsageHistory(history) {
-  ensureDataDirectory();
+async function saveUsageHistory(history) {
+  const dirReady = await ensureDataDirectory();
+  if (!dirReady) {
+    logger.error('Cannot save usage history: data directory not accessible');
+    return false;
+  }
 
   try {
     // Update the lastUpdated timestamp
     history.lastUpdated = new Date().toISOString();
 
-    // Write to file
-    fs.writeFileSync(USAGE_HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
+    // Validate JSON before writing
+    const jsonString = JSON.stringify(history, null, 2);
+    
+    // Check file size
+    if (Buffer.byteLength(jsonString, 'utf8') > IMAGE_USAGE_CONFIG.MAX_FILE_SIZE) {
+      logger.error({ size: Buffer.byteLength(jsonString, 'utf8') }, 'Usage history file too large');
+      return false;
+    }
+
+    // Write to file atomically
+    await atomicWriteFile(USAGE_HISTORY_FILE, jsonString);
     logger.debug('Saved image usage history');
+    return true;
   } catch (error) {
     logger.error({ error }, 'Error saving usage history');
+    return false;
   }
 }
 
@@ -79,43 +134,52 @@ function saveUsageHistory(history) {
  * @param {string} usageData.username - Discord username who requested the image
  * @returns {Object} The updated usage history
  */
-function trackImageGeneration(usageData) {
-  // Load the current history
-  const history = loadUsageHistory();
+async function trackImageGeneration(usageData) {
+  try {
+    // Load the current history
+    const history = await loadUsageHistory();
 
-  // Create a new entry
-  const entry = {
-    timestamp: new Date().toISOString(),
-    prompt: usageData.prompt,
-    size: usageData.size,
-    quality: usageData.quality,
-    cost: usageData.cost,
-    apiCallDuration: usageData.apiCallDuration,
-    userId: usageData.userId,
-    username: usageData.username,
-  };
-
-  // Add the entry to history
-  history.entries.push(entry);
-
-  // Update totals
-  history.totalCost += usageData.cost;
-  history.totalRequests += 1;
-
-  // Save the updated history
-  saveUsageHistory(history);
-
-  // Log the tracking
-  logger.info(
-    {
+    // Create a new entry
+    const entry = {
+      timestamp: new Date().toISOString(),
+      prompt: usageData.prompt,
+      size: usageData.size,
+      quality: usageData.quality,
       cost: usageData.cost,
-      totalCost: history.totalCost,
-      totalRequests: history.totalRequests,
-    },
-    'Tracked new image generation'
-  );
+      apiCallDuration: usageData.apiCallDuration,
+      userId: usageData.userId,
+      username: usageData.username,
+    };
 
-  return history;
+    // Add the entry to history
+    history.entries.push(entry);
+
+    // Update totals
+    history.totalCost += usageData.cost;
+    history.totalRequests += 1;
+
+    // Save the updated history
+    const saved = await saveUsageHistory(history);
+    
+    if (saved) {
+      // Log the tracking
+      logger.info(
+        {
+          cost: usageData.cost,
+          totalCost: history.totalCost,
+          totalRequests: history.totalRequests,
+        },
+        'Tracked new image generation'
+      );
+    } else {
+      logger.warn('Failed to save usage history after tracking');
+    }
+
+    return history;
+  } catch (error) {
+    logger.error({ error }, 'Error tracking image generation');
+    return getDefaultHistory();
+  }
 }
 
 /**
@@ -127,8 +191,8 @@ function trackImageGeneration(usageData) {
  * @param {string} options.endDate - End date in ISO format (optional)
  * @returns {Object} Usage statistics for the specified period
  */
-function getUsageStats(options = {}) {
-  const history = loadUsageHistory();
+async function getUsageStats(options = {}) {
+  const history = await loadUsageHistory();
 
   // Filter entries based on options
   let filteredEntries = history.entries;
@@ -175,8 +239,8 @@ function getUsageStats(options = {}) {
  * @param {Object} options - Options for filtering the statistics
  * @returns {string} A formatted report string
  */
-function getUsageReport(options = {}) {
-  const stats = getUsageStats(options);
+async function getUsageReport(options = {}) {
+  const stats = await getUsageStats(options);
 
   let report = '# Image Generation Usage Report\n\n';
 

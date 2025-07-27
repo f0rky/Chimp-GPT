@@ -19,6 +19,19 @@
  */
 
 require('dotenv').config();
+
+// Validate environment variables early in the startup process
+const { validateEnvironmentVariables } = require('../../utils/securityUtils');
+
+let validatedEnv;
+try {
+  validatedEnv = validateEnvironmentVariables();
+  console.log('✅ Environment variables validated successfully');
+} catch (error) {
+  console.error('❌ Environment validation failed:', error.message);
+  process.exit(1);
+}
+
 const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
@@ -114,5 +127,13 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start the application
-startCombinedApp();
+// Export validated environment for use by other modules
+module.exports = {
+  validatedEnv,
+  startCombinedApp,
+};
+
+// Start the application when run directly
+if (require.main === module) {
+  startCombinedApp();
+}

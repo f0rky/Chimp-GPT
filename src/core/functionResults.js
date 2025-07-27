@@ -29,13 +29,22 @@
  * @version 1.0.0
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
 const logger = createLogger('functions');
 
 // Path to the function results file
 const RESULTS_FILE = path.join(__dirname, '..', '..', 'data', 'function-results.json');
+
+// Configuration constants
+const FILE_CONFIG = {
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB max file size
+  BACKUP_RETENTION: 5, // Keep 5 backup files
+  WRITE_TIMEOUT: 10000, // 10 second timeout for write operations
+};
 
 // Maximum number of results to store per function type
 const MAX_RESULTS_PER_TYPE = 10;
@@ -57,27 +66,34 @@ const DEFAULT_RESULTS = {
 /**
  * Ensures the data directory exists and is writable
  *
- * @returns {boolean} True if the directory exists and is writable, false otherwise
+ * @returns {Promise<boolean>} True if the directory exists and is writable, false otherwise
  */
-function ensureDataDir() {
-  const dataDir = path.join(__dirname, 'data');
+async function ensureDataDir() {
+  const dataDir = path.join(__dirname, '..', '..', 'data');
   try {
+    // Validate directory path for security
+    const validatedPath = validateFilePath(dataDir);
+    
     // Check if directory exists
-    if (!fs.existsSync(dataDir)) {
-      logger.info(`Creating data directory: ${dataDir}`);
-      fs.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
+    try {
+      await fs.access(validatedPath);
+    } catch (error) {
+      // Directory doesn't exist, create it
+      logger.info(`Creating data directory: ${validatedPath}`);
+      await fs.mkdir(validatedPath, { recursive: true, mode: 0o755 });
     }
 
-    // Verify the directory exists after creation attempt
-    if (!fs.existsSync(dataDir)) {
-      logger.error(`Failed to create data directory: ${dataDir}`);
+    // Verify the directory exists and is accessible
+    const stats = await fs.stat(validatedPath);
+    if (!stats.isDirectory()) {
+      logger.error(`Path exists but is not a directory: ${validatedPath}`);
       return false;
     }
 
     // Check if directory is writable by trying to write a test file
-    const testFile = path.join(dataDir, '.write-test');
-    fs.writeFileSync(testFile, 'test', { flag: 'w' });
-    fs.unlinkSync(testFile); // Clean up test file
+    const testFile = path.join(validatedPath, '.write-test');
+    await fs.writeFile(testFile, 'test', { flag: 'w' });
+    await fs.unlink(testFile); // Clean up test file
 
     return true;
   } catch (error) {
@@ -182,28 +198,14 @@ async function saveResults(results) {
             'Failed to clean up temporary function results file'
           );
         }
-
-        // Try to restore from backup if verification fails
-        if (fs.existsSync(RESULTS_FILE + '.bak')) {
-          try {
-            fs.copyFileSync(RESULTS_FILE + '.bak', RESULTS_FILE);
-            logger.info('Restored function results file from backup after failed verification');
-            return true;
-          } catch (restoreError) {
-            logger.error(
-              { error: restoreError },
-              'Failed to restore function results file from backup'
-            );
-          }
-        }
         return false;
       }
-    } catch (writeError) {
-      logger.error({ error: writeError }, 'Failed to write function results file');
+    } catch (error) {
+      logger.error({ error, duration: Date.now() - startTime }, 'Error saving function results');
       return false;
     }
   } catch (error) {
-    logger.error({ error }, 'Failed to save function results');
+    logger.error({ error, duration: Date.now() - startTime }, 'Error saving function results');
     return false;
   }
 }
@@ -217,21 +219,27 @@ async function saveResults(results) {
 async function loadResults() {
   try {
     // Ensure data directory exists and is writable
-    const dirReady = ensureDataDir();
+    const dirReady = await ensureDataDir();
     if (!dirReady) {
       logger.error('Cannot load function results: data directory not available or not writable');
       return { ...DEFAULT_RESULTS };
     }
 
-    if (!fs.existsSync(RESULTS_FILE)) {
-      // If the file doesn't exist, return the default results
+    // Check if file exists
+    try {
+      await fs.access(RESULTS_FILE);
+    } catch (error) {
+      // File doesn't exist, return default results
+      logger.debug('Function results file does not exist, returning defaults');
       return { ...DEFAULT_RESULTS };
     }
 
     // Try to read and parse the file
     try {
-      // Use synchronous file reading for more reliability
-      let data = fs.readFileSync(RESULTS_FILE, 'utf8');
+      // Use secure async file reading
+      let data = await safeReadFile(RESULTS_FILE, { 
+        maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+      });
 
       // Trim any whitespace or unexpected characters that might be at the end of the file
       data = data.trim();
@@ -280,7 +288,7 @@ async function loadResults() {
 
           try {
             const jsonString = JSON.stringify(defaultResults, null, 2);
-            fs.writeFileSync(RESULTS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+            await atomicWriteFile(RESULTS_FILE, jsonString);
             logger.info(
               'Created new function results file with default values after truncation error'
             );
@@ -308,16 +316,17 @@ async function loadResults() {
           }
         } catch (cleanError) {
           logger.info('Attempting to recover function results from backup file');
-          if (fs.existsSync(RESULTS_FILE + '.bak')) {
-            try {
-              const backupData = fs.readFileSync(RESULTS_FILE + '.bak', 'utf8');
-              results = JSON.parse(backupData.trim());
-              logger.info('Successfully recovered function results from backup');
-            } catch (backupError) {
-              logger.error(
-                { error: backupError },
-                'Failed to recover function results from backup'
-              );
+          try {
+            const backupData = await safeReadFile(RESULTS_FILE + '.bak', { 
+              maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+            });
+            results = JSON.parse(backupData.trim());
+            logger.info('Successfully recovered function results from backup');
+          } catch (backupError) {
+            logger.error(
+              { error: backupError },
+              'Failed to recover function results from backup'
+            );
 
               // Create a new function results file with default values as last resort
               const defaultResults = { ...DEFAULT_RESULTS };
@@ -325,7 +334,7 @@ async function loadResults() {
 
               try {
                 const jsonString = JSON.stringify(defaultResults, null, 2);
-                fs.writeFileSync(RESULTS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
+                await atomicWriteFile(RESULTS_FILE, jsonString);
                 logger.info('Created new function results file with default values as last resort');
                 return defaultResults;
               } catch (writeError) {
@@ -336,28 +345,6 @@ async function loadResults() {
                 return defaultResults;
               }
             }
-          } else {
-            logger.warn('No backup function results file found, using default results');
-
-            // Create a new function results file with default values
-            const defaultResults = { ...DEFAULT_RESULTS };
-            defaultResults.lastUpdated = new Date().toISOString();
-
-            try {
-              const jsonString = JSON.stringify(defaultResults, null, 2);
-              fs.writeFileSync(RESULTS_FILE, jsonString, { encoding: 'utf8', flag: 'w' });
-              logger.info(
-                'Created new function results file with default values when no backup exists'
-              );
-              return defaultResults;
-            } catch (writeError) {
-              logger.error(
-                { error: writeError },
-                'Failed to create new function results file when no backup exists'
-              );
-              return defaultResults;
-            }
-          }
         }
       }
 
@@ -388,18 +375,18 @@ async function loadResults() {
 
       // Try to recover from backup if it exists
       const backupFile = RESULTS_FILE + '.bak';
-      if (fs.existsSync(backupFile)) {
-        try {
-          logger.info('Attempting to recover from backup file');
-          const backupData = await fs.promises.readFile(backupFile, 'utf8');
-          const backupResults = JSON.parse(backupData);
+      try {
+        logger.info('Attempting to recover from backup file');
+        const backupData = await safeReadFile(backupFile, { 
+          maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+        });
+        const backupResults = JSON.parse(backupData);
 
-          // If we got here, the backup is valid
-          logger.info('Successfully recovered from backup file');
-          return backupResults;
-        } catch (backupError) {
-          logger.error({ error: backupError }, 'Failed to recover from backup file');
-        }
+        // If we got here, the backup is valid
+        logger.info('Successfully recovered from backup file');
+        return backupResults;
+      } catch (backupError) {
+        logger.error({ error: backupError }, 'Failed to recover from backup file');
       }
 
       // If all else fails, return default results
@@ -531,21 +518,26 @@ async function repairResultsFile() {
 
   try {
     // Ensure the data directory exists
-    const dirReady = ensureDataDir();
+    const dirReady = await ensureDataDir();
     if (!dirReady) {
       logger.error('Cannot repair function results: data directory not available or not writable');
       return false;
     }
 
-    // If the file doesn't exist, create a new one with default values
-    if (!fs.existsSync(RESULTS_FILE)) {
+    // Check if the file exists
+    try {
+      await fs.access(RESULTS_FILE);
+    } catch (error) {
+      // File doesn't exist, create a new one with default values
       logger.info('Function results file does not exist, creating new file with defaults');
       return await saveResults({ ...DEFAULT_RESULTS });
     }
 
     // Try to read and parse the file
     try {
-      const data = await fs.promises.readFile(RESULTS_FILE, 'utf8');
+      const data = await safeReadFile(RESULTS_FILE, { 
+        maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+      });
       const results = JSON.parse(data);
 
       // File parsed successfully, check for integrity
@@ -594,24 +586,24 @@ async function repairResultsFile() {
 
       // Try to recover from backup if it exists
       const backupFile = RESULTS_FILE + '.bak';
-      if (fs.existsSync(backupFile)) {
-        try {
-          logger.info('Attempting to recover from backup file');
-          const backupData = await fs.promises.readFile(backupFile, 'utf8');
-          const backupResults = JSON.parse(backupData);
+      try {
+        logger.info('Attempting to recover from backup file');
+        const backupData = await safeReadFile(backupFile, { 
+          maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+        });
+        const backupResults = JSON.parse(backupData);
 
-          // If we got here, the backup is valid
-          logger.info('Successfully recovered from backup file');
-          return await saveResults(backupResults);
-        } catch (backupError) {
-          logger.error({ error: backupError }, 'Failed to recover from backup file');
-        }
+        // If we got here, the backup is valid
+        logger.info('Successfully recovered from backup file');
+        return await saveResults(backupResults);
+      } catch (backupError) {
+        logger.error({ error: backupError }, 'Failed to recover from backup file');
       }
 
       // Create a backup of the corrupted file for analysis
       try {
         const corruptedBackup = RESULTS_FILE + '.corrupted';
-        await fs.promises.copyFile(RESULTS_FILE, corruptedBackup);
+        await fs.copyFile(RESULTS_FILE, corruptedBackup);
         logger.info(`Backed up corrupted file to ${corruptedBackup}`);
       } catch (backupError) {
         logger.warn({ error: backupError }, 'Failed to backup corrupted file');

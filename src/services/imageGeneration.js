@@ -33,6 +33,14 @@
 
 const { OpenAI } = require('openai');
 const { createLogger } = require('../core/logger');
+const { 
+  ChimpError, 
+  ERROR_CATEGORIES, 
+  ERROR_SEVERITY, 
+  enhanceError,
+  handleOpenAIError,
+  logError,
+} = require('../../utils/errorHandler');
 const logger = createLogger('image');
 const { trackApiCall, trackError } = require('../core/healthCheck');
 const functionResults = require('../core/functionResults');
@@ -279,7 +287,12 @@ async function generateImage(prompt, options = {}) {
           error.message?.includes('safety system') ||
           error.message?.includes('content policy'))
       ) {
-        logger.warn({ prompt, error: error.message }, 'Image generation blocked by content policy');
+        const policyError = handleOpenAIError(error, {
+          prompt: prompt.substring(0, 100),
+          operation: 'image_generation_content_policy',
+        });
+        
+        logError(policyError);
         trackError('gptimage', error);
 
         // Return a specific error result for content policy violations
@@ -294,7 +307,14 @@ async function generateImage(prompt, options = {}) {
 
       // Check for circuit breaker open state
       if (error.message.includes('Circuit breaker is open')) {
-        logger.warn({ prompt }, 'Image generation failed due to circuit breaker');
+        const breakerError = new ChimpError('Image generation circuit breaker is open', {
+          category: ERROR_CATEGORIES.EXTERNAL_API,
+          severity: ERROR_SEVERITY.HIGH,
+          operation: 'image_generation_circuit_breaker',
+          context: { prompt: prompt.substring(0, 100) },
+        });
+        
+        logError(breakerError);
         return {
           success: false,
           error:
@@ -483,8 +503,23 @@ async function generateImage(prompt, options = {}) {
         'Extracted image URLs'
       );
     } catch (error) {
-      logger.error({ error, response }, 'Error extracting image URLs');
-      throw new Error('Failed to extract image URL from response');
+      const extractionError = enhanceError(error, {
+        operation: 'extract_image_urls',
+        category: ERROR_CATEGORIES.INTERNAL,
+        severity: ERROR_SEVERITY.HIGH,
+        context: { 
+          hasResponse: !!response,
+          responseDataLength: response?.data?.length || 0
+        },
+      });
+      
+      logError(extractionError);
+      throw new ChimpError('Failed to extract image URL from response', {
+        category: ERROR_CATEGORIES.INTERNAL,
+        severity: ERROR_SEVERITY.HIGH,
+        operation: 'extract_image_urls',
+        originalError: error,
+      });
     }
 
     // Store the function result for the status page
@@ -517,7 +552,28 @@ async function generateImage(prompt, options = {}) {
       totalProcessingTime: Date.now() - apiCallStartTime, // Total time including processing
     };
   } catch (error) {
-    logger.error({ error, prompt }, 'Error generating image with GPT Image-1');
+    // Standardize error handling based on error type
+    let standardizedError;
+    if (error.message?.includes('openai') || error.status) {
+      standardizedError = handleOpenAIError(error, {
+        prompt: prompt.substring(0, 100),
+        model: options.model || MODELS.GPT_IMAGE_1,
+        size: options.size || SIZES.SQUARE,
+      });
+    } else {
+      standardizedError = enhanceError(error, {
+        operation: 'generate_image',
+        category: ERROR_CATEGORIES.EXTERNAL_API,
+        severity: ERROR_SEVERITY.HIGH,
+        context: {
+          prompt: prompt.substring(0, 100),
+          model: options.model || MODELS.GPT_IMAGE_1,
+          size: options.size || SIZES.SQUARE,
+        },
+      });
+    }
+
+    logError(standardizedError);
     trackError('gptimage');
 
     // Check if this is a content policy violation that wasn't caught earlier
@@ -614,7 +670,12 @@ async function enhanceImagePrompt(basicPrompt) {
 
     return enhancedPrompt;
   } catch (error) {
-    logger.error({ error, basicPrompt }, 'Error enhancing image prompt');
+    const enhanceError = handleOpenAIError(error, {
+      basicPrompt: basicPrompt.substring(0, 100),
+      operation: 'enhance_image_prompt',
+    });
+    
+    logError(enhanceError);
     trackError('openai');
 
     // Fall back to the original prompt

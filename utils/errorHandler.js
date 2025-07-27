@@ -10,7 +10,7 @@
  */
 
 const { createLogger } = require('../src/core/logger');
-const { ChimpError, wrapError } = require('../src/errors');
+const { ChimpError, enhanceError } = require('../src/utils/errorHandler');
 const { trackError } = require('../src/core/healthCheck');
 
 // Create a logger for the error handler
@@ -30,21 +30,11 @@ const logger = createLogger('errorHandler');
  */
 function handleError(error, options = {}) {
   // Ensure we have a ChimpError
-  const chimpError = error instanceof ChimpError ? error : wrapError(error, error.message, options);
+  const chimpError = error instanceof ChimpError ? error : enhanceError(error, options);
 
-  // Log the error
-  logger.error(
-    {
-      error: chimpError.toJSON(),
-      component: options.component || chimpError.component,
-      operation: options.operation || chimpError.operation,
-      context: {
-        ...chimpError.context,
-        ...(options.context || {}),
-      },
-    },
-    chimpError.message
-  );
+  // Log the error using the new system
+  const { logError } = require('../src/utils/errorHandler');
+  logError(chimpError);
 
   // Track the error in health check system
   trackError(options.component || chimpError.component);
