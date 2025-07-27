@@ -11,6 +11,7 @@
  */
 
 const { Node, SharedStore, Flow } = require('./PocketFlow');
+const PersistentSharedStore = require('./PersistentSharedStore');
 const { createLogger } = require('../../core/logger');
 const { searchForFactCheck, formatSearchResults } = require('../../services/webSearch');
 const { fetchDocumentation } = require('../../services/webFetch');
@@ -32,12 +33,20 @@ class KnowledgeFlow {
   }
 
   initializeFlow() {
-    // Create shared store for knowledge and agent communication
-    this.store = new SharedStore();
-    this.store.set('knowledgeCache', new Map()); // Cache verified information
-    this.store.set('searchHistory', []); // Track search history
-    this.store.set('confidenceScores', new Map()); // Store confidence ratings
-    this.store.set('codeTemplates', this.getCodeTemplates()); // PocketFlow code templates
+    // Create persistent shared store for knowledge and agent communication
+    this.store = new PersistentSharedStore();
+
+    // Initialize with default values if not already loaded from disk
+    if (!this.store.has('knowledgeCache')) {
+      this.store.set('knowledgeCache', new Map()); // Cache verified information
+    }
+    if (!this.store.has('searchHistory')) {
+      this.store.set('searchHistory', []); // Track search history
+    }
+    if (!this.store.has('confidenceScores')) {
+      this.store.set('confidenceScores', new Map()); // Store confidence ratings
+    }
+    this.store.set('codeTemplates', this.getCodeTemplates()); // PocketFlow code templates (always refresh)
 
     // KISS Principle: Simplified 2-node PocketFlow architecture
     // Node 1: Process knowledge request (intent + info gathering + response generation)
@@ -305,7 +314,7 @@ class KnowledgeFlow {
   }
 
   /**
-   * Information Gathering Agent - Web search + MCP documentation fetch
+   * Information Gathering Agent - Web search + MCP documentation fetch with caching
    */
   async gatherInformation(store, _data) {
     try {
@@ -313,6 +322,27 @@ class KnowledgeFlow {
       const { query } = intent;
 
       logger.info(`Gathering information for query: "${query}"`);
+
+      // Check for cached knowledge first
+      const cached = store.getCachedResult(query);
+      if (cached && Date.now() - cached.timestamp < 24 * 60 * 60 * 1000) {
+        // Cache valid for 24 hours
+        logger.info(`Using cached knowledge for: "${query}" (confidence: ${cached.confidence}%)`);
+
+        return {
+          success: true,
+          informationGathered: true,
+          sources: [{ type: 'knowledge_cache', result: cached.result }],
+          informationData: {
+            query,
+            sources: [{ type: 'knowledge_cache', result: cached.result }],
+            gatheringTime: Date.now(),
+            hasErrors: false,
+            sourceCount: 1,
+            fromCache: true,
+          },
+        };
+      }
 
       // Parallel information gathering
       const gatheringPromises = [];
@@ -381,6 +411,16 @@ class KnowledgeFlow {
       };
 
       store.set('gatheredInformation', informationData);
+
+      // Cache successful web search results
+      const webSearchSource = informationSources.find(
+        s => s.type === 'web_search' && s.result?.success
+      );
+      if (webSearchSource) {
+        const confidence = webSearchSource.result.factCheck?.confidenceScore || 0;
+        store.cacheSearchResult(query, webSearchSource.result, confidence);
+        logger.info(`Cached search result for: "${query}" with ${confidence}% confidence`);
+      }
 
       logger.info(`Information gathering completed: ${informationSources.length} sources found`);
 
@@ -575,13 +615,19 @@ class KnowledgeFlow {
         response += `${confidenceEmoji} **Analysis Confidence:** ${Math.round(confirmationData.overallConfidence)}%\n`;
       }
 
-      // Detect if user wants natural conversation instead of structured response
-      const needsNaturalResponse =
-        intent.originalMessage.includes('natural') ||
-        intent.originalMessage.includes('conversational') ||
-        intent.originalMessage.includes('chat');
+      // Detect if user wants natural conversation (default for most queries)
+      // Only use structured response for specific technical cases
+      const needsStructuredResponse =
+        intent.originalMessage.includes('pocketflow') ||
+        intent.originalMessage.includes('documentation') ||
+        intent.originalMessage.includes('docs') ||
+        intent.originalMessage.includes('structured') ||
+        intent.originalMessage.includes('format') ||
+        intent.needsCode ||
+        intent.originalMessage.includes('api');
 
-      if (needsNaturalResponse && !intent.needsCode) {
+      // Default to natural response unless specifically requesting structured output
+      if (!needsStructuredResponse) {
         // Route to natural conversation about the topic
         return await this.generateNaturalResponse(store, data);
       }
@@ -1073,11 +1119,13 @@ class KnowledgeFlow {
   }
 
   /**
-   * Generate natural conversational response using OpenAI
+   * Generate natural conversational response using OpenAI with search context
    */
   async generateNaturalResponse(store, data) {
     try {
-      const intent = data.intent || store.get('currentIntent');
+      const intent = (data.intent && data.intent.intent) || store.get('currentIntent');
+      const informationData =
+        (data.information && data.information.informationData) || store.get('gatheredInformation');
 
       if (!intent) {
         throw new Error('No intent data available for natural response generation');
@@ -1085,8 +1133,53 @@ class KnowledgeFlow {
 
       logger.info(`Generating natural response for user ${intent.userId} about: ${intent.query}`);
 
-      // Create a conversational prompt based on the user's query
-      const conversationalPrompt = `The user asked about "${intent.originalMessage}". Please provide a natural, friendly, conversational response about this topic. Be helpful and informative but speak naturally like you're chatting with a friend.`;
+      // Build context from web search results
+      let searchContext = '';
+      if (informationData && informationData.sources.length > 0) {
+        const webSearchSource = informationData.sources.find(s => s.type === 'web_search');
+        if (webSearchSource && webSearchSource.result && webSearchSource.result.success) {
+          const searchData = webSearchSource.result.data;
+
+          // Add instant answer if available
+          if (searchData.instantAnswer) {
+            searchContext += `Quick Answer: ${searchData.instantAnswer.text}\n\n`;
+          }
+
+          // Add abstract if available
+          if (searchData.abstract) {
+            searchContext += `Information: ${searchData.abstract.text}\n`;
+            if (searchData.abstract.source && searchData.abstract.source !== 'Unknown') {
+              searchContext += `Source: ${searchData.abstract.source}\n`;
+            }
+            searchContext += '\n';
+          }
+
+          // Add related topics
+          if (searchData.results && searchData.results.length > 0) {
+            searchContext += 'Related Information:\n';
+            searchData.results.slice(0, 3).forEach((result, index) => {
+              searchContext += `${index + 1}. ${result.title}\n`;
+              if (result.snippet && result.snippet !== result.title) {
+                searchContext += `   ${result.snippet.substring(0, 150)}...\n`;
+              }
+            });
+            searchContext += '\n';
+          }
+        }
+      }
+
+      // Create a conversational prompt that incorporates search results
+      let conversationalPrompt;
+      if (searchContext.trim()) {
+        conversationalPrompt = `The user asked: "${intent.originalMessage}"
+
+I found this information from web search:
+${searchContext}
+
+Please provide a natural, friendly, conversational response based on this information. Be helpful and informative but speak naturally like you're having a chat with a friend. Incorporate the search findings naturally into your response.`;
+      } else {
+        conversationalPrompt = `The user asked about "${intent.originalMessage}". Please provide a natural, friendly, conversational response about this topic. Be helpful and informative but speak naturally like you're chatting with a friend.`;
+      }
 
       // Use OpenAI for natural conversation
       const completion = await this.openaiClient.chat.completions.create({
@@ -1095,7 +1188,7 @@ class KnowledgeFlow {
           {
             role: 'system',
             content:
-              "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend.",
+              "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them.",
           },
           {
             role: 'user',
@@ -1235,18 +1328,43 @@ const flow = new Flow(validationNode, new SharedStore());`,
    * Get knowledge statistics
    */
   getStats() {
+    if (this.store && this.store.getKnowledgeStats) {
+      return this.store.getKnowledgeStats();
+    }
+
+    // Fallback for non-persistent stores
     const knowledgeCache = this.store.get('knowledgeCache');
     const searchHistory = this.store.get('searchHistory');
     const confidenceScores = this.store.get('confidenceScores');
 
     return {
-      cachedKnowledge: knowledgeCache.size,
-      searchQueries: searchHistory.length,
+      cachedKnowledge: knowledgeCache ? knowledgeCache.size : 0,
+      searchQueries: searchHistory ? searchHistory.length : 0,
       avgConfidence:
-        confidenceScores.size > 0
+        confidenceScores && confidenceScores.size > 0
           ? Array.from(confidenceScores.values()).reduce((a, b) => a + b, 0) / confidenceScores.size
           : 0,
     };
+  }
+
+  /**
+   * Graceful shutdown - saves knowledge to disk
+   */
+  async shutdown() {
+    if (this.store && this.store.shutdown) {
+      logger.info('Shutting down KnowledgeFlow and saving knowledge...');
+      await this.store.shutdown();
+    }
+  }
+
+  /**
+   * Force save current knowledge state
+   */
+  async saveKnowledge() {
+    if (this.store && this.store.forceSave) {
+      logger.info('Force saving knowledge to disk...');
+      await this.store.forceSave();
+    }
   }
 }
 

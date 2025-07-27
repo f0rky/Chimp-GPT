@@ -74,9 +74,26 @@ class SimpleChimpGPTFlow {
         }
 
         const knowledgePatterns = [
-          /(?:search|lookup|find)\s+(?:information|docs|documentation)\s+about/i,
+          // Explicit search/lookup requests
+          /(?:search|lookup|look\s+up|find)\s+(?:the\s+)?(?:top|best|latest|current|information|docs|documentation)/i,
+          /can\s+you\s+(?:search|lookup|look\s+up|find)/i,
+          /(?:what\s+(?:are|is)|tell\s+me\s+about|information\s+about)\s+(?:the\s+)?(?:top|best|latest)/i,
+
+          // "Give me" requests
+          /(?:give\s+me|show\s+me)\s+(?:the\s+)?(?:top|best|latest|current)/i,
+          /can\s+you\s+(?:give\s+me|show\s+me)\s+(?:the\s+)?(?:latest|current|top|best)/i,
+
+          // Question patterns that benefit from web search
+          /what\s+(?:are|is)\s+the\s+(?:top|best|latest|current)/i,
+          /(?:what's|whats)\s+the\s+(?:latest|current|top|best)/i,
           /is\s+(?:it\s+)?true\s+that/i,
-          /can\s+you\s+(?:confirm|verify|search|lookup|look\s+up|find)/i,
+          /can\s+you\s+(?:confirm|verify)/i,
+
+          // Tech and documentation queries
+          /(?:top|best|latest)\s+(?:tech|technology|websites|sites|apps|tools)/i,
+          /(?:what\s+are\s+the\s+)?(?:top|best|latest)\s+.*(?:sites|websites|platforms|tools)/i,
+
+          // PocketFlow specific patterns
           /give\s+me\s+(?:the\s+)?pocketflow\s+code/i,
           /show\s+me\s+pocketflow\s+(?:implementation|code)/i,
           /how\s+to\s+implement\s+pocketflow/i,
@@ -711,6 +728,16 @@ class SimpleChimpGPTFlow {
 
     logger.info(`Cleaned up ${cleaned} old conversations`);
     return cleaned;
+  }
+
+  /**
+   * Graceful shutdown - save knowledge before exit
+   */
+  async shutdown() {
+    if (this.knowledgeFlow) {
+      logger.info('Shutting down SimpleChimpGPTFlow...');
+      await this.knowledgeFlow.shutdown();
+    }
   }
 }
 
