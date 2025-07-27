@@ -64,16 +64,24 @@ class SimpleChimpGPTFlow {
 
       // Check for knowledge system patterns first (if enabled)
       if (config.ENABLE_KNOWLEDGE_SYSTEM && this.knowledgeFlow) {
+        // Skip knowledge system for natural conversation requests
+        if (
+          content.includes('natural') &&
+          (content.includes('response') || content.includes('conversation'))
+        ) {
+          logger.info('Bypassing knowledge system for natural conversation request');
+          return await this.handleConversation(store, data);
+        }
+
         const knowledgePatterns = [
-          /(?:search|look\s+up|lookup|find|confirm|verify|check)/i,
+          /(?:search|lookup|find)\s+(?:information|docs|documentation)\s+about/i,
           /is\s+(?:it\s+)?true\s+that/i,
           /can\s+you\s+(?:confirm|verify|search|lookup|look\s+up|find)/i,
-          /what\s+(?:is|are|does)/i,
-          /give\s+me\s+(?:the\s+)?(?:pocketflow\s+)?code/i,
-          /show\s+me\s+(?:the\s+)?code/i,
-          /how\s+to\s+(?:implement|code|build)/i,
-          /documentation|docs/i,
-          /pocketflow/i, // Any mention of pocketflow should trigger knowledge system
+          /give\s+me\s+(?:the\s+)?pocketflow\s+code/i,
+          /show\s+me\s+pocketflow\s+(?:implementation|code)/i,
+          /how\s+to\s+implement\s+pocketflow/i,
+          /pocketflow\s+(?:implementation|example|code|documentation)/i,
+          /(?:search|find|lookup)\s+pocketflow/i,
         ];
 
         if (knowledgePatterns.some(pattern => pattern.test(content))) {

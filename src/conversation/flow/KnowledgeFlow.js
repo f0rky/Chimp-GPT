@@ -211,6 +211,17 @@ class KnowledgeFlow {
       const content = message.content.toLowerCase();
       const userId = message.author?.id;
 
+      // Validate user context
+      if (!userId) {
+        logger.warn('No user ID found in message object');
+        return {
+          success: false,
+          error: 'Missing user context',
+          needsInformation: false,
+          needsCode: false,
+        };
+      }
+
       logger.debug(`Detecting intent for knowledge request from user ${userId}`);
 
       // Check for code generation patterns
@@ -493,9 +504,13 @@ class KnowledgeFlow {
   async generateResponse(store, data) {
     try {
       // Extract data from the unified processing structure
-      const intent = data.intent || store.get('currentIntent');
-      const informationData = data.information || store.get('gatheredInformation');
-      const confirmationData = data.confirmation || store.get('confirmedInformation');
+      // Handle both new structure (data.intent.intent) and fallback to store
+      const intent = (data.intent && data.intent.intent) || store.get('currentIntent');
+      const informationData =
+        (data.information && data.information.informationData) || store.get('gatheredInformation');
+      const confirmationData =
+        (data.confirmation && data.confirmation.confirmationData) ||
+        store.get('confirmedInformation');
       const _originalMessage = data.originalData ? data.originalData.message : data.message;
 
       if (!intent) {
@@ -558,6 +573,17 @@ class KnowledgeFlow {
               ? '⚠️'
               : '❓';
         response += `${confidenceEmoji} **Analysis Confidence:** ${Math.round(confirmationData.overallConfidence)}%\n`;
+      }
+
+      // Detect if user wants natural conversation instead of structured response
+      const needsNaturalResponse =
+        intent.originalMessage.includes('natural') ||
+        intent.originalMessage.includes('conversational') ||
+        intent.originalMessage.includes('chat');
+
+      if (needsNaturalResponse && !intent.needsCode) {
+        // Route to natural conversation about the topic
+        return await this.generateNaturalResponse(store, data);
       }
 
       // Handle code generation requests
@@ -1044,6 +1070,64 @@ class KnowledgeFlow {
 
     const selectedEmojis = [...new Set(emojiSet)].slice(0, 3);
     return selectedEmojis.join(' ');
+  }
+
+  /**
+   * Generate natural conversational response using OpenAI
+   */
+  async generateNaturalResponse(store, data) {
+    try {
+      const intent = data.intent || store.get('currentIntent');
+
+      if (!intent) {
+        throw new Error('No intent data available for natural response generation');
+      }
+
+      logger.info(`Generating natural response for user ${intent.userId} about: ${intent.query}`);
+
+      // Create a conversational prompt based on the user's query
+      const conversationalPrompt = `The user asked about "${intent.originalMessage}". Please provide a natural, friendly, conversational response about this topic. Be helpful and informative but speak naturally like you're chatting with a friend.`;
+
+      // Use OpenAI for natural conversation
+      const completion = await this.openaiClient.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend.",
+          },
+          {
+            role: 'user',
+            content: conversationalPrompt,
+          },
+        ],
+        max_tokens: 1500,
+        temperature: 0.7,
+      });
+
+      const naturalResponse = completion.choices[0].message.content;
+
+      logger.info(
+        `Generated natural response (${naturalResponse.length} chars) for user ${intent.userId}`
+      );
+
+      return {
+        success: true,
+        response: naturalResponse,
+        type: 'natural_conversation',
+        confidence: 95,
+        isNatural: true,
+      };
+    } catch (error) {
+      logger.error('Error generating natural response:', error);
+      return {
+        success: false,
+        error: error.message,
+        response:
+          "I'm having trouble generating a natural response right now. Let me try the regular approach instead.",
+      };
+    }
   }
 
   /**
