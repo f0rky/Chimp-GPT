@@ -12,13 +12,14 @@ This document describes the advanced error handling system in ChimpGPT, includin
 
 ## Overview
 
-ChimpGPT uses a structured error handling system with custom error classes that extend the native JavaScript `Error` class. This approach provides several benefits:
+ChimpGPT uses a structured error handling system with custom error classes that extend the native JavaScript `Error` class. Both the legacy conversation system and the modern PocketFlow architecture (v2.0+) use this unified error handling approach. This provides several benefits:
 
 - **Rich context**: Errors contain detailed information about where and why they occurred
 - **Consistent logging**: All errors are logged with consistent structure and detail
 - **Error tracking**: Errors are automatically tracked in the health check system
 - **Type safety**: Error types help identify and handle specific error scenarios
 - **Security**: Sensitive information is automatically redacted in error logs
+- **PocketFlow Integration**: Graph-based error propagation through conversation nodes
 
 ## Error Classes
 
@@ -39,7 +40,7 @@ ChimpGPT uses a structured error handling system with custom error classes that 
 You can create errors using the factory function:
 
 ```javascript
-const { createError } = require('../src/errors');
+const { ChimpError } = require('../src/utils/errorHandler');
 
 // Create an API error
 const error = createError('api', 'Failed to call OpenAI API', {
@@ -53,7 +54,7 @@ const error = createError('api', 'Failed to call OpenAI API', {
 Or by directly instantiating the error classes:
 
 ```javascript
-const { ApiError } = require('../errors');
+const { ApiError } = require('../src/utils/errorHandler');
 
 const error = new ApiError('Failed to call OpenAI API', {
   service: 'openai',
@@ -68,7 +69,7 @@ const error = new ApiError('Failed to call OpenAI API', {
 You can wrap existing errors to add more context:
 
 ```javascript
-const { wrapError } = require('../errors');
+const { wrapError } = require('../src/utils/errorHandler');
 
 try {
   // Some operation that might throw
@@ -162,7 +163,7 @@ const weatherData = await safeGetWeatherData(location);
 ### API Error Handling
 
 ```javascript
-const { ApiError } = require('../errors');
+const { ApiError } = require('../src/utils/errorHandler');
 const { handleError } = require('../utils/errorHandler');
 
 async function callOpenAI(prompt) {
@@ -201,7 +202,7 @@ async function generateResponse(prompt) {
 ### Plugin Error Handling
 
 ```javascript
-const { PluginError } = require('../errors');
+const { PluginError } = require('../src/utils/errorHandler');
 const { handleError } = require('../utils/errorHandler');
 
 function executePluginHook(plugin, hookName, ...args) {
@@ -249,7 +250,7 @@ async function runPluginHooks(hookName, ...args) {
 ### Validation Error Handling
 
 ```javascript
-const { ValidationError } = require('../errors');
+const { ValidationError } = require('../src/utils/errorHandler');
 const { handleError } = require('../utils/errorHandler');
 
 function validateConfig(config) {
@@ -284,3 +285,80 @@ function initializeBot(config) {
   }
 }
 ```
+
+## PocketFlow Error Handling (v2.0+)
+
+The PocketFlow architecture includes specialized error handling for graph-based conversation flows:
+
+### Node-Level Error Handling
+
+```javascript
+const { BaseConversationNode } = require('../src/conversation/flow/nodes/BaseNode');
+const { handleError } = require('../src/utils/errorHandler');
+
+class CustomNode extends BaseConversationNode {
+  async process(input, context) {
+    try {
+      // Node processing logic
+      return { success: true, data: result };
+    } catch (error) {
+      // Node-specific error handling
+      return this.handleError(error, {
+        component: 'pocketflow',
+        operation: 'customNodeProcessing',
+        nodeType: this.constructor.name,
+        flowId: context.flowId
+      });
+    }
+  }
+}
+```
+
+### Flow-Level Error Handling
+
+```javascript
+const { PocketFlowConversationManager } = require('../src/conversation/flow/PocketFlowConversationManager');
+
+// Flow error handling with fallback
+async function processMessage(message, context) {
+  try {
+    const result = await pocketFlowManager.processMessage(message, context);
+    return result;
+  } catch (error) {
+    handleError(error, {
+      component: 'pocketflow',
+      operation: 'processMessage',
+      messageId: message.id,
+      channelId: message.channel.id
+    });
+    
+    // Fallback to legacy system
+    return await legacyManager.processMessage(message, context);
+  }
+}
+```
+
+### Parallel Testing Error Handling
+
+```javascript
+const { ParallelConversationTester } = require('../src/conversation/parallelTestingAdapter');
+
+// A/B testing with error comparison
+const tester = new ParallelConversationTester(legacyManager, pocketFlowManager, {
+  enableTesting: true,
+  errorHandling: {
+    compareBehavior: true,
+    logDiscrepancies: true,
+    fallbackOnError: 'legacy'
+  }
+});
+```
+
+### Error Metrics and Monitoring
+
+PocketFlow includes enhanced error tracking:
+
+- **Node performance metrics**: Error rates per conversation node
+- **Flow success rates**: Completion rates for different flow types
+- **Comparison logging**: Error behavior differences between legacy and PocketFlow
+- **Real-time monitoring**: Flow errors and recovery patterns

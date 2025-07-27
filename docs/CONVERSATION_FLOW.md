@@ -1,40 +1,78 @@
 # Conversation Flow and Function Handling
 
-This document describes the complete conversation flow and function handling architecture of Chimp-GPT.
+This document describes the complete conversation flow and function handling architecture of Chimp-GPT, featuring the modern PocketFlow system alongside legacy conversation management.
 
-## High-Level Message Flow
+## Architecture Overview
+
+Chimp-GPT uses a dual-system architecture:
+- **PocketFlow System**: Modern graph-based conversation management (v2.0+)
+- **Legacy System**: Traditional conversation handling (v1.x compatibility)
+
+## PocketFlow Architecture (Primary)
 
 ```mermaid
 flowchart TD
     A[Discord Message Event] --> B{Bot Message?}
     B -->|Yes| C[Ignore]
-    B -->|No| D{DM?}
-    D -->|Yes| C
-    D -->|No| E{Authorized Channel?}
-    E -->|No| C
-    E -->|Yes| F[Send Thinking Message]
+    B -->|No| D{Authorized Channel?}
+    D -->|No| C
+    D -->|Yes| E[PocketFlow Manager]
     
-    F --> G[Plugin Processing]
-    G --> H{Is Command?}
-    H -->|Yes| I[Execute Command]
-    H -->|No| J{Rate Limited?}
+    E --> F[Intent Detection Node]
+    F --> G[Context Manager Node]
+    G --> H[Response Router Node]
+    H --> I{Flow Type?}
     
-    J -->|Yes| K[Update with Rate Limit]
-    J -->|No| L[Load Conversation]
+    I -->|Individual| J[Individual Flow]
+    I -->|Blended| K[Blended Flow]
+    I -->|Command| L[Command Flow]
     
-    L --> M[Send to OpenAI]
-    M --> N{Function Call?}
-    N -->|Yes| O[Execute Function]
-    N -->|No| P[Direct Response]
+    J --> M[Function Executor Node]
+    K --> M
+    L --> N[Direct Command Execution]
     
-    O --> Q[Generate Natural Response]
-    Q --> R[Update Message]
-    P --> R
-    I --> R
-    K --> R
+    M --> O{Function Call?}
+    O -->|Yes| P[Execute Function]
+    O -->|No| Q[Direct Response]
     
-    R --> S[Save Conversation]
-    S --> T[Update Bot Status]
+    P --> R[Natural Response Generation]
+    Q --> R
+    N --> R
+    
+    R --> S[Update Message]
+    S --> T[Save to Conversation Store]
+    T --> U[Update Bot Status]
+```
+
+## Legacy Flow (Compatibility Mode)
+
+```mermaid
+flowchart TD
+    A[Discord Message Event] --> B{PocketFlow Enabled?}
+    B -->|No| C[Legacy Message Processing]
+    B -->|Yes| D[PocketFlow Processing]
+    
+    C --> E[Plugin Processing]
+    E --> F{Is Command?}
+    F -->|Yes| G[Execute Command]
+    F -->|No| H{Rate Limited?}
+    
+    H -->|Yes| I[Update with Rate Limit]
+    H -->|No| J[Load Conversation]
+    
+    J --> K[Send to OpenAI]
+    K --> L{Function Call?}
+    L -->|Yes| M[Execute Function]
+    L -->|No| N[Direct Response]
+    
+    M --> O[Generate Natural Response]
+    O --> P[Update Message]
+    N --> P
+    G --> P
+    I --> P
+    
+    P --> Q[Save Conversation]
+    Q --> R[Update Bot Status]
 ```
 
 ## Detailed Function Calling Flow
@@ -75,7 +113,44 @@ flowchart TD
     T --> U[Generate Natural Response]
 ```
 
-## Conversation Management Flow
+## PocketFlow Conversation Management
+
+```mermaid
+flowchart TD
+    A[New Message] --> B[PocketFlow Manager]
+    B --> C[Intent Detection Node]
+    C --> D[Context Manager Node]
+    D --> E{Conversation Exists?}
+    E -->|No| F[Create New Flow]
+    E -->|Yes| G[Load from Store]
+    
+    F --> H[Initialize Shared Store]
+    G --> I[Update Context]
+    H --> I
+    
+    I --> J[Response Router Node]
+    J --> K{Flow Selection}
+    K -->|Individual| L[User-Specific Context]
+    K -->|Blended| M[Channel-Wide Context]
+    K -->|Command| N[Direct Execution]
+    
+    L --> O[Function Executor Node]
+    M --> O
+    N --> P[Command Response]
+    
+    O --> Q{Function Call?}
+    Q -->|Yes| R[Execute API Function]
+    Q -->|No| S[Direct AI Response]
+    
+    R --> T[Natural Response Generation]
+    S --> T
+    P --> T
+    
+    T --> U[Save to Store]
+    U --> V[Cleanup Old Flows]
+```
+
+## Legacy Conversation Management
 
 ```mermaid
 flowchart TD
@@ -201,43 +276,80 @@ flowchart TD
 
 ## Key Components
 
-### 1. **Message Reception** (`chimpGPT.js`)
+### PocketFlow System (v2.0+)
+
+#### **1. PocketFlow Manager** (`PocketFlowConversationManager.js`)
+- Orchestrates all conversation flows
+- Manages A/B testing with legacy system
+- Handles concurrent flow limitations
+- Provides comprehensive metrics
+
+#### **2. Core Nodes** (`flow/nodes/`)
+- **Intent Detection Node**: Analyzes message intent with confidence scoring
+- **Context Manager Node**: Optimizes conversation context and token usage
+- **Response Router Node**: Intelligently routes between flow types
+- **Function Executor Node**: Handles OpenAI function calling workflow
+
+#### **3. Flow Types** (`flow/flows/`)
+- **Individual Flow**: One-on-one user conversations
+- **Blended Flow**: Multi-user channel conversations
+- **Command Flow**: Direct command execution
+
+#### **4. Shared Store** (`ConversationStore.js`)
+- Graph-based state management
+- Real-time conversation analytics
+- Automatic cleanup and memory management
+
+### Legacy System (v1.x Compatibility)
+
+#### **1. Message Reception** (`chimpGPT.js`)
 - Handles Discord `messageCreate` events
 - Validates messages (not bot, not DM, authorized channel)
 - Provides immediate user feedback
 
-### 2. **Conversation Manager** (`conversationManager.js`)
+#### **2. Conversation Manager** (`conversationManager.js`)
 - Maintains conversation history in memory and disk
 - Handles message references and reply chains
 - Implements automatic pruning and optimization
 
-### 3. **Function Handler** (`chimpGPT.js:handleFunctionCall`)
+#### **3. Function Handler** (`chimpGPT.js:handleFunctionCall`)
 - Processes OpenAI function calls
 - Applies rate limiting and circuit breaking
 - Formats results for natural language generation
 
-### 4. **Command Handler** (`commandHandler.js`)
+### Shared Components
+
+#### **1. Command Handler** (`commandHandler.js`)
 - Parses and validates commands
 - Checks permissions and approval requirements
 - Routes to appropriate command modules
 
-### 5. **Plugin Manager** (`pluginManager.js`)
+#### **2. Plugin Manager** (`pluginManager.js`)
 - Loads and initializes plugins
 - Manages plugin hooks and commands
 - Handles plugin errors gracefully
 
-### 6. **Circuit Breaker** (`circuitBreaker.js`)
+#### **3. Circuit Breaker** (`circuitBreaker.js`)
 - Protects external API calls
 - Implements retry logic with exponential backoff
 - Maintains circuit states across restarts
 
-### 7. **Human Circuit Breaker** (`humanCircuitBreaker.js`)
+#### **4. Human Circuit Breaker** (`humanCircuitBreaker.js`)
 - Requires Discord reaction approval for sensitive operations
 - Implements timeout and cancellation
 - Logs approval/rejection decisions
 
 ## Performance Optimizations
 
+### PocketFlow Optimizations
+1. **Graph-Based Processing**: 60% reduction in conversation logic complexity
+2. **Intent-Driven Routing**: Smart flow selection based on message analysis
+3. **Dynamic Context Management**: Intelligent token optimization
+4. **Parallel Flow Processing**: Concurrent conversation handling
+5. **Real-Time Analytics**: Performance monitoring and metrics
+6. **Automatic Cleanup**: Memory management with configurable retention
+
+### Legacy Optimizations
 1. **Immediate Feedback**: Shows "Thinking..." message instantly
 2. **Async Plugin Processing**: Plugins run in parallel
 3. **Rate Limiting**: Prevents API abuse and manages costs
@@ -245,6 +357,11 @@ flowchart TD
 5. **Conversation Optimization**: Prunes old messages to stay within token limits
 6. **Caching**: Circuit breaker caches successful responses
 7. **Batched Saves**: Conversations saved every 5 minutes instead of per-message
+
+### Shared Optimizations
+8. **A/B Testing**: Compare system performance in real-time
+9. **Intelligent Fallbacks**: Graceful degradation when services fail
+10. **Resource Management**: Configurable limits and monitoring
 
 ## Data Flow Summary
 

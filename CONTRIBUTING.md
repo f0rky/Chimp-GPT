@@ -63,24 +63,35 @@ Please be respectful and considerate of others when contributing to the project.
 
 - **Core Files**:
 
-  - `chimpGPT.js` - Main bot file
-  - `conversationManager.js` - Manages conversation context
-  - `conversationStorage.js` - Handles saving/loading conversations
-  - `imageGeneration.js` - DALL-E image generation
-  - `statusServer.js` - Status page server
+  - `src/core/chimpGPT.js` - Main bot initialization and Discord client setup
+  - `src/conversation/flow/PocketFlowConversationManager.js` - Modern graph-based conversation system
+  - `src/conversation/conversationManager.js` - Legacy conversation context management
+  - `src/services/imageGeneration.js` - DALL-E image generation
+  - `src/web/statusServer.js` - Status page server
+
+- **PocketFlow System (v2.0+)**:
+
+  - `src/conversation/flow/nodes/` - Modular conversation processing nodes
+  - `src/conversation/flow/flows/` - Individual, Blended, and Command flows
+  - `src/conversation/flow/ConversationStore.js` - Graph-based state management
+  - `src/conversation/pocketFlowAdapter.js` - Compatibility layer
 
 - **Commands**:
 
-  - `commands/` - Command implementations
+  - `src/commands/` - Command implementations
 
 - **Plugins**:
 
-  - `plugins/` - Plugin system and plugin implementations
+  - `src/plugins/` - Plugin system and plugin implementations
+
+- **Services**:
+
+  - `src/services/` - External API integrations (OpenAI, weather, etc.)
 
 - **Utilities**:
 
   - `utils/` - Utility functions and helpers
-  - `logger.js` - Logging system
+  - `src/core/logger.js` - Logging system
 
 - **Tests**:
   - `tests/` - Test files
@@ -160,11 +171,41 @@ async function processOpenAIMessage(content, conversationLog) {
 - Run tests before submitting a pull request: `npm test`
 - Ensure all tests pass before submitting
 
+## PocketFlow Development
+
+ChimpGPT v2.0+ features the PocketFlow architecture for advanced conversation management.
+
+### Working with PocketFlow
+
+**Core Concepts:**
+- **Nodes**: Modular processing units (Intent Detection, Context Management, Response Routing, Function Execution)
+- **Flows**: Complete conversation workflows (Individual, Blended, Command)
+- **Shared Store**: Graph-based state management with automatic cleanup
+
+**Adding New Nodes:**
+1. Extend `BaseConversationNode` in `src/conversation/flow/nodes/`
+2. Implement required methods: `process()`, `handleError()`, `cleanup()`
+3. Register in the appropriate flow configuration
+4. Add comprehensive tests
+
+**Creating New Flows:**
+1. Create flow class in `src/conversation/flow/flows/`
+2. Define node connections and data flow
+3. Register with `PocketFlowConversationManager`
+4. Add configuration options and metrics
+
+**A/B Testing:**
+- Enable parallel testing with `POCKETFLOW_PARALLEL_TESTING=true`
+- Compare performance metrics between legacy and PocketFlow systems
+- Use detailed logging for debugging and optimization
+
+See [src/conversation/flow/README.md](./src/conversation/flow/README.md) for comprehensive PocketFlow documentation.
+
 ## Plugin Development
 
 ChimpGPT has a plugin system that allows extending functionality without modifying core code.
 
-See [plugins/README.md](./plugins/README.md) for detailed plugin development guidelines.
+See [src/plugins/README.md](./src/plugins/README.md) for detailed plugin development guidelines.
 
 Key plugin hooks:
 
