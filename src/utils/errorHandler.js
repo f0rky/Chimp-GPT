@@ -10,7 +10,7 @@
  */
 
 const { createLogger } = require('../core/logger');
-const { hashForLogging } = require('../../utils/securityUtils');
+const { hashForLogging } = require('./securityUtils');
 
 const logger = createLogger('error-handler');
 
@@ -96,11 +96,13 @@ class ChimpError extends Error {
       // Include user ID hash for tracking without exposing it
       userIdHash: this.userId ? hashForLogging(this.userId) : null,
       // Include original error info without sensitive data
-      originalError: this.originalError ? {
-        name: this.originalError.name,
-        message: this.originalError.message,
-        code: this.originalError.code,
-      } : null,
+      originalError: this.originalError
+        ? {
+            name: this.originalError.name,
+            message: this.originalError.message,
+            code: this.originalError.code,
+          }
+        : null,
     };
   }
 
@@ -110,15 +112,18 @@ class ChimpError extends Error {
    */
   toUserMessage() {
     const userMessages = {
-      [ERROR_CATEGORIES.VALIDATION]: 'Invalid input provided. Please check your request and try again.',
+      [ERROR_CATEGORIES.VALIDATION]:
+        'Invalid input provided. Please check your request and try again.',
       [ERROR_CATEGORIES.AUTHENTICATION]: 'Authentication failed. Please check your credentials.',
       [ERROR_CATEGORIES.AUTHORIZATION]: 'You do not have permission to perform this action.',
       [ERROR_CATEGORIES.NETWORK]: 'Network connection failed. Please try again later.',
-      [ERROR_CATEGORIES.EXTERNAL_API]: 'External service is temporarily unavailable. Please try again later.',
+      [ERROR_CATEGORIES.EXTERNAL_API]:
+        'External service is temporarily unavailable. Please try again later.',
       [ERROR_CATEGORIES.DATABASE]: 'Data storage error occurred. Please try again later.',
       [ERROR_CATEGORIES.FILE_SYSTEM]: 'File operation failed. Please try again later.',
       [ERROR_CATEGORIES.RATE_LIMIT]: 'Rate limit exceeded. Please wait before trying again.',
-      [ERROR_CATEGORIES.SECURITY]: 'Security validation failed. Please contact support if this persists.',
+      [ERROR_CATEGORIES.SECURITY]:
+        'Security validation failed. Please contact support if this persists.',
       [ERROR_CATEGORIES.CONFIGURATION]: 'Service configuration error. Please contact support.',
       [ERROR_CATEGORIES.BUSINESS_LOGIC]: 'Request could not be processed due to business rules.',
       [ERROR_CATEGORIES.INTERNAL]: 'An internal error occurred. Please try again later.',
@@ -213,7 +218,7 @@ function classifyError(error) {
 
   const message = error.message?.toLowerCase() || '';
   const code = error.code?.toLowerCase() || '';
-  const name = error.name?.toLowerCase() || '';
+  const _name = error.name?.toLowerCase() || '';
 
   // Network errors
   if (code.includes('econnrefused') || code.includes('enotfound') || code.includes('etimedout')) {
@@ -221,7 +226,11 @@ function classifyError(error) {
   }
 
   // Authentication/Authorization
-  if (message.includes('unauthorized') || message.includes('authentication') || error.status === 401) {
+  if (
+    message.includes('unauthorized') ||
+    message.includes('authentication') ||
+    error.status === 401
+  ) {
     return ERROR_CATEGORIES.AUTHENTICATION;
   }
   if (message.includes('forbidden') || message.includes('permission') || error.status === 403) {
@@ -229,7 +238,11 @@ function classifyError(error) {
   }
 
   // Rate limiting
-  if (message.includes('rate limit') || message.includes('too many requests') || error.status === 429) {
+  if (
+    message.includes('rate limit') ||
+    message.includes('too many requests') ||
+    error.status === 429
+  ) {
     return ERROR_CATEGORIES.RATE_LIMIT;
   }
 
@@ -239,12 +252,21 @@ function classifyError(error) {
   }
 
   // File system
-  if (code.includes('enoent') || code.includes('eacces') || message.includes('file') || message.includes('directory')) {
+  if (
+    code.includes('enoent') ||
+    code.includes('eacces') ||
+    message.includes('file') ||
+    message.includes('directory')
+  ) {
     return ERROR_CATEGORIES.FILE_SYSTEM;
   }
 
   // External API errors
-  if (message.includes('openai') || message.includes('api') || message.includes('service unavailable')) {
+  if (
+    message.includes('openai') ||
+    message.includes('api') ||
+    message.includes('service unavailable')
+  ) {
     return ERROR_CATEGORIES.EXTERNAL_API;
   }
 
@@ -265,23 +287,29 @@ function determineSeverity(error) {
   if (!error) return ERROR_SEVERITY.LOW;
 
   // Critical errors
-  if (error.message?.includes('EADDRINUSE') || 
-      error.message?.includes('server') || 
-      error.message?.includes('database connection')) {
+  if (
+    error.message?.includes('EADDRINUSE') ||
+    error.message?.includes('server') ||
+    error.message?.includes('database connection')
+  ) {
     return ERROR_SEVERITY.CRITICAL;
   }
 
   // High severity
-  if (error.message?.includes('security') || 
-      error.message?.includes('unauthorized') ||
-      error.status >= 500) {
+  if (
+    error.message?.includes('security') ||
+    error.message?.includes('unauthorized') ||
+    error.status >= 500
+  ) {
     return ERROR_SEVERITY.HIGH;
   }
 
   // Medium severity
-  if (error.status >= 400 || 
-      error.message?.includes('validation') ||
-      error.message?.includes('rate limit')) {
+  if (
+    error.status >= 400 ||
+    error.message?.includes('validation') ||
+    error.message?.includes('rate limit')
+  ) {
     return ERROR_SEVERITY.MEDIUM;
   }
 
@@ -294,15 +322,16 @@ function determineSeverity(error) {
  * @param {Object} additionalContext - Additional context for logging
  */
 function logError(error, additionalContext = {}) {
-  const logObject = error instanceof ChimpError 
-    ? error.toLogObject() 
-    : {
-        name: error.name,
-        message: error.message,
-        category: classifyError(error),
-        severity: determineSeverity(error),
-        stack: error.stack,
-      };
+  const logObject =
+    error instanceof ChimpError
+      ? error.toLogObject()
+      : {
+          name: error.name,
+          message: error.message,
+          category: classifyError(error),
+          severity: determineSeverity(error),
+          stack: error.stack,
+        };
 
   const context = { ...logObject, ...additionalContext };
 
@@ -332,10 +361,14 @@ function logError(error, additionalContext = {}) {
  * @returns {ChimpError} Enhanced Discord error
  */
 function handleDiscordError(error, context = {}) {
-  const category = error.code === 50013 ? ERROR_CATEGORIES.AUTHORIZATION :
-                   error.code === 50001 ? ERROR_CATEGORIES.AUTHENTICATION :
-                   error.code === 50035 ? ERROR_CATEGORIES.VALIDATION :
-                   ERROR_CATEGORIES.EXTERNAL_API;
+  const category =
+    error.code === 50013
+      ? ERROR_CATEGORIES.AUTHORIZATION
+      : error.code === 50001
+        ? ERROR_CATEGORIES.AUTHENTICATION
+        : error.code === 50035
+          ? ERROR_CATEGORIES.VALIDATION
+          : ERROR_CATEGORIES.EXTERNAL_API;
 
   const severity = error.code === 50035 ? ERROR_SEVERITY.LOW : ERROR_SEVERITY.MEDIUM;
 
@@ -361,12 +394,16 @@ function handleDiscordError(error, context = {}) {
 function handleOpenAIError(error, context = {}) {
   const isRateLimit = error.status === 429 || error.message?.includes('rate limit');
   const isQuotaExceeded = error.message?.includes('quota') || error.message?.includes('billing');
-  const isContentPolicy = error.message?.includes('content policy') || error.message?.includes('safety');
+  const isContentPolicy =
+    error.message?.includes('content policy') || error.message?.includes('safety');
 
-  const category = isRateLimit ? ERROR_CATEGORIES.RATE_LIMIT :
-                   isQuotaExceeded ? ERROR_CATEGORIES.EXTERNAL_API :
-                   isContentPolicy ? ERROR_CATEGORIES.SECURITY :
-                   ERROR_CATEGORIES.EXTERNAL_API;
+  const category = isRateLimit
+    ? ERROR_CATEGORIES.RATE_LIMIT
+    : isQuotaExceeded
+      ? ERROR_CATEGORIES.EXTERNAL_API
+      : isContentPolicy
+        ? ERROR_CATEGORIES.SECURITY
+        : ERROR_CATEGORIES.EXTERNAL_API;
 
   const severity = isQuotaExceeded || isContentPolicy ? ERROR_SEVERITY.HIGH : ERROR_SEVERITY.MEDIUM;
 
@@ -397,7 +434,7 @@ class ApiError extends ChimpError {
       severity: ERROR_SEVERITY.MEDIUM,
       ...options,
     });
-    
+
     this.name = 'ApiError';
     this.service = options.service || 'unknown';
     this.endpoint = options.endpoint || 'unknown';
@@ -434,7 +471,7 @@ class PluginError extends ChimpError {
       severity: ERROR_SEVERITY.MEDIUM,
       ...options,
     });
-    
+
     this.name = 'PluginError';
     this.pluginName = options.pluginName || 'unknown';
     this.pluginVersion = options.pluginVersion;
@@ -453,14 +490,14 @@ class ValidationError extends ChimpError {
       severity: ERROR_SEVERITY.LOW,
       ...options,
     });
-    
+
     this.name = 'ValidationError';
     this.field = options.field;
     this.value = options.value;
     this.constraint = options.constraint;
     this.validationErrors = options.validationErrors || [];
   }
-  
+
   addError(field, message) {
     this.validationErrors.push({ field, message });
   }
@@ -476,7 +513,7 @@ class ConfigError extends ChimpError {
       severity: ERROR_SEVERITY.HIGH,
       ...options,
     });
-    
+
     this.name = 'ConfigError';
     this.configKey = options.configKey;
     this.missingRequired = options.missingRequired;
@@ -495,7 +532,7 @@ class DiscordError extends ApiError {
       severity: ERROR_SEVERITY.MEDIUM,
       ...options,
     });
-    
+
     this.name = 'DiscordError';
     this.channelId = options.channelId;
     this.guildId = options.guildId;
@@ -559,15 +596,71 @@ async function withTimeout(operation, timeout = 30000, options = {}) {
     operation(),
     new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new ChimpError('Operation timed out', {
-          category: ERROR_CATEGORIES.INTERNAL,
-          severity: ERROR_SEVERITY.MEDIUM,
-          operation: options.operation || 'timeout_operation',
-          context: { timeout },
-        }));
+        reject(
+          new ChimpError('Operation timed out', {
+            category: ERROR_CATEGORIES.INTERNAL,
+            severity: ERROR_SEVERITY.MEDIUM,
+            operation: options.operation || 'timeout_operation',
+            context: { timeout },
+          })
+        );
       }, timeout);
     }),
   ]);
+}
+
+/**
+ * Legacy wrapper function for backward compatibility
+ * Handle an error with consistent logging and tracking
+ *
+ * @param {Error} error - The error to handle
+ * @param {Object} options - Additional options
+ * @param {string} [options.component] - Component where the error occurred
+ * @param {string} [options.operation] - Operation that was being performed
+ * @param {Object} [options.context] - Additional context for the error
+ * @param {boolean} [options.rethrow=false] - Whether to rethrow the error after handling
+ * @returns {ChimpError} The handled error
+ * @throws {ChimpError} If rethrow is true
+ */
+function handleError(error, options = {}) {
+  // Ensure we have a ChimpError
+  const chimpError = error instanceof ChimpError ? error : enhanceError(error, options);
+
+  // Log the error using the new system
+  logError(chimpError);
+
+  // Track the error in health check system if available
+  try {
+    const { trackError } = require('../core/healthCheck');
+    trackError(options.component || chimpError.component);
+  } catch (e) {
+    // Health check integration not available, continue
+  }
+
+  // Rethrow if requested
+  if (options.rethrow) {
+    throw chimpError;
+  }
+
+  return chimpError;
+}
+
+/**
+ * Legacy wrapper function for backward compatibility
+ * Try to execute a function and handle any errors
+ *
+ * @param {Function} fn - Function to execute
+ * @param {Object} options - Error handling options
+ * @param {*} [defaultValue] - Default value to return if the function fails
+ * @returns {*} The result of the function or the default value
+ */
+async function tryExec(fn, options = {}, defaultValue = null) {
+  try {
+    return await fn();
+  } catch (error) {
+    handleError(error, options);
+    return defaultValue;
+  }
 }
 
 module.exports = {
@@ -589,4 +682,7 @@ module.exports = {
   withTimeout,
   createError,
   wrapError,
+  // Legacy functions for backward compatibility
+  handleError,
+  tryExec,
 };

@@ -17,8 +17,8 @@ const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');
 const { trackError } = require('../core/healthCheck');
-const { executeWithApproval, SENSITIVE_OPERATIONS } = require('../../utils/humanCircuitBreaker');
-const { sanitizePath } = require('../../utils/inputSanitizer');
+const { executeWithApproval, SENSITIVE_OPERATIONS } = require('../utils/humanCircuitBreaker');
+const { sanitizePath } = require('../utils/inputSanitizer');
 
 // Import slash command deployment function
 const deploySlashCommands = require('./deploySlashCommands');

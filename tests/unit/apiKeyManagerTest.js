@@ -34,7 +34,7 @@ async function testApiKeyManager() {
     const originalDataDir = path.join(process.cwd(), 'data');
 
     // Load the API key manager module
-    apiKeyManager = require('../../utils/apiKeyManager');
+    apiKeyManager = require('../src/utils/apiKeyManager');
 
     // Test 1: Get API key
     try {

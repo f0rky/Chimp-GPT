@@ -48,8 +48,8 @@
  */
 
 const fs = require('fs').promises;
-const fsSync = require('fs');
-const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
+const _fsSync = require('fs');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../utils/securityUtils');
 const path = require('path');
 const { createLogger } = require('./logger');
 
@@ -119,7 +119,7 @@ async function ensureDataDir() {
   try {
     // Validate directory path for security
     const validatedPath = validateFilePath(dataDir);
-    
+
     // Check if directory exists
     try {
       await fs.access(validatedPath);
@@ -195,7 +195,7 @@ const DEFAULT_STATS = {
  */
 async function saveStats(stats) {
   const startTime = Date.now();
-  
+
   try {
     // Ensure data directory exists
     const dirExists = await ensureDataDir();
@@ -225,20 +225,26 @@ async function saveStats(stats) {
 
     // Check file size before writing
     if (Buffer.byteLength(jsonString, 'utf8') > STATS_CONFIG.MAX_FILE_SIZE) {
-      logger.error({ size: Buffer.byteLength(jsonString, 'utf8'), max: STATS_CONFIG.MAX_FILE_SIZE }, 'Stats file too large');
+      logger.error(
+        { size: Buffer.byteLength(jsonString, 'utf8'), max: STATS_CONFIG.MAX_FILE_SIZE },
+        'Stats file too large'
+      );
       return false;
     }
 
     // Use atomic write operation for safety
     try {
       await atomicWriteFile(STATS_FILE, jsonString);
-      
+
       const duration = Date.now() - startTime;
-      logger.debug({ 
-        duration, 
-        size: Buffer.byteLength(jsonString, 'utf8') 
-      }, 'Stats saved successfully');
-      
+      logger.debug(
+        {
+          duration,
+          size: Buffer.byteLength(jsonString, 'utf8'),
+        },
+        'Stats saved successfully'
+      );
+
       return true;
     } catch (writeError) {
       logger.error(
@@ -281,8 +287,8 @@ async function loadStats() {
     let data;
     try {
       // Use secure async file reading
-      data = await safeReadFile(STATS_FILE, { 
-        maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+      data = await safeReadFile(STATS_FILE, {
+        maxSize: STATS_CONFIG.MAX_FILE_SIZE,
       });
 
       // Trim any whitespace or unexpected characters that might be at the end of the file
@@ -307,26 +313,26 @@ async function loadStats() {
       // Try to recover from backup immediately
       try {
         logger.info('Attempting to recover stats file from backup');
-        data = await safeReadFile(STATS_FILE + '.bak', { 
-          maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+        data = await safeReadFile(STATS_FILE + '.bak', {
+          maxSize: STATS_CONFIG.MAX_FILE_SIZE,
         });
         data = data.trim();
 
-          // Verify the backup file structure
-          if (!data.startsWith('{') || !data.endsWith('}')) {
-            logger.warn('Backup stats file does not contain valid JSON object format');
-            throw new Error('Backup stats file is also invalid');
-          }
+        // Verify the backup file structure
+        if (!data.startsWith('{') || !data.endsWith('}')) {
+          logger.warn('Backup stats file does not contain valid JSON object format');
+          throw new Error('Backup stats file is also invalid');
+        }
 
-          // Check for truncated JSON in backup
-          const openBraces = (data.match(/\{/g) || []).length;
-          const closeBraces = (data.match(/\}/g) || []).length;
-          if (openBraces !== closeBraces) {
-            logger.warn(
-              `Backup stats file has mismatched braces: ${openBraces} open vs ${closeBraces} close`
-            );
-            throw new Error('Backup stats file has mismatched braces - likely truncated');
-          }
+        // Check for truncated JSON in backup
+        const openBraces = (data.match(/\{/g) || []).length;
+        const closeBraces = (data.match(/\}/g) || []).length;
+        if (openBraces !== closeBraces) {
+          logger.warn(
+            `Backup stats file has mismatched braces: ${openBraces} open vs ${closeBraces} close`
+          );
+          throw new Error('Backup stats file has mismatched braces - likely truncated');
+        }
       } catch (backupReadError) {
         logger.error({ error: backupReadError }, 'Failed to read backup stats file');
         logger.warn('Creating new stats file with default values');
@@ -395,8 +401,8 @@ async function loadStats() {
           logger.info('Attempting to recover stats from backup file');
           if (fs.existsSync(STATS_FILE + '.bak')) {
             try {
-              const backupData = await safeReadFile(STATS_FILE + '.bak', { 
-                maxSize: STATS_CONFIG.MAX_FILE_SIZE 
+              const backupData = await safeReadFile(STATS_FILE + '.bak', {
+                maxSize: STATS_CONFIG.MAX_FILE_SIZE,
               });
               stats = JSON.parse(backupData.trim());
               logger.info('Successfully recovered stats from backup');

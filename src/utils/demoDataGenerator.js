@@ -10,7 +10,7 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('demoData');
 
 // Sample data for generating realistic mock responses

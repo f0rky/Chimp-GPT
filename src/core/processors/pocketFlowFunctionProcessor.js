@@ -329,7 +329,7 @@ class PocketFlowFunctionProcessor {
     const { detailed = false, technical = false } = args;
 
     try {
-      const { generateVersionResponse } = require('../../../utils/versionSelfQuery');
+      const { generateVersionResponse } = require('../utils/versionSelfQuery');
       const config = require('../configValidator');
 
       const versionResponse = generateVersionResponse({

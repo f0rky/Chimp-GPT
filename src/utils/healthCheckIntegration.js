@@ -5,8 +5,8 @@
  * to make performance metrics available through the status page.
  */
 
-const performanceMonitor = require('../src/middleware/performanceMonitor');
-const { addCustomStatsSource } = require('../src/core/healthCheck');
+const performanceMonitor = require('../middleware/performanceMonitor');
+const { addCustomStatsSource } = require('../core/healthCheck');
 
 /**
  * Register the performance monitoring as a custom stats source

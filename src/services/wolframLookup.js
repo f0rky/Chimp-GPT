@@ -12,10 +12,10 @@
 
 const axios = require('axios');
 const { wolfram: wolframLogger } = require('../core/logger');
-const { sanitizeQuery } = require('../../utils/inputSanitizer');
+const { sanitizeQuery } = require('../utils/inputSanitizer');
 const functionResults = require('../core/functionResults');
-const apiKeyManager = require('../../utils/apiKeyManager');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const apiKeyManager = require('../utils/apiKeyManager');
+const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 
 // Circuit breaker configuration for Wolfram Alpha API calls

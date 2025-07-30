@@ -11,7 +11,7 @@
 
 const { createLogger } = require('../core/logger');
 const logger = createLogger('references');
-const { sanitizeMessage } = require('../../utils/messageSanitizer');
+const { sanitizeMessage } = require('../utils/messageSanitizer');
 
 // Get config values from the validator
 const config = require('../core/configValidator');

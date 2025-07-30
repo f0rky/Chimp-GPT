@@ -9,7 +9,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const humanCircuitBreaker = require('./humanCircuitBreaker');
 
 const logger = createLogger('maliciousUserManager');

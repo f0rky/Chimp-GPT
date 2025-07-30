@@ -6,10 +6,10 @@
  */
 
 const fs = require('fs').promises;
-const fsSync = require('fs');
+const _fsSync = require('fs');
 const path = require('path');
-const { createLogger } = require('./logger');
-const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
+const { createLogger } = require('../core/logger');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../utils/securityUtils');
 
 // Configuration constants
 const IMAGE_USAGE_CONFIG = {
@@ -29,7 +29,7 @@ async function ensureDataDirectory() {
   try {
     // Validate directory path for security
     const validatedPath = validateFilePath(dataDir);
-    
+
     // Check if directory exists
     try {
       await fs.access(validatedPath);
@@ -57,22 +57,24 @@ async function loadUsageHistory() {
   try {
     // Check if file exists
     await fs.access(USAGE_HISTORY_FILE);
-    
+
     // Read file securely
     const data = await safeReadFile(USAGE_HISTORY_FILE, {
-      maxSize: IMAGE_USAGE_CONFIG.MAX_FILE_SIZE
+      maxSize: IMAGE_USAGE_CONFIG.MAX_FILE_SIZE,
     });
-    
+
     const history = JSON.parse(data);
-    
+
     // Trim entries if we have too many
     if (history.entries && history.entries.length > IMAGE_USAGE_CONFIG.MAX_ENTRIES) {
-      logger.info(`Trimming usage history from ${history.entries.length} to ${IMAGE_USAGE_CONFIG.MAX_ENTRIES} entries`);
+      logger.info(
+        `Trimming usage history from ${history.entries.length} to ${IMAGE_USAGE_CONFIG.MAX_ENTRIES} entries`
+      );
       history.entries = history.entries
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, IMAGE_USAGE_CONFIG.MAX_ENTRIES);
     }
-    
+
     return history;
   } catch (error) {
     logger.error({ error }, 'Error loading usage history');
@@ -104,7 +106,7 @@ async function saveUsageHistory(history) {
 
     // Validate JSON before writing
     const jsonString = JSON.stringify(history, null, 2);
-    
+
     // Check file size
     if (Buffer.byteLength(jsonString, 'utf8') > IMAGE_USAGE_CONFIG.MAX_FILE_SIZE) {
       logger.error({ size: Buffer.byteLength(jsonString, 'utf8') }, 'Usage history file too large');
@@ -160,7 +162,7 @@ async function trackImageGeneration(usageData) {
 
     // Save the updated history
     const saved = await saveUsageHistory(history);
-    
+
     if (saved) {
       // Log the tracking
       logger.info(

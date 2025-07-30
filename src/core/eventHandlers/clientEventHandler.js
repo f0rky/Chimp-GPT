@@ -4,13 +4,13 @@ const { initHealthCheck } = require('../healthCheck');
 const { initStatusManager } = require('../../web/statusManager');
 const MessageEventHandler = require('./messageEventHandler');
 const InteractionEventHandler = require('./interactionEventHandler');
-const maliciousUserManager = require('../../../utils/maliciousUserManager');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
 const { loadConversationsFromStorage } = require('../../conversation/conversationManagerSelector');
 const { initDebugSkip } = require('../../utils/debugSkipManager');
-const PFPManager = require('../../../utils/pfpManager');
+const PFPManager = require('../../utils/pfpManager');
 const commandHandler = require('../../commands/commandHandler');
-const { shouldDeploy, recordSuccessfulDeployment } = require('../../../utils/deploymentManager');
-const { sendChannelGreeting } = require('../../../utils/greetingManager');
+const { shouldDeploy, recordSuccessfulDeployment } = require('../../utils/deploymentManager');
+const { sendChannelGreeting } = require('../../utils/greetingManager');
 const { stats: healthCheckStats } = require('../healthCheck');
 const statsStorage = require('../statsStorage');
 
@@ -129,7 +129,7 @@ class ClientEventHandler {
     // Initialize health check system
     initHealthCheck(this.client);
     discordLogger.info('Initializing performance monitoring');
-    const { initPerformanceMonitoring } = require('../../../utils/healthCheckIntegration');
+    const { initPerformanceMonitoring } = require('../utils/healthCheckIntegration');
     initPerformanceMonitoring();
     discordLogger.info('Health check system initialized');
 

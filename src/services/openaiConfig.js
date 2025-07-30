@@ -3,7 +3,7 @@
  * Updated to use the latest models and API format with secure API key management
  */
 const OpenAI = require('openai');
-const apiKeyManager = require('../../utils/apiKeyManager');
+const apiKeyManager = require('../utils/apiKeyManager');
 const { openai: openaiLogger } = require('../core/logger');
 
 // Get the API key with fallback to environment variable if needed
@@ -105,8 +105,8 @@ const openaiWithLogging = new Proxy(openai, {
   },
 });
 
-const retryWithBreaker = require('../../utils/retryWithBreaker');
-const { sanitizeUserMessage } = require('../../utils/inputSanitizer');
+const retryWithBreaker = require('../utils/retryWithBreaker');
+const { sanitizeUserMessage } = require('../utils/inputSanitizer');
 
 /**
  * Filter conversation log to improve function calling reliability

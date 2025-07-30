@@ -61,9 +61,9 @@
 
 const axios = require('axios');
 const { quake: quakeLogger } = require('../core/logger');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
-const apiKeyManager = require('../../utils/apiKeyManager');
+const apiKeyManager = require('../utils/apiKeyManager');
 const OpenAI = require('openai');
 const { getServerDetails } = require('./qlSyncoreScraper');
 const { getEnhancedServerData } = require('./qlstatsScraper');
@@ -147,12 +147,8 @@ const OPENAI_BREAKER_CONFIG = {
   },
 };
 
-const {
-  validateServerInput,
-  validateEloMode,
-  sanitizeOutput,
-} = require('../../utils/inputValidator');
-const { sanitizeQuery } = require('../../utils/inputSanitizer');
+const { validateServerInput, validateEloMode, sanitizeOutput } = require('../utils/inputValidator');
+const { sanitizeQuery } = require('../utils/inputSanitizer');
 
 /**
  * Validates server response data to ensure it's in a usable format.

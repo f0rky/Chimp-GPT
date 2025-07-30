@@ -4,10 +4,10 @@ const fs = require('fs');
 const path = require('path');
 
 // Get configuration
-const config = require('../src/core/configValidator');
+const config = require('../core/configValidator');
 
 // Import logger
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('deploy');
 
 // Get the guild ID from the command line or use a default
@@ -61,7 +61,7 @@ async function deployCommands() {
         slashCommands.push(command.slashCommand.toJSON());
         logger.debug(`Loaded slash command: ${command.name}`);
       } catch (error) {
-        const { discord: discordLogger } = require('../src/core/logger');
+        const { discord: discordLogger } = require('../core/logger');
         discordLogger.error({ error, file }, 'Error loading command file');
       }
     }
@@ -87,7 +87,7 @@ async function deployCommands() {
       commands: data,
     };
   } catch (error) {
-    const { discord: discordLogger } = require('../src/core/logger');
+    const { discord: discordLogger } = require('../core/logger');
     discordLogger.error({ error }, 'Error deploying commands');
     return {
       success: false,
@@ -102,11 +102,11 @@ deployCommands()
     if (result.success) {
       logger.info('Command deployment completed successfully!');
     } else {
-      const { discord: discordLogger } = require('../src/core/logger');
+      const { discord: discordLogger } = require('../core/logger');
       discordLogger.error({ error: result.error }, 'Command deployment failed');
     }
   })
   .catch(error => {
-    const { discord: discordLogger } = require('../src/core/logger');
+    const { discord: discordLogger } = require('../core/logger');
     discordLogger.error({ error }, 'Unexpected error during deployment');
   });

@@ -13,12 +13,12 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('humanCircuitBreaker');
-const breakerManager = require('../src/middleware/breakerManager');
-const circuitBreaker = require('../src/middleware/circuitBreaker');
+const breakerManager = require('../middleware/breakerManager');
+const circuitBreaker = require('../middleware/circuitBreaker');
 // const { Client } = require('discord.js'); // Unused import
-const { getBotVersion, getDetailedVersionInfo } = require('../src/core/getBotVersion');
+const { getBotVersion, getDetailedVersionInfo } = require('../core/getBotVersion');
 
 // Categories of operations that require approval
 const SENSITIVE_OPERATIONS = {

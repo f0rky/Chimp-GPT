@@ -6,7 +6,7 @@ const { sanitizePath } = require('./inputSanitizer');
 let logger;
 try {
   // Try to use the real logger if available
-  const { createLogger } = require('../src/core/logger');
+  const { createLogger } = require('../core/logger');
   logger = createLogger('pfpManager');
 } catch (error) {
   // Fallback to a simple console logger for testing

@@ -7,8 +7,8 @@
 
 const axios = require('axios');
 const { createLogger } = require('../core/logger');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
-const { sanitizeQuery } = require('../../utils/inputSanitizer');
+const retryWithBreaker = require('../utils/retryWithBreaker');
+const { sanitizeQuery } = require('../utils/inputSanitizer');
 
 const logger = createLogger('webSearch');
 

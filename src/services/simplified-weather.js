@@ -10,7 +10,7 @@ const { weather: weatherLogger } = require('../core/logger');
 const functionResults = require('../core/functionResults');
 
 // Initialize OpenAI client
-const openai = new OpenAI({
+const _openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -89,10 +89,7 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
     let weatherData; // Declare weatherData to be used
 
     if (prefetchedWeatherData) {
-      weatherLogger.info(
-        { location },
-        'Using prefetched weather data for structured response'
-      );
+      weatherLogger.info({ location }, 'Using prefetched weather data for structured response');
       weatherLogger.debug({ prefetchedWeatherData }, 'Processing with prefetchedWeatherData');
       weatherData = prefetchedWeatherData;
       // The prefetchedWeatherData is assumed to have been stored by the caller if necessary (e.g., by weatherLookup.js)
@@ -132,7 +129,7 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
         formattedSummary: generateFallbackResponse(weatherData),
         weatherData: weatherData,
         userQuestion: userQuestion,
-        type: 'weather_fallback'
+        type: 'weather_fallback',
       };
     }
   } catch (fetchOrProcessError) {
@@ -157,7 +154,7 @@ async function getWeatherResponse(location, userQuestion, prefetchedWeatherData 
       formattedSummary: generateFallbackResponse(mockData),
       weatherData: mockData,
       userQuestion: userQuestion,
-      type: 'weather_fallback'
+      type: 'weather_fallback',
     };
   }
 }
@@ -296,17 +293,21 @@ async function generateResponse(weatherData, userQuestion) {
     let formattedWeather = '';
     if (essentialData.location && essentialData.current) {
       formattedWeather = `Weather in ${essentialData.location.name}: ${essentialData.current.condition.text}, ${essentialData.current.temp_c}°C`;
-      
+
       if (essentialData.current.humidity) {
         formattedWeather += `, humidity ${essentialData.current.humidity}%`;
       }
-      
+
       if (essentialData.current.wind_kph) {
         formattedWeather += `, wind ${essentialData.current.wind_kph} kph`;
       }
 
       // Add forecast if available
-      if (essentialData.forecast && essentialData.forecast.forecastday && essentialData.forecast.forecastday.length > 0) {
+      if (
+        essentialData.forecast &&
+        essentialData.forecast.forecastday &&
+        essentialData.forecast.forecastday.length > 0
+      ) {
         const forecast = essentialData.forecast.forecastday[0];
         formattedWeather += `. Tomorrow: ${forecast.day.condition.text}, high ${forecast.day.maxtemp_c}°C, low ${forecast.day.mintemp_c}°C`;
       }
@@ -322,7 +323,7 @@ async function generateResponse(weatherData, userQuestion) {
       weatherData: essentialData,
       formattedSummary: formattedWeather,
       userQuestion: userQuestion,
-      type: 'weather_function_result'
+      type: 'weather_function_result',
     };
   } catch (error) {
     weatherLogger.error({ error }, 'Error generating structured weather response');

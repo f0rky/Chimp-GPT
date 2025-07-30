@@ -16,7 +16,7 @@ class ContextManagerNode extends BaseConversationNode {
       ...options,
     });
 
-    const TokenManager = require('../../../utils/tokenManager');
+    const TokenManager = require('../../utils/tokenManager');
     this.tokenConfig = TokenManager.getConfig();
 
     this.config = {
@@ -159,7 +159,7 @@ class ContextManagerNode extends BaseConversationNode {
   }
 
   optimizeContext(messages, options = {}) {
-    const TokenManager = require('../../../utils/tokenManager');
+    const TokenManager = require('../../utils/tokenManager');
     const {
       maxTokens = this.config.defaultMaxTokens,
       emergencyMaxTokens = this.config.emergencyMaxTokens,
@@ -179,12 +179,12 @@ class ContextManagerNode extends BaseConversationNode {
   }
 
   estimateTokenCount(message) {
-    const TokenManager = require('../../../utils/tokenManager');
+    const TokenManager = require('../../utils/tokenManager');
     return TokenManager.estimateMessageTokens(message);
   }
 
   calculateTotalTokens(messages) {
-    const TokenManager = require('../../../utils/tokenManager');
+    const TokenManager = require('../../utils/tokenManager');
     return TokenManager.estimateConversationTokens(messages);
   }
 

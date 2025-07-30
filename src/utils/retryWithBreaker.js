@@ -15,8 +15,8 @@
  *   })
  */
 
-const breakerManager = require('../src/middleware/breakerManager');
-const { createLogger } = require('../src/core/logger');
+const breakerManager = require('../middleware/breakerManager');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('retryBreaker');
 const humanCircuitBreaker = require('./humanCircuitBreaker');
 

@@ -11,7 +11,7 @@ const mockClient = {
 };
 
 // Import the PFPManager
-const PFPManager = require('../utils/pfpManager');
+const PFPManager = require('../../src/utils/pfpManager');
 
 describe('PFP Manager', function () {
   this.timeout(10000); // Increase timeout for file operations

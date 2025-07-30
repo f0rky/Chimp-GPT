@@ -10,7 +10,7 @@
 
 require('dotenv').config();
 const { createLogger } = require('../core/logger');
-const referenceResolver = require('../../utils/messageReferenceResolver');
+const referenceResolver = require('../utils/messageReferenceResolver');
 const conversationManager = require('../conversation/conversationManager');
 
 const logger = createLogger('test-reply-context');

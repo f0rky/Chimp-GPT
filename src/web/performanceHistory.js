@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { createLogger } = require('../core/logger');
-const { sanitizePath } = require('../../utils/inputSanitizer');
+const { sanitizePath } = require('../utils/inputSanitizer');
 
 const logger = createLogger('performanceHistory');
 

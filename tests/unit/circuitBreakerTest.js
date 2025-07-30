@@ -11,7 +11,7 @@
 
 // Import required modules
 const axios = require('axios');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const retryWithBreaker = require('../src/utils/retryWithBreaker');
 const breakerManager = require('../../src/middleware/breakerManager');
 const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('circuitBreakerTest');

@@ -8,7 +8,7 @@
  * @module startupMessageCoordinator
  */
 
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('startup');
 
 // Store the startup message reference

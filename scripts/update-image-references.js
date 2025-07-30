@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { sanitizePath } = require('../utils/inputSanitizer');
+const { sanitizePath } = require('../src/utils/inputSanitizer');
 const { createLogger } = require('../src/core/logger');
 
 const logger = createLogger('update-image-references');

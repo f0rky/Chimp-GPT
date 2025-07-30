@@ -68,7 +68,7 @@ const { createLogger } = require('./logger');
 const logger = createLogger('health');
 // const os = require('os'); // Unused import
 const { version } = require('../../package.json');
-// const { getLastDeploymentTimestamp } = require('../../utils/deploymentManager'); // Unused import
+// const { getLastDeploymentTimestamp } = require('../utils/deploymentManager'); // Unused import
 
 // Track response times for latency calculation
 // const responseTimes = []; // Unused variable
@@ -201,7 +201,7 @@ function scheduleHealthReports(client) {
   }, REPORT_INTERVAL);
 
   // Use the startup message coordinator for startup notifications
-  const startupCoordinator = require('../../utils/startupMessageCoordinator');
+  const startupCoordinator = require('../utils/startupMessageCoordinator');
 
   // Register health check as a component that will contribute to the startup message
   startupCoordinator.registerComponent('healthCheck');
@@ -298,7 +298,7 @@ function scheduleHealthReports(client) {
             }
 
             // Import the greeting manager to get system information
-            const greetingManager = require('../../utils/greetingManager');
+            const greetingManager = require('../utils/greetingManager');
             const report = generateHealthReport(true);
             const _botVersionInfo = require('./getBotVersion').getBotVersion();
 
@@ -627,7 +627,7 @@ async function handleStatsCommand(message) {
   if (message.author.id === config.OWNER_ID) {
     try {
       // Get the startup message coordinator
-      const startupCoordinator = require('../../utils/startupMessageCoordinator');
+      const startupCoordinator = require('../utils/startupMessageCoordinator');
 
       // If the coordinator has a message reference, update it
       if (startupCoordinator.hasMessage && startupCoordinator.messageRef) {

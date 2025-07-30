@@ -10,13 +10,13 @@
  * @version 1.0.0
  */
 
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('versionQuery');
 const {
   // getBotVersion, // Unused import
   getDetailedVersionInfo,
   formatUptime,
-} = require('../src/core/getBotVersion');
+} = require('../core/getBotVersion');
 // const os = require('os'); // Unused import
 
 // Special triggers that will prompt a version response

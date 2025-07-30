@@ -5,12 +5,16 @@ const {
   constants: { IMAGE_GEN_POINTS },
 } = require('../middleware/rateLimiter');
 const { trackApiCall, trackError, handleStatsCommand } = require('../core/healthCheck');
-const { processImageStream, createDiscordAttachment, shouldUseStreaming } = require('../utils/streamingBuffer');
-const { 
-  ChimpError, 
-  ERROR_CATEGORIES, 
-  ERROR_SEVERITY, 
-  withErrorHandling, 
+const {
+  processImageStream,
+  createDiscordAttachment,
+  shouldUseStreaming,
+} = require('../utils/streamingBuffer');
+const {
+  ChimpError,
+  ERROR_CATEGORIES,
+  ERROR_SEVERITY,
+  _withErrorHandling,
   enhanceError,
   handleOpenAIError,
   handleDiscordError,
@@ -189,15 +193,18 @@ async function handleImageGeneration(
           operation: 'update_progress_message',
           category: ERROR_CATEGORIES.EXTERNAL_API,
           severity: ERROR_SEVERITY.LOW,
-          context: { 
+          context: {
             currentPhase: progress.currentPhase,
-            totalElapsed: progress.totalElapsed 
+            totalElapsed: progress.totalElapsed,
           },
           userId: message.author?.id,
         });
-        
+
         // Log at debug level to avoid spamming
-        discordLogger.debug({ error: standardizedError.toLogObject() }, 'Error updating progress message');
+        discordLogger.debug(
+          { error: standardizedError.toLogObject() },
+          'Error updating progress message'
+        );
       }
     }, UPDATE_INTERVAL);
 
@@ -214,13 +221,13 @@ async function handleImageGeneration(
         clearInterval(progressUpdater);
 
         // Handle stats command
-        await feedbackMessage.delete().catch((deleteError) => {
+        await feedbackMessage.delete().catch(deleteError => {
           // Use standardized error handling for message deletion
           const standardizedError = handleDiscordError(deleteError, {
             operation: 'delete_stats_feedback_message',
             userId: message.author?.id,
           });
-          
+
           logError(standardizedError);
         });
 
@@ -285,15 +292,15 @@ async function handleImageGeneration(
             { originalPrompt: prompt, enhancedPrompt },
             'Prompt enhanced successfully'
           );
-        } catch (enhanceError) {
-          const standardizedError = enhanceError(enhanceError, {
+        } catch (error) {
+          const standardizedError = enhanceError(error, {
             operation: 'enhance_image_prompt',
             category: ERROR_CATEGORIES.EXTERNAL_API,
             severity: ERROR_SEVERITY.LOW,
             context: { prompt: prompt.substring(0, 100) },
             userId: message.author?.id,
           });
-          
+
           logError(standardizedError);
           enhancedPrompt = prompt;
         }
@@ -368,12 +375,15 @@ async function handleImageGeneration(
       if (imageResult_firstImage.b64_json) {
         // Process image data using streaming for better memory efficiency
         const useStreaming = shouldUseStreaming(imageResult_firstImage.b64_json);
-        
-        discordLogger.debug({
-          base64Length: imageResult_firstImage.b64_json.length,
-          useStreaming,
-          estimatedSize: Math.round((imageResult_firstImage.b64_json.length * 3) / 4 / 1024),
-        }, 'Processing image data for Discord attachment');
+
+        discordLogger.debug(
+          {
+            base64Length: imageResult_firstImage.b64_json.length,
+            useStreaming,
+            estimatedSize: Math.round((imageResult_firstImage.b64_json.length * 3) / 4 / 1024),
+          },
+          'Processing image data for Discord attachment'
+        );
 
         let processedImage;
         if (useStreaming) {
@@ -399,16 +409,18 @@ async function handleImageGeneration(
             category: ERROR_CATEGORIES.INTERNAL,
             severity: ERROR_SEVERITY.MEDIUM,
             operation: 'process_image_stream',
-            context: { 
+            context: {
               error: processedImage.error,
               useStreaming,
-              estimatedSize: Math.round((imageResult_firstImage.b64_json.length * 3) / 4 / 1024)
+              estimatedSize: Math.round((imageResult_firstImage.b64_json.length * 3) / 4 / 1024),
             },
             userId: message.author?.id,
           });
-          
+
           logError(processingError);
-          await feedbackMessage.edit(finalMessage + '\n⚠️ Image generated but failed to process for Discord.');
+          await feedbackMessage.edit(
+            finalMessage + '\n⚠️ Image generated but failed to process for Discord.'
+          );
           return;
         }
 
@@ -418,19 +430,19 @@ async function handleImageGeneration(
             category: ERROR_CATEGORIES.VALIDATION,
             severity: ERROR_SEVERITY.MEDIUM,
             operation: 'validate_discord_file_size',
-            context: { 
+            context: {
               imageSize: processedImage.size,
               discordLimit: 8 * 1024 * 1024,
-              sizeMB: (processedImage.size / 1024 / 1024).toFixed(2)
+              sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
             },
             userId: message.author?.id,
           });
-          
+
           logError(sizeError);
-          
+
           await feedbackMessage.edit(
-            finalMessage + 
-            '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
+            finalMessage +
+              '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
           );
           return;
         }
@@ -442,12 +454,15 @@ async function handleImageGeneration(
         const attachment = createDiscordAttachment(processedImage, fileName);
 
         // Log processing results
-        discordLogger.info({
-          processingMethod: processedImage.method,
-          imageSize: processedImage.size,
-          sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
-          processingTime: processedImage.processingTime,
-        }, 'Image processed successfully for Discord');
+        discordLogger.info(
+          {
+            processingMethod: processedImage.method,
+            imageSize: processedImage.size,
+            sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
+            processingTime: processedImage.processingTime,
+          },
+          'Image processed successfully for Discord'
+        );
 
         // Update the message with the final result and attachment
         await feedbackMessage.edit({
@@ -468,13 +483,16 @@ async function handleImageGeneration(
 
             // Process image data using streaming for better memory efficiency
             const useStreaming = shouldUseStreaming(base64Data);
-            
-            discordLogger.debug({
-              mimeType,
-              base64Length: base64Data.length,
-              useStreaming,
-              estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
-            }, 'Processing data URL image for Discord attachment');
+
+            discordLogger.debug(
+              {
+                mimeType,
+                base64Length: base64Data.length,
+                useStreaming,
+                estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
+              },
+              'Processing data URL image for Discord attachment'
+            );
 
             let processedImage;
             if (useStreaming) {
@@ -500,17 +518,19 @@ async function handleImageGeneration(
                 category: ERROR_CATEGORIES.INTERNAL,
                 severity: ERROR_SEVERITY.MEDIUM,
                 operation: 'process_data_url_image',
-                context: { 
+                context: {
                   error: processedImage.error,
                   mimeType,
                   useStreaming,
-                  estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024)
+                  estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
                 },
                 userId: message.author?.id,
               });
-              
+
               logError(processingError);
-              await feedbackMessage.edit(finalMessage + '\n⚠️ Image generated but failed to process for Discord.');
+              await feedbackMessage.edit(
+                finalMessage + '\n⚠️ Image generated but failed to process for Discord.'
+              );
               return;
             }
 
@@ -520,20 +540,20 @@ async function handleImageGeneration(
                 category: ERROR_CATEGORIES.VALIDATION,
                 severity: ERROR_SEVERITY.MEDIUM,
                 operation: 'validate_data_url_file_size',
-                context: { 
+                context: {
                   imageSize: processedImage.size,
                   discordLimit: 8 * 1024 * 1024,
                   sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
-                  mimeType
+                  mimeType,
                 },
                 userId: message.author?.id,
               });
-              
+
               logError(sizeError);
-              
+
               await feedbackMessage.edit(
-                finalMessage + 
-                '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
+                finalMessage +
+                  '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
               );
               return;
             }
@@ -549,12 +569,15 @@ async function handleImageGeneration(
             const attachment = createDiscordAttachment(processedImage, fileName, mimeType);
 
             // Log processing results
-            discordLogger.info({
-              processingMethod: processedImage.method,
-              imageSize: processedImage.size,
-              sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
-              processingTime: processedImage.processingTime,
-            }, 'Data URL image processed successfully for Discord');
+            discordLogger.info(
+              {
+                processingMethod: processedImage.method,
+                imageSize: processedImage.size,
+                sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
+                processingTime: processedImage.processingTime,
+              },
+              'Data URL image processed successfully for Discord'
+            );
 
             await feedbackMessage.edit({
               content: finalMessage,
@@ -643,7 +666,7 @@ async function handleImageGeneration(
           messageContent: errorMessage.substring(0, 100),
           userId: message.author?.id,
         });
-        
+
         logError(discordError);
       }
     }
@@ -690,7 +713,7 @@ async function handleImageGeneration(
         messageContent: errorMessage.substring(0, 100),
         userId: message.author?.id,
       });
-      
+
       logError(discordError);
     }
   }

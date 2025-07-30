@@ -9,7 +9,7 @@
  * @version 1.0.0
  */
 
-const { getSkipState, manualDeactivate, SKIP_EMOJI } = require('../../utils/debugSkipManager');
+const { getSkipState, manualDeactivate, SKIP_EMOJI } = require('../utils/debugSkipManager');
 
 module.exports = {
   name: 'debugskip',

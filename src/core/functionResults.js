@@ -30,10 +30,10 @@
  */
 
 const fs = require('fs').promises;
-const fsSync = require('fs');
+const _fsSync = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
-const { atomicWriteFile, safeReadFile, validateFilePath } = require('../../utils/securityUtils');
+const { atomicWriteFile, safeReadFile, validateFilePath } = require('../utils/securityUtils');
 const logger = createLogger('functions');
 
 // Path to the function results file
@@ -73,7 +73,7 @@ async function ensureDataDir() {
   try {
     // Validate directory path for security
     const validatedPath = validateFilePath(dataDir);
-    
+
     // Check if directory exists
     try {
       await fs.access(validatedPath);
@@ -110,6 +110,7 @@ async function ensureDataDir() {
  * @throws {Error} If an error occurs while writing to the file
  */
 async function saveResults(results) {
+  const startTime = Date.now();
   try {
     // Create data directory synchronously to ensure it exists before any async operations
     const dataDir = path.join(__dirname, 'data');
@@ -237,8 +238,8 @@ async function loadResults() {
     // Try to read and parse the file
     try {
       // Use secure async file reading
-      let data = await safeReadFile(RESULTS_FILE, { 
-        maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+      let data = await safeReadFile(RESULTS_FILE, {
+        maxSize: FILE_CONFIG.MAX_FILE_SIZE,
       });
 
       // Trim any whitespace or unexpected characters that might be at the end of the file
@@ -317,34 +318,31 @@ async function loadResults() {
         } catch (cleanError) {
           logger.info('Attempting to recover function results from backup file');
           try {
-            const backupData = await safeReadFile(RESULTS_FILE + '.bak', { 
-              maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+            const backupData = await safeReadFile(RESULTS_FILE + '.bak', {
+              maxSize: FILE_CONFIG.MAX_FILE_SIZE,
             });
             results = JSON.parse(backupData.trim());
             logger.info('Successfully recovered function results from backup');
           } catch (backupError) {
-            logger.error(
-              { error: backupError },
-              'Failed to recover function results from backup'
-            );
+            logger.error({ error: backupError }, 'Failed to recover function results from backup');
 
-              // Create a new function results file with default values as last resort
-              const defaultResults = { ...DEFAULT_RESULTS };
-              defaultResults.lastUpdated = new Date().toISOString();
+            // Create a new function results file with default values as last resort
+            const defaultResults = { ...DEFAULT_RESULTS };
+            defaultResults.lastUpdated = new Date().toISOString();
 
-              try {
-                const jsonString = JSON.stringify(defaultResults, null, 2);
-                await atomicWriteFile(RESULTS_FILE, jsonString);
-                logger.info('Created new function results file with default values as last resort');
-                return defaultResults;
-              } catch (writeError) {
-                logger.error(
-                  { error: writeError },
-                  'Failed to create new function results file as last resort'
-                );
-                return defaultResults;
-              }
+            try {
+              const jsonString = JSON.stringify(defaultResults, null, 2);
+              await atomicWriteFile(RESULTS_FILE, jsonString);
+              logger.info('Created new function results file with default values as last resort');
+              return defaultResults;
+            } catch (writeError) {
+              logger.error(
+                { error: writeError },
+                'Failed to create new function results file as last resort'
+              );
+              return defaultResults;
             }
+          }
         }
       }
 
@@ -377,8 +375,8 @@ async function loadResults() {
       const backupFile = RESULTS_FILE + '.bak';
       try {
         logger.info('Attempting to recover from backup file');
-        const backupData = await safeReadFile(backupFile, { 
-          maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+        const backupData = await safeReadFile(backupFile, {
+          maxSize: FILE_CONFIG.MAX_FILE_SIZE,
         });
         const backupResults = JSON.parse(backupData);
 
@@ -535,8 +533,8 @@ async function repairResultsFile() {
 
     // Try to read and parse the file
     try {
-      const data = await safeReadFile(RESULTS_FILE, { 
-        maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+      const data = await safeReadFile(RESULTS_FILE, {
+        maxSize: FILE_CONFIG.MAX_FILE_SIZE,
       });
       const results = JSON.parse(data);
 
@@ -588,8 +586,8 @@ async function repairResultsFile() {
       const backupFile = RESULTS_FILE + '.bak';
       try {
         logger.info('Attempting to recover from backup file');
-        const backupData = await safeReadFile(backupFile, { 
-          maxSize: FILE_CONFIG.MAX_FILE_SIZE 
+        const backupData = await safeReadFile(backupFile, {
+          maxSize: FILE_CONFIG.MAX_FILE_SIZE,
         });
         const backupResults = JSON.parse(backupData);
 

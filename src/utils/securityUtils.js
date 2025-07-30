@@ -12,7 +12,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const inputSanitizer = require('./inputSanitizer');
 
 const logger = createLogger('security');
@@ -30,15 +30,19 @@ const ENV_VALIDATION_SCHEMA = {
   DISCORD_TOKEN: { required: true, type: 'string', minLength: 50 },
   OPENAI_API_KEY: { required: true, type: 'string', minLength: 40 },
   OWNER_ID: { required: true, type: 'string', pattern: /^\d+$/ },
-  
+
   // Optional with defaults
-  LOG_LEVEL: { required: false, type: 'string', enum: ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] },
+  LOG_LEVEL: {
+    required: false,
+    type: 'string',
+    enum: ['fatal', 'error', 'warn', 'info', 'debug', 'trace'],
+  },
   NODE_ENV: { required: false, type: 'string', enum: ['development', 'production', 'test'] },
-  
+
   // Numeric validations
   PROD_PORT: { required: false, type: 'number', min: 1, max: 65535 },
   DEV_PORT: { required: false, type: 'number', min: 1, max: 65535 },
-  
+
   // Boolean validations
   ENABLE_REPLY_CONTEXT: { required: false, type: 'boolean' },
   ENABLE_IMAGE_GENERATION: { required: false, type: 'boolean' },
@@ -127,10 +131,13 @@ function validateEnvironmentVariable(key, value, schema) {
       if (schema.enum && !schema.enum.includes(validated)) {
         throw new Error(`must be one of: ${schema.enum.join(', ')}`);
       }
-      
+
       // Sanitize string values
       validated = inputSanitizer.sanitizeText(validated);
       break;
+
+    default:
+      throw new Error(`Unsupported schema type: ${schema.type}`);
   }
 
   return validated;
@@ -150,19 +157,22 @@ function validateFilePath(filePath, basePath = PROJECT_ROOT) {
 
   // Sanitize the path
   const sanitizedPath = inputSanitizer.sanitizePath(filePath);
-  
+
   // Resolve to absolute path
   const resolvedPath = path.resolve(basePath, sanitizedPath);
   const normalizedBasePath = path.resolve(basePath);
 
   // Ensure the resolved path stays within the base path
   if (!resolvedPath.startsWith(normalizedBasePath)) {
-    logger.warn({ 
-      filePath, 
-      sanitizedPath, 
-      resolvedPath, 
-      basePath: normalizedBasePath 
-    }, 'Path traversal attempt blocked');
+    logger.warn(
+      {
+        filePath,
+        sanitizedPath,
+        resolvedPath,
+        basePath: normalizedBasePath,
+      },
+      'Path traversal attempt blocked'
+    );
     throw new Error(`Path traversal attempt blocked: ${filePath}`);
   }
 
@@ -194,10 +204,10 @@ async function atomicWriteFile(filePath, data, options = {}) {
     }
 
     // Write to temporary file
-    await fs.writeFile(tempPath, data, { 
-      encoding: 'utf8', 
+    await fs.writeFile(tempPath, data, {
+      encoding: 'utf8',
       mode: 0o644,
-      ...options 
+      ...options,
     });
 
     // Verify the write by reading back
@@ -238,22 +248,25 @@ async function safeReadFile(filePath, options = {}) {
 
     // Get file stats for validation
     const stats = await fs.stat(validatedPath);
-    
+
     // Prevent reading extremely large files (default 10MB limit)
     const maxSize = options.maxSize || 10 * 1024 * 1024;
     if (stats.size > maxSize) {
       throw new Error(`File too large: ${stats.size} bytes (max: ${maxSize})`);
     }
 
-    const data = await fs.readFile(validatedPath, { 
+    const data = await fs.readFile(validatedPath, {
       encoding: 'utf8',
-      ...options 
+      ...options,
     });
 
-    logger.debug({ 
-      filePath: validatedPath, 
-      size: stats.size 
-    }, 'Safe file read completed');
+    logger.debug(
+      {
+        filePath: validatedPath,
+        size: stats.size,
+      },
+      'Safe file read completed'
+    );
 
     return data;
   } catch (error) {
@@ -274,7 +287,7 @@ function validateCommandArguments(args, allowedCommands = []) {
     throw new Error('Command arguments must be a non-empty array');
   }
 
-  const [command, ...commandArgs] = args;
+  const [command, ..._commandArgs] = args;
 
   // Check if command is in allowed list
   if (allowedCommands.length > 0 && !allowedCommands.includes(command)) {
@@ -316,13 +329,16 @@ async function createSecureTempFile(prefix = 'chimp', suffix = '.tmp') {
   await fs.writeFile(tempPath, '', { mode: 0o600 });
 
   // Schedule cleanup after 1 hour
-  setTimeout(async () => {
-    try {
-      await fs.unlink(tempPath);
-    } catch (error) {
-      // Ignore cleanup errors
-    }
-  }, 60 * 60 * 1000);
+  setTimeout(
+    async () => {
+      try {
+        await fs.unlink(tempPath);
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    },
+    60 * 60 * 1000
+  );
 
   return tempPath;
 }
@@ -342,7 +358,8 @@ function hashForLogging(data) {
  * @param {number} maxAgeMs - Maximum age in milliseconds
  * @returns {Promise<number>} Number of files cleaned up
  */
-async function cleanupTempFiles(maxAgeMs = 24 * 60 * 60 * 1000) { // 24 hours default
+async function cleanupTempFiles(maxAgeMs = 24 * 60 * 60 * 1000) {
+  // 24 hours default
   const tempDir = path.join(PROJECT_ROOT, 'tmp');
   let cleanedCount = 0;
 
@@ -352,11 +369,11 @@ async function cleanupTempFiles(maxAgeMs = 24 * 60 * 60 * 1000) { // 24 hours de
 
     for (const file of files) {
       const filePath = path.join(tempDir, file);
-      
+
       try {
         const stats = await fs.stat(filePath);
         const age = now - stats.mtime.getTime();
-        
+
         if (age > maxAgeMs) {
           await fs.unlink(filePath);
           cleanedCount++;

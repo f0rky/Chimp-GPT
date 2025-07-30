@@ -308,7 +308,7 @@ class MessageProcessor {
 
   // Helper method to estimate token usage - delegated to TokenManager
   estimateTokens(conversationLog) {
-    const TokenManager = require('../../utils/tokenManager');
+    const TokenManager = require('../utils/tokenManager');
     return TokenManager.estimateConversationTokens(conversationLog);
   }
 }

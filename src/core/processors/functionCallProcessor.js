@@ -353,7 +353,7 @@ async function handleFunctionCall(
     case 'getVersion':
       try {
         // Import the version utilities
-        const { generateVersionResponse } = require('../../../utils/versionSelfQuery');
+        const { generateVersionResponse } = require('../utils/versionSelfQuery');
 
         // Get parameters with defaults
         const detailed = gptResponse.parameters?.detailed === true;

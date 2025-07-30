@@ -15,7 +15,7 @@ async function testHumanCircuitBreaker() {
 
   try {
     // Load the module
-    const humanCircuitBreaker = require('../../utils/humanCircuitBreaker');
+    const humanCircuitBreaker = require('../src/utils/humanCircuitBreaker');
 
     // Test 1: Check sensitive operations constants
     try {

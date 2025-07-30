@@ -12,11 +12,11 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { createLogger } = require('../src/core/logger');
+const { createLogger } = require('../core/logger');
 const logger = createLogger('apiKeyManager');
 
 // Import validated config instead of using process.env directly
-const config = require('../src/core/configValidator');
+const config = require('../core/configValidator');
 
 /**
  * @typedef {Object} ApiKeyUsage

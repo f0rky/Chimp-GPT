@@ -21,7 +21,7 @@
 require('dotenv').config();
 
 // Validate environment variables early in the startup process
-const { validateEnvironmentVariables } = require('../../utils/securityUtils');
+const { validateEnvironmentVariables } = require('../utils/securityUtils');
 
 let validatedEnv;
 try {
@@ -36,7 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
 const { parseRunMode } = require('./runModes');
-const { sanitizePath } = require('../../utils/inputSanitizer');
+const { sanitizePath } = require('../utils/inputSanitizer');
 
 // Parse run mode from command-line arguments
 const runConfig = parseRunMode();

@@ -7,7 +7,7 @@
 
 const axios = require('axios');
 const { createLogger } = require('../core/logger');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const retryWithBreaker = require('../utils/retryWithBreaker');
 
 const logger = createLogger('webFetch');
 

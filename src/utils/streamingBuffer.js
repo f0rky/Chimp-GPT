@@ -10,12 +10,12 @@
  */
 
 const fs = require('fs').promises;
-const path = require('path');
+const _path = require('path');
 const crypto = require('crypto');
 const { Readable, Transform, pipeline } = require('stream');
 const { promisify } = require('util');
 const { createLogger } = require('../core/logger');
-const { createSecureTempFile } = require('../../utils/securityUtils');
+const { createSecureTempFile } = require('./securityUtils');
 
 const logger = createLogger('streaming');
 const pipelineAsync = promisify(pipeline);
@@ -54,10 +54,10 @@ function base64ToStream(base64Data, chunkSize = STREAMING_CONFIG.CHUNK_SIZE) {
       // Calculate chunk size in base64 terms (base64 is 4/3 the size of binary)
       const base64ChunkSize = Math.ceil((chunkSize * 4) / 3);
       const endPosition = Math.min(position + base64ChunkSize, base64Length);
-      
+
       // Extract base64 chunk and convert to binary
       const base64Chunk = base64Data.slice(position, endPosition);
-      
+
       try {
         const binaryChunk = Buffer.from(base64Chunk, 'base64');
         this.push(binaryChunk);
@@ -65,7 +65,7 @@ function base64ToStream(base64Data, chunkSize = STREAMING_CONFIG.CHUNK_SIZE) {
       } catch (error) {
         this.emit('error', new Error(`Failed to decode base64 chunk: ${error.message}`));
       }
-    }
+    },
   });
 }
 
@@ -87,7 +87,9 @@ class ImageStreamProcessor extends Transform {
       // Check size limits
       this.bytesProcessed += chunk.length;
       if (this.bytesProcessed > this.maxSize) {
-        return callback(new Error(`Image size exceeds maximum allowed size of ${this.maxSize} bytes`));
+        return callback(
+          new Error(`Image size exceeds maximum allowed size of ${this.maxSize} bytes`)
+        );
       }
 
       // Update hash
@@ -105,16 +107,21 @@ class ImageStreamProcessor extends Transform {
     } catch (error) {
       callback(error);
     }
+    // Explicit return to satisfy ESLint
+    return undefined;
   }
 
   _flush(callback) {
     // Log processing completion
     const finalHash = this.hash.digest('hex');
-    logger.debug({
-      fileName: this.fileName,
-      bytesProcessed: this.bytesProcessed,
-      hash: finalHash.substring(0, 16), // First 16 chars for logging
-    }, 'Image stream processing completed');
+    logger.debug(
+      {
+        fileName: this.fileName,
+        bytesProcessed: this.bytesProcessed,
+        hash: finalHash.substring(0, 16), // First 16 chars for logging
+      },
+      'Image stream processing completed'
+    );
 
     callback();
   }
@@ -129,8 +136,8 @@ class ImageStreamProcessor extends Transform {
 
     // Check for common image format signatures
     const signatures = [
-      [0x89, 0x50, 0x4E, 0x47], // PNG
-      [0xFF, 0xD8, 0xFF], // JPEG
+      [0x89, 0x50, 0x4e, 0x47], // PNG
+      [0xff, 0xd8, 0xff], // JPEG
       [0x52, 0x49, 0x46, 0x46], // WEBP (starts with RIFF)
       [0x47, 0x49, 0x46], // GIF
     ];
@@ -162,7 +169,7 @@ class ImageStreamProcessor extends Transform {
 async function processImageStream(base64Data, options = {}) {
   const startTime = Date.now();
   const fileName = options.fileName || `image_${Date.now()}`;
-  
+
   try {
     // Validate input
     if (!base64Data || typeof base64Data !== 'string') {
@@ -171,21 +178,24 @@ async function processImageStream(base64Data, options = {}) {
 
     // Estimate final size (base64 is ~33% larger than binary)
     const estimatedSize = (base64Data.length * 3) / 4;
-    logger.debug({
-      fileName,
-      base64Length: base64Data.length,
-      estimatedSize,
-      estimatedSizeMB: (estimatedSize / 1024 / 1024).toFixed(2),
-    }, 'Starting image stream processing');
+    logger.debug(
+      {
+        fileName,
+        base64Length: base64Data.length,
+        estimatedSize,
+        estimatedSizeMB: (estimatedSize / 1024 / 1024).toFixed(2),
+      },
+      'Starting image stream processing'
+    );
 
     // Check if we need to use streaming (for large images) or can process in memory
     if (estimatedSize <= STREAMING_CONFIG.CHUNK_SIZE * 2) {
       // Small image - process directly in memory for efficiency
       logger.debug({ fileName, estimatedSize }, 'Using direct processing for small image');
-      
+
       const buffer = Buffer.from(base64Data, 'base64');
       const hash = crypto.createHash(STREAMING_CONFIG.HASH_ALGORITHM).update(buffer).digest('hex');
-      
+
       return {
         success: true,
         buffer,
@@ -202,10 +212,10 @@ async function processImageStream(base64Data, options = {}) {
 
     // Create temporary file for streaming
     const tempFilePath = await createSecureTempFile(STREAMING_CONFIG.TEMP_FILE_PREFIX, '.tmp');
-    
+
     // Create streams
     const sourceStream = base64ToStream(base64Data);
-    const processor = new ImageStreamProcessor({ 
+    const processor = new ImageStreamProcessor({
       fileName,
       maxSize: options.maxSize || STREAMING_CONFIG.MAX_BUFFER_SIZE,
       validateImage: options.validateImage !== false,
@@ -217,7 +227,7 @@ async function processImageStream(base64Data, options = {}) {
 
     // Read the processed file back into memory (now validated and chunked)
     const processedBuffer = await fs.readFile(tempFilePath);
-    
+
     // Clean up temp file
     await fs.unlink(tempFilePath).catch(() => {
       // Ignore cleanup errors
@@ -225,7 +235,7 @@ async function processImageStream(base64Data, options = {}) {
 
     // Get processing stats
     const stats = processor.getStats();
-    
+
     const result = {
       success: true,
       buffer: processedBuffer,
@@ -237,22 +247,27 @@ async function processImageStream(base64Data, options = {}) {
       bytesProcessed: stats.bytesProcessed,
     };
 
-    logger.info({
-      fileName,
-      size: result.size,
-      processingTime: result.processingTime,
-      method: result.method,
-      exceedsDiscordLimit: result.exceedsDiscordLimit,
-    }, 'Image stream processing completed successfully');
+    logger.info(
+      {
+        fileName,
+        size: result.size,
+        processingTime: result.processingTime,
+        method: result.method,
+        exceedsDiscordLimit: result.exceedsDiscordLimit,
+      },
+      'Image stream processing completed successfully'
+    );
 
     return result;
-
   } catch (error) {
-    logger.error({
-      error,
-      fileName,
-      processingTime: Date.now() - startTime,
-    }, 'Image stream processing failed');
+    logger.error(
+      {
+        error,
+        fileName,
+        processingTime: Date.now() - startTime,
+      },
+      'Image stream processing failed'
+    );
 
     return {
       success: false,
@@ -275,9 +290,7 @@ function createDiscordAttachment(processedImage, fileName, mimeType = 'image/png
   }
 
   // Determine file extension from MIME type
-  const extension = mimeType.includes('jpeg') ? 'jpg' 
-                  : mimeType.includes('webp') ? 'webp' 
-                  : 'png';
+  const extension = mimeType.includes('jpeg') ? 'jpg' : mimeType.includes('webp') ? 'webp' : 'png';
 
   const finalFileName = fileName || `generated_image_${Date.now()}.${extension}`;
 
@@ -295,7 +308,7 @@ function createDiscordAttachment(processedImage, fileName, mimeType = 'image/png
  */
 function shouldUseStreaming(base64Data) {
   if (!base64Data) return false;
-  
+
   const estimatedSize = (base64Data.length * 3) / 4;
   return estimatedSize > STREAMING_CONFIG.CHUNK_SIZE * 2;
 }

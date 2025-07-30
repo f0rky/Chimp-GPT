@@ -33,19 +33,19 @@
 
 const { OpenAI } = require('openai');
 const { createLogger } = require('../core/logger');
-const { 
-  ChimpError, 
-  ERROR_CATEGORIES, 
-  ERROR_SEVERITY, 
+const {
+  ChimpError,
+  ERROR_CATEGORIES,
+  ERROR_SEVERITY,
   enhanceError,
   handleOpenAIError,
   logError,
-} = require('../../utils/errorHandler');
+} = require('../utils/errorHandler');
 const logger = createLogger('image');
 const { trackApiCall, trackError } = require('../core/healthCheck');
 const functionResults = require('../core/functionResults');
 const config = require('../core/configValidator');
-const retryWithBreaker = require('../../utils/retryWithBreaker');
+const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 
 // Initialize OpenAI client
@@ -291,7 +291,7 @@ async function generateImage(prompt, options = {}) {
           prompt: prompt.substring(0, 100),
           operation: 'image_generation_content_policy',
         });
-        
+
         logError(policyError);
         trackError('gptimage', error);
 
@@ -313,7 +313,7 @@ async function generateImage(prompt, options = {}) {
           operation: 'image_generation_circuit_breaker',
           context: { prompt: prompt.substring(0, 100) },
         });
-        
+
         logError(breakerError);
         return {
           success: false,
@@ -507,12 +507,12 @@ async function generateImage(prompt, options = {}) {
         operation: 'extract_image_urls',
         category: ERROR_CATEGORIES.INTERNAL,
         severity: ERROR_SEVERITY.HIGH,
-        context: { 
+        context: {
           hasResponse: !!response,
-          responseDataLength: response?.data?.length || 0
+          responseDataLength: response?.data?.length || 0,
         },
       });
-      
+
       logError(extractionError);
       throw new ChimpError('Failed to extract image URL from response', {
         category: ERROR_CATEGORIES.INTERNAL,
@@ -670,12 +670,12 @@ async function enhanceImagePrompt(basicPrompt) {
 
     return enhancedPrompt;
   } catch (error) {
-    const enhanceError = handleOpenAIError(error, {
+    const handledError = handleOpenAIError(error, {
       basicPrompt: basicPrompt.substring(0, 100),
       operation: 'enhance_image_prompt',
     });
-    
-    logError(enhanceError);
+
+    logError(handledError);
     trackError('openai');
 
     // Fall back to the original prompt

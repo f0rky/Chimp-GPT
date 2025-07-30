@@ -1,14 +1,14 @@
 const { discord: discordLogger } = require('../logger');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { checkUserRateLimit } = require('../../middleware/rateLimiter');
-const maliciousUserManager = require('../../../utils/maliciousUserManager');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
 const {
   trackMessage,
   trackRateLimit,
   isStatsCommand,
   handleStatsCommand,
 } = require('../healthCheck');
-const { processVersionQuery } = require('../../../utils/versionSelfQuery');
+const { processVersionQuery } = require('../../utils/versionSelfQuery');
 const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
 const SimpleChimpGPTFlow = require('../../conversation/flow/SimpleChimpGPTFlow');

@@ -153,7 +153,7 @@ module.exports = {
 
       // Use the startup message coordinator
       try {
-        const startupCoordinator = require('../../../utils/startupMessageCoordinator');
+        const startupCoordinator = require('../../utils/startupMessageCoordinator');
 
         // Register example plugin as a component
         startupCoordinator.registerComponent('example-plugin');
