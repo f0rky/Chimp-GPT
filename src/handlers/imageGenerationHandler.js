@@ -386,14 +386,16 @@ async function handleImageGeneration(
         );
 
         let processedImage;
-        if (useStreaming) {
+        // Temporarily disable streaming to debug PNG corruption issue
+        const streamingEnabled = false; // Disabled until corruption issue is resolved
+        if (streamingEnabled && useStreaming) {
           // Use streaming processing for large images
           processedImage = await processImageStream(imageResult_firstImage.b64_json, {
             fileName: `generated_image_${Date.now()}`,
             maxSize: 25 * 1024 * 1024, // 25MB limit (Discord is 8MB, but allow headroom)
           });
         } else {
-          // Direct processing for small images
+          // Direct processing for all images (temporary fix)
           const imageBuffer = Buffer.from(imageResult_firstImage.b64_json, 'base64');
           processedImage = {
             success: true,
@@ -495,14 +497,16 @@ async function handleImageGeneration(
             );
 
             let processedImage;
-            if (useStreaming) {
+            // Temporarily disable streaming to debug PNG corruption issue
+            const streamingEnabled = false; // Disabled until corruption issue is resolved
+            if (streamingEnabled && useStreaming) {
               // Use streaming processing for large images
               processedImage = await processImageStream(base64Data, {
                 fileName: `generated_image_${Date.now()}`,
                 maxSize: 25 * 1024 * 1024, // 25MB limit
               });
             } else {
-              // Direct processing for small images
+              // Direct processing for all images (temporary fix)
               const imageBuffer = Buffer.from(base64Data, 'base64');
               processedImage = {
                 success: true,
