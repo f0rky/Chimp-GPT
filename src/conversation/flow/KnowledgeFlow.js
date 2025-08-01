@@ -10,7 +10,7 @@
  * - CodingAgent: Generates PocketFlow code (owner-only) or provides toned-down responses
  */
 
-const { Node, SharedStore, Flow } = require('./PocketFlow');
+const { Node, Flow } = require('./PocketFlow');
 const PersistentSharedStore = require('./PersistentSharedStore');
 const { createLogger } = require('../../core/logger');
 const { searchForFactCheck, formatSearchResults } = require('../../services/webSearch');
@@ -1229,7 +1229,7 @@ Please provide a natural, friendly, conversational response based on this inform
   getCodeTemplates() {
     return {
       basicFlow: `// Basic PocketFlow Knowledge Implementation
-const { Node, SharedStore, Flow } = require('./PocketFlow');
+const { Node, Flow } = require('./PocketFlow');
 
 const knowledgeNode = new Node('knowledge_processor', async (store, data) => {
   const { query } = data;
@@ -1253,7 +1253,7 @@ const flow = new Flow(knowledgeNode, new SharedStore());
 const result = await flow.run({ query: 'your query here' });`,
 
       searchFlow: `// PocketFlow Search Implementation
-const { Node, SharedStore, Flow } = require('./PocketFlow');
+const { Node, Flow } = require('./PocketFlow');
 const { searchForFactCheck } = require('../../services/webSearch');
 
 const searchNode = new Node('search_processor', async (store, data) => {
@@ -1284,7 +1284,7 @@ const searchNode = new Node('search_processor', async (store, data) => {
 const flow = new Flow(searchNode, new SharedStore());`,
 
       validationFlow: `// PocketFlow Validation Implementation  
-const { Node, SharedStore, Flow } = require('./PocketFlow');
+const { Node, Flow } = require('./PocketFlow');
 
 const validationNode = new Node('validator', async (store, data) => {
   const { statement, sources } = data;

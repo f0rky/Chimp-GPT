@@ -223,7 +223,7 @@ async function main() {
     const counts = await security.runAudit();
 
     // Evaluate risk
-    const risk = security.evaluateRisk(counts);
+    const _risk = security.evaluateRisk(counts);
 
     // Apply fixes if needed and allowed
     if (counts.total > 0) {

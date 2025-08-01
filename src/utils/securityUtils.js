@@ -20,7 +20,7 @@ const logger = createLogger('security');
 /**
  * Project root directory for path validation
  */
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 /**
  * Environment variable validation schema

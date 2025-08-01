@@ -239,7 +239,7 @@ class PocketFlowFunctionProcessor {
    * Handle image generation
    * Note: This needs special handling since the original expects Discord message objects
    */
-  async handleImageGeneration(args, message) {
+  async handleImageGeneration(args, _message) {
     const { prompt } = args;
     if (!prompt) {
       throw new Error('Prompt parameter is required for image generation');

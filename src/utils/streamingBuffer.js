@@ -80,6 +80,7 @@ class ImageStreamProcessor extends Transform {
     this.maxSize = options.maxSize || STREAMING_CONFIG.MAX_BUFFER_SIZE;
     this.validateImage = options.validateImage !== false;
     this.fileName = options.fileName || 'processed_image';
+    this._digestCache = null; // Cache for hash digest
   }
 
   _transform(chunk, encoding, callback) {
@@ -112,13 +113,17 @@ class ImageStreamProcessor extends Transform {
   }
 
   _flush(callback) {
+    // Cache the digest to avoid "Digest already called" error
+    if (!this._digestCache) {
+      this._digestCache = this.hash.digest('hex');
+    }
+
     // Log processing completion
-    const finalHash = this.hash.digest('hex');
     logger.debug(
       {
         fileName: this.fileName,
         bytesProcessed: this.bytesProcessed,
-        hash: finalHash.substring(0, 16), // First 16 chars for logging
+        hash: this._digestCache.substring(0, 16), // First 16 chars for logging
       },
       'Image stream processing completed'
     );
@@ -152,9 +157,14 @@ class ImageStreamProcessor extends Transform {
    * @returns {Object} Processing statistics
    */
   getStats() {
+    // Cache the digest to avoid "Digest already called" error
+    if (!this._digestCache) {
+      this._digestCache = this.hash.digest('hex');
+    }
+
     return {
       bytesProcessed: this.bytesProcessed,
-      hash: this.hash.digest('hex'),
+      hash: this._digestCache,
       exceedsDiscordLimit: this.bytesProcessed > 8 * 1024 * 1024, // 8MB Discord limit
     };
   }
@@ -294,10 +304,12 @@ function createDiscordAttachment(processedImage, fileName, mimeType = 'image/png
 
   const finalFileName = fileName || `generated_image_${Date.now()}.${extension}`;
 
+  // For Discord.js v14, we need to use the correct attachment format
+  // Discord.js v14 accepts both old and new formats, but prefers the new one
   return {
     attachment: processedImage.buffer,
     name: finalFileName,
-    contentType: mimeType,
+    description: 'AI Generated Image',
   };
 }
 

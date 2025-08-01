@@ -13,7 +13,6 @@ const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
 const SimpleChimpGPTFlow = require('../../conversation/flow/SimpleChimpGPTFlow');
 const {
-  removeMessageById,
   updateMessageById,
   saveConversationsToStorage,
 } = require('../../conversation/conversationManagerSelector');
@@ -364,6 +363,70 @@ class MessageEventHandler {
         );
       }
 
+      // Check for image generation requests and bypass PocketFlow for performance
+      const lowerContent = message.content.toLowerCase().trim();
+      const imagePhrases = [
+        /^draw (?:me |us |a |an |the )?/i,
+        /^generate (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+        /^create (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+        /^make (?:me |us |a |an |the )?(?:image|picture|photo)/i,
+        /^show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)/i,
+        /^(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)/i,
+        /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i,
+      ];
+
+      const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
+
+      if (isImageRequest) {
+        discordLogger.debug('Bypassing PocketFlow for image generation request', {
+          content: message.content.substring(0, 50) + '...',
+        });
+
+        // Clean up the prompt by removing the command phrases
+        let cleanPrompt = message.content;
+        for (const phrase of imagePhrases) {
+          cleanPrompt = cleanPrompt.replace(phrase, '').trim();
+        }
+
+        // Import and call the image generation handler directly
+        const { handleImageGeneration } = require('../../handlers/imageGenerationHandler');
+
+        // Process the image generation request directly
+        try {
+          addTiming('before_image_generation');
+          const imageResult = await handleImageGeneration(
+            { prompt: cleanPrompt },
+            await feedbackPromise,
+            [], // empty conversation log for bypass
+            Date.now(),
+            {}, // usage
+            {}, // timings
+            (startTime, _usage, _functionTimings) => {
+              const elapsed = Date.now() - startTime;
+              return `\n\n⏱️ Generated in ${Math.round(elapsed / 1000)}s`;
+            },
+            () => {
+              /* storeMessageRelationship placeholder */
+            }, // storeMessageRelationship
+            this.statusManager
+          );
+          addTiming('after_image_generation');
+
+          // Image generation was handled directly, skip PocketFlow
+          discordLogger.info('Image generation completed via bypass', {
+            messageId: message.id,
+            success: !!imageResult,
+          });
+          return;
+        } catch (error) {
+          discordLogger.error('Image generation bypass failed, falling back to PocketFlow', {
+            error: error.message,
+            messageId: message.id,
+          });
+          // Fall through to PocketFlow processing
+        }
+      }
+
       // Use PocketFlow for conversation processing
       addTiming('before_pocketflow_processing');
 
@@ -529,7 +592,8 @@ class MessageEventHandler {
             message.id,
             message.channelId,
             message.content,
-            timeSinceCreation
+            timeSinceCreation,
+            message // Pass full message object for WebUI storage
           );
 
           // Check for suspicious behavior and potentially trigger human approval
@@ -543,7 +607,7 @@ class MessageEventHandler {
       }
 
       // Determine if this is a DM
-      const isDM = message.channel?.isDMBased() || false;
+      const _isDM = message.channel?.isDMBased() || false;
 
       // PocketFlow manages conversation state internally
 
@@ -557,23 +621,23 @@ class MessageEventHandler {
           const username = userInfo.username || userInfo.displayName || 'Unknown User';
           const contextText = context.substring(0, 100) + (context.length > 100 ? '...' : '');
 
-          let updatedContent;
-          if (context.type === 'image') {
-            updatedContent = `**${username}** removed their message - Generated image for: *${contextText}*`;
-          } else if (context.type === 'weather') {
-            updatedContent = `**${username}** removed their message - Weather for: *${contextText}*`;
-          } else if (context.type === 'time') {
-            updatedContent = `**${username}** removed their message - Time for: *${contextText}*`;
-          } else if (context.type === 'wolfram') {
-            updatedContent = `**${username}** removed their message - Calculation: *${contextText}*`;
-          } else if (context.type === 'quake') {
-            updatedContent = `**${username}** removed their message - Quake server info: *${contextText}*`;
-          } else {
-            updatedContent = `**${username}** removed their message - Context: *${contextText}*`;
-          }
+          // Get user's deletion count for better comment template selection
+          const userStats = maliciousUserManager.getUserStats(message.author.id);
+          const deleteCount = userStats.totalDeletions;
+
+          // Use the new comment template system
+          const updatedContent = maliciousUserManager.getDeletionComment(
+            message.author.id,
+            username,
+            contextText,
+            deleteCount
+          );
 
           // Edit the bot message to preserve context
           await botMessage.edit(updatedContent);
+
+          // Link the deleted message to the bot response for WebUI tracking
+          await maliciousUserManager.linkDeletedMessageToBotResponse(message.id, botMessage.id);
 
           discordLogger.info(
             {
@@ -581,6 +645,8 @@ class MessageEventHandler {
               botMessageId: botMessage.id,
               username,
               contextType: context.type,
+              deleteCount,
+              isOwner: maliciousUserManager.isOwner(message.author.id),
             },
             'Updated bot response after user message deletion'
           );

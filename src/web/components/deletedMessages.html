@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChimpGPT - Deleted Messages Management</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Arial', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .header {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .header h1 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+      }
+
+      .filters {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .filter-group {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .filter-group label {
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .filter-group select,
+      .filter-group input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+
+      .btn {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s ease;
+      }
+
+      .btn:hover {
+        background: #2980b9;
+        transform: translateY(-2px);
+      }
+
+      .btn-danger {
+        background: #e74c3c;
+      }
+
+      .btn-danger:hover {
+        background: #c0392b;
+      }
+
+      .btn-success {
+        background: #27ae60;
+      }
+
+      .btn-success:hover {
+        background: #219a52;
+      }
+
+      .btn-warning {
+        background: #f39c12;
+      }
+
+      .btn-warning:hover {
+        background: #e67e22;
+      }
+
+      .messages-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .message-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: #fafafa;
+        transition: all 0.3s ease;
+      }
+
+      .message-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .message-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .username {
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .owner-badge {
+        background: #f39c12;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .rapid-badge {
+        background: #e74c3c;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .status-badge {
+        padding: 4px 12px;
+        border-radius: 15px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .status-pending {
+        background: #f39c12;
+        color: white;
+      }
+      .status-approved {
+        background: #27ae60;
+        color: white;
+      }
+      .status-flagged {
+        background: #e74c3c;
+        color: white;
+      }
+      .status-ignored {
+        background: #95a5a6;
+        color: white;
+      }
+
+      .message-content {
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        border-left: 4px solid #3498db;
+        font-family: monospace;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+
+      .message-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 10px 0;
+        font-size: 13px;
+        color: #666;
+      }
+
+      .message-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+      }
+
+      .notes-section {
+        margin-top: 15px;
+      }
+
+      .notes-section textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        resize: vertical;
+        min-height: 60px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .error {
+        background: #e74c3c;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+
+      .success {
+        background: #27ae60;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+
+      .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-content {
+        background: white;
+        margin: 10% auto;
+        padding: 20px;
+        border-radius: 10px;
+        width: 80%;
+        max-width: 600px;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+
+      .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .close:hover {
+        color: #000;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 10px;
+        }
+
+        .filter-group {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .message-actions {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🔍 Deleted Messages Management</h1>
+        <p>Monitor and manage user message deletions. Owner access only.</p>
+      </div>
+
+      <div id="error-container"></div>
+      <div id="success-container"></div>
+
+      <div class="stats-summary">
+        <div class="stat-card">
+          <div class="stat-number" id="total-messages">-</div>
+          <div class="stat-label">Total Deleted</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="pending-messages">-</div>
+          <div class="stat-label">Pending Review</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="rapid-deletions">-</div>
+          <div class="stat-label">Rapid Deletions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="flagged-messages">-</div>
+          <div class="stat-label">Flagged</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label>Status:</label>
+          <select id="status-filter">
+            <option value="">All Statuses</option>
+            <option value="pending_review">Pending Review</option>
+            <option value="approved">Approved</option>
+            <option value="flagged">Flagged</option>
+            <option value="ignored">Ignored</option>
+          </select>
+
+          <label>User ID:</label>
+          <input type="text" id="user-filter" placeholder="Filter by user ID" />
+
+          <label>Channel:</label>
+          <input type="text" id="channel-filter" placeholder="Filter by channel ID" />
+        </div>
+
+        <div class="filter-group">
+          <label>Start Date:</label>
+          <input type="datetime-local" id="start-date" />
+
+          <label>End Date:</label>
+          <input type="datetime-local" id="end-date" />
+
+          <label>Rapid Deletions Only:</label>
+          <input type="checkbox" id="rapid-only" />
+
+          <button class="btn" onclick="applyFilters()">Apply Filters</button>
+          <button class="btn" onclick="loadMessages()">Refresh</button>
+        </div>
+      </div>
+
+      <div class="messages-container">
+        <div id="loading" class="loading">Loading deleted messages...</div>
+        <div id="messages-list"></div>
+      </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Review Message</h2>
+        <div id="modal-content"></div>
+      </div>
+    </div>
+
+    <script>
+      let currentMessages = [];
+      let currentUser = null;
+
+      // Initialize page
+      document.addEventListener('DOMContentLoaded', function () {
+        checkAuthentication();
+        loadMessages();
+
+        // Set default date range to last 7 days
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+
+        document.getElementById('end-date').value = formatDateForInput(endDate);
+        document.getElementById('start-date').value = formatDateForInput(startDate);
+      });
+
+      function formatDateForInput(date) {
+        return date.toISOString().slice(0, 16);
+      }
+
+      async function checkAuthentication() {
+        try {
+          const response = await fetch('/api/deleted-messages/auth');
+          if (!response.ok) {
+            showError('Access denied: Owner privileges required');
+            return;
+          }
+          const data = await response.json();
+          currentUser = data.userId;
+        } catch (error) {
+          showError('Authentication failed: ' + error.message);
+        }
+      }
+
+      async function loadMessages() {
+        showLoading(true);
+        clearMessages();
+
+        try {
+          const filters = getFilters();
+          const queryString = new URLSearchParams(filters).toString();
+          const response = await fetch(`/api/deleted-messages?${queryString}`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          currentMessages = data.messages || [];
+          displayMessages(currentMessages);
+          updateStats(data.stats || {});
+        } catch (error) {
+          showError('Failed to load messages: ' + error.message);
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function getFilters() {
+        const filters = {};
+
+        const status = document.getElementById('status-filter').value;
+        if (status) filters.status = status;
+
+        const userId = document.getElementById('user-filter').value.trim();
+        if (userId) filters.userId = userId;
+
+        const channelId = document.getElementById('channel-filter').value.trim();
+        if (channelId) filters.channelId = channelId;
+
+        const startDate = document.getElementById('start-date').value;
+        if (startDate) filters.startDate = new Date(startDate).getTime();
+
+        const endDate = document.getElementById('end-date').value;
+        if (endDate) filters.endDate = new Date(endDate).getTime();
+
+        const rapidOnly = document.getElementById('rapid-only').checked;
+        if (rapidOnly) filters.isRapidDeletion = true;
+
+        return filters;
+      }
+
+      function applyFilters() {
+        loadMessages();
+      }
+
+      function displayMessages(messages) {
+        const container = document.getElementById('messages-list');
+
+        if (messages.length === 0) {
+          container.innerHTML =
+            '<div class="loading">No deleted messages found matching the filters.</div>';
+          return;
+        }
+
+        container.innerHTML = messages
+          .map(
+            message => `
+                <div class="message-item">
+                    <div class="message-header">
+                        <div class="user-info">
+                            <span class="username">${escapeHtml(message.username)}</span>
+                            ${message.isOwner ? '<span class="owner-badge">OWNER</span>' : ''}
+                            ${message.isRapidDeletion ? '<span class="rapid-badge">RAPID</span>' : ''}
+                            <span class="status-badge status-${message.status}">${message.status.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+                        <div class="message-actions">
+                            <button class="btn" onclick="reviewMessage('${message.messageId}')">Review</button>
+                            <button class="btn btn-success" onclick="updateStatus('${message.messageId}', 'approved')">Approve</button>
+                            <button class="btn btn-danger" onclick="updateStatus('${message.messageId}', 'flagged')">Flag</button>
+                            <button class="btn btn-warning" onclick="updateStatus('${message.messageId}', 'ignored')">Ignore</button>
+                        </div>
+                    </div>
+                    
+                    <div class="message-content">
+                        ${escapeHtml(message.content || 'No content available')}
+                    </div>
+                    
+                    <div class="message-meta">
+                        <div><strong>Channel:</strong> ${escapeHtml(message.channelName)}</div>
+                        <div><strong>Deleted:</strong> ${new Date(message.timestamp).toLocaleString()}</div>
+                        <div><strong>Time to Delete:</strong> ${formatDuration(message.timeSinceCreation)}</div>
+                        <div><strong>Total Deletions:</strong> ${message.deletionCount}</div>
+                        <div><strong>User ID:</strong> ${message.userId}</div>
+                        <div><strong>Message ID:</strong> ${message.messageId}</div>
+                    </div>
+
+                    ${
+                      message.notes
+                        ? `
+                        <div class="notes-section">
+                            <strong>Notes:</strong>
+                            <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 5px;">
+                                ${escapeHtml(message.notes)}
+                            </div>
+                        </div>
+                    `
+                        : ''
+                    }
+                </div>
+            `
+          )
+          .join('');
+      }
+
+      function updateStats(stats) {
+        document.getElementById('total-messages').textContent = stats.total || 0;
+        document.getElementById('pending-messages').textContent = stats.pending || 0;
+        document.getElementById('rapid-deletions').textContent = stats.rapid || 0;
+        document.getElementById('flagged-messages').textContent = stats.flagged || 0;
+      }
+
+      async function updateStatus(messageId, status) {
+        try {
+          const notes = prompt(`Enter notes for ${status} status (optional):`);
+          if (notes === null) return; // User cancelled
+
+          const response = await fetch('/api/deleted-messages/status', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageId,
+              status,
+              notes,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          showSuccess(`Message ${status} successfully`);
+          loadMessages(); // Refresh the list
+        } catch (error) {
+          showError('Failed to update status: ' + error.message);
+        }
+      }
+
+      function reviewMessage(messageId) {
+        const message = currentMessages.find(m => m.messageId === messageId);
+        if (!message) return;
+
+        const modalContent = document.getElementById('modal-content');
+        modalContent.innerHTML = `
+                <h3>Message Details</h3>
+                <div class="message-meta" style="margin: 15px 0;">
+                    <div><strong>User:</strong> ${escapeHtml(message.username)} (${message.userId})</div>
+                    <div><strong>Channel:</strong> ${escapeHtml(message.channelName)} (${message.channelId})</div>
+                    <div><strong>Deleted:</strong> ${new Date(message.timestamp).toLocaleString()}</div>
+                    <div><strong>Created:</strong> ${new Date(message.messageCreatedAt).toLocaleString()}</div>
+                    <div><strong>Time to Delete:</strong> ${formatDuration(message.timeSinceCreation)}</div>
+                    <div><strong>Total User Deletions:</strong> ${message.deletionCount}</div>
+                    <div><strong>Status:</strong> ${message.status.replace('_', ' ').toUpperCase()}</div>
+                    <div><strong>Is Owner:</strong> ${message.isOwner ? 'Yes' : 'No'}</div>
+                    <div><strong>Rapid Deletion:</strong> ${message.isRapidDeletion ? 'Yes' : 'No'}</div>
+                </div>
+                
+                <h4>Full Message Content:</h4>
+                <div class="message-content" style="max-height: 200px;">
+                    ${escapeHtml(message.fullContent || 'No content available')}
+                </div>
+                
+                ${
+                  message.attachments && message.attachments.length > 0
+                    ? `
+                    <h4>Attachments (${message.attachments.length}):</h4>
+                    <ul>
+                        ${message.attachments
+                          .map(
+                            att => `
+                            <li>${escapeHtml(att.name)} (${att.size} bytes, ${att.contentType})</li>
+                        `
+                          )
+                          .join('')}
+                    </ul>
+                `
+                    : ''
+                }
+                
+                <div class="notes-section">
+                    <label for="review-notes"><strong>Review Notes:</strong></label>
+                    <textarea id="review-notes" placeholder="Add notes about this deletion...">${escapeHtml(message.notes || '')}</textarea>
+                </div>
+                
+                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-success" onclick="updateStatusFromModal('${messageId}', 'approved')">Approve</button>
+                    <button class="btn btn-danger" onclick="updateStatusFromModal('${messageId}', 'flagged')">Flag</button>
+                    <button class="btn btn-warning" onclick="updateStatusFromModal('${messageId}', 'ignored')">Ignore</button>
+                    <button class="btn" onclick="closeModal()">Close</button>
+                </div>
+            `;
+
+        document.getElementById('reviewModal').style.display = 'block';
+      }
+
+      async function updateStatusFromModal(messageId, status) {
+        const notes = document.getElementById('review-notes').value;
+
+        try {
+          const response = await fetch('/api/deleted-messages/status', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageId,
+              status,
+              notes,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          showSuccess(`Message ${status} successfully`);
+          closeModal();
+          loadMessages(); // Refresh the list
+        } catch (error) {
+          showError('Failed to update status: ' + error.message);
+        }
+      }
+
+      function closeModal() {
+        document.getElementById('reviewModal').style.display = 'none';
+      }
+
+      function showLoading(show) {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+      }
+
+      function clearMessages() {
+        document.getElementById('messages-list').innerHTML = '';
+      }
+
+      function showError(message) {
+        const container = document.getElementById('error-container');
+        container.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+        setTimeout(() => (container.innerHTML = ''), 5000);
+      }
+
+      function showSuccess(message) {
+        const container = document.getElementById('success-container');
+        container.innerHTML = `<div class="success">${escapeHtml(message)}</div>`;
+        setTimeout(() => (container.innerHTML = ''), 3000);
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function formatDuration(ms) {
+        if (ms < 1000) return `${ms}ms`;
+        if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+        if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
+        return `${Math.round(ms / 3600000)}h`;
+      }
+
+      // Close modal when clicking outside
+      window.onclick = function (event) {
+        const modal = document.getElementById('reviewModal');
+        if (event.target === modal) {
+          closeModal();
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -330,7 +330,7 @@ class SimpleChimpGPTFlow {
     let weatherData = null;
     try {
       const { message } = data;
-      const content = message.content.toLowerCase();
+      const _content = message.content.toLowerCase();
 
       logger.info(`Processing weather request: ${message.content.substring(0, 50)}...`);
 
@@ -447,7 +447,7 @@ class SimpleChimpGPTFlow {
   async handleTimeRequest(store, data) {
     try {
       const { message } = data;
-      const content = message.content.toLowerCase();
+      const _content = message.content.toLowerCase();
 
       logger.info(`Processing time request: ${message.content.substring(0, 50)}...`);
 

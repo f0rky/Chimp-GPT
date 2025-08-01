@@ -129,7 +129,7 @@ class ClientEventHandler {
     // Initialize health check system
     initHealthCheck(this.client);
     discordLogger.info('Initializing performance monitoring');
-    const { initPerformanceMonitoring } = require('../utils/healthCheckIntegration');
+    const { initPerformanceMonitoring } = require('../../utils/healthCheckIntegration');
     initPerformanceMonitoring();
     discordLogger.info('Health check system initialized');
 
