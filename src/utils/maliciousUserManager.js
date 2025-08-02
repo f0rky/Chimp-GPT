@@ -11,6 +11,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { createLogger } = require('../core/logger');
 const humanCircuitBreaker = require('./humanCircuitBreaker');
+const { contextExtractionService } = require('./contextExtractionService');
 
 const logger = createLogger('maliciousUserManager');
 
@@ -37,7 +38,7 @@ const DETECTION_CONFIG = {
   STORE_DELETED_MESSAGE_CONTENT: true,
   MAX_STORED_CONTENT_LENGTH: 2000,
 
-  // Comment templates for bot responses
+  // Enhanced comment templates for bot responses
   DELETION_COMMENT_TEMPLATES: {
     default: '**{username}** removed their message: *{context}*',
     frequent: '**{username}** removed their message again ({deleteCount} total): *{context}*',
@@ -45,6 +46,14 @@ const DETECTION_CONFIG = {
       '**{username}** removed their message ({deleteCount} deletions - approaching limit): *{context}*',
     owner: '**{username}** (Owner) removed their message: *{context}*',
   },
+
+  // Enhanced message management integration
+  ENHANCED_MESSAGE_MANAGEMENT: true,
+  USE_CONTEXT_EXTRACTION: true,
+
+  // Bulk deletion thresholds for enhanced management
+  BULK_DELETION_THRESHOLD: 2,
+  BULK_DELETION_WINDOW_MS: 10 * 60 * 1000, // 10 minutes
 };
 
 // File paths
@@ -273,6 +282,21 @@ async function recordDeletion(
       DETECTION_CONFIG.STORE_DELETED_MESSAGE_CONTENT &&
       fullMessage
     ) {
+      // Extract enhanced context if enabled
+      let enhancedContext = null;
+      if (DETECTION_CONFIG.USE_CONTEXT_EXTRACTION && content) {
+        try {
+          enhancedContext = contextExtractionService.extractContext(content, {
+            messageId,
+            userId,
+            channelId,
+            timestamp: now,
+          });
+        } catch (error) {
+          logger.warn({ error, messageId }, 'Failed to extract enhanced context');
+        }
+      }
+
       const webUIRecord = {
         messageId,
         userId,
@@ -300,10 +324,28 @@ async function recordDeletion(
         deletionCount: deletionHistory.get(userId).length,
         isRapidDeletion: timeSinceCreation < DETECTION_CONFIG.RAPID_DELETE_THRESHOLD_MS,
         botResponseId: null, // Will be set by message handler if there's a bot response
-        status: 'pending_review', // pending_review, approved, flagged, ignored
+        status: 'pending_review', // pending_review, approved, flagged, ignored, banned
         reviewedBy: null,
         reviewedAt: null,
         notes: '',
+        canReprocess: true, // Allow reprocessing for testing
+        reprocessCount: 0,
+        lastReprocessedAt: null,
+        reviewHistory: [], // Track all review actions
+        // Enhanced context information
+        enhancedContext: enhancedContext
+          ? {
+              type: enhancedContext.type,
+              theme: enhancedContext.theme,
+              intent: enhancedContext.intent,
+              functionType: enhancedContext.functionType,
+              imageContext: enhancedContext.imageContext,
+              conversationTheme: enhancedContext.conversationTheme,
+              complexity: enhancedContext.complexity,
+              sentiment: enhancedContext.sentiment,
+              keywords: enhancedContext.keywords?.slice(0, 5), // Top 5 keywords
+            }
+          : null,
       };
 
       deletedMessages.set(messageId, webUIRecord);
@@ -634,6 +676,10 @@ function getDeletedMessagesForWebUI(requestingUserId, filters = {}) {
     messages = messages.filter(msg => msg.timestamp <= filters.endDate);
   }
 
+  if (filters.canReprocess !== undefined) {
+    messages = messages.filter(msg => msg.canReprocess === filters.canReprocess);
+  }
+
   // Sort by timestamp (newest first)
   messages.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -646,8 +692,17 @@ function getDeletedMessagesForWebUI(requestingUserId, filters = {}) {
  * @param {string} messageId - Message ID to update
  * @param {string} status - New status
  * @param {string} notes - Optional notes
+ * @param {boolean} allowReprocessing - Allow future reprocessing
+ * @param {Object} discordClient - Discord client for message operations (optional)
  */
-async function updateDeletedMessageStatus(requestingUserId, messageId, status, notes = '') {
+async function updateDeletedMessageStatus(
+  requestingUserId,
+  messageId,
+  status,
+  notes = '',
+  allowReprocessing = true,
+  discordClient = null
+) {
   // Only allow owner access
   if (!isOwner(requestingUserId)) {
     logger.warn(
@@ -662,15 +717,30 @@ async function updateDeletedMessageStatus(requestingUserId, messageId, status, n
     throw new Error('Message not found');
   }
 
-  const validStatuses = ['pending_review', 'approved', 'flagged', 'ignored'];
+  const validStatuses = ['pending_review', 'approved', 'flagged', 'ignored', 'banned'];
   if (!validStatuses.includes(status)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
+
+  // Store previous status in history
+  const previousStatus = message.status;
+  message.reviewHistory.push({
+    previousStatus,
+    newStatus: status,
+    reviewedBy: requestingUserId,
+    reviewedAt: Date.now(),
+    notes: notes || '',
+    action: getReviewActionOutcome(status),
+  });
 
   message.status = status;
   message.reviewedBy = requestingUserId;
   message.reviewedAt = Date.now();
   message.notes = notes;
+  message.canReprocess = allowReprocessing;
+
+  // Apply status-specific actions
+  const actionResult = await applyReviewAction(message, status, requestingUserId, discordClient);
 
   deletedMessages.set(messageId, message);
   await saveDeletedMessages();
@@ -681,11 +751,13 @@ async function updateDeletedMessageStatus(requestingUserId, messageId, status, n
       reviewedBy: requestingUserId,
       status,
       userId: message.userId,
+      action: actionResult.action,
+      outcome: actionResult.outcome,
     },
-    'Deleted message status updated'
+    'Deleted message status updated with action applied'
   );
 
-  return message;
+  return { ...message, actionResult };
 }
 
 /**
@@ -732,6 +804,355 @@ async function linkDeletedMessageToBotResponse(messageId, botResponseId) {
   }
 }
 
+/**
+ * Get review action outcome description
+ * @param {string} status - Review status
+ * @returns {string} Action description
+ */
+function getReviewActionOutcome(status) {
+  const outcomes = {
+    approved: 'Legitimate deletion - update response with context',
+    flagged: 'Suspicious, needs attention - warning issued with bot response',
+    ignored: 'Treat as normal deletion - delete bot original response',
+    banned: 'Results in user ban - user blocked from bot',
+    pending_review: 'Awaiting manual review',
+  };
+  return outcomes[status] || 'Unknown action';
+}
+
+/**
+ * Apply review action based on status
+ * @param {Object} message - Message object
+ * @param {string} status - New status
+ * @param {string} reviewerId - Reviewer user ID
+ * @param {Object} discordClient - Discord client for message operations (optional)
+ * @returns {Object} Action result
+ */
+async function applyReviewAction(message, status, reviewerId, discordClient = null) {
+  try {
+    let actionResult;
+
+    switch (status) {
+      case 'approved':
+        // Update bot response with context (if bot response exists)
+        if (message.botResponseId) {
+          actionResult = {
+            action: 'approved',
+            outcome: 'Update bot response with deletion context',
+            userAction: 'update_response_with_context',
+          };
+        } else {
+          actionResult = {
+            action: 'approved',
+            outcome: 'Message approved - legitimate deletion',
+            userAction: 'none',
+          };
+        }
+        break;
+
+      case 'flagged':
+        // Issue warning and keep bot response
+        actionResult = {
+          action: 'flagged',
+          outcome: 'Warning issued, bot response preserved',
+          userAction: 'warning_issued_with_response',
+        };
+        break;
+
+      case 'ignored':
+        // Delete bot's original response
+        if (message.botResponseId) {
+          actionResult = {
+            action: 'ignored',
+            outcome: 'Delete bot original response - treat as normal deletion',
+            userAction: 'delete_bot_response',
+          };
+        } else {
+          actionResult = {
+            action: 'ignored',
+            outcome: 'Treat as normal deletion',
+            userAction: 'none',
+          };
+        }
+        break;
+
+      case 'banned':
+        // Block the user
+        await blockUser(message.userId, `Manual ban from review of message ${message.messageId}`);
+        actionResult = {
+          action: 'banned',
+          outcome: 'User blocked from bot access',
+          userAction: 'user_blocked',
+        };
+        break;
+
+      default:
+        actionResult = {
+          action: 'pending',
+          outcome: 'No action taken - pending review',
+          userAction: 'none',
+        };
+    }
+
+    // Execute Discord operations if client is provided and action is needed
+    if (discordClient && actionResult.userAction !== 'none') {
+      try {
+        const { DiscordMessageExecutor } = require('./discordMessageExecutor');
+        const executor = new DiscordMessageExecutor(discordClient);
+        const executionResult = await executor.executeReviewAction(message, status, actionResult);
+
+        // Add execution result to action result
+        actionResult.discordExecution = executionResult;
+        actionResult.discordExecuted = executionResult.success;
+
+        if (executionResult.success) {
+          logger.info(
+            {
+              messageId: message.messageId,
+              status,
+              userAction: actionResult.userAction,
+              discordAction: executionResult.action,
+            },
+            'Discord action executed successfully for review'
+          );
+        } else {
+          logger.warn(
+            {
+              messageId: message.messageId,
+              status,
+              userAction: actionResult.userAction,
+              error: executionResult.error,
+            },
+            'Discord action failed for review'
+          );
+        }
+      } catch (executionError) {
+        logger.error(
+          {
+            error: executionError,
+            messageId: message.messageId,
+            status,
+            userAction: actionResult.userAction,
+          },
+          'Error executing Discord action for review'
+        );
+
+        actionResult.discordExecution = {
+          success: false,
+          error: executionError.message,
+          action: 'execution_error',
+        };
+        actionResult.discordExecuted = false;
+      }
+    }
+
+    return actionResult;
+  } catch (error) {
+    logger.error({ error, messageId: message.messageId, status }, 'Error applying review action');
+    return {
+      action: 'error',
+      outcome: `Failed to apply action: ${error.message}`,
+      userAction: 'none',
+      discordExecuted: false,
+    };
+  }
+}
+
+/**
+ * Reprocess a deleted message to test deletion behavior
+ * @param {string} requestingUserId - User making the request
+ * @param {string} messageId - Message ID to reprocess
+ * @param {Object} options - Reprocessing options
+ * @returns {Object} Reprocessing result
+ */
+async function reprocessDeletedMessage(requestingUserId, messageId, options = {}) {
+  // Only allow owner access
+  if (!isOwner(requestingUserId)) {
+    logger.warn({ requestingUserId, messageId }, 'Unauthorized reprocessing attempt');
+    throw new Error('Access denied: Owner privileges required');
+  }
+
+  const message = deletedMessages.get(messageId);
+  if (!message) {
+    throw new Error('Message not found');
+  }
+
+  if (!message.canReprocess) {
+    throw new Error('Message not eligible for reprocessing');
+  }
+
+  try {
+    // Import enhanced message manager
+    const { enhancedMessageManager } = require('./enhancedMessageManager');
+
+    // Create mock deleted message object for reprocessing
+    const mockDeletedMessage = {
+      id: message.messageId,
+      author: {
+        id: message.userId,
+        username: message.username,
+      },
+      content: message.fullContent,
+      createdAt: new Date(message.messageCreatedAt),
+      channelId: message.channelId,
+    };
+
+    // Override behavior for testing if specified
+    if (options.forceBulkDeletion) {
+      // Simulate bulk deletion by adding multiple recent deletions
+      const userDeletions = enhancedMessageManager.userDeletionWindows.get(message.userId) || [];
+      const now = Date.now();
+      userDeletions.push(now - 60000, now - 30000, now); // 3 deletions in last minute
+      enhancedMessageManager.userDeletionWindows.set(message.userId, userDeletions);
+    }
+
+    if (options.forceRapidDeletion) {
+      // Modify creation time to simulate rapid deletion
+      mockDeletedMessage.createdAt = new Date(Date.now() - 15000); // 15 seconds ago
+    }
+
+    // Process the deletion with enhanced system
+    const result = await enhancedMessageManager.processDeletion(mockDeletedMessage);
+
+    // Update reprocessing stats
+    message.reprocessCount++;
+    message.lastReprocessedAt = Date.now();
+    message.reviewHistory.push({
+      action: 'reprocessed',
+      reprocessedBy: requestingUserId,
+      reprocessedAt: Date.now(),
+      options,
+      result,
+    });
+
+    deletedMessages.set(messageId, message);
+    await saveDeletedMessages();
+
+    logger.info(
+      {
+        messageId,
+        userId: message.userId,
+        reprocessedBy: requestingUserId,
+        result: result.success,
+        action: result.action,
+      },
+      'Message reprocessed for testing'
+    );
+
+    return {
+      success: true,
+      originalMessage: message,
+      reprocessingResult: result,
+      testingOptions: options,
+    };
+  } catch (error) {
+    logger.error({ error, messageId }, 'Error reprocessing deleted message');
+    throw error;
+  }
+}
+
+/**
+ * Bulk reprocess messages for testing
+ * @param {string} requestingUserId - User making the request
+ * @param {Object} filters - Filters for messages to reprocess
+ * @param {Object} options - Reprocessing options
+ * @returns {Object} Bulk reprocessing result
+ */
+async function bulkReprocessMessages(requestingUserId, filters = {}, options = {}) {
+  // Only allow owner access
+  if (!isOwner(requestingUserId)) {
+    logger.warn({ requestingUserId }, 'Unauthorized bulk reprocessing attempt');
+    throw new Error('Access denied: Owner privileges required');
+  }
+
+  const messages = getDeletedMessagesForWebUI(requestingUserId, {
+    ...filters,
+    canReprocess: true,
+  });
+
+  if (messages.length === 0) {
+    return { success: true, processed: 0, results: [] };
+  }
+
+  const maxBulkSize = options.maxCount || 10;
+  const messagesToProcess = messages.slice(0, maxBulkSize);
+  const results = [];
+
+  for (const message of messagesToProcess) {
+    try {
+      const result = await reprocessDeletedMessage(requestingUserId, message.messageId, options);
+      results.push({ messageId: message.messageId, success: true, result });
+
+      // Rate limit to avoid overwhelming Discord API
+      if (messagesToProcess.indexOf(message) < messagesToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      results.push({
+        messageId: message.messageId,
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  const successful = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+
+  logger.info(
+    {
+      requestingUserId,
+      totalProcessed: results.length,
+      successful,
+      failed,
+      filters,
+      options,
+    },
+    'Bulk reprocessing completed'
+  );
+
+  return {
+    success: true,
+    processed: results.length,
+    successful,
+    failed,
+    results,
+  };
+}
+
+/**
+ * Get reprocessing statistics
+ * @param {string} requestingUserId - User making the request
+ * @returns {Object} Reprocessing statistics
+ */
+function getReprocessingStats(requestingUserId) {
+  // Only allow owner access
+  if (!isOwner(requestingUserId)) {
+    throw new Error('Access denied: Owner privileges required');
+  }
+
+  const allMessages = Array.from(deletedMessages.values());
+  const reprocessableMessages = allMessages.filter(msg => msg.canReprocess);
+  const reprocessedMessages = allMessages.filter(msg => msg.reprocessCount > 0);
+
+  const statusCounts = {};
+  allMessages.forEach(msg => {
+    statusCounts[msg.status] = (statusCounts[msg.status] || 0) + 1;
+  });
+
+  return {
+    totalMessages: allMessages.length,
+    reprocessableMessages: reprocessableMessages.length,
+    alreadyReprocessed: reprocessedMessages.length,
+    statusBreakdown: statusCounts,
+    averageReprocessCount:
+      reprocessedMessages.length > 0
+        ? reprocessedMessages.reduce((sum, msg) => sum + msg.reprocessCount, 0) /
+          reprocessedMessages.length
+        : 0,
+  };
+}
+
 module.exports = {
   init,
   recordDeletion,
@@ -747,5 +1168,10 @@ module.exports = {
   getDeletionComment,
   linkDeletedMessageToBotResponse,
   isOwner,
+  reprocessDeletedMessage,
+  bulkReprocessMessages,
+  getReprocessingStats,
+  getReviewActionOutcome,
+  applyReviewAction,
   DETECTION_CONFIG,
 };

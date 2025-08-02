@@ -2,6 +2,8 @@ const { discord: discordLogger } = require('../logger');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { checkUserRateLimit } = require('../../middleware/rateLimiter');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
+const { enhancedMessageManager } = require('../../utils/enhancedMessageManager');
+const { contextExtractionService } = require('../../utils/contextExtractionService');
 const {
   trackMessage,
   trackRateLimit,
@@ -34,6 +36,20 @@ class MessageEventHandler {
 
     // Initialize PocketFlow for conversation processing with PFPManager
     this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
+
+    // Set up periodic cleanup for enhanced message relationships
+    if (maliciousUserManager.DETECTION_CONFIG.ENHANCED_MESSAGE_MANAGEMENT) {
+      this.cleanupInterval = setInterval(
+        () => {
+          try {
+            enhancedMessageManager.cleanupOldRelationships();
+          } catch (error) {
+            discordLogger.warn({ error }, 'Error during enhanced message cleanup');
+          }
+        },
+        60 * 60 * 1000
+      ); // Clean up every hour
+    }
 
     this.setupEventHandlers();
   }
@@ -457,6 +473,38 @@ class MessageEventHandler {
             await responseFeedbackMessage.edit(flowResult.response);
             addTiming('after_edit_message');
           }
+
+          // Store enhanced message relationship for deletion tracking
+          try {
+            const context = contextExtractionService.extractContext(message.content, {
+              type: flowResult.type,
+              conversationLength: flowResult.conversationLength || 0,
+              functionType: flowResult.functionType,
+              imageContext: flowResult.imageContext,
+              conversationTheme: flowResult.conversationTheme,
+            });
+
+            enhancedMessageManager.storeRelationship(
+              message.id,
+              responseFeedbackMessage,
+              {
+                id: message.author.id,
+                username: message.author.username,
+                displayName: message.author.displayName,
+              },
+              context
+            );
+
+            addTiming('after_relationship_storage');
+          } catch (relationshipError) {
+            discordLogger.warn(
+              {
+                error: relationshipError,
+                messageId: message.id,
+              },
+              'Failed to store enhanced message relationship'
+            );
+          }
         }
       } else {
         // If no response, provide fallback message
@@ -611,7 +659,40 @@ class MessageEventHandler {
 
       // PocketFlow manages conversation state internally
 
-      // Check if we have a bot response for this deleted message
+      // Use enhanced message management system if enabled
+      if (maliciousUserManager.DETECTION_CONFIG.ENHANCED_MESSAGE_MANAGEMENT) {
+        try {
+          const enhancedResult = await enhancedMessageManager.processDeletion(message);
+
+          discordLogger.info(
+            {
+              messageId: message.id,
+              userId: message.author?.id,
+              action: enhancedResult.action,
+              success: enhancedResult.success,
+              reason: enhancedResult.reason,
+            },
+            'Enhanced deletion processing completed'
+          );
+
+          // If enhanced processing succeeded, skip legacy handling
+          if (enhancedResult.success) {
+            // Save conversations after enhanced processing
+            await saveConversationsToStorage();
+            return;
+          }
+        } catch (enhancedError) {
+          discordLogger.error(
+            {
+              error: enhancedError,
+              messageId: message.id,
+            },
+            'Enhanced deletion processing failed, falling back to legacy'
+          );
+        }
+      }
+
+      // Fallback to legacy message relationship handling
       const relationship = this.messageRelationships.get(message.id);
       if (relationship) {
         try {
@@ -648,7 +729,7 @@ class MessageEventHandler {
               deleteCount,
               isOwner: maliciousUserManager.isOwner(message.author.id),
             },
-            'Updated bot response after user message deletion'
+            'Updated bot response after user message deletion (legacy)'
           );
 
           // Remove the relationship since it's no longer needed
