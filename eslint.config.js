@@ -237,6 +237,7 @@ module.exports = [
         },
       ],
       'no-undef': 'warn',
+      'no-alert': 'off', // Allow prompt/alert in browser context
     },
   },
 

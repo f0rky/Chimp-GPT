@@ -74,6 +74,7 @@ if (require.main === module) {
 const express = require('express');
 const path = require('path');
 const { createLogger } = require('../core/logger');
+const { getSafeErrorDetails } = require('../core/errors');
 const logger = createLogger('status');
 const os = require('os');
 const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
@@ -642,6 +643,16 @@ function initStatusServer(options = {}) {
     // Redirect old dashboard paths to unified dashboard
     app.get('/dashboard', (req, res) => {
       res.redirect('/#performance');
+    });
+
+    // Redirect deleted messages standalone page to unified dashboard
+    app.get('/deleted-messages', (req, res) => {
+      res.redirect('/#deleted-messages');
+    });
+
+    // Also handle the components path if accessed directly
+    app.get('/components/deletedMessages.html', (req, res) => {
+      res.redirect('/#deleted-messages');
     });
 
     app.get('/dashboard/', (req, res) => {
@@ -1827,7 +1838,13 @@ function initStatusServer(options = {}) {
         });
       } catch (error) {
         logger.error({ error }, 'Error updating deleted message status');
-        return res.status(500).json({ error: error.message || 'Failed to update message status' });
+
+        const errorDetails = getSafeErrorDetails(error);
+        return res.status(errorDetails.statusCode || 500).json({
+          error: errorDetails.message,
+          timestamp: errorDetails.timestamp,
+          ...(errorDetails.context && { context: errorDetails.context }),
+        });
       }
     });
 

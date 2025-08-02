@@ -10,6 +10,7 @@
  */
 
 const { createLogger } = require('../core/logger');
+const { ValidationError } = require('../core/errors');
 const logger = createLogger('inputValidator');
 
 /**
@@ -199,9 +200,163 @@ function sanitizeDiscordMessage(content) {
   );
 }
 
+/**
+ * Validate message status for deleted messages
+ * @param {string} status - Status to validate
+ * @param {string} messageId - Message ID for context
+ * @returns {string} Validated status
+ * @throws {ValidationError} If status is invalid
+ */
+function validateMessageStatus(status, messageId) {
+  const validStatuses = ['pending_review', 'approved', 'flagged', 'ignored', 'banned'];
+
+  if (!status || typeof status !== 'string') {
+    throw new ValidationError('Status is required and must be a string', {
+      safe: true,
+      providedStatus: status,
+      validStatuses,
+      messageId,
+    });
+  }
+
+  const normalizedStatus = status.trim().toLowerCase();
+
+  if (!validStatuses.includes(normalizedStatus)) {
+    throw new ValidationError(
+      `Invalid status '${status}'. Must be one of: ${validStatuses.join(', ')}`,
+      {
+        safe: true,
+        providedStatus: status,
+        validStatuses,
+        messageId,
+      }
+    );
+  }
+
+  return normalizedStatus;
+}
+
+/**
+ * Validate and sanitize review notes
+ * @param {string} notes - Notes to validate
+ * @param {Object} options - Validation options
+ * @returns {string} Sanitized notes
+ */
+function validateReviewNotes(notes, options = {}) {
+  const { maxLength = 500, required = false, allowEmpty = true } = options;
+
+  if (!notes) {
+    if (required) {
+      throw new ValidationError('Notes are required for this status', {
+        safe: true,
+        maxLength,
+        required,
+      });
+    }
+    return '';
+  }
+
+  if (typeof notes !== 'string') {
+    throw new ValidationError('Notes must be a string', {
+      safe: true,
+      providedType: typeof notes,
+      maxLength,
+    });
+  }
+
+  const trimmedNotes = notes.trim();
+
+  if (!allowEmpty && trimmedNotes.length === 0) {
+    throw new ValidationError('Notes cannot be empty', {
+      safe: true,
+      maxLength,
+    });
+  }
+
+  if (trimmedNotes.length > maxLength) {
+    throw new ValidationError(`Notes must be ${maxLength} characters or less`, {
+      safe: true,
+      providedLength: trimmedNotes.length,
+      maxLength,
+    });
+  }
+
+  // Use existing sanitization function
+  return sanitizeOutput(trimmedNotes);
+}
+
+/**
+ * Validate Discord message/user ID format
+ * @param {string} id - ID to validate
+ * @param {string} type - Type for error messages ('message' or 'user')
+ * @returns {string} Validated ID
+ */
+function validateDiscordId(id, type = 'ID') {
+  if (!id || typeof id !== 'string') {
+    throw new ValidationError(`${type} is required and must be a string`, {
+      safe: true,
+      providedId: id,
+      type,
+    });
+  }
+
+  const trimmedId = id.trim();
+
+  if (trimmedId.length === 0) {
+    throw new ValidationError(`${type} cannot be empty`, {
+      safe: true,
+      type,
+    });
+  }
+
+  // Discord snowflakes are typically 17-19 digits
+  if (!/^[0-9]{10,20}$/.test(trimmedId)) {
+    throw new ValidationError(`Invalid ${type.toLowerCase()} format`, {
+      safe: true,
+      providedId: id,
+      type,
+      expectedFormat: 'numeric string 10-20 digits',
+    });
+  }
+
+  return trimmedId;
+}
+
+/**
+ * Comprehensive validation for deleted message status update
+ * @param {Object} data - Data to validate
+ * @returns {Object} Validated data
+ */
+function validateStatusUpdateData(data) {
+  const { messageId, status, notes, userId } = data;
+
+  const validatedData = {
+    messageId: validateDiscordId(messageId, 'Message ID'),
+    status: validateMessageStatus(status, messageId),
+    userId: validateDiscordId(userId, 'User ID'),
+    notes: validateReviewNotes(notes, {
+      required: status === 'flagged', // Require notes for flagged messages
+      maxLength: 500,
+    }),
+  };
+
+  logger.debug('Status update data validated successfully', {
+    messageId: validatedData.messageId,
+    status: validatedData.status,
+    userId: validatedData.userId,
+    notesLength: validatedData.notes.length,
+  });
+
+  return validatedData;
+}
+
 module.exports = {
   validateServerInput,
   validateEloMode,
   sanitizeOutput,
   sanitizeDiscordMessage,
+  validateMessageStatus,
+  validateReviewNotes,
+  validateDiscordId,
+  validateStatusUpdateData,
 };

@@ -23,7 +23,7 @@ const state = {
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('Unified dashboard initializing...');
+  logDebug('Unified dashboard initializing...', 'info');
   logDebug('Dashboard starting up', 'info');
 
   initializeTheme();
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   updateClock();
 
-  console.log('Unified dashboard initialized');
+  logDebug('Unified dashboard initialized', 'info');
   logDebug('Dashboard fully loaded', 'info');
 });
 
@@ -98,6 +98,9 @@ function loadTabData(tab) {
       break;
     case 'settings':
       fetchSettings();
+      break;
+    case 'deleted-messages':
+      fetchDeletedMessages();
       break;
     default:
       break;
@@ -175,11 +178,11 @@ function executeDebugCommand(command) {
 
 // Chart Initialization
 function initializeCharts() {
-  console.log('Initializing charts...');
+  logDebug('Initializing charts...', 'info');
 
   // Status page metrics chart
   const metricsCanvas = document.getElementById('metrics-chart');
-  console.log('Metrics canvas found:', metricsCanvas);
+  logDebug('Metrics canvas found: ' + (metricsCanvas ? 'yes' : 'no'), 'info');
 
   if (metricsCanvas) {
     const metricsCtx = metricsCanvas.getContext('2d');
@@ -232,7 +235,7 @@ function initializeCharts() {
 
   // Performance dashboard latency chart
   const latencyCanvas = document.getElementById('latencyChart');
-  console.log('Latency canvas found:', latencyCanvas);
+  logDebug('Latency canvas found: ' + (latencyCanvas ? 'yes' : 'no'), 'info');
 
   if (latencyCanvas) {
     const latencyCtx = latencyCanvas.getContext('2d');
@@ -286,7 +289,7 @@ function initializeCharts() {
     });
   }
 
-  console.log('Charts initialized:', state.charts);
+  logDebug('Charts initialized: ' + Object.keys(state.charts).length + ' charts', 'info');
 }
 
 // Data Fetching
@@ -315,12 +318,12 @@ async function fetchHealthData() {
     const response = await fetch('/health');
     const data = await response.json();
 
-    console.log('Health data received:', data);
+    logDebug('Health data received from API', 'info');
     updateStatusDisplay(data);
     updateConversationMode(data.conversationMode);
     logDebug('Health data updated', 'info');
   } catch (error) {
-    console.error('Error fetching health data:', error);
+    logDebug('Error fetching health data: ' + error.message, 'error');
     logDebug(`Error fetching health data: ${error.message}`, 'error');
   }
 }
@@ -330,12 +333,12 @@ async function fetchPerformanceData() {
     const response = await fetch('/performance');
     const data = await response.json();
 
-    console.log('Performance data received:', data);
+    logDebug('Performance data received from API', 'info');
     updatePerformanceDisplay(data);
     updateCharts(data);
     logDebug('Performance data updated', 'info');
   } catch (error) {
-    console.error('Error fetching performance data:', error);
+    logDebug('Error fetching performance data: ' + error.message, 'error');
     logDebug(`Error fetching performance data: ${error.message}`, 'error');
   }
 }
@@ -345,13 +348,15 @@ async function fetchPerformanceDataForStatus() {
     const response = await fetch('/performance');
     const data = await response.json();
 
-    console.log('Performance data for status tab:', data);
-    console.log('Performance summary:', data.summary);
-    console.log('Available keys in summary:', Object.keys(data.summary || {}));
+    logDebug('Performance data for status tab received', 'info');
+    logDebug('Performance summary available: ' + (data.summary ? 'yes' : 'no'), 'info');
+    if (data.summary) {
+      logDebug('Summary keys: ' + Object.keys(data.summary).join(', '), 'info');
+    }
     updateStatusResponseTime(data);
     logDebug('Status response time updated', 'info');
   } catch (error) {
-    console.error('Error fetching performance data for status:', error);
+    logDebug('Error fetching performance data for status: ' + error.message, 'error');
     logDebug(`Error fetching performance data for status: ${error.message}`, 'error');
   }
 }
@@ -361,11 +366,11 @@ async function fetchFunctionResults() {
     const response = await fetch('/function-results/summary');
     const data = await response.json();
 
-    console.log('Function results summary:', data);
+    logDebug('Function results summary received', 'info');
     updateFunctionSummary(data);
     logDebug('Function results updated', 'info');
   } catch (error) {
-    console.error('Error fetching function results:', error);
+    logDebug('Error fetching function results: ' + error.message, 'error');
     logDebug(`Error fetching function results: ${error.message}`, 'error');
   }
 }
@@ -396,7 +401,7 @@ async function fetchSettings() {
 
 // Display Updates
 function updateStatusDisplay(data) {
-  console.log('Updating status display with data:', data);
+  logDebug('Updating status display with new data', 'info');
 
   // Update header
   const headerEl = document.getElementById('bot-name-header');
@@ -404,7 +409,7 @@ function updateStatusDisplay(data) {
     headerEl.textContent = data.name || 'Bot Status';
     document.title = `${data.name || 'Bot'} Status`;
   } else {
-    console.warn('bot-name-header element not found');
+    logDebug('bot-name-header element not found', 'warn');
   }
 
   // Update status indicator
@@ -420,7 +425,7 @@ function updateStatusDisplay(data) {
       statusText.textContent = 'Offline';
     }
   } else {
-    console.warn('Status indicator elements not found');
+    logDebug('Status indicator elements not found', 'warn');
   }
 
   // Update stats with null checks
@@ -437,7 +442,7 @@ function updateStatusDisplay(data) {
     if (el) {
       el.textContent = values[index];
     } else {
-      console.warn(`Element ${id} not found`);
+      logDebug(`Element ${id} not found`, 'warn');
     }
   });
 
@@ -491,7 +496,7 @@ function updateStatusDisplay(data) {
 
 function updateStatusResponseTime(data) {
   if (!data.summary) {
-    console.warn('No summary in performance data');
+    logDebug('No summary in performance data', 'warn');
     return;
   }
 
@@ -536,7 +541,7 @@ function updateConversationMode(modeData) {
 function updateApiStats(apiCalls) {
   const container = document.getElementById('api-stats');
   if (!container) {
-    console.warn('api-stats container not found');
+    logDebug('api-stats container not found', 'warn');
     return;
   }
   container.innerHTML = '';
@@ -610,7 +615,7 @@ function updateRateLimits(rateLimits) {
 
 function updatePerformanceDisplay(data) {
   if (!data.summary) {
-    console.warn('No performance summary data');
+    logDebug('No performance summary data available', 'warn');
     return;
   }
 
@@ -685,7 +690,7 @@ function updateMemoryGauge(memory) {
 
 function updateMetricsChart(data) {
   if (!state.charts.metrics) {
-    console.warn('Metrics chart not initialized');
+    logDebug('Metrics chart not initialized', 'warn');
     return;
   }
 
@@ -718,7 +723,7 @@ function updateMetricsChart(data) {
     state.charts.metrics.data.datasets[1].data = state.performanceData.cpuUsage;
     state.charts.metrics.update('none');
   } catch (error) {
-    console.error('Error updating metrics chart:', error);
+    logDebug('Error updating metrics chart: ' + error.message, 'error');
   }
 }
 
@@ -887,16 +892,15 @@ async function runTests() {
   logDebug('Running tests...', 'info');
   try {
     const response = await fetch('/run-tests');
-    const results = await response.json();
+    const _results = await response.json();
     logDebug('Tests completed successfully', 'info');
-    console.log('Test results:', results);
+    logDebug('Test results received from API', 'info');
   } catch (error) {
     logDebug(`Test execution failed: ${error.message}`, 'error');
   }
 }
 
 async function resetStats() {
-  // eslint-disable-next-line no-alert
   if (!confirm('Are you sure you want to reset all statistics?')) return;
 
   try {
@@ -915,7 +919,6 @@ async function resetStats() {
 }
 
 async function unblockUser(userId) {
-  // eslint-disable-next-line no-alert
   const token = prompt('Enter owner token:');
   if (!token) return;
 
@@ -1011,7 +1014,7 @@ async function loadFunctionDetails(func) {
     const data = await response.json();
 
     // Display the results for this function
-    console.log(`Details for ${func}:`, data[func]);
+    logDebug(`Details for ${func} received`, 'info');
     logDebug(`Loaded details for ${func}`, 'info');
 
     // If it's images, update the gallery
@@ -1116,8 +1119,885 @@ function openImageModal(url, prompt) {
   };
 }
 
+//
+// ==================== DELETED MESSAGES FUNCTIONALITY ====================
+//
+
+// Global variables for deleted messages
+let currentDeletedMessages = [];
+let currentDeletedUser = null;
+
+// Initialize deleted messages when tab loads
+async function fetchDeletedMessages() {
+  try {
+    // Set default date range to last 7 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+
+    const startDateInput = document.getElementById('deleted-start-date');
+    const endDateInput = document.getElementById('deleted-end-date');
+
+    if (startDateInput && !startDateInput.value) {
+      startDateInput.value = formatDateForInput(startDate);
+    }
+    if (endDateInput && !endDateInput.value) {
+      endDateInput.value = formatDateForInput(endDate);
+    }
+
+    await checkDeletedMessagesAuthentication();
+    await loadDeletedMessages();
+  } catch (error) {
+    logDebug(`Error initializing deleted messages: ${error.message}`, 'error');
+    showDeletedError('Failed to initialize deleted messages: ' + error.message);
+  }
+}
+
+function formatDateForInput(date) {
+  return date.toISOString().slice(0, 16);
+}
+
+async function checkDeletedMessagesAuthentication() {
+  try {
+    const response = await fetch('/api/deleted-messages/auth');
+    if (!response.ok) {
+      showDeletedError('Access denied: Owner privileges required');
+      return;
+    }
+    const data = await response.json();
+    currentDeletedUser = data.userId;
+    logDebug('Deleted messages authentication successful', 'info');
+  } catch (error) {
+    showDeletedError('Authentication failed: ' + error.message);
+    logDebug(`Deleted messages auth error: ${error.message}`, 'error');
+  }
+}
+
+async function loadDeletedMessages() {
+  showDeletedLoading(true);
+  clearDeletedMessages();
+
+  try {
+    const filters = getDeletedMessagesFilters();
+    const queryString = new URLSearchParams(filters).toString();
+    const response = await fetch(`/api/deleted-messages?${queryString}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    currentDeletedMessages = data.messages || [];
+    displayDeletedMessages(currentDeletedMessages);
+    updateDeletedStats(data.stats || {});
+
+    logDebug(`Loaded ${currentDeletedMessages.length} deleted messages`, 'info');
+  } catch (error) {
+    showDeletedError('Failed to load messages: ' + error.message);
+    logDebug(`Error loading deleted messages: ${error.message}`, 'error');
+  } finally {
+    showDeletedLoading(false);
+  }
+}
+
+function getDeletedMessagesFilters() {
+  const filters = {};
+
+  const statusFilter = document.getElementById('deleted-status-filter');
+  const userFilter = document.getElementById('deleted-user-filter');
+  const channelFilter = document.getElementById('deleted-channel-filter');
+  const startDateFilter = document.getElementById('deleted-start-date');
+  const endDateFilter = document.getElementById('deleted-end-date');
+  const rapidOnlyFilter = document.getElementById('deleted-rapid-only');
+
+  if (statusFilter && statusFilter.value) filters.status = statusFilter.value;
+  if (userFilter && userFilter.value.trim()) filters.userId = userFilter.value.trim();
+  if (channelFilter && channelFilter.value.trim()) filters.channelId = channelFilter.value.trim();
+  if (startDateFilter && startDateFilter.value)
+    filters.startDate = new Date(startDateFilter.value).getTime();
+  if (endDateFilter && endDateFilter.value)
+    filters.endDate = new Date(endDateFilter.value).getTime();
+  if (rapidOnlyFilter && rapidOnlyFilter.checked) filters.isRapidDeletion = true;
+
+  return filters;
+}
+
+function applyDeletedMessagesFilters() {
+  loadDeletedMessages();
+}
+
+function displayDeletedMessages(messages) {
+  const container = document.getElementById('deleted-messages-list');
+
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-content">
+          <i class="fas fa-search" style="font-size: 2em; color: var(--text-muted); margin-bottom: 10px;"></i>
+          <p class="empty-state-text">No messages match your current filters</p>
+          <p class="empty-state-hint">Try adjusting your search criteria or clearing filters</p>
+          <button class="btn btn-secondary btn-sm" onclick="clearDeletedFilters()">
+            <i class="fas fa-times"></i> Clear Filters
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = messages
+    .map(message => {
+      const importance = getMessageImportance(message);
+      return `
+        <div class="message-item message-importance-${importance.level}" data-message-id="${message.messageId}">
+          <div class="message-header">
+            <div class="message-select-container">
+              <input type="checkbox" class="message-select" data-message-id="${message.messageId}" 
+                     onchange="toggleMessageSelection('${message.messageId}')">
+            </div>
+            <div class="user-info">
+              <span class="username">${escapeHtml(message.username)}</span>
+              ${message.isOwner ? '<span class="owner-badge">OWNER</span>' : ''}
+              ${message.isRapidDeletion ? '<span class="rapid-badge">RAPID</span>' : ''}
+              <span class="status-badge status-${message.status}">${message.status.replace('_', ' ').toUpperCase()}</span>
+              ${importance.indicators
+                .map(
+                  ind =>
+                    `<span class="importance-indicator ${ind.class}">
+                   <i class="${ind.icon}"></i> ${ind.text}
+                 </span>`
+                )
+                .join('')}
+            </div>
+            <div class="message-actions">
+              <button class="btn" onclick="reviewDeletedMessage('${message.messageId}')">Review</button>
+              <button class="btn btn-success" onclick="updateDeletedMessageStatus('${message.messageId}', 'approved')">Approve</button>
+              <button class="btn btn-danger" onclick="updateDeletedMessageStatus('${message.messageId}', 'flagged')">Flag</button>
+              <button class="btn btn-warning" onclick="updateDeletedMessageStatus('${message.messageId}', 'ignored')">Ignore</button>
+            </div>
+          </div>
+          
+          <div class="message-content">
+            ${escapeHtml(message.content || 'No content available')}
+          </div>
+          
+          <div class="message-meta">
+            <div><strong>Channel:</strong> ${escapeHtml(message.channelName)}</div>
+            <div><strong>Deleted:</strong> ${new Date(message.timestamp).toLocaleString()}</div>
+            <div><strong>Time to Delete:</strong> ${formatDuration(message.timeSinceCreation)}</div>
+            <div><strong>Total Deletions:</strong> ${message.deletionCount}</div>
+            <div><strong>User ID:</strong> ${message.userId}</div>
+            <div><strong>Message ID:</strong> ${message.messageId}</div>
+          </div>
+
+          ${
+            message.notes
+              ? `
+              <div class="notes-section">
+                <strong>Notes:</strong>
+                <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-top: 5px; color: var(--text-primary);">
+                  ${escapeHtml(message.notes)}
+                </div>
+              </div>
+            `
+              : ''
+          }
+        </div>
+      `;
+    })
+    .join('');
+}
+
+function updateDeletedStats(stats) {
+  // Basic stats
+  const totalElement = document.getElementById('deleted-total-messages');
+  const pendingElement = document.getElementById('deleted-pending-messages');
+  const rapidElement = document.getElementById('deleted-rapid-deletions');
+  const flaggedElement = document.getElementById('deleted-flagged-messages');
+
+  if (totalElement) totalElement.textContent = stats.total || 0;
+  if (pendingElement) pendingElement.textContent = stats.pending || 0;
+  if (rapidElement) rapidElement.textContent = stats.rapid || 0;
+  if (flaggedElement) flaggedElement.textContent = stats.flagged || 0;
+
+  // Enhanced stats and analytics
+  updateDetailedStats(stats);
+
+  // Build analytics from current message data
+  const userAnalytics = buildUserAnalytics(currentDeletedMessages);
+  const channelAnalytics = buildChannelAnalytics(currentDeletedMessages);
+
+  updateUserLeaderboard(userAnalytics);
+  updateChannelAnalytics(channelAnalytics);
+}
+
+function updateDetailedStats(_stats) {
+  // Calculate additional metrics from current messages
+  if (!currentDeletedMessages || currentDeletedMessages.length === 0) return;
+
+  const now = Date.now();
+  const hourAgo = now - 60 * 60 * 1000;
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+
+  const recentMessages = currentDeletedMessages.filter(m => m.timestamp > hourAgo);
+  const todayMessages = currentDeletedMessages.filter(m => m.timestamp > dayAgo);
+
+  const avgTimeToDelete =
+    currentDeletedMessages.reduce((sum, m) => sum + (m.timeSinceCreation || 0), 0) /
+    currentDeletedMessages.length;
+
+  // Update additional stat elements if they exist
+  const updateStatElement = (id, value, formatter = null) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = formatter ? formatter(value) : value;
+    }
+  };
+
+  updateStatElement('deleted-recent-count', recentMessages.length);
+  updateStatElement('deleted-today-count', todayMessages.length);
+  updateStatElement('deleted-avg-time', avgTimeToDelete, formatDuration);
+  updateStatElement(
+    'deleted-high-priority',
+    currentDeletedMessages.filter(m => getMessageImportance(m).level === 'high').length
+  );
+}
+
+function updateUserLeaderboard(topUsers) {
+  const leaderboardContainer = document.getElementById('user-leaderboard');
+  if (!leaderboardContainer) return;
+
+  if (!topUsers || topUsers.length === 0) {
+    leaderboardContainer.innerHTML =
+      '<p class="text-muted text-center">No user activity data available</p>';
+    return;
+  }
+
+  leaderboardContainer.innerHTML = `
+    <div class="leaderboard-header">
+      <h4><i class="fas fa-trophy"></i> User Leaderboard</h4>
+      <small class="text-muted">${topUsers.length} active users</small>
+    </div>
+    <div class="leaderboard-list">
+      ${topUsers
+        .slice(0, 10)
+        .map(
+          (user, index) => `
+        <div class="leaderboard-item ${index < 3 ? 'leaderboard-top' : ''}">
+          <div class="leaderboard-rank">${index + 1}</div>
+          <div class="leaderboard-user">
+            <span class="leaderboard-username">
+              ${escapeHtml(user.username || 'Unknown User')}
+              ${user.isOwner ? '<span class="owner-badge">OWNER</span>' : ''}
+            </span>
+            <span class="leaderboard-userid">${user.userId}</span>
+          </div>
+          <div class="leaderboard-stats">
+            <div style="display: flex; flex-direction: column; align-items: flex-end;">
+              <div>
+                <span class="leaderboard-count">${user.deletionCount}</span>
+                <span class="leaderboard-label">deletions</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                ${user.channelCount || 0} channels • ${formatDuration(user.averageTimeToDelete || 0)} avg
+              </div>
+            </div>
+            ${user.rapidCount > 0 ? `<span class="leaderboard-rapid">${user.rapidCount} rapid</span>` : ''}
+            ${user.flaggedCount > 0 ? `<span class="leaderboard-rapid" style="background: #dc3545;">${user.flaggedCount} flagged</span>` : ''}
+          </div>
+          <div class="leaderboard-actions">
+            <button class="btn btn-sm" onclick="filterByUser('${user.userId}')" title="Filter messages by this user">
+              <i class="fas fa-filter"></i>
+            </button>
+          </div>
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function updateChannelAnalytics(channelStats) {
+  const channelContainer = document.getElementById('channel-analytics');
+  if (!channelContainer) return;
+
+  const channels = Object.entries(channelStats).sort((a, b) => b[1].count - a[1].count);
+
+  if (channels.length === 0) {
+    channelContainer.innerHTML = '<p class="text-muted text-center">No channel data available</p>';
+    return;
+  }
+
+  channelContainer.innerHTML = `
+    <div class="analytics-header">
+      <h4><i class="fas fa-chart-bar"></i> Channel Analytics</h4>
+      <small class="text-muted">${channels.length} channels with activity</small>
+    </div>
+    <div class="analytics-list">
+      ${channels
+        .slice(0, 8)
+        .map(
+          ([channelId, data]) => `
+        <div class="analytics-item">
+          <div class="analytics-channel">
+            <span class="analytics-name">${escapeHtml(data.name || 'Unknown Channel')}</span>
+            <span class="analytics-id">${channelId}</span>
+          </div>
+          <div class="analytics-stats">
+            <div style="display: flex; flex-direction: column; align-items: flex-end;">
+              <div>
+                <span class="analytics-count">${data.count}</span>
+                <span class="analytics-label">deletions</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                ${data.uniqueUserCount || 0} users • ${formatDuration(data.averageTimeToDelete || 0)} avg
+              </div>
+            </div>
+            ${data.rapidCount > 0 ? `<span class="analytics-rapid">${data.rapidCount} rapid</span>` : ''}
+            ${data.flaggedCount > 0 ? `<span class="analytics-rapid" style="background: #dc3545;">${data.flaggedCount} flagged</span>` : ''}
+          </div>
+          <div class="analytics-actions">
+            <button class="btn btn-sm" onclick="filterByChannel('${channelId}')" title="Filter messages from this channel">
+              <i class="fas fa-filter"></i>
+            </button>
+          </div>
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+// Analytics builder functions
+function buildUserAnalytics(messages) {
+  if (!messages || messages.length === 0) return [];
+
+  const userStats = {};
+
+  // Process each message to build user statistics
+  messages.forEach(message => {
+    const userId = message.userId;
+    if (!userId) return;
+
+    if (!userStats[userId]) {
+      userStats[userId] = {
+        userId: userId,
+        username: message.username || 'Unknown User',
+        deletionCount: 0,
+        rapidCount: 0,
+        flaggedCount: 0,
+        isOwner: message.isOwner || false,
+        lastActivity: 0,
+        averageTimeToDelete: 0,
+        totalTimeToDelete: 0,
+        channels: new Set(),
+      };
+    }
+
+    const user = userStats[userId];
+    user.deletionCount++;
+    user.totalTimeToDelete += message.timeSinceCreation || 0;
+    user.channels.add(message.channelId);
+
+    if (message.isRapidDeletion) {
+      user.rapidCount++;
+    }
+
+    if (message.status === 'flagged') {
+      user.flaggedCount++;
+    }
+
+    if (message.timestamp > user.lastActivity) {
+      user.lastActivity = message.timestamp;
+    }
+  });
+
+  // Convert to array and calculate averages
+  const userArray = Object.values(userStats).map(user => {
+    user.averageTimeToDelete =
+      user.deletionCount > 0 ? user.totalTimeToDelete / user.deletionCount : 0;
+    user.channelCount = user.channels.size;
+    delete user.channels; // Clean up Set object for JSON
+    delete user.totalTimeToDelete; // Clean up internal counter
+    return user;
+  });
+
+  // Sort by activity score (more recent activity and higher deletion count get higher scores)
+  return userArray
+    .sort((a, b) => {
+      // Primary sort: deletion count (descending)
+      const deletionDiff = b.deletionCount - a.deletionCount;
+      if (deletionDiff !== 0) return deletionDiff;
+
+      // Secondary sort: recent activity (more recent first)
+      return b.lastActivity - a.lastActivity;
+    })
+    .slice(0, 10); // Top 10 users
+}
+
+function buildChannelAnalytics(messages) {
+  if (!messages || messages.length === 0) return {};
+
+  const channelStats = {};
+
+  // Process each message to build channel statistics
+  messages.forEach(message => {
+    const channelId = message.channelId;
+    if (!channelId) return;
+
+    if (!channelStats[channelId]) {
+      channelStats[channelId] = {
+        name: message.channelName || 'Unknown Channel',
+        count: 0,
+        rapidCount: 0,
+        flaggedCount: 0,
+        uniqueUsers: new Set(),
+        lastActivity: 0,
+        averageTimeToDelete: 0,
+        totalTimeToDelete: 0,
+      };
+    }
+
+    const channel = channelStats[channelId];
+    channel.count++;
+    channel.totalTimeToDelete += message.timeSinceCreation || 0;
+    channel.uniqueUsers.add(message.userId);
+
+    if (message.isRapidDeletion) {
+      channel.rapidCount++;
+    }
+
+    if (message.status === 'flagged') {
+      channel.flaggedCount++;
+    }
+
+    if (message.timestamp > channel.lastActivity) {
+      channel.lastActivity = message.timestamp;
+    }
+  });
+
+  // Calculate averages and clean up
+  Object.keys(channelStats).forEach(channelId => {
+    const channel = channelStats[channelId];
+    channel.averageTimeToDelete = channel.count > 0 ? channel.totalTimeToDelete / channel.count : 0;
+    channel.uniqueUserCount = channel.uniqueUsers.size;
+    delete channel.uniqueUsers; // Clean up Set object for JSON
+    delete channel.totalTimeToDelete; // Clean up internal counter
+  });
+
+  return channelStats;
+}
+
+// Filter helper functions (intentionally unused for future feature)
+function _filterByUser(userId) {
+  const userFilter = document.getElementById('deleted-user-filter');
+  if (userFilter) {
+    userFilter.value = userId;
+    applyDeletedMessagesFilters();
+  }
+}
+
+function _filterByChannel(channelId) {
+  const channelFilter = document.getElementById('deleted-channel-filter');
+  if (channelFilter) {
+    channelFilter.value = channelId;
+    applyDeletedMessagesFilters();
+  }
+}
+
+async function updateDeletedMessageStatus(messageId, status) {
+  try {
+    // Validate inputs
+    if (!currentDeletedUser) {
+      throw new Error('User not authenticated. Please refresh the page.');
+    }
+    if (!messageId) {
+      throw new Error('Invalid message ID');
+    }
+
+    // Get notes for status update
+    const notes = window.prompt(`Enter notes for ${status} status (optional):`);
+    if (notes === null) return; // User cancelled
+
+    logDebug(`Updating message ${messageId} to ${status} by user ${currentDeletedUser}`, 'info');
+
+    const response = await fetch('/api/deleted-messages/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': currentDeletedUser,
+      },
+      body: JSON.stringify({
+        messageId,
+        status,
+        notes,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    showDeletedSuccess(`Message ${status} successfully`);
+    loadDeletedMessages(); // Refresh the list
+    logDebug(`Updated message ${messageId} status to ${status}`, 'info');
+  } catch (error) {
+    showDeletedError('Failed to update status: ' + error.message);
+    logDebug(`Error updating message status: ${error.message}`, 'error');
+  }
+}
+
+function reviewDeletedMessage(messageId) {
+  const message = currentDeletedMessages.find(m => m.messageId === messageId);
+  if (!message) return;
+
+  const modalContent = document.getElementById('deleted-modal-content');
+  modalContent.innerHTML = `
+    <h3>Message Details</h3>
+    <div class="message-meta" style="margin: 15px 0;">
+      <div><strong>User:</strong> ${escapeHtml(message.username)} (${message.userId})</div>
+      <div><strong>Channel:</strong> ${escapeHtml(message.channelName)} (${message.channelId})</div>
+      <div><strong>Deleted:</strong> ${new Date(message.timestamp).toLocaleString()}</div>
+      <div><strong>Created:</strong> ${new Date(message.messageCreatedAt).toLocaleString()}</div>
+      <div><strong>Time to Delete:</strong> ${formatDuration(message.timeSinceCreation)}</div>
+      <div><strong>Total User Deletions:</strong> ${message.deletionCount}</div>
+      <div><strong>Status:</strong> ${message.status.replace('_', ' ').toUpperCase()}</div>
+      <div><strong>Is Owner:</strong> ${message.isOwner ? 'Yes' : 'No'}</div>
+      <div><strong>Rapid Deletion:</strong> ${message.isRapidDeletion ? 'Yes' : 'No'}</div>
+    </div>
+    
+    <h4>Full Message Content:</h4>
+    <div class="message-content" style="max-height: 200px;">
+      ${escapeHtml(message.fullContent || 'No content available')}
+    </div>
+    
+    ${
+      message.attachments && message.attachments.length > 0
+        ? `
+        <h4>Attachments (${message.attachments.length}):</h4>
+        <ul>
+          ${message.attachments
+            .map(
+              att => `
+              <li>${escapeHtml(att.name)} (${att.size} bytes, ${att.contentType})</li>
+            `
+            )
+            .join('')}
+        </ul>
+      `
+        : ''
+    }
+    
+    <div class="notes-section">
+      <label for="deleted-review-notes"><strong>Review Notes:</strong></label>
+      <textarea id="deleted-review-notes" placeholder="Add notes about this deletion..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; resize: vertical; min-height: 60px; background: var(--bg-secondary); color: var(--text-primary);">${escapeHtml(message.notes || '')}</textarea>
+    </div>
+    
+    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="btn btn-success" onclick="updateDeletedMessageStatusFromModal('${messageId}', 'approved')">Approve</button>
+      <button class="btn btn-danger" onclick="updateDeletedMessageStatusFromModal('${messageId}', 'flagged')">Flag</button>
+      <button class="btn btn-warning" onclick="updateDeletedMessageStatusFromModal('${messageId}', 'ignored')">Ignore</button>
+      <button class="btn" onclick="closeDeletedReviewModal()">Close</button>
+    </div>
+  `;
+
+  document.getElementById('deleted-review-modal').style.display = 'block';
+}
+
+async function updateDeletedMessageStatusFromModal(messageId, status) {
+  const notesTextarea = document.getElementById('deleted-review-notes');
+  const notes = notesTextarea ? notesTextarea.value : '';
+
+  try {
+    // Validate inputs
+    if (!currentDeletedUser) {
+      throw new Error('User not authenticated. Please refresh the page.');
+    }
+    if (!messageId) {
+      throw new Error('Invalid message ID');
+    }
+
+    logDebug(
+      `Updating message ${messageId} to ${status} from modal by user ${currentDeletedUser}`,
+      'info'
+    );
+
+    const response = await fetch('/api/deleted-messages/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': currentDeletedUser,
+      },
+      body: JSON.stringify({
+        messageId,
+        status,
+        notes,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    showDeletedSuccess(`Message ${status} successfully`);
+    closeDeletedReviewModal();
+    loadDeletedMessages(); // Refresh the list
+    logDebug(`Updated message ${messageId} status to ${status} from modal`, 'info');
+  } catch (error) {
+    showDeletedError('Failed to update status: ' + error.message);
+    logDebug(`Error updating message status from modal: ${error.message}`, 'error');
+  }
+}
+
+function closeDeletedReviewModal() {
+  document.getElementById('deleted-review-modal').style.display = 'none';
+}
+
+// Clear all deleted message filters
+function clearDeletedFilters() {
+  const statusFilter = document.getElementById('deleted-status-filter');
+  const userFilter = document.getElementById('deleted-user-filter');
+  const channelFilter = document.getElementById('deleted-channel-filter');
+  const startDateFilter = document.getElementById('deleted-start-date');
+  const endDateFilter = document.getElementById('deleted-end-date');
+  const rapidOnlyFilter = document.getElementById('deleted-rapid-only');
+
+  if (statusFilter) statusFilter.value = '';
+  if (userFilter) userFilter.value = '';
+  if (channelFilter) channelFilter.value = '';
+  if (startDateFilter) startDateFilter.value = '';
+  if (endDateFilter) endDateFilter.value = '';
+  if (rapidOnlyFilter) rapidOnlyFilter.checked = false;
+
+  logDebug('Filters cleared, reloading messages', 'info');
+  loadDeletedMessages();
+}
+
+// Global state for selected messages
+const selectedMessages = new Set();
+
+// Toggle message selection
+function toggleMessageSelection(messageId) {
+  if (selectedMessages.has(messageId)) {
+    selectedMessages.delete(messageId);
+  } else {
+    selectedMessages.add(messageId);
+  }
+
+  updateBulkActionsVisibility();
+  updateMessageSelectionUI(messageId);
+}
+
+// Select all visible messages
+function selectAllMessages() {
+  const checkboxes = document.querySelectorAll('.message-select');
+  const allSelected = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+
+  checkboxes.forEach(checkbox => {
+    const messageId = checkbox.dataset.messageId;
+    checkbox.checked = !allSelected;
+
+    if (!allSelected) {
+      selectedMessages.add(messageId);
+    } else {
+      selectedMessages.delete(messageId);
+    }
+  });
+
+  updateBulkActionsVisibility();
+}
+
+// Update bulk actions visibility
+function updateBulkActionsVisibility() {
+  const bulkActions = document.getElementById('bulk-actions');
+  const selectedCount = document.getElementById('selected-count');
+
+  if (bulkActions && selectedCount) {
+    bulkActions.style.display = selectedMessages.size > 0 ? 'block' : 'none';
+    selectedCount.textContent = selectedMessages.size;
+  }
+}
+
+// Update message selection UI
+function updateMessageSelectionUI(messageId) {
+  const checkbox = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (checkbox) {
+    checkbox.checked = selectedMessages.has(messageId);
+  }
+}
+
+// Bulk update status for selected messages
+async function bulkUpdateStatus(status) {
+  if (selectedMessages.size === 0) {
+    showDeletedError('No messages selected');
+    return;
+  }
+
+  // Get notes for bulk operation
+  const notes = window.prompt(`Enter notes for bulk ${status} operation (optional):`);
+  if (notes === null) return; // User cancelled
+
+  const progressDiv = document.getElementById('bulk-progress');
+  if (progressDiv) progressDiv.style.display = 'block';
+
+  let completed = 0;
+  const total = selectedMessages.size;
+  const errors = [];
+
+  for (const messageId of selectedMessages) {
+    try {
+      await updateDeletedMessageStatus(messageId, status, notes, false); // Don't reload for each
+      completed++;
+
+      // Update progress
+      const progressBar = document.getElementById('bulk-progress-bar');
+      if (progressBar) {
+        progressBar.style.width = `${(completed / total) * 100}%`;
+      }
+
+      const progressText = document.getElementById('bulk-progress-text');
+      if (progressText) {
+        progressText.textContent = `${completed}/${total} messages processed`;
+      }
+    } catch (error) {
+      errors.push(`${messageId}: ${error.message}`);
+    }
+  }
+
+  // Hide progress and show results
+  if (progressDiv) progressDiv.style.display = 'none';
+
+  if (errors.length > 0) {
+    showDeletedError(`Bulk operation completed with ${errors.length} errors: ${errors.join(', ')}`);
+  } else {
+    showDeletedSuccess(`Successfully ${status} ${completed} messages`);
+  }
+
+  // Clear selection and reload
+  selectedMessages.clear();
+  updateBulkActionsVisibility();
+  loadDeletedMessages();
+}
+
+// Get message importance score for display
+function getMessageImportance(message) {
+  let score = 0;
+  const indicators = [];
+
+  // High importance indicators
+  if (message.isRapidDeletion) {
+    score += 3;
+    indicators.push({ text: 'Rapid', class: 'importance-high', icon: 'fas fa-bolt' });
+  }
+
+  if (message.deletionCount >= 10) {
+    score += 2;
+    indicators.push({
+      text: 'Frequent',
+      class: 'importance-medium',
+      icon: 'fas fa-exclamation-triangle',
+    });
+  }
+
+  if (message.status === 'flagged') {
+    score += 2;
+    indicators.push({ text: 'Flagged', class: 'importance-high', icon: 'fas fa-flag' });
+  }
+
+  // Medium importance indicators
+  if (message.timeSinceCreation < 10000) {
+    // Less than 10 seconds
+    score += 1;
+    indicators.push({ text: 'Quick Delete', class: 'importance-medium', icon: 'fas fa-clock' });
+  }
+
+  if (message.deletionCount >= 5) {
+    score += 1;
+    indicators.push({ text: 'Multiple', class: 'importance-low', icon: 'fas fa-redo' });
+  }
+
+  // Content-based importance
+  const content = (message.content || '').toLowerCase();
+  if (content.includes('http') || content.includes('discord.gg')) {
+    score += 1;
+    indicators.push({ text: 'Links', class: 'importance-medium', icon: 'fas fa-link' });
+  }
+
+  return {
+    score,
+    level: score >= 4 ? 'high' : score >= 2 ? 'medium' : 'low',
+    indicators,
+  };
+}
+
+function showDeletedLoading(show) {
+  const loadingElement = document.getElementById('deleted-loading');
+  if (loadingElement) {
+    loadingElement.style.display = show ? 'block' : 'none';
+  }
+}
+
+function clearDeletedMessages() {
+  const listElement = document.getElementById('deleted-messages-list');
+  if (listElement) {
+    listElement.innerHTML = '';
+  }
+}
+
+function showDeletedError(message) {
+  const container = document.getElementById('deleted-error-container');
+  if (container) {
+    container.innerHTML = `<div class="error" style="background: #dc3545; color: white; padding: 15px; border-radius: 5px; margin-bottom: 20px;">${escapeHtml(message)}</div>`;
+    setTimeout(() => (container.innerHTML = ''), 5000);
+  }
+  logDebug(`Deleted messages error: ${message}`, 'error');
+}
+
+function showDeletedSuccess(message) {
+  const container = document.getElementById('deleted-success-container');
+  if (container) {
+    container.innerHTML = `<div class="success" style="background: #28a745; color: white; padding: 15px; border-radius: 5px; margin-bottom: 20px;">${escapeHtml(message)}</div>`;
+    setTimeout(() => (container.innerHTML = ''), 3000);
+  }
+  logDebug(`Deleted messages success: ${message}`, 'info');
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
+  return `${Math.round(ms / 3600000)}h`;
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function (event) {
+  const modal = document.getElementById('deleted-review-modal');
+  if (event.target === modal) {
+    closeDeletedReviewModal();
+  }
+});
+
 // Export for global access
 window.toggleTheme = toggleTheme;
 window.unblockUser = unblockUser;
 window.loadFunctionDetails = loadFunctionDetails;
 window.openImageModal = openImageModal;
+window.applyDeletedMessagesFilters = applyDeletedMessagesFilters;
+window.loadDeletedMessages = loadDeletedMessages;
+window.updateDeletedMessageStatus = updateDeletedMessageStatus;
+window.reviewDeletedMessage = reviewDeletedMessage;
+window.updateDeletedMessageStatusFromModal = updateDeletedMessageStatusFromModal;
+window.closeDeletedReviewModal = closeDeletedReviewModal;
+window.clearDeletedFilters = clearDeletedFilters;
+window.bulkUpdateStatus = bulkUpdateStatus;
+window.toggleMessageSelection = toggleMessageSelection;
+window.selectAllMessages = selectAllMessages;

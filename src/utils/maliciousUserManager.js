@@ -12,6 +12,8 @@ const path = require('path');
 const { createLogger } = require('../core/logger');
 const humanCircuitBreaker = require('./humanCircuitBreaker');
 const { contextExtractionService } = require('./contextExtractionService');
+const { AuthorizationError, NotFoundError } = require('../core/errors');
+const { validateStatusUpdateData } = require('./inputValidator');
 
 const logger = createLogger('maliciousUserManager');
 
@@ -703,27 +705,46 @@ async function updateDeletedMessageStatus(
   allowReprocessing = true,
   discordClient = null
 ) {
+  // Validate input data comprehensively
+  const validatedData = validateStatusUpdateData({
+    messageId,
+    status,
+    notes,
+    userId: requestingUserId,
+  });
+
   // Only allow owner access
-  if (!isOwner(requestingUserId)) {
+  if (!isOwner(validatedData.userId)) {
     logger.warn(
-      { requestingUserId, messageId },
+      { requestingUserId: validatedData.userId, messageId: validatedData.messageId },
       'Unauthorized attempt to update deleted message status'
     );
-    throw new Error('Access denied: Owner privileges required');
+    throw new AuthorizationError('Owner privileges required for message status updates', {
+      safe: true,
+      requestingUserId: validatedData.userId,
+      messageId: validatedData.messageId,
+      operation: 'updateDeletedMessageStatus',
+    });
   }
 
-  const message = deletedMessages.get(messageId);
+  const message = deletedMessages.get(validatedData.messageId);
   if (!message) {
-    throw new Error('Message not found');
-  }
-
-  const validStatuses = ['pending_review', 'approved', 'flagged', 'ignored', 'banned'];
-  if (!validStatuses.includes(status)) {
-    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    throw new NotFoundError('Deleted message not found', {
+      safe: true,
+      messageId: validatedData.messageId,
+      requestingUserId: validatedData.userId,
+      operation: 'updateDeletedMessageStatus',
+    });
   }
 
   // Store previous status in history
   const previousStatus = message.status;
+
+  // Initialize reviewHistory if it doesn't exist (for older messages)
+  if (!message.reviewHistory) {
+    message.reviewHistory = [];
+  }
+
   message.reviewHistory.push({
     previousStatus,
     newStatus: status,
