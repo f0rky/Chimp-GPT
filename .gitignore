@@ -88,8 +88,14 @@ debug-*.js
 test-*.js
 direct-*.js
 
-# Data directory
+# Data directory (exclude pfp specifically)
 data/
+!data/pfp/
+data/pfp/*.png
+data/pfp/*.jpg
+data/pfp/*.jpeg
+data/pfp/*.gif
+data/pfp/*.webp
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
