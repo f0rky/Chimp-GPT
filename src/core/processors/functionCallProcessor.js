@@ -33,6 +33,7 @@ const { handleQuakeStats } = require('../../handlers/quakeStatsHandler');
  * @param {Function} generateNaturalResponse - Function to generate natural responses
  * @param {Function} formatSubtext - Function to format response subtext
  * @param {Function} storeMessageRelationship - Function to store message relationships
+ * @param {Object} pfpManager - PFP manager instance for saving images
  * @returns {Promise<void>}
  */
 async function handleFunctionCall(
@@ -47,7 +48,8 @@ async function handleFunctionCall(
   statusManager,
   generateNaturalResponse,
   formatSubtext,
-  storeMessageRelationship
+  storeMessageRelationship,
+  pfpManager = null
 ) {
   // Start function call timer
   const functionCallTimerId = performanceMonitor.startTimer('function_call', {
@@ -337,7 +339,8 @@ async function handleFunctionCall(
           timings.apiCalls,
           formatSubtext,
           storeMessageRelationship,
-          statusManager
+          statusManager,
+          pfpManager
         );
         trackApiCall('gptimage');
         if (timings.apiCalls) timings.apiCalls.gptimage++;

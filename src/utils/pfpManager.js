@@ -21,7 +21,7 @@ try {
 class PFPManager {
   constructor(client, options = {}) {
     this.client = client;
-    this.pfpDir = options.pfpDir || path.join(__dirname, '../pfp');
+    this.pfpDir = options.pfpDir || path.join(__dirname, '../../data/pfp');
     this.maxImages = options.maxImages || 50;
     this.rotationInterval = options.rotationInterval || 30 * 60 * 1000; // 30 minutes by default
     this.minUpdateInterval = options.minUpdateInterval || 30 * 60 * 1000; // 30 minutes minimum between updates

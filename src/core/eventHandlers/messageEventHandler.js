@@ -424,7 +424,8 @@ class MessageEventHandler {
             () => {
               /* storeMessageRelationship placeholder */
             }, // storeMessageRelationship
-            this.statusManager
+            this.statusManager,
+            this.pfpManager
           );
           addTiming('after_image_generation');
 

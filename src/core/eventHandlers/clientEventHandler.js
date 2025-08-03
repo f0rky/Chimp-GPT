@@ -144,7 +144,7 @@ class ClientEventHandler {
 
     // Initialize PFP Manager FIRST to ensure it's available for other components
     const pfpManager = new PFPManager(this.client, {
-      pfpDir: path.join(__dirname, '../../../pfp'),
+      pfpDir: path.join(__dirname, '../../../data/pfp'),
       maxImages: 50,
       rotateIntervalMs: 30 * 60 * 1000, // 30 minutes
     });
