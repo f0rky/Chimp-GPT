@@ -4,7 +4,7 @@ This file contains important context and commands for Claude Code to remember wh
 
 ## Project Details
 - **Project Name**: Chimp-GPT Discord Bot
-- **Version**: 2.0.0
+- **Version**: 2.0.1
 - **Technology**: Node.js Discord bot with OpenAI integration
 
 ## Process Management
@@ -222,6 +222,16 @@ npm start
 - **Before**: 160+ seconds with undefined responses
 - **After**: ~58 seconds with proper image URLs
 - **Improvement**: 65% faster response time + functional image delivery
+
+## Version History
+
+### v2.0.1 (2025-08-03) - Image Generation URL Fix
+- **Issue**: Image generation completed successfully (~23s) but displayed "⚠️ Image generated but no URL available" instead of actual images
+- **Root Cause**: Logic gap in image handler where data URLs (`data:image/png;base64,...`) fell through condition checks to fallback error
+- **Solution**: Enhanced URL handling logic to properly process data URLs as Discord attachments
+- **Files Modified**: `src/handlers/imageGenerationHandler.js`
+- **Result**: Images now display correctly in Discord regardless of return format (b64_json, data URL, or regular URL)
+- **Quality**: Added debug logging, maintained performance, passed all linting/formatting checks
 
 ## Log Monitoring
 When troubleshooting, check these log files:

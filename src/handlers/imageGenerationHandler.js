@@ -37,6 +37,7 @@ const {
  * @param {Function} formatSubtext - Function to format response subtext
  * @param {Function} storeMessageRelationship - Function to store message relationships
  * @param {Object} statusManager - Status manager instance for tracking
+ * @param {Object} pfpManager - PFP manager instance for saving images
  * @returns {Promise<void>}
  */
 async function handleImageGeneration(
@@ -48,7 +49,8 @@ async function handleImageGeneration(
   apiCalls = {},
   formatSubtext,
   storeMessageRelationship,
-  statusManager
+  statusManager,
+  pfpManager = null
 ) {
   try {
     // Use the start time passed in or from handleFunctionCall if available, otherwise use current time
@@ -359,6 +361,21 @@ async function handleImageGeneration(
       const revisedPrompt =
         imageResult_firstImage.revisedPrompt || imageResult.revised_prompt || enhancedPrompt;
 
+      // Debug logging for image structure analysis
+      discordLogger.debug(
+        {
+          hasB64Json: !!imageResult_firstImage.b64_json,
+          hasUrl: !!imageUrl,
+          urlType: imageUrl ? (imageUrl.startsWith('data:') ? 'data-url' : 'regular-url') : 'none',
+          imageStructure: {
+            url: imageUrl ? 'present' : 'missing',
+            b64_json: imageResult_firstImage.b64_json ? 'present' : 'missing',
+            revisedPrompt: revisedPrompt ? 'present' : 'missing',
+          },
+        },
+        'Image result structure analysis'
+      );
+
       // Create subtext with performance information
       const subtext = formatSubtext(actualStartTime, usage, apiCalls);
 
@@ -372,6 +389,7 @@ async function handleImageGeneration(
       finalMessage += subtext;
 
       // Check if we have base64 data to send as attachment
+      // Handle three cases: 1) Direct b64_json, 2) Data URL in url field, 3) Regular URL
       if (imageResult_firstImage.b64_json) {
         // Process image data using streaming for better memory efficiency
         const useStreaming = shouldUseStreaming(imageResult_firstImage.b64_json);
@@ -404,6 +422,18 @@ async function handleImageGeneration(
             method: 'direct',
             exceedsDiscordLimit: imageBuffer.length > 8 * 1024 * 1024,
           };
+
+          // Save image to PFP rotation if PFPManager is available
+          if (pfpManager && imageBuffer) {
+            try {
+              const fileName = `generated_image_${Date.now()}.png`;
+              const savedPath = await pfpManager.addImage(imageBuffer, fileName);
+              discordLogger.info(`Image saved to PFP rotation: ${savedPath}`);
+            } catch (pfpError) {
+              discordLogger.warn('Failed to save image to PFP rotation:', pfpError.message);
+              // Don't fail the whole request if PFP save fails
+            }
+          }
         }
 
         if (!processedImage.success) {
@@ -471,132 +501,124 @@ async function handleImageGeneration(
           content: finalMessage,
           files: [attachment],
         });
+      } else if (imageUrl && imageUrl.startsWith('data:')) {
+        // Handle data URL case - extract base64 and process as attachment
+        const base64Match = imageUrl.match(/data:([^;]+);base64,(.+)/);
+        if (base64Match) {
+          const mimeType = base64Match[1];
+          const base64Data = base64Match[2];
+
+          discordLogger.debug(
+            {
+              mimeType,
+              base64Length: base64Data.length,
+              estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
+            },
+            'Processing data URL from url field as attachment'
+          );
+
+          // Process the base64 data as an attachment
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          const processedImage = {
+            success: true,
+            buffer: imageBuffer,
+            size: imageBuffer.length,
+            method: 'direct',
+            exceedsDiscordLimit: imageBuffer.length > 8 * 1024 * 1024,
+          };
+
+          // Save image to PFP rotation if PFPManager is available
+          if (pfpManager && imageBuffer) {
+            try {
+              const fileName = `generated_image_${Date.now()}.png`;
+              const savedPath = await pfpManager.addImage(imageBuffer, fileName);
+              discordLogger.info(`Image saved to PFP rotation from data URL: ${savedPath}`);
+            } catch (pfpError) {
+              discordLogger.warn(
+                'Failed to save data URL image to PFP rotation:',
+                pfpError.message
+              );
+              // Don't fail the whole request if PFP save fails
+            }
+          }
+
+          // Check Discord file size limit
+          if (processedImage.exceedsDiscordLimit) {
+            const sizeError = new ChimpError('Data URL image exceeds Discord file size limit', {
+              category: ERROR_CATEGORIES.VALIDATION,
+              severity: ERROR_SEVERITY.MEDIUM,
+              operation: 'validate_data_url_file_size',
+              context: {
+                imageSize: processedImage.size,
+                discordLimit: 8 * 1024 * 1024,
+                sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
+                mimeType,
+              },
+              userId: message.author?.id,
+            });
+
+            logError(sizeError);
+
+            await feedbackMessage.edit(
+              finalMessage +
+                '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
+            );
+            return;
+          }
+
+          // Determine file extension from MIME type
+          let fileExtension = 'png';
+          if (mimeType.includes('jpeg')) fileExtension = 'jpg';
+          else if (mimeType.includes('webp')) fileExtension = 'webp';
+
+          const fileName = `generated_image_${Date.now()}.${fileExtension}`;
+
+          // Create Discord attachment from processed image
+          const attachment = createDiscordAttachment(processedImage, fileName, mimeType);
+
+          // Log processing results
+          discordLogger.info(
+            {
+              processingMethod: 'data-url-extraction',
+              imageSize: processedImage.size,
+              sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
+              mimeType: mimeType,
+            },
+            'Data URL from url field processed successfully for Discord'
+          );
+
+          // Update the message with the final result and attachment
+          await feedbackMessage.edit({
+            content: finalMessage,
+            files: [attachment],
+          });
+        } else {
+          // Couldn't parse the data URL, fall back to error
+          await feedbackMessage.edit(
+            finalMessage + '\n⚠️ Image generated but data URL could not be parsed properly.'
+          );
+        }
       } else if (imageUrl && !imageUrl.startsWith('data:')) {
         // Regular URL - include it in the message
         finalMessage += `${imageUrl}`;
         await feedbackMessage.edit(finalMessage);
       } else {
-        // If we still have a data URL but no b64_json, extract the base64 part
-        if (imageUrl && imageUrl.startsWith('data:')) {
-          const base64Match = imageUrl.match(/data:([^;]+);base64,(.+)/);
-          if (base64Match) {
-            const mimeType = base64Match[1];
-            const base64Data = base64Match[2];
-
-            // Process image data using streaming for better memory efficiency
-            const useStreaming = shouldUseStreaming(base64Data);
-
-            discordLogger.debug(
-              {
-                mimeType,
-                base64Length: base64Data.length,
-                useStreaming,
-                estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
-              },
-              'Processing data URL image for Discord attachment'
-            );
-
-            let processedImage;
-            // Temporarily disable streaming to debug PNG corruption issue
-            const streamingEnabled = false; // Disabled until corruption issue is resolved
-            if (streamingEnabled && useStreaming) {
-              // Use streaming processing for large images
-              processedImage = await processImageStream(base64Data, {
-                fileName: `generated_image_${Date.now()}`,
-                maxSize: 25 * 1024 * 1024, // 25MB limit
-              });
-            } else {
-              // Direct processing for all images (temporary fix)
-              const imageBuffer = Buffer.from(base64Data, 'base64');
-              processedImage = {
-                success: true,
-                buffer: imageBuffer,
-                size: imageBuffer.length,
-                method: 'direct',
-                exceedsDiscordLimit: imageBuffer.length > 8 * 1024 * 1024,
-              };
-            }
-
-            if (!processedImage.success) {
-              const processingError = new ChimpError('Failed to process data URL image', {
-                category: ERROR_CATEGORIES.INTERNAL,
-                severity: ERROR_SEVERITY.MEDIUM,
-                operation: 'process_data_url_image',
-                context: {
-                  error: processedImage.error,
-                  mimeType,
-                  useStreaming,
-                  estimatedSize: Math.round((base64Data.length * 3) / 4 / 1024),
-                },
-                userId: message.author?.id,
-              });
-
-              logError(processingError);
-              await feedbackMessage.edit(
-                finalMessage + '\n⚠️ Image generated but failed to process for Discord.'
-              );
-              return;
-            }
-
-            // Check Discord file size limit
-            if (processedImage.exceedsDiscordLimit) {
-              const sizeError = new ChimpError('Data URL image exceeds Discord file size limit', {
-                category: ERROR_CATEGORIES.VALIDATION,
-                severity: ERROR_SEVERITY.MEDIUM,
-                operation: 'validate_data_url_file_size',
-                context: {
-                  imageSize: processedImage.size,
-                  discordLimit: 8 * 1024 * 1024,
-                  sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
-                  mimeType,
-                },
-                userId: message.author?.id,
-              });
-
-              logError(sizeError);
-
-              await feedbackMessage.edit(
-                finalMessage +
-                  '\n⚠️ Image generated but is too large for Discord (>8MB). Try requesting a smaller size or lower quality.'
-              );
-              return;
-            }
-
-            // Determine file extension from MIME type
-            let fileExtension = 'png';
-            if (mimeType.includes('jpeg')) fileExtension = 'jpg';
-            else if (mimeType.includes('webp')) fileExtension = 'webp';
-
-            const fileName = `generated_image_${Date.now()}.${fileExtension}`;
-
-            // Create Discord attachment from processed image
-            const attachment = createDiscordAttachment(processedImage, fileName, mimeType);
-
-            // Log processing results
-            discordLogger.info(
-              {
-                processingMethod: processedImage.method,
-                imageSize: processedImage.size,
-                sizeMB: (processedImage.size / 1024 / 1024).toFixed(2),
-                processingTime: processedImage.processingTime,
-              },
-              'Data URL image processed successfully for Discord'
-            );
-
-            await feedbackMessage.edit({
-              content: finalMessage,
-              files: [attachment],
-            });
-          } else {
-            // Fallback if we can't parse the data URL
-            await feedbackMessage.edit(
-              finalMessage + '\n⚠️ Image generated but could not be displayed properly.'
-            );
-          }
-        } else {
-          // No image URL available
-          await feedbackMessage.edit(finalMessage + '\n⚠️ Image generated but no URL available.');
-        }
+        // Final fallback - should rarely be reached now with improved data URL handling
+        discordLogger.warn(
+          {
+            hasUrl: !!imageUrl,
+            urlType: imageUrl
+              ? imageUrl.startsWith('data:')
+                ? 'data-url'
+                : 'regular-url'
+              : 'none',
+            hasB64Json: !!imageResult_firstImage.b64_json,
+          },
+          'Reached final fallback in image handler - this should be rare'
+        );
+        await feedbackMessage.edit(
+          finalMessage + '\n⚠️ Image generated but could not be processed for display.'
+        );
       }
 
       // Store message relationship for context preservation
