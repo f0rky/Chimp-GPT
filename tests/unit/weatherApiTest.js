@@ -47,15 +47,16 @@ async function testWeatherApi() {
     try {
       const weatherData = await lookupWeather('London');
 
-      // Validate response format
+      // Validate response format - handle both direct response and success/data wrapper
+      const actualData = weatherData?.data || weatherData;
       const validResponse =
-        weatherData && weatherData.location && weatherData.current && weatherData.current.condition;
+        actualData && actualData.location && actualData.current && actualData.current.condition;
 
       test1Result.success = validResponse;
       test1Result.details = {
-        location: weatherData?.location?.name || 'N/A',
-        condition: weatherData?.current?.condition?.text || 'N/A',
-        temperature: weatherData?.current?.temp_c || 'N/A',
+        location: actualData?.location?.name || 'N/A',
+        condition: actualData?.current?.condition?.text || 'N/A',
+        temperature: actualData?.current?.temp_c || 'N/A',
       };
 
       if (!validResponse) {
@@ -113,19 +114,20 @@ async function testWeatherApi() {
     try {
       const forecastData = await lookupExtendedForecast('New York');
 
-      // Validate forecast data
+      // Validate forecast data - handle both direct response and success/data wrapper
+      const actualData = forecastData?.data || forecastData;
       const validForecast =
-        forecastData &&
-        forecastData.location &&
-        forecastData.forecast &&
-        forecastData.forecast.forecastday &&
-        forecastData.forecast.forecastday.length > 0;
+        actualData &&
+        actualData.location &&
+        actualData.forecast &&
+        actualData.forecast.forecastday &&
+        actualData.forecast.forecastday.length > 0;
 
       test3Result.success = validForecast;
       test3Result.details = {
-        location: forecastData?.location?.name || 'N/A',
-        forecastDays: forecastData?.forecast?.forecastday?.length || 0,
-        firstDayDate: forecastData?.forecast?.forecastday?.[0]?.date || 'N/A',
+        location: actualData?.location?.name || 'N/A',
+        forecastDays: actualData?.forecast?.forecastday?.length || 0,
+        firstDayDate: actualData?.forecast?.forecastday?.[0]?.date || 'N/A',
       };
 
       if (!validForecast) {
@@ -153,13 +155,20 @@ async function testWeatherApi() {
         "What's the weather like in Tokyo?"
       );
 
-      // Validate response
-      const validResponse = response && typeof response === 'string' && response.length > 0;
+      // Validate response - it should be an object with formattedSummary
+      const validResponse =
+        response &&
+        typeof response === 'object' &&
+        response.formattedSummary &&
+        typeof response.formattedSummary === 'string' &&
+        response.formattedSummary.length > 0;
 
       test4Result.success = validResponse;
       test4Result.details = {
-        responseLength: response?.length || 0,
-        responsePreview: response?.substring(0, 50) + '...' || 'N/A',
+        responseType: typeof response,
+        hasFormattedSummary: !!(response && response.formattedSummary),
+        summaryLength: response?.formattedSummary?.length || 0,
+        summaryPreview: response?.formattedSummary?.substring(0, 50) + '...' || 'N/A',
       };
 
       if (!validResponse) {

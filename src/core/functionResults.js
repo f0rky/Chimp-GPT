@@ -113,11 +113,11 @@ async function saveResults(results) {
   const startTime = Date.now();
   try {
     // Create data directory synchronously to ensure it exists before any async operations
-    const dataDir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dataDir)) {
+    const dataDir = path.join(__dirname, '..', '..', 'data');
+    if (!_fsSync.existsSync(dataDir)) {
       try {
         logger.info(`Creating data directory: ${dataDir}`);
-        fs.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
+        _fsSync.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
       } catch (mkdirError) {
         logger.error({ error: mkdirError }, 'Failed to create data directory');
         return false;
@@ -125,7 +125,7 @@ async function saveResults(results) {
     }
 
     // Double-check that the directory exists
-    if (!fs.existsSync(dataDir)) {
+    if (!_fsSync.existsSync(dataDir)) {
       logger.error(`Data directory does not exist and could not be created: ${dataDir}`);
       return false;
     }
@@ -145,9 +145,9 @@ async function saveResults(results) {
     }
 
     // Create a backup of the current results file before writing
-    if (fs.existsSync(RESULTS_FILE)) {
+    if (_fsSync.existsSync(RESULTS_FILE)) {
       try {
-        await fs.promises.copyFile(RESULTS_FILE, RESULTS_FILE + '.bak');
+        await fs.copyFile(RESULTS_FILE, RESULTS_FILE + '.bak');
         logger.debug('Created backup of function results file');
       } catch (backupError) {
         logger.warn({ error: backupError }, 'Failed to create backup of function results file');
@@ -161,17 +161,17 @@ async function saveResults(results) {
       const tempFile = RESULTS_FILE + '.new';
 
       // Use synchronous file writing to ensure the file is completely written
-      fs.writeFileSync(tempFile, jsonString, { encoding: 'utf8', flag: 'w' });
+      _fsSync.writeFileSync(tempFile, jsonString, { encoding: 'utf8', flag: 'w' });
 
       // Verify the file was written correctly by reading it back synchronously
       try {
-        const verifyData = fs.readFileSync(tempFile, 'utf8');
+        const verifyData = _fsSync.readFileSync(tempFile, 'utf8');
         JSON.parse(verifyData); // This will throw if the JSON is invalid
 
         // If verification passes, create a backup of the current file if it exists
-        if (fs.existsSync(RESULTS_FILE)) {
+        if (_fsSync.existsSync(RESULTS_FILE)) {
           try {
-            fs.copyFileSync(RESULTS_FILE, RESULTS_FILE + '.bak');
+            _fsSync.copyFileSync(RESULTS_FILE, RESULTS_FILE + '.bak');
             logger.debug('Created backup of function results file');
           } catch (backupError) {
             logger.warn({ error: backupError }, 'Failed to create backup of function results file');
@@ -180,7 +180,7 @@ async function saveResults(results) {
         }
 
         // Move the new file to the real file location
-        fs.renameSync(tempFile, RESULTS_FILE);
+        _fsSync.renameSync(tempFile, RESULTS_FILE);
         return true;
       } catch (verifyError) {
         logger.error(
@@ -190,8 +190,8 @@ async function saveResults(results) {
 
         // Try to clean up the temporary file
         try {
-          if (fs.existsSync(tempFile)) {
-            fs.unlinkSync(tempFile);
+          if (_fsSync.existsSync(tempFile)) {
+            _fsSync.unlinkSync(tempFile);
           }
         } catch (cleanupError) {
           logger.warn(

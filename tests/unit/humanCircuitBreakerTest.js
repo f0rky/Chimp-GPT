@@ -15,7 +15,7 @@ async function testHumanCircuitBreaker() {
 
   try {
     // Load the module
-    const humanCircuitBreaker = require('../src/utils/humanCircuitBreaker');
+    const humanCircuitBreaker = require('../../src/utils/humanCircuitBreaker');
 
     // Test 1: Check sensitive operations constants
     try {
@@ -111,8 +111,8 @@ async function testHumanCircuitBreaker() {
     // Test 5: Integration with circuit breaker
     try {
       // Check if the module correctly imports circuit breaker dependencies
-      const circuitBreaker = require('../circuitBreaker');
-      const breakerManager = require('../breakerManager');
+      const circuitBreaker = require('../../src/middleware/circuitBreaker');
+      const breakerManager = require('../../src/middleware/breakerManager');
 
       const hasCircuitBreaker = !!circuitBreaker;
       const hasBreakerManager = !!breakerManager;

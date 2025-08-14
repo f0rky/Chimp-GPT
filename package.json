@@ -1,11 +1,17 @@
 {
   "name": "chimp-gpt",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "A Discord chatbot with revolutionary PocketFlow architecture and OpenAI GPT integration for intelligent conversations.",
   "main": "src/core/combined.js",
   "private": true,
   "scripts": {
     "test": "node tests/unit/testRunner.js",
+    "test:comprehensive": "node tests/comprehensiveTestRunner.js",
+    "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
+    "test:integration": "node tests/comprehensiveTestRunner.js --category integration",
+    "test:coverage": "node tests/comprehensiveTestRunner.js --save",
+    "test:high-priority": "node tests/comprehensiveTestRunner.js --priority high",
+    "test:medium-priority": "node tests/comprehensiveTestRunner.js --priority medium",
     "test:advanced": "node tests/unit/commandHandlerAdvancedTest.js",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -48,7 +54,6 @@
     "quoteProps": "as-needed",
     "jsxSingleQuote": false,
     "bracketSameLine": false,
-    "jsxBracketSameLine": false,
     "requirePragma": false,
     "insertPragma": false,
     "proseWrap": "preserve",
@@ -88,7 +93,7 @@
     "playwright-extra": "^4.3.6",
     "playwright-extra-plugin-stealth": "^0.0.1",
     "rate-limiter-flexible": "^7.1.0",
-    "undici": "^6.21.2",
+    "undici": "^7.13.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -110,6 +115,6 @@
     "sinon-chai": "^4.0.0"
   },
   "overrides": {
-    "undici": "^6.21.2"
+    "undici": "^7.13.0"
   }
 }

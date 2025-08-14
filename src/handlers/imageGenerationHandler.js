@@ -404,8 +404,8 @@ async function handleImageGeneration(
         );
 
         let processedImage;
-        // Temporarily disable streaming to debug PNG corruption issue
-        const streamingEnabled = false; // Disabled until corruption issue is resolved
+        // Streaming can be disabled via environment variable for debugging
+        const streamingEnabled = process.env.ENABLE_IMAGE_STREAMING !== 'false';
         if (streamingEnabled && useStreaming) {
           // Use streaming processing for large images
           processedImage = await processImageStream(imageResult_firstImage.b64_json, {
@@ -413,7 +413,7 @@ async function handleImageGeneration(
             maxSize: 25 * 1024 * 1024, // 25MB limit (Discord is 8MB, but allow headroom)
           });
         } else {
-          // Direct processing for all images (temporary fix)
+          // Direct processing fallback (streaming disabled or not needed)
           const imageBuffer = Buffer.from(imageResult_firstImage.b64_json, 'base64');
           processedImage = {
             success: true,

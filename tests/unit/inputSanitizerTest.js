@@ -16,7 +16,7 @@ async function testInputSanitizer() {
 
   try {
     // Load the input sanitizer module
-    inputSanitizer = require('../src/utils/inputSanitizer');
+    inputSanitizer = require('../../src/utils/inputSanitizer');
 
     // Test 1: Basic text sanitization
     try {

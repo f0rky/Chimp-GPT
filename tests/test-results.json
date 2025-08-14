@@ -1,0 +1,1257 @@
+{
+  "summary": {
+    "total": 12,
+    "passed": 12,
+    "failed": 0,
+    "startTime": 1755200786453,
+    "endTime": 1755200803431,
+    "duration": 16978
+  },
+  "suites": {
+    "SimpleChimpGPTFlow": {
+      "success": true,
+      "duration": 12737,
+      "details": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "results": [
+          {
+            "name": "Intent Detection",
+            "success": true,
+            "details": {
+              "passed": 5,
+              "total": 5,
+              "results": [
+                {
+                  "name": "Image generation intent",
+                  "success": true,
+                  "expectedType": "image",
+                  "actualType": "image",
+                  "hasResponse": true
+                },
+                {
+                  "name": "Weather request intent",
+                  "success": true,
+                  "expectedType": "weather",
+                  "actualType": "weather",
+                  "hasResponse": true
+                },
+                {
+                  "name": "Time request intent",
+                  "success": true,
+                  "expectedType": "time",
+                  "actualType": "time",
+                  "hasResponse": true
+                },
+                {
+                  "name": "Quake stats intent",
+                  "success": true,
+                  "expectedType": "quake",
+                  "actualType": "quake",
+                  "hasResponse": true
+                },
+                {
+                  "name": "General conversation intent",
+                  "success": true,
+                  "expectedType": "conversation",
+                  "actualType": "conversation",
+                  "hasResponse": true
+                }
+              ]
+            }
+          },
+          {
+            "name": "Conversation Memory",
+            "success": true,
+            "details": {
+              "results": [
+                {
+                  "messageIndex": 0,
+                  "success": true,
+                  "hasResponse": true,
+                  "conversationLength": 2,
+                  "type": "conversation"
+                },
+                {
+                  "messageIndex": 1,
+                  "success": true,
+                  "hasResponse": true,
+                  "conversationLength": 4,
+                  "type": "conversation"
+                },
+                {
+                  "messageIndex": 2,
+                  "success": true,
+                  "hasResponse": true,
+                  "conversationLength": 4,
+                  "type": "conversation"
+                },
+                {
+                  "messageIndex": 3,
+                  "success": true,
+                  "hasResponse": true,
+                  "conversationLength": 4,
+                  "type": "conversation"
+                }
+              ],
+              "conversationLengthManaged": true,
+              "hasConversationStats": true,
+              "stats": {
+                "architecture": "simplified_pocketflow",
+                "implementation": "single_node_unified_processor",
+                "performance": "optimized_for_speed",
+                "totalConversations": 1,
+                "totalMessages": 4,
+                "avgMessagesPerConversation": 4,
+                "knowledgeSystemEnabled": true,
+                "uptime": 12
+              }
+            }
+          },
+          {
+            "name": "Error Handling",
+            "success": true,
+            "details": {
+              "results": [
+                {
+                  "name": "Conversation error handling",
+                  "success": "Mock OpenAI API error",
+                  "hasErrorResponse": true,
+                  "hasErrorMessage": true
+                },
+                {
+                  "name": "Image generation error handling",
+                  "success": "Mock image generation error",
+                  "hasErrorResponse": true,
+                  "hasErrorMessage": true
+                }
+              ],
+              "allErrorsHandled": true
+            }
+          },
+          {
+            "name": "Flow Statistics",
+            "success": true,
+            "details": {
+              "stats": {
+                "architecture": "simplified_pocketflow",
+                "implementation": "single_node_unified_processor",
+                "performance": "optimized_for_speed",
+                "totalConversations": 2,
+                "totalMessages": 6,
+                "avgMessagesPerConversation": 3,
+                "knowledgeSystemEnabled": true,
+                "uptime": 12
+              },
+              "hasRequiredFields": true,
+              "conversationCountCorrect": true,
+              "messageCountCorrect": true
+            }
+          },
+          {
+            "name": "Conversation Cleanup",
+            "success": true,
+            "details": {
+              "cleanupWorks": true,
+              "conversationsPreserved": true,
+              "cleaned": 0,
+              "statsBefore": {
+                "architecture": "simplified_pocketflow",
+                "implementation": "single_node_unified_processor",
+                "performance": "optimized_for_speed",
+                "totalConversations": 2,
+                "totalMessages": 4,
+                "avgMessagesPerConversation": 2,
+                "knowledgeSystemEnabled": true,
+                "uptime": 12
+              },
+              "statsAfter": {
+                "architecture": "simplified_pocketflow",
+                "implementation": "single_node_unified_processor",
+                "performance": "optimized_for_speed",
+                "totalConversations": 2,
+                "totalMessages": 4,
+                "avgMessagesPerConversation": 2,
+                "knowledgeSystemEnabled": true,
+                "uptime": 12
+              }
+            }
+          }
+        ]
+      },
+      "category": "Unit",
+      "priority": "High"
+    },
+    "Image Generation": {
+      "success": true,
+      "duration": 26,
+      "details": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "results": [
+          {
+            "name": "Image Generation Detection",
+            "success": true,
+            "details": {
+              "passed": 7,
+              "total": 7,
+              "results": [
+                {
+                  "name": "Draw command",
+                  "success": true,
+                  "detected": true,
+                  "expected": true
+                },
+                {
+                  "name": "Create command",
+                  "success": true,
+                  "detected": true,
+                  "expected": true
+                },
+                {
+                  "name": "Generate command",
+                  "success": true,
+                  "detected": true,
+                  "expected": true
+                },
+                {
+                  "name": "Image of pattern",
+                  "success": true,
+                  "detected": true,
+                  "expected": true
+                },
+                {
+                  "name": "Show me image pattern",
+                  "success": true,
+                  "detected": true,
+                  "expected": true
+                },
+                {
+                  "name": "Non-image request",
+                  "success": true,
+                  "detected": false,
+                  "expected": false
+                },
+                {
+                  "name": "Regular conversation",
+                  "success": true,
+                  "detected": false,
+                  "expected": false
+                }
+              ]
+            }
+          },
+          {
+            "name": "Image Generation Workflow",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "Successful image generation",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Image generation with custom parameters",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Empty prompt handling",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "error": "Empty prompt"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Image Generation Error Handling",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Content policy violation",
+                  "success": true,
+                  "errorCaught": true,
+                  "errorType": "content_policy_violation",
+                  "expectedError": "content_policy_violation"
+                },
+                {
+                  "name": "Rate limit exceeded",
+                  "success": true,
+                  "errorCaught": true,
+                  "errorType": "rate_limit",
+                  "expectedError": "rate_limit"
+                },
+                {
+                  "name": "Insufficient quota",
+                  "success": true,
+                  "errorCaught": true,
+                  "errorType": "insufficient_quota",
+                  "expectedError": "insufficient_quota"
+                },
+                {
+                  "name": "Generic error",
+                  "success": true,
+                  "errorCaught": true,
+                  "errorType": "generic",
+                  "expectedError": "generic"
+                }
+              ]
+            }
+          },
+          {
+            "name": "PFP Manager Integration",
+            "success": true,
+            "details": {
+              "passed": 2,
+              "total": 2,
+              "results": [
+                {
+                  "name": "Successful PFP save",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "savedPath": "/mock/pfp/path/test_image_123.png",
+                  "error": null
+                },
+                {
+                  "name": "PFP save failure",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "savedPath": null,
+                  "error": "PFP save failed"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Image Bypass Logic",
+            "success": true,
+            "details": {
+              "passed": 5,
+              "total": 5,
+              "results": [
+                {
+                  "name": "Draw image bypass",
+                  "success": true,
+                  "shouldBypass": true,
+                  "expected": true,
+                  "duration": 0
+                },
+                {
+                  "name": "Create picture bypass",
+                  "success": true,
+                  "shouldBypass": true,
+                  "expected": true,
+                  "duration": 0
+                },
+                {
+                  "name": "Generate artwork bypass",
+                  "success": true,
+                  "shouldBypass": true,
+                  "expected": true,
+                  "duration": 0
+                },
+                {
+                  "name": "No bypass for weather",
+                  "success": true,
+                  "shouldBypass": false,
+                  "expected": false,
+                  "duration": 0
+                },
+                {
+                  "name": "No bypass for conversation",
+                  "success": true,
+                  "shouldBypass": false,
+                  "expected": false,
+                  "duration": 0
+                }
+              ],
+              "performance": {
+                "totalTime": 1,
+                "averageTime": 0.2,
+                "performanceGood": true
+              }
+            }
+          }
+        ]
+      },
+      "category": "Unit",
+      "priority": "High"
+    },
+    "Command Processing": {
+      "success": true,
+      "duration": 532,
+      "details": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "results": [
+          {
+            "name": "Command Parsing",
+            "success": true,
+            "details": {
+              "passed": 5,
+              "total": 5,
+              "results": [
+                {
+                  "name": "Simple command with exclamation prefix",
+                  "success": true,
+                  "parsed": {
+                    "prefix": "!",
+                    "command": "ping",
+                    "args": []
+                  },
+                  "expected": {
+                    "command": "ping",
+                    "prefix": "!",
+                    "args": []
+                  }
+                },
+                {
+                  "name": "Command with dot prefix",
+                  "success": true,
+                  "parsed": {
+                    "prefix": ".",
+                    "command": "help",
+                    "args": []
+                  },
+                  "expected": {
+                    "command": "help",
+                    "prefix": ".",
+                    "args": []
+                  }
+                },
+                {
+                  "name": "Command with arguments",
+                  "success": true,
+                  "parsed": {
+                    "prefix": "!",
+                    "command": "image",
+                    "args": [
+                      "sunset",
+                      "over",
+                      "ocean"
+                    ]
+                  },
+                  "expected": {
+                    "command": "image",
+                    "prefix": "!",
+                    "args": [
+                      "sunset",
+                      "over",
+                      "ocean"
+                    ]
+                  }
+                },
+                {
+                  "name": "Command with slash prefix",
+                  "success": true,
+                  "parsed": {
+                    "prefix": "/",
+                    "command": "stats",
+                    "args": [
+                      "bot"
+                    ]
+                  },
+                  "expected": {
+                    "command": "stats",
+                    "prefix": "/",
+                    "args": [
+                      "bot"
+                    ]
+                  }
+                },
+                {
+                  "name": "Non-command message",
+                  "success": true,
+                  "parsed": null,
+                  "expected": {
+                    "command": null,
+                    "prefix": null,
+                    "args": null
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "Slash Command Execution",
+            "success": true,
+            "details": {
+              "passed": 5,
+              "total": 5,
+              "results": [
+                {
+                  "name": "Ping slash command",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Help slash command",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Stats slash command",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Image slash command with prompt",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "error": null
+                },
+                {
+                  "name": "Unknown slash command",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "error": "Command not found"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Command Permissions",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Regular user accessing public command",
+                  "success": true,
+                  "allowed": true,
+                  "expected": true,
+                  "config": {
+                    "ownerOnly": false,
+                    "adminOnly": false
+                  }
+                },
+                {
+                  "name": "Regular user accessing owner-only command",
+                  "success": true,
+                  "allowed": false,
+                  "expected": false,
+                  "config": {
+                    "ownerOnly": true,
+                    "adminOnly": false
+                  }
+                },
+                {
+                  "name": "Admin accessing admin command",
+                  "success": true,
+                  "allowed": true,
+                  "expected": true,
+                  "config": {
+                    "ownerOnly": false,
+                    "adminOnly": true
+                  }
+                },
+                {
+                  "name": "Owner accessing any command",
+                  "success": true,
+                  "allowed": true,
+                  "expected": true,
+                  "config": {
+                    "ownerOnly": true,
+                    "adminOnly": false
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "Command Error Handling",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "Command throws error",
+                  "success": true,
+                  "errorHandled": true,
+                  "expected": true,
+                  "error": "Test command error"
+                },
+                {
+                  "name": "Command with invalid parameters",
+                  "success": true,
+                  "errorHandled": true,
+                  "expected": true,
+                  "error": "Missing required parameter"
+                },
+                {
+                  "name": "Command timeout",
+                  "success": true,
+                  "errorHandled": true,
+                  "expected": true,
+                  "error": "Command timeout"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Command Aliases",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Help command with h alias",
+                  "success": true,
+                  "resolvedCommand": "help",
+                  "expectedCommand": "help"
+                },
+                {
+                  "name": "Stats command with s alias",
+                  "success": true,
+                  "resolvedCommand": "stats",
+                  "expectedCommand": "stats"
+                },
+                {
+                  "name": "Image command with img alias",
+                  "success": true,
+                  "resolvedCommand": "image",
+                  "expectedCommand": "image"
+                },
+                {
+                  "name": "Multiple prefix support",
+                  "success": true,
+                  "resolvedCommand": "ping"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "category": "Unit",
+      "priority": "Medium"
+    },
+    "Message Handling Integration": {
+      "success": true,
+      "duration": 20,
+      "details": {
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "results": [
+          {
+            "name": "Message Processing Pipeline",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "Simple conversation",
+                  "success": true,
+                  "hasResponse": true,
+                  "type": "conversation",
+                  "responseLength": 38
+                },
+                {
+                  "name": "Weather query",
+                  "success": true,
+                  "hasResponse": true,
+                  "type": "conversation",
+                  "responseLength": 38
+                },
+                {
+                  "name": "Image generation request",
+                  "success": true,
+                  "hasResponse": true,
+                  "type": "image",
+                  "responseLength": 27
+                }
+              ]
+            }
+          },
+          {
+            "name": "Message Event Handling",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Valid user message",
+                  "success": true,
+                  "expectedProcessing": true,
+                  "actualProcessing": true
+                },
+                {
+                  "name": "Bot message (should ignore)",
+                  "success": true,
+                  "expectedProcessing": false,
+                  "actualProcessing": false
+                },
+                {
+                  "name": "Empty message",
+                  "success": true,
+                  "expectedProcessing": false,
+                  "actualProcessing": false
+                },
+                {
+                  "name": "Command-like message",
+                  "success": true,
+                  "expectedProcessing": true,
+                  "actualProcessing": true
+                }
+              ]
+            }
+          },
+          {
+            "name": "Response Formatting",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Simple text response",
+                  "success": true,
+                  "formatted": true,
+                  "responseLength": 31
+                },
+                {
+                  "name": "Image response",
+                  "success": true,
+                  "formatted": true,
+                  "responseLength": 29
+                },
+                {
+                  "name": "Weather response",
+                  "success": true,
+                  "formatted": true,
+                  "responseLength": 26
+                },
+                {
+                  "name": "Error response",
+                  "success": true,
+                  "formatted": true,
+                  "responseLength": 22
+                }
+              ]
+            }
+          },
+          {
+            "name": "Error Propagation",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "OpenAI API error",
+                  "success": "OpenAI API rate limit exceeded",
+                  "errorHandled": true,
+                  "errorMessage": "OpenAI API rate limit exceeded"
+                },
+                {
+                  "name": "Discord API error",
+                  "success": "Discord channel not found",
+                  "errorHandled": true,
+                  "errorMessage": "Discord channel not found"
+                },
+                {
+                  "name": "Network timeout error",
+                  "success": "Request timeout",
+                  "errorHandled": true,
+                  "errorMessage": "Request timeout"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "category": "Integration",
+      "priority": "High"
+    },
+    "Weather API Integration": {
+      "success": true,
+      "duration": 328,
+      "details": {
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "results": [
+          {
+            "name": "Weather Location Parsing",
+            "success": true,
+            "details": {
+              "passed": 6,
+              "total": 6,
+              "results": [
+                {
+                  "name": "Simple city name",
+                  "success": true,
+                  "extracted": "Tokyo",
+                  "expected": "Tokyo"
+                },
+                {
+                  "name": "City with country",
+                  "success": true,
+                  "extracted": "Paris, France",
+                  "expected": "Paris, France"
+                },
+                {
+                  "name": "Complex location query",
+                  "success": true,
+                  "extracted": "New York City",
+                  "expected": "New York City"
+                },
+                {
+                  "name": "Weather with trailing words",
+                  "success": true,
+                  "extracted": "London",
+                  "expected": "London"
+                },
+                {
+                  "name": "No location specified",
+                  "success": true,
+                  "extracted": null,
+                  "expected": null
+                },
+                {
+                  "name": "Location with special characters",
+                  "success": true,
+                  "extracted": "São Paulo, Brazil",
+                  "expected": "São Paulo, Brazil"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Weather API Service",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "Successful weather request",
+                  "success": true,
+                  "actualSuccess": true,
+                  "expectedSuccess": true,
+                  "dataValid": true,
+                  "error": null
+                },
+                {
+                  "name": "Invalid location handling",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "dataValid": true,
+                  "error": "Request failed with status code 400"
+                },
+                {
+                  "name": "API timeout handling",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "dataValid": true,
+                  "error": "timeout of 10000ms exceeded"
+                },
+                {
+                  "name": "Rate limiting handling",
+                  "success": true,
+                  "actualSuccess": false,
+                  "expectedSuccess": false,
+                  "dataValid": true,
+                  "error": "Request failed with status code 429"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Weather Response Formatting",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "Current weather formatting",
+                  "success": true,
+                  "formatted": true,
+                  "expected": true,
+                  "responseLength": 40
+                },
+                {
+                  "name": "Extended forecast formatting",
+                  "success": true,
+                  "formatted": true,
+                  "expected": true,
+                  "responseLength": 88
+                },
+                {
+                  "name": "Missing data handling",
+                  "success": true,
+                  "formatted": false,
+                  "expected": false,
+                  "responseLength": 0
+                }
+              ]
+            }
+          },
+          {
+            "name": "Weather Error Handling",
+            "success": true,
+            "details": {
+              "passed": 4,
+              "total": 4,
+              "results": [
+                {
+                  "name": "API key error with fallback",
+                  "success": true,
+                  "errorHandled": true,
+                  "fallbackUsed": true,
+                  "expectedFallback": true,
+                  "fallbackResponse": "Weather service temporarily unavailable. Please try again later."
+                },
+                {
+                  "name": "Location not found with suggestion",
+                  "success": true,
+                  "errorHandled": true,
+                  "fallbackUsed": true,
+                  "expectedFallback": true,
+                  "fallbackResponse": "Location not found. Please check the spelling and try again."
+                },
+                {
+                  "name": "Network timeout with retry",
+                  "success": true,
+                  "errorHandled": true,
+                  "fallbackUsed": true,
+                  "expectedFallback": true,
+                  "fallbackResponse": "Weather service is slow to respond. Please try again."
+                },
+                {
+                  "name": "Rate limit with backoff",
+                  "success": true,
+                  "errorHandled": true,
+                  "fallbackUsed": true,
+                  "expectedFallback": true,
+                  "fallbackResponse": "Too many requests. Please wait a moment and try again."
+                }
+              ]
+            }
+          },
+          {
+            "name": "Weather PocketFlow Integration",
+            "success": true,
+            "details": {
+              "passed": 3,
+              "total": 3,
+              "results": [
+                {
+                  "name": "Weather request through PocketFlow",
+                  "success": true,
+                  "type": "weather",
+                  "expectedType": "weather",
+                  "hasResponse": true,
+                  "hasWeatherData": true
+                },
+                {
+                  "name": "Weather with personality response",
+                  "success": true,
+                  "type": "weather",
+                  "expectedType": "weather",
+                  "hasResponse": true,
+                  "hasWeatherData": true
+                },
+                {
+                  "name": "Complex weather query",
+                  "success": true,
+                  "type": "weather",
+                  "expectedType": "weather",
+                  "hasResponse": true,
+                  "hasWeatherData": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "category": "Integration",
+      "priority": "Medium"
+    },
+    "Error Classes": {
+      "success": true,
+      "duration": 78,
+      "category": "Unit",
+      "priority": "Low"
+    },
+    "Command Handler": {
+      "success": true,
+      "duration": 9,
+      "category": "Unit",
+      "priority": "Medium"
+    },
+    "Input Sanitizer": {
+      "success": true,
+      "duration": 3,
+      "details": [
+        {
+          "name": "Basic Text Sanitization",
+          "success": true,
+          "casesRun": 4
+        },
+        {
+          "name": "Command Injection Protection",
+          "success": true,
+          "inputsTested": 6
+        },
+        {
+          "name": "SQL Injection Protection",
+          "success": true,
+          "attemptsTested": 5
+        },
+        {
+          "name": "Length Limit Enforcement",
+          "success": true,
+          "typesChecked": 4
+        },
+        {
+          "name": "Path Traversal Protection",
+          "success": true,
+          "attemptsBlocked": 4
+        },
+        {
+          "name": "Special Character Handling",
+          "success": true,
+          "casesHandled": 4
+        },
+        {
+          "name": "API-Specific Sanitization",
+          "success": true,
+          "apisChecked": 3
+        },
+        {
+          "name": "Validation Functions",
+          "success": true,
+          "testsRun": 6
+        }
+      ],
+      "category": "Unit",
+      "priority": "High"
+    },
+    "API Key Manager": {
+      "success": true,
+      "duration": 3,
+      "details": [
+        {
+          "name": "Get API Key",
+          "success": true,
+          "keyRetrieved": true,
+          "keyType": "Custom"
+        },
+        {
+          "name": "Mask API Key",
+          "success": true,
+          "testCases": 4
+        },
+        {
+          "name": "Get API Key Stats",
+          "success": true,
+          "statsRetrieved": true,
+          "statsType": "object"
+        },
+        {
+          "name": "Record API Key Errors",
+          "success": true,
+          "message": "Error recording functions executed successfully"
+        },
+        {
+          "name": "Rotate API Key",
+          "success": true,
+          "rotated": true,
+          "message": "Key rotation function executed successfully"
+        },
+        {
+          "name": "Handle Missing API Key",
+          "success": true,
+          "message": "Correctly threw error for missing key",
+          "error": "API key NON_EXISTENT_KEY not found in manager"
+        }
+      ],
+      "category": "Unit",
+      "priority": "Medium"
+    },
+    "Human Circuit Breaker": {
+      "success": true,
+      "duration": 1,
+      "details": [
+        {
+          "name": "Sensitive Operations Constants",
+          "success": true,
+          "operationCount": 5,
+          "hasAllExpected": true
+        },
+        {
+          "name": "Request Approval Function",
+          "success": true,
+          "functionExists": true,
+          "parameterCount": 4
+        },
+        {
+          "name": "Approval Management Functions",
+          "success": true,
+          "hasExecuteFunction": true,
+          "hasRequiresFunction": true,
+          "hasCreateMessageFunction": true
+        },
+        {
+          "name": "Module Exports",
+          "success": true,
+          "exportCount": 6,
+          "exports": [
+            "SENSITIVE_OPERATIONS",
+            "requestHumanApproval",
+            "executeWithApproval",
+            "requiresHumanApproval",
+            "createApprovalMessage",
+            "getVersionInfo"
+          ]
+        },
+        {
+          "name": "Circuit Breaker Integration",
+          "success": true,
+          "hasCircuitBreaker": true,
+          "hasBreakerManager": true
+        }
+      ],
+      "category": "Unit",
+      "priority": "Medium"
+    },
+    "Circuit Breaker": {
+      "success": true,
+      "duration": 554,
+      "details": [
+        {
+          "name": "Successful API call",
+          "success": true,
+          "details": {
+            "status": 200,
+            "expected": 200
+          }
+        },
+        {
+          "name": "Retry functionality",
+          "success": true,
+          "details": {
+            "status": 200,
+            "retryCount": 2,
+            "expected": {
+              "status": 200,
+              "retryCount": 2
+            }
+          }
+        },
+        {
+          "name": "Circuit opening on repeated failures",
+          "success": true,
+          "details": {
+            "error": "Circuit breaker opened due to repeated failures: Simulated failure to open circuit",
+            "failureCount": 3,
+            "circuitOpened": true,
+            "expected": {
+              "circuitOpened": true,
+              "errorContains": "Circuit breaker opened"
+            }
+          }
+        },
+        {
+          "name": "Circuit timeout and reset",
+          "success": true,
+          "details": {
+            "status": 200,
+            "expected": 200
+          }
+        }
+      ],
+      "category": "Unit",
+      "priority": "Medium"
+    },
+    "Weather API": {
+      "success": true,
+      "duration": 2686,
+      "category": "Unit",
+      "priority": "Medium"
+    }
+  },
+  "coverage": {
+    "totalFiles": 126,
+    "coveredFiles": 16,
+    "uncoveredFiles": 110,
+    "coveragePercentage": "12.7",
+    "coveredFilesList": [
+      "src/conversation/flow/SimpleChimpGPTFlow.js",
+      "src/conversation/flow/PocketFlow.js",
+      "src/handlers/imageGenerationHandler.js",
+      "src/services/imageGeneration.js",
+      "src/commands/commandHandler.js",
+      "src/commands/modules/",
+      "src/core/eventHandlers/messageEventHandler.js",
+      "src/core/processors/messageProcessor.js",
+      "src/handlers/responseFormatter.js",
+      "src/services/weatherLookup.js",
+      "src/services/simplified-weather.js",
+      "src/core/errors.js",
+      "src/utils/inputSanitizer.js",
+      "src/utils/apiKeyManager.js",
+      "src/utils/humanCircuitBreaker.js",
+      "src/middleware/circuitBreaker.js"
+    ],
+    "summary": "16/126 files (12.7%)"
+  },
+  "priorities": {
+    "high": {
+      "total": 4,
+      "passed": 4
+    },
+    "medium": {
+      "total": 7,
+      "passed": 7
+    },
+    "low": {
+      "total": 1,
+      "passed": 1
+    }
+  },
+  "categories": {
+    "unit": {
+      "total": 10,
+      "passed": 10
+    },
+    "integration": {
+      "total": 2,
+      "passed": 2
+    }
+  }
+}

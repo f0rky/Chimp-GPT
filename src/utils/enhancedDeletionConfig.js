@@ -385,8 +385,9 @@ class EnhancedDeletionConfigManager {
     // Generate migration commands based on warnings
     for (const warning of validationResult.warnings) {
       if (warning.message.includes('deprecated')) {
-        script.push(`# TODO: Remove deprecated ${warning.field} from .env file`);
+        script.push(`# ACTION REQUIRED: Remove deprecated ${warning.field} from .env file`);
         script.push(`# ${warning.message}`);
+        script.push(`# Run: sed -i '/${warning.field}=/d' .env`);
         script.push('');
       }
     }

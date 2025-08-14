@@ -656,10 +656,11 @@ class SimpleChimpGPTFlow {
     const startTime = Date.now();
 
     try {
-      logger.info(`Starting PocketFlow processing for message ${discordMessage.id}`, {
+      logger.info(`Starting SimpleChimpGPTFlow processing for message ${discordMessage.id}`, {
         userId: discordMessage.author?.id,
         content: discordMessage.content.substring(0, 50) + '...',
         messageId: discordMessage.id,
+        architecture: 'simplified_single_node',
       });
 
       const result = await this.flow.run({ message: discordMessage });
@@ -705,9 +706,14 @@ class SimpleChimpGPTFlow {
     }
 
     return {
+      architecture: 'simplified_pocketflow',
+      implementation: 'single_node_unified_processor',
+      performance: 'optimized_for_speed',
       totalConversations,
       totalMessages,
       avgMessagesPerConversation: totalConversations > 0 ? totalMessages / totalConversations : 0,
+      knowledgeSystemEnabled: !!this.knowledgeFlow,
+      uptime: Math.floor(process.uptime()),
     };
   }
 

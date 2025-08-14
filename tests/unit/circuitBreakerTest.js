@@ -10,14 +10,22 @@
  */
 
 // Import required modules
-const axios = require('axios');
-const retryWithBreaker = require('../src/utils/retryWithBreaker');
+const retryWithBreaker = require('../../src/utils/retryWithBreaker');
 const breakerManager = require('../../src/middleware/breakerManager');
 const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('circuitBreakerTest');
 
-// Mock server for testing
-const MOCK_SERVER_URL = 'https://httpstat.us';
+// Mock functions for testing
+const createMockSuccessResponse = () => ({
+  status: 200,
+  data: { message: 'Mock success' },
+});
+
+const createMockFailureResponse = () => {
+  const error = new Error('Mock network failure');
+  error.code = 'ECONNRESET';
+  return Promise.reject(error);
+};
 
 /**
  * Test the circuit breaker implementation
@@ -44,6 +52,7 @@ async function testCircuitBreaker() {
   try {
     // Test 1: Successful API call
     logger.info('Test 1: Successful API call');
+    breakerManager.resetBreaker(); // Reset before each test
     const test1Result = {
       name: 'Successful API call',
       success: false,
@@ -53,7 +62,7 @@ async function testCircuitBreaker() {
     try {
       const response = await retryWithBreaker(
         async () => {
-          return await axios.get(`${MOCK_SERVER_URL}/200`);
+          return createMockSuccessResponse();
         },
         {
           maxRetries: 1,
@@ -82,6 +91,7 @@ async function testCircuitBreaker() {
 
     // Test 2: Retry functionality
     logger.info('Test 2: Retry functionality');
+    breakerManager.resetBreaker(); // Reset before each test
     const test2Result = {
       name: 'Retry functionality',
       success: false,
@@ -98,7 +108,7 @@ async function testCircuitBreaker() {
             // Fail on first attempt
             throw new Error('Simulated failure for retry test');
           }
-          return await axios.get(`${MOCK_SERVER_URL}/200`);
+          return createMockSuccessResponse();
         },
         {
           maxRetries: 2,
@@ -219,6 +229,7 @@ async function testCircuitBreaker() {
 
     // Test 4: Circuit timeout and reset
     logger.info('Test 4: Circuit timeout and reset');
+    breakerManager.resetBreaker(); // Reset before each test
     const test4Result = {
       name: 'Circuit timeout and reset',
       success: false,
@@ -251,7 +262,7 @@ async function testCircuitBreaker() {
       // Now try again, should succeed after timeout
       const response = await retryWithBreaker(
         async () => {
-          return await axios.get(`${MOCK_SERVER_URL}/200`);
+          return createMockSuccessResponse();
         },
         {
           maxRetries: 1,

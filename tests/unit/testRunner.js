@@ -26,7 +26,7 @@ let testApiKeyManager, testErrorClasses, testCommandHandler;
 function loadTestModules() {
   if (!testWeatherApi) {
     testWeatherApi = require('./weatherApiTest').testWeatherApi;
-    testCircuitBreaker = require('./circuitBreakerTest');
+    testCircuitBreaker = require('./circuitBreakerTest'); // Exports directly
     testHumanCircuitBreaker = require('./humanCircuitBreakerTest').testHumanCircuitBreaker;
     testInputSanitizer = require('./inputSanitizerTest').testInputSanitizer;
     testApiKeyManager = require('./apiKeyManagerTest').testApiKeyManager;
@@ -468,6 +468,7 @@ async function runRateLimiterTests(baseUrl = 'http://localhost:3000') {
 async function runWeatherApiTests() {
   try {
     logger.info('Running weather API tests');
+    loadTestModules();
     const results = await testWeatherApi();
     return results;
   } catch (error) {
@@ -531,6 +532,7 @@ async function runConversationStorageTests() {
 async function runCircuitBreakerTests() {
   try {
     logger.info('Running circuit breaker tests');
+    loadTestModules();
     const results = await testCircuitBreaker();
     return {
       success: results.success,
@@ -738,6 +740,76 @@ async function runErrorClassesTests() {
 async function runCommandHandlerTests() {
   loadTestModules();
   return testCommandHandler();
+}
+
+// Main execution when run directly
+if (require.main === module) {
+  (async () => {
+    console.log('🧪 Running Chimp-GPT Test Suite\n');
+    let totalTests = 0;
+    let passedTests = 0;
+    let failedTests = 0;
+    const results = {};
+
+    // Test suite configuration
+    const tests = [
+      { name: 'Error Classes', fn: runErrorClassesTests },
+      { name: 'Command Handler', fn: runCommandHandlerTests },
+      { name: 'Input Sanitizer', fn: runInputSanitizerTests },
+      { name: 'API Key Manager', fn: runApiKeyManagerTests },
+      { name: 'Human Circuit Breaker', fn: runHumanCircuitBreakerTests },
+      { name: 'Circuit Breaker', fn: runCircuitBreakerTests },
+      { name: 'Weather API', fn: runWeatherApiTests },
+    ];
+
+    // Run each test suite
+    for (const test of tests) {
+      try {
+        console.log(`Running ${test.name} tests...`);
+        const result = await test.fn();
+        results[test.name] = result;
+        totalTests++;
+
+        if (result.success) {
+          passedTests++;
+          console.log(`✅ ${test.name}: PASSED`);
+        } else {
+          failedTests++;
+          console.log(`❌ ${test.name}: FAILED`);
+          if (result.error) {
+            console.log(`   Error: ${result.error}`);
+          }
+        }
+
+        if (result.details) {
+          console.log(`   Details: ${JSON.stringify(result.details, null, 2)}`);
+        }
+        console.log('');
+      } catch (error) {
+        failedTests++;
+        totalTests++;
+        console.log(`❌ ${test.name}: ERROR - ${error.message}`);
+        results[test.name] = { success: false, error: error.message };
+      }
+    }
+
+    // Print summary
+    console.log('═══════════════════════════════════════');
+    console.log('📊 Test Summary');
+    console.log('═══════════════════════════════════════');
+    console.log(`Total Test Suites: ${totalTests}`);
+    console.log(`Passed: ${passedTests}`);
+    console.log(`Failed: ${failedTests}`);
+    console.log(
+      `Success Rate: ${totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0}%`
+    );
+
+    // Exit with appropriate code
+    process.exit(failedTests > 0 ? 1 : 0);
+  })().catch(error => {
+    console.error('Test runner error:', error);
+    process.exit(1);
+  });
 }
 
 // Export all test functions at the end to avoid circular dependencies

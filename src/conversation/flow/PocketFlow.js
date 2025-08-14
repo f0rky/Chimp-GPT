@@ -1,3 +1,15 @@
+/**
+ * PocketFlow - Simplified Core (KISS Principle)
+ *
+ * True to the original PocketFlow philosophy: "Keep it Simple, Stupid"
+ * This is the complete PocketFlow implementation in ~80 lines.
+ *
+ * Original PocketFlow: 100 lines Python
+ * Our implementation: ~80 lines JavaScript
+ *
+ * Used by SimpleChimpGPTFlow for efficient conversation processing.
+ */
+
 class Node {
   constructor(id, action) {
     this.id = id;
