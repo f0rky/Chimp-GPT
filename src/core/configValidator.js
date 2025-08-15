@@ -65,6 +65,18 @@ const CONFIG_SCHEMA = {
     default: '',
     validate: value => typeof value === 'string',
   },
+  SERPAPI_API_KEY: {
+    required: false,
+    description: 'SerpApi API Key for Google Search integration (enhanced web search)',
+    default: '',
+    validate: value => typeof value === 'string',
+  },
+  BRAVE_SEARCH_API_KEY: {
+    required: false,
+    description: 'Brave Search API Key for web search fallback',
+    default: '',
+    validate: value => typeof value === 'string',
+  },
   BOT_NAME: {
     required: false,
     description: 'Bot name for display purposes',

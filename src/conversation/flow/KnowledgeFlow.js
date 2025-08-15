@@ -248,19 +248,35 @@ class KnowledgeFlow {
       const searchPatterns = [
         /(?:search|look\s+up|lookup|find|confirm|verify|check)/i,
         /is\s+(?:it\s+)?true\s+that/i,
-        /can\s+you\s+(?:confirm|verify|search)/i,
-        /what\s+(?:is|are|does)/i,
+        /can\s+you\s+(?:confirm|verify|search|tell\s+me)/i,
+        /what\s+(?:is|are|does|was|were)/i,
+        /(?:what's|whats)/i,
         /documentation|docs/i, // Documentation requests trigger web search
         /tell\s+me\s+about/i,
         /explain/i,
         /information\s+about/i,
         /details\s+on/i,
         /summary\s+of/i,
+        /(?:give\s+me|show\s+me)/i,
+        /how\s+(?:does|do|can|to|is|are)/i,
+        /why\s+(?:is|are|does|do|did|was|were)/i,
+        /where\s+(?:is|are|can|to|was|were)/i,
+        /when\s+(?:is|are|was|were|did|do|does)/i,
+        /who\s+(?:is|are|was|were)/i,
+        /which\s+(?:is|are|was|were)/i,
+        /do\s+you\s+know/i,
+        /have\s+you\s+heard/i,
+        /(?:top|best|latest|current|new|recent)/i,
+        /(?:tutorial|guide|example)/i,
+        /(?:price|cost|value)/i,
+        /(?:javascript|python|react|node|programming|coding|development|tech|technology)/i,
       ];
 
-      // Enable information gathering for most queries - let web search handle PocketFlow too
+      // Enable information gathering for most queries - be more inclusive
       const needsInformation =
-        searchPatterns.some(pattern => pattern.test(content)) || content.length > 20; // Remove PocketFlow exception to enable web search
+        searchPatterns.some(pattern => pattern.test(content)) ||
+        content.length > 15 || // Lower threshold for triggering search
+        content.includes('?'); // Questions should trigger search
 
       // Extract the actual query/statement to work with
       let query = content;
@@ -287,8 +303,16 @@ class KnowledgeFlow {
 
       store.set('currentIntent', intentData);
 
+      // Log which patterns matched for debugging
+      const matchedSearchPatterns = searchPatterns.filter(pattern => pattern.test(content));
+      if (matchedSearchPatterns.length > 0) {
+        logger.debug(
+          `Search patterns matched: ${matchedSearchPatterns.map(p => p.source).join(', ')}`
+        );
+      }
+
       logger.info(
-        `Intent detected: ${needsInformation ? 'information gathering' : 'direct'} ${needsCode ? '+ code generation' : ''}`
+        `Intent detected: ${needsInformation ? 'information gathering' : 'direct'} ${needsCode ? '+ code generation' : ''} - matched ${matchedSearchPatterns.length} search patterns`
       );
 
       // Store intent data for other methods
@@ -323,25 +347,45 @@ class KnowledgeFlow {
 
       logger.info(`Gathering information for query: "${query}"`);
 
-      // Check for cached knowledge first
+      // Check for cached knowledge first with intelligent TTL
       const cached = store.getCachedResult(query);
-      if (cached && Date.now() - cached.timestamp < 24 * 60 * 60 * 1000) {
-        // Cache valid for 24 hours
-        logger.info(`Using cached knowledge for: "${query}" (confidence: ${cached.confidence}%)`);
+      if (cached) {
+        // Determine cache TTL based on query type
+        const isTimeSensitive = this.isTimeSensitiveQuery(query);
+        const isFinancial = this.isFinancialQuery(query);
+        const isLowConfidence = cached.confidence < 50;
 
-        return {
-          success: true,
-          informationGathered: true,
-          sources: [{ type: 'knowledge_cache', result: cached.result }],
-          informationData: {
-            query,
+        let cacheTTL;
+        if (isFinancial || isTimeSensitive) {
+          cacheTTL = 60 * 60 * 1000; // 1 hour for financial/time-sensitive
+        } else if (isLowConfidence) {
+          cacheTTL = 30 * 60 * 1000; // 30 minutes for low confidence results
+        } else {
+          cacheTTL = 24 * 60 * 60 * 1000; // 24 hours for general knowledge
+        }
+
+        if (Date.now() - cached.timestamp < cacheTTL) {
+          logger.info(
+            `Using cached knowledge for: "${query}" (confidence: ${cached.confidence}%, TTL: ${Math.round(cacheTTL / 60000)}min)`
+          );
+
+          return {
+            success: true,
+            informationGathered: true,
             sources: [{ type: 'knowledge_cache', result: cached.result }],
-            gatheringTime: Date.now(),
-            hasErrors: false,
-            sourceCount: 1,
-            fromCache: true,
-          },
-        };
+            informationData: {
+              query,
+              sources: [{ type: 'knowledge_cache', result: cached.result }],
+              gatheringTime: Date.now(),
+              hasErrors: false,
+              sourceCount: 1,
+              fromCache: true,
+            },
+          };
+        }
+        logger.info(
+          `Cache expired for: "${query}" (${isFinancial ? 'financial' : isTimeSensitive ? 'time-sensitive' : 'low-confidence'} query)`
+        );
       }
 
       // Parallel information gathering
@@ -888,6 +932,60 @@ class KnowledgeFlow {
       logger.error('Error in Discord formatting:', error);
       return data; // Return original data if formatting fails
     }
+  }
+
+  /**
+   * Check if a query is financial/price related (requires frequent updates)
+   */
+  isFinancialQuery(query) {
+    const financialKeywords = [
+      'price',
+      'cost',
+      'value',
+      'worth',
+      'bitcoin',
+      'crypto',
+      'stock',
+      'market',
+      'currency',
+      'exchange',
+      'trading',
+      'investment',
+      'ethereum',
+      'usd',
+      'dollar',
+      'euro',
+      'yen',
+      'rates',
+      'inflation',
+      'economy',
+      'financial',
+      'money',
+    ];
+    return financialKeywords.some(keyword => query.toLowerCase().includes(keyword));
+  }
+
+  /**
+   * Check if a query is time-sensitive (requires current information)
+   */
+  isTimeSensitiveQuery(query) {
+    const timeSensitiveKeywords = [
+      'current',
+      'latest',
+      'now',
+      'today',
+      'recent',
+      'new',
+      'breaking',
+      'live',
+      'real-time',
+      'updated',
+      '2025',
+      'this year',
+      'happening',
+      'trending',
+    ];
+    return timeSensitiveKeywords.some(keyword => query.toLowerCase().includes(keyword));
   }
 
   /**

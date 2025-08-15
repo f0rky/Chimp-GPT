@@ -75,23 +75,39 @@ class SimpleChimpGPTFlow {
 
         const knowledgePatterns = [
           // Explicit search/lookup requests
-          /(?:search|lookup|look\s+up|find)\s+(?:the\s+)?(?:top|best|latest|current|information|docs|documentation)/i,
+          /(?:search|lookup|look\s+up|find)\s+(?:for\s+)?(?:the\s+)?(?:top|best|latest|current|information|docs|documentation)/i,
+          /(?:search|lookup|look\s+up|find)\s+(?:for\s+)?(?:information\s+)?about/i,
+          /(?:search|lookup|look\s+up|find)/i, // More general search pattern
           /can\s+you\s+(?:search|lookup|look\s+up|find)/i,
           /(?:what\s+(?:are|is)|tell\s+me\s+about|information\s+about)\s+(?:the\s+)?(?:top|best|latest)/i,
 
-          // "Give me" requests
-          /(?:give\s+me|show\s+me)\s+(?:the\s+)?(?:top|best|latest|current)/i,
+          // "Give me" requests - expanded patterns
+          /(?:give\s+me|show\s+me)\s+(?:the\s+)?(?:top|best|latest|current|information)/i,
+          /(?:give\s+me|show\s+me)\s+(?:some\s+)?(?:information|details|facts)/i,
           /can\s+you\s+(?:give\s+me|show\s+me)\s+(?:the\s+)?(?:latest|current|top|best)/i,
 
-          // Question patterns that benefit from web search
+          // Question patterns that benefit from web search - more inclusive
           /what\s+(?:are|is)\s+the\s+(?:top|best|latest|current)/i,
+          /what\s+(?:are|is)/i, // More general "what is" pattern
           /(?:what's|whats)\s+the\s+(?:latest|current|top|best)/i,
+          /(?:what's|whats)/i, // More general "what's" pattern
           /is\s+(?:it\s+)?true\s+that/i,
-          /can\s+you\s+(?:confirm|verify)/i,
+          /can\s+you\s+(?:confirm|verify|tell\s+me)/i,
+          /do\s+you\s+know\s+(?:about|anything\s+about)/i,
+          /have\s+you\s+heard\s+(?:of|about)/i,
 
-          // Tech and documentation queries
-          /(?:top|best|latest)\s+(?:tech|technology|websites|sites|apps|tools)/i,
-          /(?:what\s+are\s+the\s+)?(?:top|best|latest)\s+.*(?:sites|websites|platforms|tools)/i,
+          // Tech and documentation queries - expanded
+          /(?:top|best|latest)\s+(?:tech|technology|websites|sites|apps|tools|frameworks|libraries)/i,
+          /(?:what\s+are\s+the\s+)?(?:top|best|latest)\s+.*(?:sites|websites|platforms|tools|languages|frameworks)/i,
+          /(?:javascript|python|react|node|programming|coding|development)/i, // Tech keywords
+
+          // More natural language patterns
+          /tell\s+me\s+about/i,
+          /explain\s+(?:to\s+me\s+)?(?:what|how)/i,
+          /how\s+(?:does|do|can|to)/i,
+          /why\s+(?:is|are|does|do)/i,
+          /where\s+(?:is|are|can|to)/i,
+          /when\s+(?:is|are|was|were|did)/i,
 
           // PocketFlow specific patterns
           /give\s+me\s+(?:the\s+)?pocketflow\s+code/i,
@@ -99,12 +115,22 @@ class SimpleChimpGPTFlow {
           /how\s+to\s+implement\s+pocketflow/i,
           /pocketflow\s+(?:implementation|example|code|documentation)/i,
           /(?:search|find|lookup)\s+pocketflow/i,
+
+          // Current events and trends
+          /(?:current|latest|recent|new)\s+(?:trends|news|updates|developments)/i,
+          /(?:price|cost|value)\s+of/i,
+          /(?:tutorial|guide|example)\s+(?:for|on|about)/i,
         ];
 
-        if (knowledgePatterns.some(pattern => pattern.test(content))) {
-          logger.info('Processing as knowledge system request');
+        // Test knowledge patterns and log which one matched
+        const matchedPattern = knowledgePatterns.find(pattern => pattern.test(content));
+        if (matchedPattern) {
+          logger.info(
+            `Processing as knowledge system request - matched pattern: ${matchedPattern.source}`
+          );
           return await this.handleKnowledgeRequest(store, data);
         }
+        logger.debug(`No knowledge patterns matched for: "${content.substring(0, 50)}..."`);
       }
 
       // Check for image generation patterns
