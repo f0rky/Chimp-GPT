@@ -322,9 +322,26 @@ async function fetchHealthData() {
     updateStatusDisplay(data);
     updateConversationMode(data.conversationMode);
     logDebug('Health data updated', 'info');
+
+    // Also fetch detailed health data for LLM providers
+    await fetchDetailedHealthData();
   } catch (error) {
     logDebug('Error fetching health data: ' + error.message, 'error');
     logDebug(`Error fetching health data: ${error.message}`, 'error');
+  }
+}
+
+async function fetchDetailedHealthData() {
+  try {
+    const response = await fetch('/health/detailed');
+    const data = await response.json();
+
+    logDebug('Detailed health data received from API', 'info');
+    updateLLMProvidersDisplay(data);
+    logDebug('LLM providers data updated', 'info');
+  } catch (error) {
+    logDebug('Error fetching detailed health data: ' + error.message, 'error');
+    // Don't show user error for this, just log it
   }
 }
 
@@ -337,6 +354,9 @@ async function fetchPerformanceData() {
     updatePerformanceDisplay(data);
     updateCharts(data);
     logDebug('Performance data updated', 'info');
+
+    // Also fetch detailed health data for LLM providers on performance tab
+    await fetchDetailedHealthData();
   } catch (error) {
     logDebug('Error fetching performance data: ' + error.message, 'error');
     logDebug(`Error fetching performance data: ${error.message}`, 'error');
@@ -536,6 +556,91 @@ function updateConversationMode(modeData) {
     el.textContent = modeData?.mode || 'Unknown';
     el.title = `Blended: ${modeData?.blendedConversations}, Reply Context: ${modeData?.replyContext}`;
   });
+}
+
+function updateLLMProvidersDisplay(data) {
+  logDebug('Updating LLM providers display', 'info');
+
+  // Update primary LLM
+  if (data.llmProviders?.primary) {
+    const primary = data.llmProviders.primary;
+
+    const primaryModel = document.getElementById('primaryLLMModel');
+    const primaryProvider = document.getElementById('primaryLLMProvider');
+    const primaryStatus = document.getElementById('primaryLLMStatus');
+
+    if (primaryModel) primaryModel.textContent = primary.model || 'Unknown Model';
+    if (primaryProvider) primaryProvider.textContent = primary.provider || 'Unknown Provider';
+    if (primaryStatus) {
+      primaryStatus.textContent = '●';
+      primaryStatus.className = `llm-status ${getHealthStatusClass(primary.status)}`;
+    }
+  }
+
+  // Update image generation LLM
+  if (data.llmProviders?.image) {
+    const image = data.llmProviders.image;
+
+    const imageModel = document.getElementById('imageLLMModel');
+    const imageProvider = document.getElementById('imageLLMProvider');
+    const imageStatus = document.getElementById('imageLLMStatus');
+
+    if (imageModel) imageModel.textContent = image.model || 'Unknown Model';
+    if (imageProvider) imageProvider.textContent = image.provider || 'Unknown Provider';
+    if (imageStatus) {
+      imageStatus.textContent = '●';
+      imageStatus.className = `llm-status ${getHealthStatusClass(image.status)}`;
+    }
+  }
+
+  // Update search engines
+  if (data.searchEngines) {
+    const engines = data.searchEngines;
+
+    if (engines.serpapi !== undefined) {
+      const serpStatus = document.getElementById('serpApiStatus');
+      if (serpStatus) {
+        serpStatus.textContent = '●';
+        serpStatus.className = `engine-status-indicator ${getHealthStatusClass(engines.serpapi.status)}`;
+      }
+    }
+
+    if (engines.brave !== undefined) {
+      const braveStatus = document.getElementById('braveStatus');
+      if (braveStatus) {
+        braveStatus.textContent = '●';
+        braveStatus.className = `engine-status-indicator ${getHealthStatusClass(engines.brave.status)}`;
+      }
+    }
+
+    if (engines.duckduckgo !== undefined) {
+      const duckduckgoStatus = document.getElementById('duckduckgoStatus');
+      if (duckduckgoStatus) {
+        duckduckgoStatus.textContent = '●';
+        duckduckgoStatus.className = `engine-status-indicator ${getHealthStatusClass(engines.duckduckgo.status)}`;
+      }
+    }
+  }
+
+  logDebug('LLM providers display updated', 'info');
+}
+
+function getHealthStatusClass(status) {
+  switch (status) {
+    case 'online':
+    case 'operational':
+    case 'ok':
+      return 'status-online';
+    case 'warning':
+    case 'degraded':
+      return 'status-warning';
+    case 'offline':
+    case 'error':
+    case 'failed':
+      return 'status-offline';
+    default:
+      return 'status-unknown';
+  }
 }
 
 function updateApiStats(apiCalls) {

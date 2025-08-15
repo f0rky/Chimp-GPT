@@ -217,7 +217,9 @@ module.exports = {
       // Handle the !status-report command
       if (
         message.content.toLowerCase() === '!status-report' ||
-        message.content.toLowerCase() === '.status-report'
+        message.content.toLowerCase() === '.status-report' ||
+        message.content.toLowerCase() === '!status' ||
+        message.content.toLowerCase() === '.status'
       ) {
         logger.info(
           {
@@ -228,20 +230,23 @@ module.exports = {
           'Status report message command received'
         );
 
-        // Only allow the owner to use this command
-        if (message.author.id !== config.OWNER_ID) {
-          logger.info('Non-owner tried to use status-report command');
-          await message.reply('Sorry, only the bot owner can use this command.');
-          return true; // We handled the message
-        }
-
+        // Use the enhanced status report command
         try {
-          await sendStatusReport(message.client);
-          logger.info('Status report sent via message command');
-          await message.reply('Status report sent to the owner!');
+          const { handleStatusCommand } = require('../../commands/statusReport');
+          await handleStatusCommand(message);
+          logger.info('Enhanced status report sent via message command');
         } catch (error) {
-          logger.error({ error }, 'Error sending status report via message command');
-          await message.reply('Failed to send status report. Check logs for details.');
+          logger.error({ error }, 'Error sending enhanced status report via message command');
+
+          // Fallback to old method if new one fails
+          try {
+            await sendStatusReport(message.client);
+            logger.info('Fallback status report sent via message command');
+            await message.reply('Status report sent (using fallback method)!');
+          } catch (fallbackError) {
+            logger.error({ fallbackError }, 'Fallback status report also failed');
+            await message.reply('Failed to send status report. Check logs for details.');
+          }
         }
 
         return true; // We handled the message

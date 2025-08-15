@@ -1216,3 +1216,212 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* LLM Providers Panel Styles */
+.llm-providers {
+  background: var(--card-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: var(--shadow);
+}
+
+.llm-providers h2 {
+  color: var(--text-color);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.llm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.llm-card {
+  background: var(--background-color);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.llm-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 12px rgba(114, 137, 218, 0.2);
+}
+
+.llm-card.primary {
+  border-left: 4px solid var(--primary-color);
+}
+
+.llm-card.image {
+  border-left: 4px solid #7b68ee;
+}
+
+.llm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.llm-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.llm-status {
+  font-size: 1.2rem;
+  color: var(--success-color);
+  transition: color 0.3s ease;
+}
+
+.llm-status.offline {
+  color: var(--error-color);
+}
+
+.llm-status.degraded {
+  color: var(--warning-color);
+}
+
+.llm-info {
+  margin-bottom: 0.75rem;
+}
+
+.llm-model {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--text-color);
+  margin-bottom: 0.25rem;
+}
+
+.llm-provider {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.llm-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.usage-tag {
+  background: var(--accent-bg);
+  color: var(--primary-color);
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.search-engines {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.search-engines h3 {
+  color: var(--text-color);
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.engine-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.engine-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--background-color);
+  padding: 0.75rem;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.engine-item:hover {
+  background: var(--hover);
+}
+
+.engine-name {
+  font-weight: 600;
+  color: var(--text-color);
+  flex: 1;
+}
+
+.engine-status-indicator {
+  font-size: 1rem;
+  margin: 0 0.5rem;
+  color: var(--success-color);
+  transition: color 0.3s ease;
+}
+
+.engine-status-indicator.offline {
+  color: var(--error-color);
+}
+
+.engine-status-indicator.degraded {
+  color: var(--warning-color);
+}
+
+/* Health status colors for LLM providers and search engines */
+.llm-status.status-online,
+.engine-status-indicator.status-online {
+  color: var(--success-color) !important;
+}
+
+.llm-status.status-warning,
+.engine-status-indicator.status-warning {
+  color: var(--warning-color) !important;
+}
+
+.llm-status.status-offline,
+.engine-status-indicator.status-offline {
+  color: var(--error-color) !important;
+}
+
+.llm-status.status-unknown,
+.engine-status-indicator.status-unknown {
+  color: var(--text-secondary) !important;
+}
+
+.engine-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.5rem;
+  background: var(--secondary-color);
+  border-radius: 10px;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Responsive adjustments for LLM panel */
+@media (max-width: 768px) {
+  .llm-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .engine-status {
+    grid-template-columns: 1fr;
+  }
+  
+  .engine-item {
+    padding: 0.5rem;
+  }
+}

@@ -838,6 +838,144 @@ function initStatusServer(options = {}) {
     });
 
     /**
+     * GET /health/detailed
+     * Enhanced health check endpoint with color coding and LLM provider info.
+     *
+     * @route GET /health/detailed
+     * @returns {Object} Detailed health with scores, colors, and provider info
+     */
+    app.get('/health/detailed', async (req, res) => {
+      try {
+        // Import status report utilities
+        const {
+          detectLLMProviders,
+          getServiceHealth,
+          getEnvironmentConfig,
+        } = require('../commands/statusReport');
+
+        const uptime = Math.floor((new Date() - stats.startTime) / 1000);
+        const memoryUsage = process.memoryUsage();
+
+        // Load persistent stats
+        const persistentStats = await statsStorage.loadStats();
+
+        // Get LLM provider information
+        const llmProviders = detectLLMProviders();
+
+        // Get service health with scores (client not available in this context)
+        const serviceHealth = await getServiceHealth(null);
+
+        // Get environment configuration
+        const envConfig = getEnvironmentConfig();
+
+        // Calculate memory percentage
+        const memUsed = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+        const memTotal = Math.round(memoryUsage.heapTotal / 1024 / 1024);
+        const memPercentage = Math.round((memUsed / memTotal) * 100);
+
+        // Determine memory health color
+        let memoryColor = 'green';
+        if (memPercentage > 80) memoryColor = 'red';
+        else if (memPercentage > 60) memoryColor = 'yellow';
+        else if (memPercentage > 40) memoryColor = 'blue';
+
+        // Calculate API call breakdown
+        const apiCallBreakdown = {
+          total: Object.values(persistentStats.apiCalls || {}).reduce((a, b) => a + b, 0),
+          openai: persistentStats.apiCalls?.openai || 0,
+          dalle: persistentStats.apiCalls?.dalle || 0,
+          weather: persistentStats.apiCalls?.weather || 0,
+          search:
+            (persistentStats.apiCalls?.serpapi || 0) +
+            (persistentStats.apiCalls?.brave || 0) +
+            (persistentStats.apiCalls?.duckduckgo || 0),
+        };
+
+        // Calculate error rate
+        const totalErrors = Object.values(persistentStats.errors || {}).reduce((a, b) => a + b, 0);
+        const errorRate =
+          persistentStats.messageCount > 0
+            ? ((totalErrors / persistentStats.messageCount) * 100).toFixed(2)
+            : 0;
+
+        // Build detailed health response
+        const detailedHealth = {
+          status: 'online',
+          timestamp: new Date().toISOString(),
+          uptime: {
+            seconds: uptime,
+            formatted: formatUptime(uptime),
+          },
+          llmProviders: {
+            primary: {
+              provider: llmProviders.primary.provider,
+              model: llmProviders.primary.model,
+              status: llmProviders.primary.configured ? 'online' : 'offline',
+              health: llmProviders.primary.configured ? 100 : 0,
+              color: llmProviders.primary.configured ? 'green' : 'red',
+              usage: llmProviders.primary.usage,
+            },
+            imageGeneration: {
+              provider: llmProviders.imageGeneration.provider,
+              model: llmProviders.imageGeneration.model,
+              status: llmProviders.imageGeneration.configured ? 'online' : 'offline',
+              health: llmProviders.imageGeneration.configured ? 100 : 0,
+              color: llmProviders.imageGeneration.configured ? 'green' : 'red',
+              usage: llmProviders.imageGeneration.usage,
+            },
+            searchEngines: llmProviders.searchEngines,
+          },
+          services: serviceHealth,
+          environment: envConfig,
+          performance: {
+            memory: {
+              used: memUsed,
+              total: memTotal,
+              percentage: memPercentage,
+              color: memoryColor,
+              formatted: `${memUsed}MB/${memTotal}MB`,
+            },
+            cpu: {
+              usage: process.cpuUsage(),
+              loadAvg: os.loadavg()[0].toFixed(2),
+            },
+            responseTime: {
+              discord: serviceHealth.discord.details?.ping || 0,
+              trend: 'stable',
+            },
+          },
+          statistics: {
+            messages: persistentStats.messageCount || 0,
+            apiCalls: apiCallBreakdown,
+            errors: {
+              total: totalErrors,
+              rate: parseFloat(errorRate),
+              breakdown: persistentStats.errors || {},
+            },
+            rateLimits: {
+              count: persistentStats.rateLimits?.hit || 0,
+              users: persistentStats.rateLimits?.userCounts || {},
+            },
+          },
+          version: {
+            bot: getDetailedVersionInfo().version,
+            node: process.version,
+            platform: process.platform,
+          },
+        };
+
+        res.json(detailedHealth);
+      } catch (error) {
+        logger.error('Error generating detailed health report:', error);
+        res.status(500).json({
+          status: 'error',
+          message: 'Failed to generate detailed health report',
+          error: error.message,
+        });
+      }
+    });
+
+    /**
      * GET /version
      * Returns detailed version information about the bot.
      *
