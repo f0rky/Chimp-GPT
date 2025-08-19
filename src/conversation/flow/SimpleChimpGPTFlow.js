@@ -135,9 +135,14 @@ class SimpleChimpGPTFlow {
 
       // Check for image generation patterns
       const imagePatterns = [
+        // Direct drawing/creation requests
+        /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
+        // Specific image/picture requests
         /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
         /(?:image|picture|photo)\s+of/i,
         /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
+        // "I want/need" patterns
+        /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
       ];
 
       if (imagePatterns.some(pattern => pattern.test(content))) {
@@ -214,8 +219,13 @@ class SimpleChimpGPTFlow {
 
       logger.info(`Processing image generation request: ${prompt.substring(0, 50)}...`);
 
+      // Create OpenAI client (same approach as PocketFlowFunctionProcessor)
+      const configFile = require('../../core/configValidator');
+      const { OpenAI } = require('openai');
+      const openaiClient = new OpenAI({ apiKey: configFile.OPENAI_API_KEY });
+
       // Call OpenAI DALL-E API
-      const imageResponse = await this.openaiClient.images.generate({
+      const imageResponse = await openaiClient.images.generate({
         model: 'dall-e-3',
         prompt: prompt,
         n: 1,
@@ -256,6 +266,21 @@ class SimpleChimpGPTFlow {
         const imageBuffer = await downloadImage(imageUrl);
         const fileName = `generated_image_${Date.now()}.png`;
 
+        // Validate buffer before using it
+        if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
+          logger.error('Downloaded image buffer is invalid:', {
+            bufferExists: !!imageBuffer,
+            isBuffer: Buffer.isBuffer(imageBuffer),
+            bufferType: typeof imageBuffer,
+          });
+          throw new Error('Failed to download image - invalid buffer');
+        }
+
+        logger.debug('Image downloaded successfully:', {
+          bufferSize: imageBuffer.length,
+          fileName: fileName,
+        });
+
         // Save image to PFP rotation if PFPManager is available
         if (this.pfpManager) {
           try {
@@ -269,7 +294,7 @@ class SimpleChimpGPTFlow {
 
         return {
           success: true,
-          response: `🎨 **Image Generated Successfully!** *(Added to PFP rotation)*`,
+          response: `Here's your generated image for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
           type: 'image',
           imageUrl: imageUrl,
           attachment: {
@@ -283,17 +308,43 @@ class SimpleChimpGPTFlow {
         // Fallback to clean link if download fails
         return {
           success: true,
-          response: `🎨 **Image Generated!** [Click to view your image](${imageUrl})`,
+          response: `Your image has been generated! [Click to view](${imageUrl})`,
           type: 'image',
           imageUrl: imageUrl,
         };
       }
     } catch (error) {
-      logger.error('Error generating image:', error);
+      logger.error('Error generating image:', {
+        error: error.message,
+        stack: error.stack,
+        errorType: error.constructor.name,
+        errorCode: error.code || 'unknown',
+      });
+
+      // Handle specific error types with user-friendly messages
+      let userMessage = "I'm having trouble generating that image right now. Please try again.";
+
+      if (
+        error.code === 'billing_hard_limit_reached' ||
+        error.message?.includes('Billing hard limit')
+      ) {
+        userMessage =
+          '🎰 Oops! The image generation slot machine needs more coins! The OpenAI account has hit its billing limit. Time to feed the machine some more credits! 💰';
+      } else if (error.code === 'rate_limit_exceeded' || error.message?.includes('rate limit')) {
+        userMessage =
+          "🐌 Whoa there, speed racer! I'm generating images too fast. Let me catch my breath for a moment and try again in a few seconds!";
+      } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
+        userMessage =
+          '🤔 Hmm, something about that request confused my artistic brain. Could you try describing the image a bit differently?';
+      } else if (error.message?.includes('content_policy')) {
+        userMessage =
+          "🚫 Uh oh! That image request bumped into OpenAI's content policy. Let's try something a bit more family-friendly!";
+      }
+
       return {
         success: false,
         error: error.message,
-        response: "I'm having trouble generating that image right now. Please try again.",
+        response: userMessage,
       };
     }
   }
@@ -343,11 +394,25 @@ class SimpleChimpGPTFlow {
         messageContent: data?.message?.content || 'unknown',
         userId: data?.message?.author?.id || 'unknown',
       });
+      // Handle specific error types with user-friendly messages
+      let userMessage =
+        "I'm having trouble processing your knowledge request right now. Please try again.";
+
+      if (
+        error.code === 'billing_hard_limit_reached' ||
+        error.message?.includes('Billing hard limit')
+      ) {
+        userMessage =
+          '🧠 My knowledge bank ran out of research credits! The OpenAI account hit its billing limit. Time to refill the intellectual fuel tank! 📚💰';
+      } else if (error.code === 'rate_limit_exceeded' || error.message?.includes('rate limit')) {
+        userMessage =
+          "🔍 I'm searching for answers too fast and making the knowledge servers dizzy! Let me slow down my research pace... 📖";
+      }
+
       return {
         success: false,
         error: error.message,
-        response:
-          "I'm having trouble processing your knowledge request right now. Please try again.",
+        response: userMessage,
       };
     }
   }
@@ -462,10 +527,25 @@ class SimpleChimpGPTFlow {
         weatherDataType: weatherData?.type || 'unknown',
         hasFormattedSummary: !!weatherData?.formattedSummary,
       });
+      // Handle specific error types with user-friendly messages
+      let userMessage =
+        "I'm having trouble getting the weather right now. Please try again in a moment.";
+
+      if (
+        error.code === 'billing_hard_limit_reached' ||
+        error.message?.includes('Billing hard limit')
+      ) {
+        userMessage =
+          '🌧️ Looks like my weather radar ran out of coins! The OpenAI account hit its billing limit. Time to refuel the forecast machine! ⛽💰';
+      } else if (error.code === 'rate_limit_exceeded' || error.message?.includes('rate limit')) {
+        userMessage =
+          "🌪️ Whoa! I'm checking the weather too fast and causing a storm in the servers! Let the clouds settle for a moment... ☁️";
+      }
+
       return {
         success: false,
         error: error.message,
-        response: "I'm having trouble getting the weather right now. Please try again in a moment.",
+        response: userMessage,
       };
     }
   }
@@ -566,10 +646,25 @@ class SimpleChimpGPTFlow {
         messageContent: data?.message?.content || 'unknown',
         userId: data?.message?.author?.id || 'unknown',
       });
+      // Handle specific error types with user-friendly messages
+      let userMessage =
+        "I'm having trouble getting the time right now. Please try again in a moment.";
+
+      if (
+        error.code === 'billing_hard_limit_reached' ||
+        error.message?.includes('Billing hard limit')
+      ) {
+        userMessage =
+          '⏰ Oops! My internal clock ran out of battery! The OpenAI account hit its billing limit. Time to charge up those time-telling tokens! 🔋💰';
+      } else if (error.code === 'rate_limit_exceeded' || error.message?.includes('rate limit')) {
+        userMessage =
+          "🕐 Tick tock, I'm checking time too fast! Let me slow down my clock for a moment... ⏳";
+      }
+
       return {
         success: false,
         error: error.message,
-        response: "I'm having trouble getting the time right now. Please try again in a moment.",
+        response: userMessage,
       };
     }
   }
@@ -670,10 +765,31 @@ class SimpleChimpGPTFlow {
       };
     } catch (error) {
       logger.error('Error in conversation handling:', error);
+
+      // Handle specific error types with user-friendly messages
+      let userMessage = "I'm having trouble processing your message right now. Please try again.";
+
+      if (
+        error.code === 'billing_hard_limit_reached' ||
+        error.message?.includes('Billing hard limit')
+      ) {
+        userMessage =
+          "💸 Uh oh! My brain ran out of thinking tokens! The OpenAI account hit its billing limit. Time to top up the ol' digital wallet! 🧠💰";
+      } else if (error.code === 'rate_limit_exceeded' || error.message?.includes('rate limit')) {
+        userMessage =
+          "🏃‍♂️ Whoa, I'm thinking too fast and my brain is overheating! Give me a sec to cool down and I'll be right back! ❄️";
+      } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
+        userMessage =
+          '🤷‍♂️ Something about your message scrambled my circuits a bit. Could you try rephrasing that?';
+      } else if (error.message?.includes('content_policy')) {
+        userMessage =
+          "🚫 Oops! That topic bumped into my content guidelines. Let's chat about something else! 😊";
+      }
+
       return {
         success: false,
         error: error.message,
-        response: "I'm having trouble processing your message right now. Please try again.",
+        response: userMessage,
       };
     }
   }

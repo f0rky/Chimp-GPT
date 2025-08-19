@@ -1,4 +1,5 @@
 const { discord: discordLogger } = require('../logger');
+const { EmbedBuilder } = require('discord.js');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { checkUserRateLimit } = require('../../middleware/rateLimiter');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
@@ -52,6 +53,22 @@ class MessageEventHandler {
     }
 
     this.setupEventHandlers();
+  }
+
+  /**
+   * Creates a Discord embed for displaying generated images
+   * @param {string} imageUrl - The URL of the generated image
+   * @param {string} responseText - The response text from PocketFlow
+   * @returns {EmbedBuilder} - The Discord embed object
+   */
+  createImageEmbed(imageUrl, responseText) {
+    return new EmbedBuilder()
+      .setTitle('🎨 Image Generated Successfully!')
+      .setDescription(responseText)
+      .setImage(imageUrl)
+      .setColor(0x9932cc) // Purple/artistic theme
+      .setTimestamp()
+      .setFooter({ text: 'Generated via PocketFlow • Added to PFP rotation' });
   }
 
   setupEventHandlers() {
@@ -196,6 +213,24 @@ class MessageEventHandler {
       addTiming('before_thinking_message');
       const feedbackPromise = message.channel.send(`${this.loadingEmoji} Thinking...`);
 
+      // Log the initial message creation for tracking
+      feedbackPromise
+        .then(msg => {
+          discordLogger.info('Created initial thinking message:', {
+            thinkingMessageId: msg.id,
+            channelId: msg.channelId,
+            originalMessageId: message.id,
+            authorId: message.author.id,
+          });
+        })
+        .catch(err => {
+          discordLogger.error('Failed to create initial thinking message:', {
+            error: err.message,
+            channelId: message.channelId,
+            originalMessageId: message.id,
+          });
+        });
+
       // Track message for stats - this is fast and helps with metrics
       trackMessage();
       addTiming('after_tracking_message');
@@ -269,8 +304,8 @@ class MessageEventHandler {
       addTiming('before_stats_command_check');
       if (isStatsCommand(message)) {
         addTiming('stats_command_detected');
-        const feedbackMessage = await feedbackPromise; // Make sure we have the feedback message first
-        await feedbackMessage.delete().catch(() => {
+        const statsFeedbackMessage = await feedbackPromise; // Make sure we have the feedback message first
+        await statsFeedbackMessage.delete().catch(() => {
           /* Ignore deletion errors */
         }); // Delete the thinking message
         await handleStatsCommand(message);
@@ -285,8 +320,8 @@ class MessageEventHandler {
       addTiming('after_command_handling', { wasCommand: isCommand });
       if (isCommand) {
         // If it was a command, delete the thinking message and exit
-        const feedbackMessage = await feedbackPromise;
-        await feedbackMessage.delete().catch(() => {
+        const commandFeedbackMessage = await feedbackPromise;
+        await commandFeedbackMessage.delete().catch(() => {
           /* Ignore deletion errors */
         });
         return;
@@ -320,8 +355,8 @@ class MessageEventHandler {
         trackRateLimit(message.author.id);
 
         // Update the feedback message instead of sending a new one
-        const feedbackMessage = await feedbackPromise;
-        await feedbackMessage.edit(`⏱️ ${rateLimitResult.message}`);
+        const rateLimitFeedbackMessage = await feedbackPromise;
+        await rateLimitFeedbackMessage.edit(`⏱️ ${rateLimitResult.message}`);
         addTiming('rate_limit_message_edited');
         return;
       }
@@ -379,70 +414,7 @@ class MessageEventHandler {
         );
       }
 
-      // Check for image generation requests and bypass PocketFlow for performance
-      const lowerContent = message.content.toLowerCase().trim();
-      const imagePhrases = [
-        /^draw (?:me |us |a |an |the )?/i,
-        /^generate (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^create (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^make (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)/i,
-        /^(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)/i,
-        /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i,
-      ];
-
-      const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
-
-      if (isImageRequest) {
-        discordLogger.debug('Bypassing PocketFlow for image generation request', {
-          content: message.content.substring(0, 50) + '...',
-        });
-
-        // Clean up the prompt by removing the command phrases
-        let cleanPrompt = message.content;
-        for (const phrase of imagePhrases) {
-          cleanPrompt = cleanPrompt.replace(phrase, '').trim();
-        }
-
-        // Import and call the image generation handler directly
-        const { handleImageGeneration } = require('../../handlers/imageGenerationHandler');
-
-        // Process the image generation request directly
-        try {
-          addTiming('before_image_generation');
-          const imageResult = await handleImageGeneration(
-            { prompt: cleanPrompt },
-            await feedbackPromise,
-            [], // empty conversation log for bypass
-            Date.now(),
-            {}, // usage
-            {}, // timings
-            (startTime, _usage, _functionTimings) => {
-              const elapsed = Date.now() - startTime;
-              return `\n\n⏱️ Generated in ${Math.round(elapsed / 1000)}s`;
-            },
-            () => {
-              /* storeMessageRelationship placeholder */
-            }, // storeMessageRelationship
-            this.statusManager,
-            this.pfpManager
-          );
-          addTiming('after_image_generation');
-
-          // Image generation was handled directly, skip PocketFlow
-          discordLogger.info('Image generation completed via bypass', {
-            messageId: message.id,
-            success: !!imageResult,
-          });
-          return;
-        } catch (error) {
-          discordLogger.error('Image generation bypass failed, falling back to PocketFlow', {
-            error: error.message,
-            messageId: message.id,
-          });
-          // Fall through to PocketFlow processing
-        }
-      }
+      // PocketFlow now handles all message types including image generation
 
       // Use PocketFlow for conversation processing
       addTiming('before_pocketflow_processing');
@@ -454,24 +426,247 @@ class MessageEventHandler {
         type: flowResult.type,
       });
 
+      // Debug flowResult structure for image requests
+      if (flowResult && flowResult.type === 'image') {
+        try {
+          // Log each piece of information separately to avoid truncation
+          discordLogger.debug('Image flowResult - Success:', String(flowResult.success));
+          discordLogger.debug('Image flowResult - Type:', String(flowResult.type));
+          discordLogger.debug('Image flowResult - Has Response:', String(!!flowResult.response));
+          discordLogger.debug(
+            'Image flowResult - Has Attachment:',
+            String(!!flowResult.attachment)
+          );
+          discordLogger.debug(
+            'Image flowResult - Image URL:',
+            String(flowResult.imageUrl || 'none')
+          );
+
+          if (flowResult.attachment) {
+            try {
+              discordLogger.debug(
+                'Image flowResult - Attachment Keys:',
+                Object.keys(flowResult.attachment).join(',')
+              );
+              discordLogger.debug(
+                'Image flowResult - Has Buffer:',
+                String(!!flowResult.attachment.buffer)
+              );
+              discordLogger.debug(
+                'Image flowResult - File Name:',
+                String(flowResult.attachment.name || 'unknown')
+              );
+
+              if (flowResult.attachment.buffer) {
+                discordLogger.debug(
+                  'Image flowResult - Buffer Type:',
+                  typeof flowResult.attachment.buffer
+                );
+                discordLogger.debug(
+                  'Image flowResult - Is Buffer:',
+                  String(Buffer.isBuffer(flowResult.attachment.buffer))
+                );
+                discordLogger.debug(
+                  'Image flowResult - Buffer Length:',
+                  String(flowResult.attachment.buffer.length || 'unknown')
+                );
+              }
+            } catch (attachmentError) {
+              discordLogger.error(
+                'Image flowResult - Attachment Debug Error:',
+                String(attachmentError.message)
+              );
+            }
+          }
+        } catch (debugError) {
+          discordLogger.error('Image flowResult - Debug Failed:', String(debugError.message));
+        }
+      }
+
       // Send PocketFlow response back to Discord
       if (flowResult.response) {
-        const responseFeedbackMessage = await feedbackPromise;
-        if (responseFeedbackMessage) {
+        // Use the same feedbackMessage reference we already have
+        if (feedbackMessage) {
           // Check if this is an image response with attachment
           if (flowResult.type === 'image' && flowResult.attachment) {
-            await responseFeedbackMessage.edit({
-              content: flowResult.response,
-              files: [
-                {
-                  attachment: flowResult.attachment.buffer,
-                  name: flowResult.attachment.name,
-                },
-              ],
-            });
+            discordLogger.debug('Processing image attachment for Discord');
+
+            // Validate attachment buffer before sending
+            if (!flowResult.attachment.buffer) {
+              discordLogger.error('Image attachment buffer is missing', {
+                hasAttachment: !!flowResult.attachment,
+                attachmentKeys: Object.keys(flowResult.attachment || {}),
+                bufferType: typeof flowResult.attachment.buffer,
+                imageUrl: flowResult.imageUrl,
+              });
+
+              // Fallback to URL-only response if buffer is missing
+              if (flowResult.imageUrl) {
+                await feedbackMessage.edit(
+                  `${flowResult.response}\n\n[Click to view image](${flowResult.imageUrl})`
+                );
+              } else {
+                await feedbackMessage.edit(
+                  `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`
+                );
+              }
+            } else {
+              // Additional buffer validation just before Discord API call
+              try {
+                if (!Buffer.isBuffer(flowResult.attachment.buffer)) {
+                  discordLogger.error('Buffer validation failed before Discord API call:', {
+                    bufferType: typeof flowResult.attachment.buffer,
+                    isBuffer: Buffer.isBuffer(flowResult.attachment.buffer),
+                    bufferConstructor: flowResult.attachment.buffer?.constructor?.name,
+                    hasLength: 'length' in (flowResult.attachment.buffer || {}),
+                    attachmentName: flowResult.attachment.name,
+                  });
+                  throw new Error('Invalid buffer before Discord API call');
+                }
+
+                discordLogger.debug('Buffer validation passed, sending to Discord:', {
+                  bufferSize: flowResult.attachment.buffer.length,
+                  fileName: flowResult.attachment.name,
+                  bufferType: typeof flowResult.attachment.buffer,
+                });
+
+                // Enhanced logging for message edit operation
+                discordLogger.info('Attempting to edit message with image attachment:', {
+                  messageId: feedbackMessage.id,
+                  channelId: feedbackMessage.channelId,
+                  contentLength: flowResult.response.length,
+                  bufferSize: flowResult.attachment.buffer.length,
+                  fileName: flowResult.attachment.name,
+                });
+
+                await feedbackMessage.edit({
+                  content: flowResult.response,
+                  files: [
+                    {
+                      attachment: flowResult.attachment.buffer,
+                      name: flowResult.attachment.name,
+                    },
+                  ],
+                });
+
+                discordLogger.info('Successfully edited message with image attachment:', {
+                  messageId: feedbackMessage.id,
+                  operation: 'edit_with_file_attachment',
+                });
+              } catch (discordError) {
+                // Log detailed error information separately to avoid truncation
+                discordLogger.error(
+                  'Discord API call failed - Error Message:',
+                  String(discordError.message)
+                );
+                discordLogger.error(
+                  'Discord API call failed - Error Name:',
+                  String(discordError.name || 'Unknown')
+                );
+                discordLogger.error(
+                  'Discord API call failed - Error Code:',
+                  String(discordError.code || 'No code')
+                );
+                discordLogger.error('Discord API call failed - Message Info:', {
+                  messageId: feedbackMessage.id,
+                  channelId: feedbackMessage.channelId,
+                  messageExists: !!feedbackMessage,
+                  hasEditFunction: typeof feedbackMessage.edit === 'function',
+                });
+
+                if (discordError.stack) {
+                  discordLogger.error(
+                    'Discord API call failed - Stack trace:',
+                    String(discordError.stack)
+                  );
+                }
+
+                discordLogger.error('Discord API call failed - Buffer Info:', {
+                  bufferExists: !!flowResult.attachment.buffer,
+                  bufferSize: flowResult.attachment.buffer?.length || 'unknown',
+                  fileName: flowResult.attachment.name || 'unknown',
+                  bufferIsBuffer: Buffer.isBuffer(flowResult.attachment.buffer),
+                  bufferType: typeof flowResult.attachment.buffer,
+                });
+
+                // Fallback to embed if Discord upload fails
+                try {
+                  if (flowResult.imageUrl) {
+                    discordLogger.info('Attempting fallback to embed after upload failure:', {
+                      messageId: feedbackMessage.id,
+                      imageUrl: flowResult.imageUrl.substring(0, 50) + '...',
+                    });
+                    const imageEmbed = this.createImageEmbed(
+                      flowResult.imageUrl,
+                      flowResult.response
+                    );
+
+                    // Clear content and files, only use embed
+                    await feedbackMessage.edit({
+                      content: null,
+                      embeds: [imageEmbed],
+                      files: [], // Explicitly clear files
+                    });
+
+                    discordLogger.info('Successfully edited message with embed fallback:', {
+                      messageId: feedbackMessage.id,
+                      operation: 'edit_with_embed_fallback',
+                    });
+                  } else {
+                    discordLogger.info('Attempting fallback to text-only response:', {
+                      messageId: feedbackMessage.id,
+                    });
+                    await feedbackMessage.edit({
+                      content: `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`,
+                      embeds: [],
+                      files: [],
+                    });
+                    discordLogger.info('Successfully edited message with text fallback:', {
+                      messageId: feedbackMessage.id,
+                      operation: 'edit_with_text_fallback',
+                    });
+                  }
+                } catch (fallbackError) {
+                  discordLogger.error('Fallback edit operation also failed:', {
+                    messageId: feedbackMessage.id,
+                    fallbackError: String(fallbackError.message),
+                    fallbackErrorCode: fallbackError.code || 'unknown',
+                    originalError: String(discordError.message),
+                  });
+                  throw fallbackError; // Re-throw to trigger higher-level error handling
+                }
+              }
+            }
             addTiming('after_image_attachment_message');
           } else {
-            await responseFeedbackMessage.edit(flowResult.response);
+            // Non-image response - standard text edit
+            try {
+              discordLogger.info('Attempting to edit message with standard response:', {
+                messageId: feedbackMessage.id,
+                channelId: feedbackMessage.channelId,
+                contentLength: flowResult.response.length,
+                responseType: flowResult.type || 'unknown',
+              });
+
+              await feedbackMessage.edit(flowResult.response);
+
+              discordLogger.info('Successfully edited message with standard response:', {
+                messageId: feedbackMessage.id,
+                operation: 'edit_with_text_response',
+                responseType: flowResult.type || 'unknown',
+              });
+            } catch (editError) {
+              discordLogger.error('Failed to edit message with standard response:', {
+                messageId: feedbackMessage.id,
+                channelId: feedbackMessage.channelId,
+                editError: String(editError.message),
+                editErrorCode: editError.code || 'unknown',
+                messageExists: !!feedbackMessage,
+                hasEditFunction: typeof feedbackMessage.edit === 'function',
+                contentLength: flowResult.response.length,
+              });
+              throw editError; // Re-throw to trigger higher-level error handling
+            }
             addTiming('after_edit_message');
           }
 
@@ -487,7 +682,7 @@ class MessageEventHandler {
 
             enhancedMessageManager.storeRelationship(
               message.id,
-              responseFeedbackMessage,
+              feedbackMessage,
               {
                 id: message.author.id,
                 username: message.author.username,
@@ -509,9 +704,9 @@ class MessageEventHandler {
         }
       } else {
         // If no response, provide fallback message
-        const responseFeedbackMessage = await feedbackPromise;
-        if (responseFeedbackMessage) {
-          await responseFeedbackMessage.edit(
+        const fallbackFeedbackMessage = await feedbackPromise;
+        if (fallbackFeedbackMessage) {
+          await fallbackFeedbackMessage.edit(
             '❌ I encountered an issue processing your message. Please try again.'
           );
           addTiming('after_fallback_message');
