@@ -14,6 +14,7 @@ const _path = require('path');
 const crypto = require('crypto');
 const { Readable, Transform, pipeline } = require('stream');
 const { promisify } = require('util');
+// AttachmentBuilder no longer used - using simple attachment objects for better compatibility
 const { createLogger } = require('../core/logger');
 const { createSecureTempFile } = require('./securityUtils');
 
@@ -199,9 +200,15 @@ async function processImageStream(base64Data, options = {}) {
     );
 
     // Check if we need to use streaming (for large images) or can process in memory
-    if (estimatedSize <= STREAMING_CONFIG.CHUNK_SIZE * 2) {
-      // Small image - process directly in memory for efficiency
-      logger.debug({ fileName, estimatedSize }, 'Using direct processing for small image');
+    // TEMPORARY FIX: Force direct processing to avoid undici buffer issues with streaming
+    // The streaming approach has buffer lifecycle issues with Discord.js v14 + undici
+    if (estimatedSize <= 8 * 1024 * 1024) {
+      // Under 8MB Discord limit - process directly
+      // Process directly in memory to avoid streaming buffer issues
+      logger.debug(
+        { fileName, estimatedSize },
+        'Using direct processing to avoid undici buffer issues'
+      );
 
       const buffer = Buffer.from(base64Data, 'base64');
       const hash = crypto.createHash(STREAMING_CONFIG.HASH_ALGORITHM).update(buffer).digest('hex');
@@ -237,6 +244,11 @@ async function processImageStream(base64Data, options = {}) {
 
     // Read the processed file back into memory (now validated and chunked)
     const processedBuffer = await fs.readFile(tempFilePath);
+
+    // Validate that we actually got a buffer
+    if (!processedBuffer || processedBuffer.length === 0) {
+      throw new Error('Streaming processing produced empty buffer');
+    }
 
     // Clean up temp file
     await fs.unlink(tempFilePath).catch(() => {
@@ -288,15 +300,28 @@ async function processImageStream(base64Data, options = {}) {
 }
 
 /**
- * Create a Discord-compatible attachment from processed image data
+ * Create a Discord-compatible attachment from processed image data using file-based approach
+ * This method avoids undici buffer issues by using temporary files
  * @param {Object} processedImage - Result from processImageStream
  * @param {string} [fileName] - Custom filename for the attachment
  * @param {string} [mimeType='image/png'] - MIME type for the image
  * @returns {Object} Discord attachment object
  */
 function createDiscordAttachment(processedImage, fileName, mimeType = 'image/png') {
-  if (!processedImage.success || !processedImage.buffer) {
-    throw new Error('Invalid processed image data');
+  if (!processedImage.success) {
+    throw new Error('Processed image indicates failure');
+  }
+
+  if (!processedImage.buffer || processedImage.buffer === null) {
+    throw new Error('Processed image buffer is null or undefined');
+  }
+
+  if (!Buffer.isBuffer(processedImage.buffer)) {
+    throw new Error('Processed image buffer is not a valid Buffer object');
+  }
+
+  if (processedImage.buffer.length === 0) {
+    throw new Error('Processed image buffer is empty');
   }
 
   // Determine file extension from MIME type
@@ -304,13 +329,42 @@ function createDiscordAttachment(processedImage, fileName, mimeType = 'image/png
 
   const finalFileName = fileName || `generated_image_${Date.now()}.${extension}`;
 
-  // For Discord.js v14, we need to use the correct attachment format
-  // Discord.js v14 accepts both old and new formats, but prefers the new one
-  return {
-    attachment: processedImage.buffer,
-    name: finalFileName,
-    description: 'AI Generated Image',
-  };
+  try {
+    // USE SIMPLE ATTACHMENT OBJECT (like PocketFlow) instead of AttachmentBuilder
+    // This avoids the undici buffer issues completely by using the old Discord.js format
+
+    const attachment = {
+      attachment: processedImage.buffer,
+      name: finalFileName,
+      description: 'AI Generated Image',
+    };
+
+    // Log the attachment creation for debugging
+    logger.debug(
+      {
+        bufferLength: processedImage.buffer.length,
+        fileName: finalFileName,
+        attachmentType: typeof attachment,
+        hasBuffer: !!attachment.attachment,
+        bufferType: typeof attachment.attachment,
+        isBuffer: Buffer.isBuffer(attachment.attachment),
+        method: 'simple-object',
+      },
+      'Discord attachment created successfully using simple object approach (like PocketFlow)'
+    );
+
+    return attachment;
+  } catch (attachmentError) {
+    logger.error(
+      {
+        error: attachmentError,
+        bufferLength: processedImage.buffer.length,
+        fileName: finalFileName,
+      },
+      'Failed to create simple attachment object'
+    );
+    throw new Error(`Failed to create simple attachment object: ${attachmentError.message}`);
+  }
 }
 
 /**
@@ -325,9 +379,27 @@ function shouldUseStreaming(base64Data) {
   return estimatedSize > STREAMING_CONFIG.CHUNK_SIZE * 2;
 }
 
+/**
+ * Clean up temporary file created by createDiscordAttachment
+ * @param {Object} attachment - The attachment object (no longer needs cleanup for simple objects)
+ */
+function cleanupTempFile(attachment) {
+  // No cleanup needed for simple attachment objects (no temp files created)
+  // This function is kept for API compatibility but does nothing now
+  logger.debug(
+    {
+      hasAttachment: !!attachment,
+      attachmentType: typeof attachment,
+      method: 'no-cleanup-needed',
+    },
+    'No cleanup needed for simple attachment object'
+  );
+}
+
 module.exports = {
   processImageStream,
   createDiscordAttachment,
+  cleanupTempFile,
   shouldUseStreaming,
   base64ToStream,
   ImageStreamProcessor,

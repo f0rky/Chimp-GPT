@@ -17,7 +17,7 @@ const logger = createLogger('PocketFlowFunctionProcessor');
 const lookupTime = require('../../services/timeLookup');
 const { lookupWeather, lookupExtendedForecast } = require('../../services/weatherLookup');
 const lookupWolfram = require('../../services/wolframLookup');
-const { handleImageGeneration } = require('../../handlers/imageGenerationHandler');
+// Note: Using direct OpenAI API call instead of legacy handler for PocketFlow compatibility
 const { handleQuakeStats } = require('../../handlers/quakeStatsHandler');
 
 /**
@@ -25,7 +25,8 @@ const { handleQuakeStats } = require('../../handlers/quakeStatsHandler');
  * Provides a simplified interface for PocketFlow to execute functions
  */
 class PocketFlowFunctionProcessor {
-  constructor() {
+  constructor(pfpManager = null) {
+    this.pfpManager = pfpManager;
     this.supportedFunctions = [
       'lookupTime',
       'lookupWeather',
@@ -82,8 +83,12 @@ class PocketFlowFunctionProcessor {
           break;
 
         case 'generateImage':
-          result = await this.handleImageGeneration(functionArgs, message);
-          break;
+          // Image generation is now handled directly by SimpleChimpGPTFlow
+          return {
+            success: false,
+            error: 'Image generation is handled by SimpleChimpGPTFlow, not function calls',
+            functionName,
+          };
 
         case 'getVersion':
           result = await this.handleVersionLookup(functionArgs);
@@ -236,88 +241,111 @@ class PocketFlowFunctionProcessor {
   }
 
   /**
-   * Handle image generation
-   * Note: This needs special handling since the original expects Discord message objects
+   * Handle image generation using PocketFlow pattern
+   * Returns structured data that the flow can properly process
    */
   async handleImageGeneration(args, _message) {
-    const { prompt } = args;
+    const { prompt, model = 'dall-e-3', size = '1024x1024', enhance = true } = args;
     if (!prompt) {
       throw new Error('Prompt parameter is required for image generation');
     }
 
-    // Create a minimal mock feedback message for the legacy handler
-    let imageUrl = null;
-    let finalContent = null;
+    try {
+      logger.info(`Processing image generation request: ${prompt.substring(0, 50)}...`);
 
-    const mockFeedback = {
-      edit: async content => {
-        finalContent = content;
-        // Extract image URL if present in the content (improved patterns)
-        const urlPatterns = [
-          /https?:\/\/[^\s\n]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s\n]*)?/gi, // Image URLs with extensions
-          /https?:\/\/oaidalleapiprodscus\.blob\.core\.windows\.net\/[^\s\n]+/gi, // OpenAI DALL-E URLs
-          /https?:\/\/[^\s\n]+/gi, // Any complete URL
-        ];
+      // Get OpenAI client from config
+      const config = require('../configValidator');
+      const { OpenAI } = require('openai');
+      const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
-        for (const pattern of urlPatterns) {
-          const urlMatch = content.match(pattern);
-          if (urlMatch && urlMatch.length > 0) {
-            // Take the first URL found
-            imageUrl = urlMatch[0];
-            // Clean up any trailing characters that might have been captured
-            imageUrl = imageUrl.replace(/[.,;!?\\s]*$/, '');
-            break;
+      // Call OpenAI DALL-E API directly
+      const imageResponse = await openaiClient.images.generate({
+        model: model,
+        prompt: prompt,
+        n: 1,
+        size: size,
+        quality: 'standard',
+        response_format: 'url',
+      });
+
+      const imageUrl = imageResponse.data[0].url;
+      const revisedPrompt = imageResponse.data[0].revised_prompt || prompt;
+
+      logger.info(`Image generated successfully: ${imageUrl}`);
+
+      try {
+        // Download the image for attachment
+        const https = require('https');
+        const http = require('http');
+
+        const downloadImage = url => {
+          return new Promise((resolve, reject) => {
+            const client = url.startsWith('https') ? https : http;
+
+            client
+              .get(url, response => {
+                if (response.statusCode !== 200) {
+                  reject(new Error(`Failed to download image: ${response.statusCode}`));
+                  return;
+                }
+
+                const chunks = [];
+                response.on('data', chunk => chunks.push(chunk));
+                response.on('end', () => {
+                  const buffer = Buffer.concat(chunks);
+                  resolve(buffer);
+                });
+              })
+              .on('error', reject);
+          });
+        };
+
+        const imageBuffer = await downloadImage(imageUrl);
+        const fileName = `generated_image_${Date.now()}.png`;
+
+        // Save image to PFP rotation if PFPManager is available
+        if (this.pfpManager) {
+          try {
+            const savedPath = await this.pfpManager.addImage(imageBuffer, fileName);
+            logger.info(`Image saved to PFP rotation: ${savedPath}`);
+          } catch (pfpError) {
+            logger.warn('Failed to save image to PFP rotation:', pfpError.message);
+            // Don't fail the whole request if PFP save fails
           }
         }
-        return { content };
-      },
-    };
 
-    // Use bot personality in mock conversation
-    const config = require('../configValidator');
-    const mockConversationLog = [
-      { role: 'system', content: config.BOT_PERSONALITY || 'You are a helpful AI assistant.' },
-      { role: 'user', content: `Generate an image: ${prompt}` },
-    ];
+        // Return PocketFlow-compatible result with attachment
+        return {
+          success: true,
+          response: `🎨 **Image Generated Successfully!** ${this.pfpManager ? '*(Added to PFP rotation)*' : ''}`,
+          type: 'image',
+          prompt: prompt,
+          revisedPrompt: revisedPrompt,
+          imageUrl: imageUrl,
+          attachment: {
+            buffer: imageBuffer,
+            name: fileName,
+          },
+          formatted: `🎨 **Image Generated Successfully!**\n\n**Original Prompt:** ${prompt}${
+            enhance && revisedPrompt !== prompt ? `\n**Enhanced Prompt:** ${revisedPrompt}` : ''
+          }\n**Model:** ${model} | **Size:** ${size}`,
+        };
+      } catch (downloadError) {
+        logger.warn('Failed to download image, returning URL only:', downloadError.message);
 
-    const mockTimings = { apiCalls: {} };
-    const mockFormatSubtext = (startTime, _usage, _timings) => {
-      const elapsed = Date.now() - startTime;
-      return `\n\n⏱️ Generated in ${Math.round(elapsed / 1000)}s`;
-    };
-    const mockStoreMessageRelationship = () => {
-      // Store message relationship - placeholder for legacy compatibility
-      return null;
-    };
-    const mockStatusManager = {
-      trackImageGeneration: () => {
-        // Track image generation - placeholder for legacy compatibility
-        return null;
-      },
-    };
-
-    try {
-      await handleImageGeneration(
-        { prompt }, // parameters
-        mockFeedback, // feedbackMessage
-        mockConversationLog, // conversationLog
-        Date.now(), // startTime
-        {}, // usage
-        mockTimings.apiCalls, // timings.apiCalls
-        mockFormatSubtext, // formatSubtext
-        mockStoreMessageRelationship, // storeMessageRelationship
-        mockStatusManager // statusManager
-      );
-
-      return {
-        prompt,
-        imageUrl: imageUrl,
-        content: finalContent,
-        formatted: imageUrl
-          ? `Generated image: ${imageUrl}`
-          : finalContent || 'Image generation completed',
-      };
+        // Return PocketFlow-compatible result with URL only
+        return {
+          success: true,
+          response: `🎨 **Image Generated!** [Click to view your image](${imageUrl})`,
+          type: 'image',
+          prompt: prompt,
+          revisedPrompt: revisedPrompt,
+          imageUrl: imageUrl,
+          formatted: `🎨 **Image Generated!** [Click to view your image](${imageUrl})`,
+        };
+      }
     } catch (error) {
+      logger.error('Error generating image in PocketFlow processor:', error);
       throw new Error(`Image generation failed: ${error.message}`);
     }
   }

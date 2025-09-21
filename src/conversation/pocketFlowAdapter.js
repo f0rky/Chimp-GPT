@@ -20,7 +20,7 @@ const logger = createLogger('pocketFlowAdapter');
 // Initialize PocketFlow manager
 let pocketFlowManager;
 
-function initializePocketFlow() {
+function initializePocketFlow(pfpManager = null) {
   if (!pocketFlowManager) {
     const pocketFlowOptions = {
       enableParallelTesting: false,
@@ -61,7 +61,7 @@ function initializePocketFlow() {
     };
 
     // Create PocketFlow function processor instance
-    const pocketFlowFunctionProcessor = new PocketFlowFunctionProcessor();
+    const pocketFlowFunctionProcessor = new PocketFlowFunctionProcessor(pfpManager);
 
     pocketFlowManager = new PocketFlowConversationManager(
       openaiConfig.client,
@@ -82,9 +82,14 @@ function initializePocketFlow() {
  * @param {import('discord.js').Message} discordMessage - Discord message object
  * @returns {Promise<Array<Object>>} The conversation log
  */
-async function manageConversation(userId, newMessage = null, discordMessage = null) {
+async function manageConversation(
+  userId,
+  newMessage = null,
+  discordMessage = null,
+  pfpManager = null
+) {
   try {
-    const manager = initializePocketFlow();
+    const manager = initializePocketFlow(pfpManager);
 
     if (!discordMessage) {
       logger.warn('No Discord message provided to PocketFlow adapter');

@@ -8,6 +8,7 @@ const { trackApiCall, trackError, handleStatsCommand } = require('../core/health
 const {
   processImageStream,
   createDiscordAttachment,
+  cleanupTempFile,
   shouldUseStreaming,
 } = require('../utils/streamingBuffer');
 const {
@@ -357,7 +358,14 @@ async function handleImageGeneration(
       // Prepare the response with the image
       const imageResult_firstImage =
         imageResult.images && imageResult.images[0] ? imageResult.images[0] : imageResult;
-      const imageUrl = imageResult_firstImage.url;
+
+      // Extract URL with better fallback logic
+      let imageUrl = imageResult_firstImage.url;
+      if (!imageUrl && imageResult_firstImage.b64_json) {
+        // If we have base64 data but no URL, create a data URL
+        imageUrl = `data:image/png;base64,${imageResult_firstImage.b64_json}`;
+      }
+
       const revisedPrompt =
         imageResult_firstImage.revisedPrompt || imageResult.revised_prompt || enhancedPrompt;
 
@@ -483,7 +491,35 @@ async function handleImageGeneration(
         const fileName = `generated_image_${Date.now()}.${fileExtension}`;
 
         // Create Discord attachment from processed image
-        const attachment = createDiscordAttachment(processedImage, fileName);
+        let attachment;
+        try {
+          attachment = createDiscordAttachment(processedImage, fileName);
+        } catch (attachmentError) {
+          const attachmentErrorStandardized = new ChimpError(
+            'Failed to create Discord attachment',
+            {
+              category: ERROR_CATEGORIES.INTERNAL,
+              severity: ERROR_SEVERITY.HIGH,
+              operation: 'create_discord_attachment',
+              context: {
+                error: attachmentError.message,
+                hasBuffer: !!processedImage.buffer,
+                bufferType: processedImage.buffer ? typeof processedImage.buffer : 'null',
+                isBuffer: processedImage.buffer ? Buffer.isBuffer(processedImage.buffer) : false,
+                bufferLength: processedImage.buffer ? processedImage.buffer.length : 0,
+                processingMethod: processedImage.method,
+                processingSuccess: processedImage.success,
+              },
+              userId: message.author?.id,
+            }
+          );
+
+          logError(attachmentErrorStandardized);
+          await feedbackMessage.edit(
+            finalMessage + '\\n⚠️ Image generated but failed to create attachment for Discord.'
+          );
+          return;
+        }
 
         // Log processing results
         discordLogger.info(
@@ -497,10 +533,54 @@ async function handleImageGeneration(
         );
 
         // Update the message with the final result and attachment
-        await feedbackMessage.edit({
-          content: finalMessage,
-          files: [attachment],
-        });
+        try {
+          discordLogger.debug(
+            {
+              hasAttachment: !!attachment,
+              attachmentType: typeof attachment,
+              attachmentName: attachment?.name || 'unknown',
+              hasBuffer: !!attachment?.attachment,
+              bufferLength: attachment?.attachment?.length || 0,
+              method: 'simple-object',
+            },
+            'About to edit Discord message with simple attachment object'
+          );
+
+          await feedbackMessage.edit({
+            content: finalMessage,
+            files: [attachment],
+          });
+
+          // Clean up (no-op for simple objects)
+          discordLogger.debug(
+            { attachmentName: attachment.name },
+            'Discord upload successful, no cleanup needed for simple object'
+          );
+          cleanupTempFile(attachment);
+        } catch (discordEditError) {
+          // Clean up (no-op for simple objects)
+          discordLogger.error(
+            {
+              error: discordEditError,
+              attachmentName: attachment?.name,
+              message: 'Discord edit failed with simple attachment object',
+            },
+            'Discord edit failed - no cleanup needed for simple object'
+          );
+          cleanupTempFile(attachment);
+
+          discordLogger.error(
+            {
+              error: discordEditError,
+              hasAttachment: !!attachment,
+              attachmentType: typeof attachment,
+              isAttachmentBuilder: attachment?.constructor?.name === 'AttachmentBuilder',
+              attachmentName: attachment?.name || 'unknown',
+            },
+            'Discord message edit with simple attachment object failed'
+          );
+          throw discordEditError;
+        }
       } else if (imageUrl && imageUrl.startsWith('data:')) {
         // Handle data URL case - extract base64 and process as attachment
         const base64Match = imageUrl.match(/data:([^;]+);base64,(.+)/);
@@ -574,7 +654,34 @@ async function handleImageGeneration(
           const fileName = `generated_image_${Date.now()}.${fileExtension}`;
 
           // Create Discord attachment from processed image
-          const attachment = createDiscordAttachment(processedImage, fileName, mimeType);
+          let attachment;
+          try {
+            attachment = createDiscordAttachment(processedImage, fileName, mimeType);
+          } catch (attachmentError) {
+            const attachmentErrorStandardized = new ChimpError(
+              'Failed to create Discord attachment from data URL',
+              {
+                category: ERROR_CATEGORIES.INTERNAL,
+                severity: ERROR_SEVERITY.HIGH,
+                operation: 'create_discord_attachment_data_url',
+                context: {
+                  error: attachmentError.message,
+                  hasBuffer: !!processedImage.buffer,
+                  bufferType: processedImage.buffer ? typeof processedImage.buffer : 'null',
+                  isBuffer: processedImage.buffer ? Buffer.isBuffer(processedImage.buffer) : false,
+                  bufferLength: processedImage.buffer ? processedImage.buffer.length : 0,
+                  mimeType,
+                },
+                userId: message.author?.id,
+              }
+            );
+
+            logError(attachmentErrorStandardized);
+            await feedbackMessage.edit(
+              finalMessage + '\\n⚠️ Image generated but failed to create attachment for Discord.'
+            );
+            return;
+          }
 
           // Log processing results
           discordLogger.info(
@@ -588,10 +695,54 @@ async function handleImageGeneration(
           );
 
           // Update the message with the final result and attachment
-          await feedbackMessage.edit({
-            content: finalMessage,
-            files: [attachment],
-          });
+          try {
+            discordLogger.debug(
+              {
+                hasAttachment: !!attachment,
+                attachmentType: typeof attachment,
+                attachmentName: attachment?.name || 'unknown',
+                hasBuffer: !!attachment?.attachment,
+                bufferLength: attachment?.attachment?.length || 0,
+                method: 'simple-object-dataurl',
+              },
+              'About to edit Discord message with data URL simple attachment object'
+            );
+
+            await feedbackMessage.edit({
+              content: finalMessage,
+              files: [attachment],
+            });
+
+            // Clean up (no-op for simple objects)
+            discordLogger.debug(
+              { attachmentName: attachment.name },
+              'Discord data URL upload successful, no cleanup needed for simple object'
+            );
+            cleanupTempFile(attachment);
+          } catch (discordEditError) {
+            // Clean up (no-op for simple objects)
+            discordLogger.error(
+              {
+                error: discordEditError,
+                attachmentName: attachment?.name,
+                message: 'Discord data URL edit failed with simple attachment object',
+              },
+              'Discord data URL edit failed - no cleanup needed for simple object'
+            );
+            cleanupTempFile(attachment);
+
+            discordLogger.error(
+              {
+                error: discordEditError,
+                hasAttachment: !!attachment,
+                attachmentType: typeof attachment,
+                isAttachmentBuilder: attachment?.constructor?.name === 'AttachmentBuilder',
+                attachmentName: attachment?.name || 'unknown',
+              },
+              'Discord message edit with data URL simple attachment object failed'
+            );
+            throw discordEditError;
+          }
         } else {
           // Couldn't parse the data URL, fall back to error
           await feedbackMessage.edit(
@@ -603,7 +754,7 @@ async function handleImageGeneration(
         finalMessage += `${imageUrl}`;
         await feedbackMessage.edit(finalMessage);
       } else {
-        // Final fallback - should rarely be reached now with improved data URL handling
+        // Enhanced fallback - try to extract any URL from the image result
         discordLogger.warn(
           {
             hasUrl: !!imageUrl,
@@ -613,12 +764,33 @@ async function handleImageGeneration(
                 : 'regular-url'
               : 'none',
             hasB64Json: !!imageResult_firstImage.b64_json,
+            imageResultKeys: Object.keys(imageResult_firstImage),
+            fullImageResult: JSON.stringify(imageResult_firstImage).substring(0, 500),
           },
-          'Reached final fallback in image handler - this should be rare'
+          'Reached final fallback - analyzing image result structure'
         );
-        await feedbackMessage.edit(
-          finalMessage + '\n⚠️ Image generated but could not be processed for display.'
-        );
+
+        // Try to find any URL in the image result object
+        let foundUrl = null;
+        if (imageResult_firstImage.url) {
+          foundUrl = imageResult_firstImage.url;
+        } else if (imageResult.url) {
+          foundUrl = imageResult.url;
+        } else if (imageResult.images && imageResult.images[0] && imageResult.images[0].url) {
+          foundUrl = imageResult.images[0].url;
+        }
+
+        if (foundUrl && !foundUrl.startsWith('data:')) {
+          // Found a regular URL - display it
+          finalMessage += `${foundUrl}`;
+          await feedbackMessage.edit(finalMessage);
+          discordLogger.info({ foundUrl }, 'Successfully recovered URL from fallback analysis');
+        } else {
+          // True fallback - no valid URL found
+          await feedbackMessage.edit(
+            finalMessage + '\n⚠️ Image generated but could not be processed for display.'
+          );
+        }
       }
 
       // Store message relationship for context preservation

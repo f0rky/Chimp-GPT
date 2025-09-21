@@ -138,8 +138,18 @@ async function ensureDataDir() {
 
     // Check if directory is writable by trying to write a test file
     const testFile = path.join(validatedPath, '.write-test');
-    await fs.writeFile(testFile, 'test', { flag: 'w' });
-    await fs.unlink(testFile); // Clean up test file
+    try {
+      await fs.writeFile(testFile, 'test', { flag: 'w' });
+      await fs.unlink(testFile); // Clean up test file only if write succeeded
+    } catch (testError) {
+      // If write test fails, try to clean up anyway (but don't fail if file doesn't exist)
+      try {
+        await fs.unlink(testFile);
+      } catch (unlinkError) {
+        // Ignore unlink errors for test file cleanup
+      }
+      throw testError; // Re-throw the original write error
+    }
 
     return true;
   } catch (error) {

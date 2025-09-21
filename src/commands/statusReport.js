@@ -10,10 +10,8 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
-const os = require('os');
 const config = require('../core/configValidator');
 const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
-const { getConversationStorageStatus } = require('../conversation/conversationManagerSelector');
 const statsStorage = require('../core/statsStorage');
 const { createLogger } = require('../core/logger');
 

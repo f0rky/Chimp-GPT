@@ -55,11 +55,11 @@ const openai = new OpenAI({
 
 // Circuit breaker configuration for image generation API calls
 const IMAGE_BREAKER_CONFIG = {
-  maxRetries: 1, // Only retry once for image generation to avoid long waits
-  breakerLimit: 3, // Opens after 3 consecutive failures
-  breakerTimeoutMs: 300000, // 5 minutes timeout
-  initialBackoffMs: 500, // Start with shorter backoff
-  maxBackoffMs: 2000, // Cap backoff at 2 seconds
+  maxRetries: 2, // Increase retries for better reliability
+  breakerLimit: 5, // Increase failure threshold before opening (was 3)
+  breakerTimeoutMs: 180000, // Reduce breaker timeout to 3 minutes (was 5)
+  initialBackoffMs: 1000, // Increase initial backoff
+  maxBackoffMs: 5000, // Increase max backoff
   onBreakerOpen: error => {
     logger.error({ error }, 'Image generation API circuit breaker opened');
     breakerManager.notifyOwnerBreakerTriggered(
@@ -73,7 +73,9 @@ const IMAGE_BREAKER_CONFIG = {
  * @enum {string}
  */
 const MODELS = {
-  GPT_IMAGE_1: 'gpt-image-1',
+  DALL_E_3: 'dall-e-3', // Standard DALL-E 3 model
+  DALL_E_2: 'dall-e-2', // Standard DALL-E 2 model
+  GPT_IMAGE_1: 'gpt-image-1', // Legacy name - maps to dall-e-3
 };
 
 /**
@@ -170,52 +172,73 @@ async function generateImage(prompt, options = {}) {
     'Image generation configuration check'
   );
   try {
-    // Default to GPT Image-1 model
-    const model = options.model || MODELS.GPT_IMAGE_1;
-    // Set default size to auto if not specified (let API choose optimal size)
-    let size = options.size || SIZES.AUTO;
+    // Map legacy model names to current OpenAI API models
+    const requestedModel = options.model || MODELS.GPT_IMAGE_1;
+    let actualModel = requestedModel;
 
-    // We'll log all parameters together after building the full imageParams object
-
-    // Validate the model and size combination
-    // Validate that we're using a supported size
-    const validSizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE, SIZES.AUTO];
-    if (!validSizes.includes(size)) {
-      logger.warn(`GPT Image-1 does not support ${size} size, falling back to auto`);
-      size = SIZES.AUTO;
+    // Map legacy GPT Image 1 to DALL-E 3 (current best model)
+    if (requestedModel === MODELS.GPT_IMAGE_1) {
+      actualModel = MODELS.DALL_E_3;
+      logger.debug('Mapping legacy gpt-image-1 model to dall-e-3');
     }
 
-    // Set default quality to auto if not specified
-    const quality = options.quality || QUALITY.AUTO;
+    // Set default size to square if not specified
+    let size = options.size || SIZES.SQUARE;
 
-    // Set default format to png if not specified
-    const format = options.format || FORMAT.PNG;
+    // Validate the model and size combination based on OpenAI API documentation
+    const validDALLE3Sizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE];
+    const validDALLE2Sizes = ['256x256', '512x512', SIZES.SQUARE];
 
-    // Set default background to opaque if not specified
-    const background = options.background || BACKGROUND.OPAQUE;
+    if (actualModel === MODELS.DALL_E_3) {
+      if (!validDALLE3Sizes.includes(size)) {
+        logger.warn(`DALL-E 3 does not support ${size} size, falling back to square`);
+        size = SIZES.SQUARE;
+      }
+    } else if (actualModel === MODELS.DALL_E_2) {
+      if (!validDALLE2Sizes.includes(size)) {
+        logger.warn(`DALL-E 2 does not support ${size} size, falling back to square`);
+        size = SIZES.SQUARE;
+      }
+    }
 
-    // Build the image parameters object according to OpenAI's API
+    // Set quality based on model capabilities
+    let quality = options.quality;
+    if (actualModel === MODELS.DALL_E_3) {
+      // DALL-E 3 supports quality parameter
+      quality = quality || 'standard'; // OpenAI standard is 'standard' or 'hd'
+      if (!['standard', 'hd'].includes(quality)) {
+        logger.warn(`Invalid quality ${quality} for DALL-E 3, using 'standard'`);
+        quality = 'standard';
+      }
+    } else {
+      // DALL-E 2 doesn't support quality parameter
+      quality = undefined;
+    }
+
+    // Build the image parameters object according to OpenAI API standards
     const imageParams = {
-      model: MODELS.GPT_IMAGE_1,
+      model: actualModel,
       prompt,
       size,
-      quality,
-      output_format: format,
+      n: 1, // Generate 1 image
+      response_format: 'b64_json', // Request base64 format for better reliability
     };
 
-    // Only add background parameter if it's transparent (opaque is default)
-    if (background === BACKGROUND.TRANSPARENT) {
-      imageParams.background = background;
+    // Add quality for DALL-E 3 only
+    if (actualModel === MODELS.DALL_E_3 && quality) {
+      imageParams.quality = quality;
     }
 
-    // Add compression parameter if format is jpeg or webp and compression is specified
-    if ((format === FORMAT.JPEG || format === FORMAT.WEBP) && options.compression !== undefined) {
-      // Ensure compression is between 0 and 100
-      const compression = Math.max(0, Math.min(100, options.compression));
-      imageParams.output_compression = compression;
-    }
-
-    logger.info({ imageParams }, 'Generating image with GPT Image-1');
+    logger.info(
+      {
+        imageParams,
+        requestedModel,
+        actualModel,
+        modelMapping:
+          requestedModel !== actualModel ? `${requestedModel} -> ${actualModel}` : 'direct',
+      },
+      'Generating image with OpenAI API'
+    );
 
     // Pre-check for potentially problematic content with quick client-side check
     // This helps provide immediate feedback for obvious cases
@@ -262,11 +285,11 @@ async function generateImage(prompt, options = {}) {
       response = await retryWithBreaker(async () => {
         const callStart = Date.now();
 
-        // Create a timeout promise
+        // Create a timeout promise with increased timeout for image generation
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Image generation request timed out after 60 seconds'));
-          }, 60000); // 60 second timeout
+            reject(new Error('Image generation request timed out after 90 seconds'));
+          }, 90000); // 90 second timeout (increased from 60)
         });
 
         // Race between the API call and timeout
@@ -279,7 +302,47 @@ async function generateImage(prompt, options = {}) {
 
       // Track the successful API call
       trackApiCall('gptimage');
+
+      // Debug logging to understand GPT Image 1 response structure
+      logger.info(
+        {
+          responseStructure: {
+            hasData: !!response.data,
+            dataLength: response.data?.length || 0,
+            firstImageKeys: response.data?.[0] ? Object.keys(response.data[0]) : [],
+            firstImageStructure: response.data?.[0]
+              ? {
+                  hasUrl: !!response.data[0].url,
+                  hasB64Json: !!response.data[0].b64_json,
+                  urlType: response.data[0].url
+                    ? response.data[0].url.startsWith('data:')
+                      ? 'data-url'
+                      : 'regular-url'
+                    : 'none',
+                  revisedPrompt: !!response.data[0].revised_prompt,
+                }
+              : 'no-first-image',
+          },
+        },
+        'GPT Image 1 API response structure analysis'
+      );
     } catch (error) {
+      // Enhanced error logging for debugging
+      logger.error(
+        {
+          error: {
+            message: error.message,
+            status: error.status,
+            code: error.code,
+            type: error.type,
+            stack: error.stack?.substring(0, 500),
+          },
+          prompt: prompt.substring(0, 100),
+          apiCallDuration: apiCallDuration || 'unknown',
+        },
+        'Image generation API call failed'
+      );
+
       // Check for content policy violation
       if (
         error.status === 400 &&
@@ -315,17 +378,39 @@ async function generateImage(prompt, options = {}) {
         });
 
         logError(breakerError);
-        return {
-          success: false,
-          error:
-            'Image generation service is temporarily unavailable. Please try again in a few minutes.',
-          isCircuitBreakerOpen: true,
-          prompt,
-        };
-      }
 
-      // For other errors, re-throw to be handled by the outer try-catch
-      throw error;
+        // Try to reset the circuit breaker and attempt one direct call
+        logger.info('Attempting to reset circuit breaker and retry image generation');
+        try {
+          // Reset the circuit breaker
+          if (typeof breakerManager.resetBreaker === 'function') {
+            breakerManager.resetBreaker('image_generation');
+          }
+
+          // Make one direct attempt without the circuit breaker
+          const directResponse = await openai.images.generate(imageParams);
+
+          if (directResponse && directResponse.data) {
+            logger.info('Direct image generation call succeeded after breaker reset');
+            response = directResponse;
+            trackApiCall('gptimage');
+          } else {
+            throw new Error('Direct call returned no data');
+          }
+        } catch (directError) {
+          logger.error({ directError }, 'Direct image generation call also failed');
+          return {
+            success: false,
+            error:
+              'Image generation service is temporarily unavailable. Please try again in a few minutes.',
+            isCircuitBreakerOpen: true,
+            prompt,
+          };
+        }
+      } else {
+        // For other errors, re-throw to be handled by the outer try-catch
+        throw error;
+      }
     }
 
     // Log response metadata without exposing base64 data
@@ -347,52 +432,54 @@ async function generateImage(prompt, options = {}) {
       'Successfully generated images'
     );
 
-    // Calculate more accurate cost based on GPT Image-1 pricing
+    // Calculate cost based on current OpenAI pricing (December 2024)
     // https://openai.com/pricing
     let estimatedCost = 0;
 
-    // Base cost by size (in dollars) - GPT Image-1 pricing
-    const baseCostBySize = {
-      '1024x1024': 0.008, // Square
-      '1536x1024': 0.012, // Portrait
-      '1024x1536': 0.012, // Landscape
-      auto: 0.01, // Auto (average estimate)
-    };
+    if (actualModel === MODELS.DALL_E_3) {
+      // DALL-E 3 pricing (USD per image)
+      const dalle3Costs = {
+        standard: {
+          '1024x1024': 0.04, // $0.040 per image
+          '1024x1792': 0.08, // $0.080 per image
+          '1792x1024': 0.08, // $0.080 per image
+        },
+        hd: {
+          '1024x1024': 0.08, // $0.080 per image
+          '1024x1792': 0.12, // $0.120 per image
+          '1792x1024': 0.12, // $0.120 per image
+        },
+      };
 
-    // Get the base cost for the selected size
-    const baseCost = baseCostBySize[size] || 0.008; // Default to square if size not found
+      // Convert size format for lookup
+      const sizeKey =
+        size === '1536x1024' ? '1792x1024' : size === '1024x1536' ? '1024x1792' : size;
 
-    // Factor in prompt length (longer prompts may require more processing)
-    // This is an approximation since OpenAI doesn't specify exact pricing by token for images
-    const promptLength = prompt.length;
-    const promptFactor = Math.min(1.5, Math.max(1.0, 1.0 + promptLength / 1000)); // 1.0-1.5x based on length
+      estimatedCost = dalle3Costs[quality]?.[sizeKey] || dalle3Costs.standard['1024x1024'];
+    } else if (actualModel === MODELS.DALL_E_2) {
+      // DALL-E 2 pricing (USD per image)
+      const dalle2Costs = {
+        '1024x1024': 0.02, // $0.020 per image
+        '512x512': 0.018, // $0.018 per image
+        '256x256': 0.016, // $0.016 per image
+      };
 
-    // Quality factor (higher quality costs more)
-    const qualityFactor =
-      {
-        [QUALITY.LOW]: 0.8,
-        [QUALITY.MEDIUM]: 1.0,
-        [QUALITY.HIGH]: 1.5,
-        [QUALITY.AUTO]: 1.0,
-      }[quality] || 1.0;
+      estimatedCost = dalle2Costs[size] || dalle2Costs['1024x1024'];
+    }
 
-    // Calculate final estimated cost
-    estimatedCost = baseCost * promptFactor * qualityFactor;
-
-    // Log the cost calculation factors
+    // Log the cost calculation
     logger.debug(
       {
-        baseCost,
-        promptLength,
-        promptFactor,
-        qualityFactor,
-        finalCost: estimatedCost,
+        model: actualModel,
+        quality,
+        size,
+        exactCost: estimatedCost,
       },
-      'Cost estimation factors for GPT Image-1'
+      'Cost calculation for OpenAI image generation'
     );
 
     // Extract the image URLs based on the response structure
-    // GPT Image-1 may have a different structure than DALL-E
+    // GPT Image 1 returns images in a standard OpenAI format
     let images = [];
 
     try {
@@ -414,7 +501,7 @@ async function generateImage(prompt, options = {}) {
           }, 0) || 0,
         responseId: response?.id,
       };
-      logger.info(responseMetadata, 'GPT Image-1 response metadata and file size estimation');
+      logger.info(responseMetadata, 'GPT Image 1 response metadata and file size estimation');
 
       // Performance optimization: warn about large images that might impact Discord message limits
       if (responseMetadata.estimatedFileSizeMB > 8) {
@@ -438,15 +525,10 @@ async function generateImage(prompt, options = {}) {
             : [response.data];
 
         images = dataArray.map(img => {
-          // For image formats that support base64 encoding
+          // Handle base64 response format (requested via response_format: 'b64_json')
           if (img.b64_json) {
-            // Create a data URL with the appropriate MIME type
-            const mimeType =
-              format === FORMAT.JPEG
-                ? 'image/jpeg'
-                : format === FORMAT.WEBP
-                  ? 'image/webp'
-                  : 'image/png';
+            // DALL-E returns PNG format for base64
+            const mimeType = 'image/png';
             return {
               url: `data:${mimeType};base64,${img.b64_json}`,
               revisedPrompt: img.revised_prompt || prompt,
@@ -454,14 +536,21 @@ async function generateImage(prompt, options = {}) {
               b64_json: img.b64_json,
             };
           } else if (img.url) {
-            // For URL responses
+            // Handle URL response format
             return {
               url: img.url,
               revisedPrompt: img.revised_prompt || prompt,
             };
           }
           // Fallback for unexpected response format
-          logger.warn({ img }, 'Unexpected image data format in response');
+          logger.warn(
+            {
+              imgKeys: Object.keys(img),
+              hasB64: !!img.b64_json,
+              hasUrl: !!img.url,
+            },
+            'Unexpected image data format in response'
+          );
           return {
             url: null,
             revisedPrompt: prompt,
@@ -534,7 +623,7 @@ async function generateImage(prompt, options = {}) {
       'gptimage',
       {
         prompt,
-        model,
+        model: actualModel,
         size,
         enhance: options.enhance || false,
       },

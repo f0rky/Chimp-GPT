@@ -228,6 +228,11 @@ class MessageProcessor {
                     enum: ['1024x1024', '1024x1536', '1536x1024'],
                     description: 'The size of the generated image',
                   },
+                  quality: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high'],
+                    description: 'The quality level for the generated image (medium is default)',
+                  },
                   enhance: {
                     type: 'boolean',
                     description: 'Whether to enhance the prompt with AI for better results',
