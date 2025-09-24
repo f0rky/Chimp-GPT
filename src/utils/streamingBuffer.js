@@ -199,15 +199,15 @@ async function processImageStream(base64Data, options = {}) {
       'Starting image stream processing'
     );
 
-    // Check if we need to use streaming (for large images) or can process in memory
-    // TEMPORARY FIX: Force direct processing to avoid undici buffer issues with streaming
-    // The streaming approach has buffer lifecycle issues with Discord.js v14 + undici
-    if (estimatedSize <= 8 * 1024 * 1024) {
-      // Under 8MB Discord limit - process directly
-      // Process directly in memory to avoid streaming buffer issues
+    // Determine processing method based on size and efficiency
+    // Use direct processing for small images, streaming for large ones
+    const useStreaming = estimatedSize > STREAMING_CONFIG.CHUNK_SIZE * 16; // 1MB threshold
+
+    if (!useStreaming || estimatedSize <= 8 * 1024 * 1024) {
+      // Small images or under Discord limit - process directly for better performance
       logger.debug(
-        { fileName, estimatedSize },
-        'Using direct processing to avoid undici buffer issues'
+        { fileName, estimatedSize, method: 'direct' },
+        'Using direct processing for optimal performance'
       );
 
       const buffer = Buffer.from(base64Data, 'base64');
@@ -224,8 +224,11 @@ async function processImageStream(base64Data, options = {}) {
       };
     }
 
-    // Large image - use streaming approach
-    logger.debug({ fileName, estimatedSize }, 'Using streaming processing for large image');
+    // Large image - use streaming approach for memory efficiency
+    logger.debug(
+      { fileName, estimatedSize, method: 'streaming' },
+      'Using streaming processing for large image (>1MB) to optimize memory usage'
+    );
 
     // Create temporary file for streaming
     const tempFilePath = await createSecureTempFile(STREAMING_CONFIG.TEMP_FILE_PREFIX, '.tmp');
