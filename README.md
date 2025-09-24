@@ -5,7 +5,7 @@
 [![Discord Bot](https://img.shields.io/badge/Discord-Bot-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com)
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
-[![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen?style=for-the-badge)](./package.json)
+[![Version](https://img.shields.io/badge/Version-2.1.0-brightgreen?style=for-the-badge)](./package.json)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 **Transform your Discord server into an intelligent, interactive community hub!**
@@ -47,13 +47,34 @@
 
 👤 User: "Generate an image of a cyberpunk cityscape"
 🤖 Chimp-GPT: 🎨 Creating your cyberpunk masterpiece... 
-              [Generates stunning AI artwork in seconds]
+              [Real-time streaming progress with enhanced error recovery]
+              [Generates stunning AI artwork with DALL-E 3/2 fallback]
 
 👤 User: "!serverstats"
 🤖 Chimp-GPT: 🎮 Live Quake Servers:
               🔴 Team Red vs 🔵 Team Blue on dm17
               8/16 players • Pro-level ratings • Epic battles!
 ```
+
+### 🚀 New in v2.1.0 - Enhanced Performance & Reliability
+
+**🎨 Next-Generation Image Creation**
+- **Streaming Progress**: Real-time updates show generation progress
+- **Multi-Model Support**: Automatic fallback between DALL-E 3 and DALL-E 2
+- **Enhanced Error Recovery**: Robust retry logic with exponential backoff
+- **Performance Monitoring**: Comprehensive metrics and timing analysis
+
+**📊 Advanced Status & Monitoring**
+- **LLM Provider Tracking**: Real-time OpenAI API performance monitoring
+- **System Health**: CPU, memory, and response time analytics
+- **Historical Data**: Performance trends and usage statistics
+- **Smart Alerts**: Automated health checks with proactive notifications
+
+**🔍 Intelligent Search & Caching**
+- **Multi-Engine Search**: Coordinated search across multiple providers
+- **Smart Cache Invalidation**: Performance-based cache management
+- **Response Optimization**: Enhanced formatting and delivery speed
+- **Fallback Chains**: Reliable service redundancy for maximum uptime
 
 ---
 

@@ -161,6 +161,35 @@ class FunctionExecutorNode extends BaseConversationNode {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'web_search',
+          description:
+            'Search the web for information using multiple search engines with intelligent fallback',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The search query to look up',
+              },
+              max_results: {
+                type: 'integer',
+                description: 'Maximum number of search results to return (default: 5)',
+                minimum: 1,
+                maximum: 10,
+              },
+              search_type: {
+                type: 'string',
+                description: 'Type of search to perform',
+                enum: ['general', 'academic', 'news', 'current'],
+              },
+            },
+            required: ['query'],
+          },
+        },
+      },
     ];
   }
 

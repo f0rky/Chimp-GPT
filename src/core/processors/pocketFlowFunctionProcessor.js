@@ -20,6 +20,9 @@ const lookupWolfram = require('../../services/wolframLookup');
 // Note: Using direct OpenAI API call instead of legacy handler for PocketFlow compatibility
 const { handleQuakeStats } = require('../../handlers/quakeStatsHandler');
 
+// Import existing web services
+const { searchWeb, formatSearchResults } = require('../../services/webSearch');
+
 /**
  * PocketFlow Function Call Processor
  * Provides a simplified interface for PocketFlow to execute functions
@@ -35,6 +38,8 @@ class PocketFlowFunctionProcessor {
       'quakeLookup',
       'generateImage',
       'getVersion',
+      // Web search functions
+      'web_search',
     ];
   }
 
@@ -92,6 +97,11 @@ class PocketFlowFunctionProcessor {
 
         case 'getVersion':
           result = await this.handleVersionLookup(functionArgs);
+          break;
+
+        // Web search function
+        case 'web_search':
+          result = await this.handleWebSearch(functionArgs);
           break;
 
         default:
@@ -374,6 +384,44 @@ class PocketFlowFunctionProcessor {
       };
     } catch (error) {
       throw new Error(`Version lookup failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle web search using existing webSearch service
+   */
+  async handleWebSearch(args) {
+    const { query, max_results = 5, search_type = 'general' } = args;
+
+    if (!query) {
+      throw new Error('Query parameter is required for web search');
+    }
+
+    logger.debug('Web search request', { query, max_results, search_type });
+
+    try {
+      const results = await searchWeb(query, {
+        maxResults: max_results,
+      });
+
+      if (results.success) {
+        // Use the existing formatSearchResults function for consistent formatting
+        const formatted = formatSearchResults(results, true);
+
+        return {
+          query,
+          search_type,
+          results: results.data.results,
+          result_count: results.data.results.length,
+          source: results.data.source,
+          engine: results.metadata.engine,
+          formatted: formatted,
+          raw: results,
+        };
+      }
+      throw new Error(results.error || 'Web search failed');
+    } catch (error) {
+      throw new Error(`Web search failed: ${error.message}`);
     }
   }
 }
