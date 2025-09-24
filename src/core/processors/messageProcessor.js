@@ -53,19 +53,31 @@ class MessageProcessor {
 
       const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
 
-      // If it's clearly an image request, bypass the full context
+      // If it's clearly an image request, check if image generation is enabled
       if (isImageRequest) {
         openaiLogger.debug('Detected image generation request', { content: currentContent });
-        // Clean up the prompt by removing the command phrases
-        let cleanPrompt = currentContent;
-        for (const phrase of imagePhrases) {
-          cleanPrompt = cleanPrompt.replace(phrase, '').trim();
+
+        // Check if image generation is enabled
+        const imageGenEnabled =
+          process.env.ENABLE_IMAGE_GENERATION === 'true' ||
+          this.config.ENABLE_IMAGE_GENERATION === true;
+
+        if (!imageGenEnabled) {
+          openaiLogger.info('Image generation request blocked - feature is disabled');
+          // Don't process as image request, let it fall through to normal conversation
+          // This will make the bot respond with text instead of trying to generate an image
+        } else {
+          // Clean up the prompt by removing the command phrases
+          let cleanPrompt = currentContent;
+          for (const phrase of imagePhrases) {
+            cleanPrompt = cleanPrompt.replace(phrase, '').trim();
+          }
+          return {
+            type: 'functionCall',
+            functionName: 'generateImage',
+            parameters: { prompt: cleanPrompt },
+          };
         }
-        return {
-          type: 'functionCall',
-          functionName: 'generateImage',
-          parameters: { prompt: cleanPrompt },
-        };
       }
 
       // SIMPLE CONTEXT OPTIMIZATION
