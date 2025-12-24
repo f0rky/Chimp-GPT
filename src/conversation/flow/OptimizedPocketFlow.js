@@ -77,13 +77,13 @@ class OptimizedPocketFlow {
         conversation.messages = conversation.messages.slice(-this.options.maxConversationLength);
       }
 
-      // Call OpenAI with simple conversation
+      // Call OpenAI with simple conversation and current date/time context
+      const currentDateTime = new Date().toISOString();
+      const systemPrompt = `You are ChimpGPT, a helpful AI assistant.\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+
       const completion = await this.openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are ChimpGPT, a helpful AI assistant.' },
-          ...conversation.messages,
-        ],
+        messages: [{ role: 'system', content: systemPrompt }, ...conversation.messages],
         max_tokens: this.options.maxTokens,
         temperature: 0.7,
       });

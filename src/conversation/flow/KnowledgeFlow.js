@@ -1279,14 +1279,18 @@ Please provide a natural, friendly, conversational response based on this inform
         conversationalPrompt = `The user asked about "${intent.originalMessage}". Please provide a natural, friendly, conversational response about this topic. Be helpful and informative but speak naturally like you're chatting with a friend.`;
       }
 
-      // Use OpenAI for natural conversation
+      // Use OpenAI for natural conversation with current date/time context
+      const currentDateTime = new Date().toISOString();
+      const systemPrompt =
+        "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them." +
+        `\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+
       const completion = await this.openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content:
-              "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them.",
+            content: systemPrompt,
           },
           {
             role: 'user',

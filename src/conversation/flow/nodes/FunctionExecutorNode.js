@@ -300,15 +300,18 @@ class FunctionExecutorNode extends BaseConversationNode {
 
   async generateNaturalResponse(context, toolCall, functionResult, store) {
     try {
-      // Get bot personality from SharedStore if available
+      // Get bot personality from SharedStore if available with current date/time context
       const botPersonality =
         store?.get('botPersonality') ||
         'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
 
+      const currentDateTime = new Date().toISOString();
+      const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+
       const responseContext = [
         {
           role: 'system',
-          content: botPersonality,
+          content: systemPrompt,
         },
         ...context,
         {

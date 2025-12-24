@@ -1,5 +1,5 @@
 const { format } = require('date-fns');
-const { toZonedTime, formatInTimeZone } = require('date-fns-tz');
+const { toZonedTime } = require('date-fns-tz');
 const { time: timeLogger } = require('../core/logger');
 const functionResults = require('../core/functionResults');
 const { sanitizeLocation } = require('../utils/inputSanitizer');

@@ -468,13 +468,16 @@ class SimpleChimpGPTFlow {
         const weatherContext = `The user asked: "${message.content}"\n\nWeather data: ${weatherData.formattedSummary}\n\nRespond naturally with your personality while providing this weather information.`;
 
         try {
-          // Generate response with bot personality
+          // Generate response with bot personality and current date/time context
+          const currentDateTime = new Date().toISOString();
+          const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+
           const completion = await this.openaiClient.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'system',
-                content: botPersonality,
+                content: systemPrompt,
               },
               {
                 role: 'user',
@@ -599,13 +602,16 @@ class SimpleChimpGPTFlow {
       const timeContext = `The user asked: "${message.content}"\n\nTime information: ${timeData}\n\nRespond naturally with your personality while providing this time information.`;
 
       try {
-        // Generate response with bot personality
+        // Generate response with bot personality and current date/time context
+        const currentDateTime = new Date().toISOString();
+        const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+
         const completion = await this.openaiClient.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
-              content: botPersonality,
+              content: systemPrompt,
             },
             {
               role: 'user',
@@ -721,12 +727,15 @@ class SimpleChimpGPTFlow {
         conversation.messages = conversation.messages.slice(-this.options.maxConversationLength);
       }
 
-      // Build OpenAI conversation with personality
+      // Build OpenAI conversation with personality and current date/time context
       const botPersonality = store.get('botPersonality');
+      const currentDateTime = new Date().toISOString();
+      const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+
       const openaiMessages = [
         {
           role: 'system',
-          content: botPersonality,
+          content: systemPrompt,
         },
         ...conversation.messages,
       ];

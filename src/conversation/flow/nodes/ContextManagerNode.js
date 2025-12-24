@@ -206,11 +206,13 @@ class ContextManagerNode extends BaseConversationNode {
   }
 
   getSystemPrompt() {
-    // Use the bot's personality from configuration
+    // Use the bot's personality from configuration with current date/time context
     const personality =
       config.BOT_PERSONALITY ||
       'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
-    return personality;
+
+    const currentDateTime = new Date().toISOString();
+    return `${personality}\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
   }
 }
 
