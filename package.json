@@ -80,8 +80,6 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^1.9.0",
-    "completions": "^2.7.0",
-    "cors": "^2.8.5",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -93,13 +91,11 @@
     "playwright-extra": "^4.3.6",
     "playwright-extra-plugin-stealth": "^0.0.1",
     "rate-limiter-flexible": "^7.1.0",
-    "undici": "^7.13.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.30.0",
-    "@eslint/migrate-config": "^1.5.2",
     "canvas": "^3.1.0",
     "chai": "^5.2.0",
     "eslint": "^9.30.0",
@@ -115,6 +111,6 @@
     "sinon-chai": "^4.0.0"
   },
   "overrides": {
-    "undici": "^7.13.0"
+    "undici": "^7.16.0"
   }
 }
