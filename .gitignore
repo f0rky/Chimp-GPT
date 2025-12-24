@@ -88,6 +88,13 @@ debug-*.js
 test-*.js
 direct-*.js
 
+# Backup files
+*.backup
+*.bak
+*.old
+*backup.*
+*.backup.*
+
 # Data directory (exclude pfp specifically)
 data/
 !data/pfp/
@@ -119,7 +126,7 @@ dist
 .vuepress/dist
 
 # Project specific
-archive/
+/archive/
 CHECKLIST.md
 
 # Claude Code AI assistant cache
