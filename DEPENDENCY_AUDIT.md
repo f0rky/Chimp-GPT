@@ -3,6 +3,7 @@
 **Project**: Chimp-GPT Discord Bot
 **Date**: 2025-12-24
 **Audited Version**: 2.1.0
+**Resolved Version**: 2.1.1
 
 ---
 
