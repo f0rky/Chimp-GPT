@@ -61,7 +61,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 **📂 Current Clean Folder Structure:**
 ```
 ├── 📦 Package Management: package.json, package-lock.json
-├── ⚙️ Configuration: ecosystem.config.js, eslint.config.js, windsurf.config.js  
+├── ⚙️ Configuration: ecosystem.config.js, eslint.config.js
 ├── 🐳 Deployment: Dockerfile, docker-compose.yml
 ├── 📚 Key Documentation: README.md, CHANGELOG.md, LICENSE, CONTRIBUTING.md
 ├── 🏗️ Source Code: src/ (fully organized)
