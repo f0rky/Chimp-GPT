@@ -63,7 +63,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 ├── 📦 Package Management: package.json, package-lock.json
 ├── ⚙️ Configuration: ecosystem.config.js, eslint.config.js
 ├── 🐳 Deployment: Dockerfile, docker-compose.yml
-├── 📚 Key Documentation: README.md, CHANGELOG.md, LICENSE, CONTRIBUTING.md
+├── 📚 Key Documentation: README.md, LICENSE, CONTRIBUTING.md, CLAUDE.md
 ├── 🏗️ Source Code: src/ (fully organized)
 │   ├── commands/      # Discord commands & handlers
 │   ├── conversation/  # Chat management & optimization
@@ -307,8 +307,8 @@ POCKETFLOW_CLEANUP_INTERVAL=300000  # Cleanup interval in milliseconds
 
 3. **Complete Documentation** (Priority 3)
    - Update any remaining file path references in docs/
-   - Update CHANGELOG.md with v1.7.3 reflecting completed reorganization
-   - Update package.json version to 1.7.3
+   - Update package.json version to reflect completed reorganization
+   - Maintain git commit history for detailed change tracking
 
 ### Notes for Future Development
 - **Always use modular structure**: New features should go in appropriate src/ subdirectories
