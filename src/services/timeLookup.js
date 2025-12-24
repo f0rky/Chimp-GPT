@@ -1,4 +1,5 @@
-const moment = require('moment-timezone');
+const { format } = require('date-fns');
+const { toZonedTime, formatInTimeZone } = require('date-fns-tz');
 const { time: timeLogger } = require('../core/logger');
 const functionResults = require('../core/functionResults');
 const { sanitizeLocation } = require('../utils/inputSanitizer');
@@ -159,7 +160,8 @@ function getTimezoneFromLocation(location) {
  */
 function findTimezoneByPartialMatch(query) {
   const normalizedQuery = query.toLowerCase().trim();
-  const allTimezones = moment.tz.names();
+  // Use Intl API to get all supported timezones (Node 16+)
+  const allTimezones = Intl.supportedValuesOf('timeZone');
 
   // Handle multi-word queries (e.g., "Washington DC")
   const words = normalizedQuery.split(/\s+/);
@@ -224,7 +226,7 @@ async function _performTimeLookup(location) {
     // Try to get timezone from our mapping first
     let timezone = getTimezoneFromLocation(sanitizedLocation);
 
-    // If not found in our mapping, try to find a partial match in moment timezones
+    // If not found in our mapping, try to find a partial match in supported timezones
     if (!timezone) {
       timezone = findTimezoneByPartialMatch(sanitizedLocation);
     }
@@ -250,10 +252,13 @@ async function _performTimeLookup(location) {
       return `Sorry, I couldn't find a timezone for "${location}". Please try a more specific location like "New York" or "Tokyo".`;
     }
 
-    // Get the current time in the timezone using moment-timezone
-    const now = moment().tz(timezone);
-    const formattedTime = now.format('h:mmA');
-    const formattedDate = now.format('dddd, MMMM D, YYYY');
+    // Get the current time in the timezone using date-fns-tz
+    const now = new Date();
+    const zonedTime = toZonedTime(now, timezone);
+
+    // Format the time and date using date-fns
+    const formattedTime = format(zonedTime, 'h:mma');
+    const formattedDate = format(zonedTime, 'EEEE, MMMM d, yyyy');
 
     // Format the response
     const response = `The current time in ${sanitizedLocation} (${timezone}) is ${formattedTime} on ${formattedDate}.`;
@@ -267,7 +272,7 @@ async function _performTimeLookup(location) {
         timezone,
         time: formattedTime,
         date: formattedDate,
-        timestamp: now.toISOString(),
+        timestamp: zonedTime.toISOString(),
         formatted: response,
       }
     );
