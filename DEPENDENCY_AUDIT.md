@@ -3,13 +3,13 @@
 **Project**: Chimp-GPT Discord Bot
 **Date**: 2025-12-24
 **Audited Version**: 2.1.0
-**Resolved Version**: 2.1.1
+**Resolved Version**: 2.1.2
 
 ---
 
 ## ✅ Resolution Summary (Completed 2025-12-24)
 
-**Status**: All critical and high-priority items resolved successfully
+**Status**: All critical, high, and medium-priority items resolved successfully
 
 ### Actions Completed
 
@@ -17,8 +17,9 @@
 |--------|--------|---------|
 | **Security Fixes** | ✅ Complete | All 3 vulnerabilities resolved via `npm audit fix` |
 | **Dependency Cleanup** | ✅ Complete | Removed 3 unused packages (completions, cors, undici from deps) |
-| **Package Updates** | ✅ Complete | Updated 6 packages to latest safe versions |
+| **Package Updates** | ✅ Complete | Updated 7 packages to latest safe versions |
 | **Dev Cleanup** | ✅ Complete | Removed @eslint/migrate-config migration tool |
+| **dotenv v17 Upgrade** | ✅ Complete | Updated dotenv from v16 to v17.2.3 (medium priority) |
 | **Validation** | ✅ Complete | All tests passing (100% success rate), lint clean |
 
 ### Final State
@@ -34,6 +35,7 @@
 
 - ✅ `axios`: ^1.9.0 → ^1.13.2
 - ✅ `discord.js`: ^14.19.3 → ^14.25.1
+- ✅ `dotenv`: ^16.5.0 → ^17.2.3 (major version upgrade - tested and verified)
 - ✅ `express`: ^5.1.0 → ^5.2.1
 - ✅ `pino-pretty`: ^13.0.0 → ^13.1.3
 - ✅ `playwright`: ^1.53.2 → ^1.57.0
