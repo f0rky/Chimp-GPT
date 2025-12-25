@@ -38,6 +38,20 @@ document.addEventListener('DOMContentLoaded', () => {
   logDebug('Dashboard fully loaded', 'info');
 });
 
+// Handle URL hash changes to switch tabs
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.slice(1);
+  const validTabs = ['status', 'performance', 'functions', 'settings', 'deleted-messages'];
+
+  if (validTabs.includes(hash)) {
+    const tabs = document.querySelectorAll('.tab-button');
+    const targetButton = Array.from(tabs).find(tab => tab.dataset.tab === hash);
+    if (targetButton) {
+      targetButton.click();
+    }
+  }
+});
+
 // Theme Management
 function initializeTheme() {
   if (state.theme === 'light') {
@@ -76,10 +90,37 @@ function initializeTabs() {
 
       state.currentTab = targetTab;
 
+      // Update URL hash without triggering hashchange event
+      history.replaceState(null, null, `#${targetTab}`);
+
       // Load tab-specific data
       loadTabData(targetTab);
     });
   });
+
+  // Activate initial tab based on URL hash or default to status
+  activateInitialTab();
+}
+
+function activateInitialTab() {
+  // Get tab from URL hash (e.g., #performance -> 'performance')
+  const hash = window.location.hash.slice(1); // Remove the '#'
+  const validTabs = ['status', 'performance', 'functions', 'settings', 'deleted-messages'];
+  const initialTab = validTabs.includes(hash) ? hash : 'status';
+
+  logDebug(`Activating initial tab: ${initialTab}`, 'info');
+
+  // Find and click the appropriate tab button to trigger activation and data loading
+  const tabs = document.querySelectorAll('.tab-button');
+  const targetButton = Array.from(tabs).find(tab => tab.dataset.tab === initialTab);
+
+  if (targetButton) {
+    targetButton.click();
+  } else {
+    // Fallback: manually activate status tab
+    state.currentTab = 'status';
+    loadTabData('status');
+  }
 }
 
 function loadTabData(tab) {
@@ -294,9 +335,8 @@ function initializeCharts() {
 
 // Data Fetching
 function startDataFetching() {
-  // Initial fetch
-  fetchHealthData();
-  fetchPerformanceDataForStatus();
+  // Don't fetch initial data here - let the initial tab activation handle it
+  // This prevents fetching status data when user loads #performance directly
 
   // Set up intervals
   state.timers.status = setInterval(() => {
@@ -751,8 +791,9 @@ function updatePerformanceDisplay(data) {
   const weatherLatencyEl = document.getElementById('weatherLatency');
   const otherLatencyEl = document.getElementById('otherLatency');
 
+  // Use message_processing for OpenAI latency since that's what the API returns
   if (openaiLatencyEl)
-    openaiLatencyEl.textContent = `${Math.round(data.summary.openai_api?.avg || 0)}ms`;
+    openaiLatencyEl.textContent = `${Math.round(data.summary.message_processing?.avg || 0)}ms`;
   if (weatherLatencyEl)
     weatherLatencyEl.textContent = `${Math.round(data.summary.weather_api?.avg || 0)}ms`;
   if (otherLatencyEl)
@@ -1056,11 +1097,12 @@ function updateRequestHistory(detailed) {
 
   container.innerHTML = '';
 
-  // Get recent operations
+  // Get recent operations - API returns 'recentTimings' not 'recent'
   const operations = [];
   for (const [op, stats] of Object.entries(detailed)) {
-    if (stats.recent && stats.recent.length > 0) {
-      stats.recent.forEach(item => {
+    const recentData = stats.recentTimings || stats.recent || [];
+    if (recentData.length > 0) {
+      recentData.forEach(item => {
         operations.push({ operation: op, ...item });
       });
     }
