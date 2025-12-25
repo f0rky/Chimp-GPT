@@ -98,10 +98,12 @@ class ContextManagerNode extends BaseConversationNode {
     if (!userId) return [];
 
     const conversation = store.getConversation(userId);
+    const userContext = store.getUserContext(userId);
 
+    // Get user-specific system prompt with location if available
     const systemMessage = {
       role: 'system',
-      content: this.getSystemPrompt(),
+      content: this.getSystemPrompt(userContext),
       timestamp: Date.now(),
     };
 
@@ -205,14 +207,26 @@ class ContextManagerNode extends BaseConversationNode {
     store.updateConversation(userId, conversation);
   }
 
-  getSystemPrompt() {
+  getSystemPrompt(userContext = {}) {
     // Use the bot's personality from configuration with current date/time context
     const personality =
       config.BOT_PERSONALITY ||
       'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
 
     const currentDateTime = new Date().toISOString();
-    return `${personality}\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+
+    // Build user-specific context
+    let userContextInfo = '';
+    if (userContext && userContext.preferences) {
+      if (userContext.preferences.location) {
+        userContextInfo += `\nUser's location: ${userContext.preferences.location}`;
+      }
+      if (userContext.preferences.timezone) {
+        userContextInfo += `\nUser's timezone: ${userContext.preferences.timezone}`;
+      }
+    }
+
+    return `${personality}\n\nCurrent UTC date and time: ${currentDateTime}${userContextInfo}\n\nIMPORTANT: When users ask for the time without specifying a location, use the lookupTime function with their saved location if available, otherwise ask them where they are or assume New Zealand (Auckland) or Australia (Sydney) as most users are from these regions.`;
   }
 }
 

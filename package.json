@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "A Discord chatbot with revolutionary PocketFlow architecture and OpenAI GPT integration for intelligent conversations.",
   "main": "src/core/combined.js",
   "private": true,

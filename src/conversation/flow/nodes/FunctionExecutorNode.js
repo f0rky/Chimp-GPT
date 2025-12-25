@@ -1,6 +1,7 @@
 const BaseConversationNode = require('./BaseNode');
 const { createLogger } = require('../../../core/logger');
 const ImageGenerationFlow = require('../ImageGenerationFlow');
+const { storeUserLocation, normalizeLocation } = require('../../../utils/userLocationManager');
 
 const logger = createLogger('FunctionExecutorNode');
 
@@ -41,13 +42,15 @@ class FunctionExecutorNode extends BaseConversationNode {
         type: 'function',
         function: {
           name: 'lookupTime',
-          description: 'Get the current time in a given location',
+          description:
+            'Get the current local time for any location. Use this when users ask "what time is it?" or mention time. If the user has told you their location previously, use that location. Common locations: New Zealand cities (Auckland, Wellington, Christchurch), Australian cities (Sydney, Melbourne, Brisbane, Perth).',
           parameters: {
             type: 'object',
             properties: {
               location: {
                 type: 'string',
-                description: 'The location (should be timezone name like Asia/Shanghai)',
+                description:
+                  'The location name, e.g., "Auckland", "Sydney", "New York", "London". Can be a city name, country name, or region.',
               },
             },
             required: ['location'],
@@ -278,6 +281,27 @@ class FunctionExecutorNode extends BaseConversationNode {
         message,
         store,
       });
+
+      // Store user location for time/weather functions
+      const userId = message.author?.id;
+      if (userId && functionArgs.location) {
+        if (
+          functionName === 'lookupTime' ||
+          functionName === 'lookupWeather' ||
+          functionName === 'lookupExtendedForecast'
+        ) {
+          const normalizedLocation = normalizeLocation(functionArgs.location);
+          storeUserLocation(store, userId, normalizedLocation);
+          logger.debug(
+            {
+              userId,
+              functionName,
+              location: normalizedLocation,
+            },
+            'Stored user location from function call'
+          );
+        }
+      }
 
       store.set('lastFunctionCall', {
         name: functionName,

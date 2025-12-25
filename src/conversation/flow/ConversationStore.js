@@ -91,16 +91,18 @@ class ConversationStore extends SharedStore {
 
   setBotIntent(messageId, intent) {
     const botIntentCache = this.get('botIntentCache');
+
+    // Check size BEFORE insertion to enforce strict limit of 1000 entries
+    if (botIntentCache.size >= 1000) {
+      const oldestKey = botIntentCache.keys().next().value;
+      botIntentCache.delete(oldestKey);
+    }
+
     botIntentCache.set(messageId, {
       intent,
       timestamp: Date.now(),
       confidence: intent.confidence || 0,
     });
-
-    if (botIntentCache.size > 1000) {
-      const oldestKey = botIntentCache.keys().next().value;
-      botIntentCache.delete(oldestKey);
-    }
 
     return this;
   }
@@ -138,29 +140,38 @@ class ConversationStore extends SharedStore {
     const channelContexts = this.get('channelContexts');
     const botIntentCache = this.get('botIntentCache');
 
+    // Optimize: Collect keys first, then delete (better than modifying during iteration)
+    const expiredConversations = [];
     for (const [userId, conversation] of conversations) {
       if (now - conversation.lastActivity > maxAge) {
-        conversations.delete(userId);
+        expiredConversations.push(userId);
       }
     }
+    expiredConversations.forEach(userId => conversations.delete(userId));
 
+    const expiredUserContexts = [];
     for (const [userId, context] of userContexts) {
       if (now - context.lastSeen > maxAge) {
-        userContexts.delete(userId);
+        expiredUserContexts.push(userId);
       }
     }
+    expiredUserContexts.forEach(userId => userContexts.delete(userId));
 
+    const expiredChannelContexts = [];
     for (const [channelId, context] of channelContexts) {
       if (now - context.lastActivity > maxAge) {
-        channelContexts.delete(channelId);
+        expiredChannelContexts.push(channelId);
       }
     }
+    expiredChannelContexts.forEach(channelId => channelContexts.delete(channelId));
 
+    const expiredIntents = [];
     for (const [messageId, intent] of botIntentCache) {
       if (now - intent.timestamp > maxAge) {
-        botIntentCache.delete(messageId);
+        expiredIntents.push(messageId);
       }
     }
+    expiredIntents.forEach(messageId => botIntentCache.delete(messageId));
 
     return this;
   }

@@ -13,6 +13,7 @@ const axios = require('axios');
 const { createLogger } = require('../core/logger');
 const retryWithBreaker = require('../utils/retryWithBreaker');
 const { sanitizeQuery } = require('../utils/inputSanitizer');
+const searchCache = require('../utils/searchCache');
 
 const logger = createLogger('webSearch');
 
@@ -299,6 +300,17 @@ async function searchWeb(query, options = {}) {
   // Sanitize the query
   const sanitizedQuery = sanitizeQuery(query);
 
+  // Check cache first to avoid redundant API calls
+  const cacheKey = `${sanitizedQuery}:${maxResults}:${preferredEngine || 'auto'}`;
+  const cachedResult = searchCache.get(cacheKey);
+
+  if (cachedResult) {
+    logger.info(`Cache hit for search query: "${sanitizedQuery}"`, {
+      cacheStats: searchCache.getStats(),
+    });
+    return cachedResult;
+  }
+
   // Determine which search engine to use
   const selectedEngine = preferredEngine || selectSearchEngine(sanitizedQuery);
 
@@ -353,9 +365,13 @@ async function searchWeb(query, options = {}) {
             continue;
         }
 
-        // If we got results, return them
+        // If we got results, cache and return them
         if (result && result.success) {
           logger.info(`Search successful with ${engine}: ${result.data.results.length} results`);
+
+          // Cache the successful result
+          searchCache.set(cacheKey, result);
+
           return result;
         }
       } catch (error) {

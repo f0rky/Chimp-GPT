@@ -46,6 +46,9 @@ class PocketFlowConversationManager {
       responseTimes: [],
     };
 
+    // Store interval ID to prevent memory leak
+    this.cleanupIntervalId = null;
+
     this.setupCleanupInterval();
   }
 
@@ -270,7 +273,7 @@ class PocketFlowConversationManager {
   }
 
   setupCleanupInterval() {
-    setInterval(() => {
+    this.cleanupIntervalId = setInterval(() => {
       this.cleanup().catch(error => {
         logger.error('Scheduled cleanup failed:', error);
       });
@@ -281,6 +284,12 @@ class PocketFlowConversationManager {
     logger.info('Shutting down PocketFlow conversation manager');
 
     try {
+      // Clear cleanup interval to prevent memory leak
+      if (this.cleanupIntervalId) {
+        clearInterval(this.cleanupIntervalId);
+        this.cleanupIntervalId = null;
+      }
+
       await this.cleanup();
 
       this.activeFlows.clear();

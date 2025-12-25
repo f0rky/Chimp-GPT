@@ -254,14 +254,15 @@ async function processMessage(userMessage, conversationLog) {
                 type: 'function',
                 function: {
                   name: 'lookupTime',
-                  description: 'get the current time in a given location',
+                  description:
+                    'Get the current local time for any location. Use this when users ask "what time is it?" or mention time. If the user has told you their location previously, use that location. Common locations: New Zealand cities (Auckland, Wellington, Christchurch), Australian cities (Sydney, Melbourne, Brisbane, Perth).',
                   parameters: {
                     type: 'object',
                     properties: {
                       location: {
                         type: 'string',
                         description:
-                          'The location, e.g., Beijing, China. But it should be written in a timezone name like Asia/Shanghai',
+                          'The location name, e.g., "Auckland", "Sydney", "New York", "London". Can be a city name, country name, or region.',
                       },
                     },
                     required: ['location'],

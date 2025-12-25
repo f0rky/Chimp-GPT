@@ -72,6 +72,12 @@ function stopTimer(timerId, additionalMetadata = {}) {
     metadata: combinedMetadata,
   };
 
+  // Implement circular buffer with max 1000 entries per operation to prevent unbounded growth
+  const maxTimings = 1000;
+  if (timings[operationId].length >= maxTimings) {
+    timings[operationId].shift(); // Remove oldest entry
+  }
+
   timings[operationId].push(timingData);
 
   // Check if this operation exceeded its threshold

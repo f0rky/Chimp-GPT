@@ -41,17 +41,12 @@ class MessageProcessor {
     try {
       // Check for explicit image generation intent in the current message
       const lowerContent = currentContent.toLowerCase().trim();
-      const imagePhrases = [
-        /^draw (?:me |us |a |an |the )?/i,
-        /^generate (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^create (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^make (?:me |us |a |an |the )?(?:image|picture|photo)/i,
-        /^show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)/i,
-        /^(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)/i,
-        /^i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for)/i,
-      ];
 
-      const isImageRequest = imagePhrases.some(regex => regex.test(lowerContent));
+      // Optimize: Consolidated regex pattern instead of 7 separate tests
+      const imageRequestPattern =
+        /^(?:draw (?:me |us |a |an |the )?|generate (?:me |us |a |an |the )?(?:image|picture|photo)|create (?:me |us |a |an |the )?(?:image|picture|photo)|make (?:me |us |a |an |the )?(?:image|picture|photo)|show (?:me |us )?(?:a |an |the )?(?:image|picture|photo) (?:of|for)|(?:generate|create|make) (?:me |us )?an? image (?:of|for|showing)|i (?:need|want) (?:a|an|the) (?:image|picture|photo) (?:of|for))/i;
+
+      const isImageRequest = imageRequestPattern.test(lowerContent);
 
       // If it's clearly an image request, check if image generation is enabled
       if (isImageRequest) {
@@ -68,10 +63,7 @@ class MessageProcessor {
           // This will make the bot respond with text instead of trying to generate an image
         } else {
           // Clean up the prompt by removing the command phrases
-          let cleanPrompt = currentContent;
-          for (const phrase of imagePhrases) {
-            cleanPrompt = cleanPrompt.replace(phrase, '').trim();
-          }
+          const cleanPrompt = currentContent.replace(imageRequestPattern, '').trim();
           return {
             type: 'functionCall',
             functionName: 'generateImage',
@@ -92,9 +84,19 @@ class MessageProcessor {
         });
 
         // Keep system message (if present) and last 14 messages
-        const systemMessages = conversationLog.filter(msg => msg.role === 'system');
-        const nonSystemMessages = conversationLog.filter(msg => msg.role !== 'system').slice(-14);
-        optimizedConversationLog = [...systemMessages, ...nonSystemMessages];
+        // Optimize: single-pass separation instead of double filtering
+        const systemMessages = [];
+        const nonSystemMessages = [];
+
+        conversationLog.forEach(msg => {
+          if (msg.role === 'system') {
+            systemMessages.push(msg);
+          } else {
+            nonSystemMessages.push(msg);
+          }
+        });
+
+        optimizedConversationLog = [...systemMessages, ...nonSystemMessages.slice(-14)];
       }
 
       // Log detailed token estimation for debugging
