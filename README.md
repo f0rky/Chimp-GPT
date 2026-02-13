@@ -524,6 +524,19 @@ The bot supports Discord's slash commands. Type `/` to see available commands:
 - `/serverstats` - Display Quake Live server statistics
 
 
+## 🔮 Development with VoidBeacon
+
+This project benefits from AI-assisted development through the **VoidBeacon** coding team - a multi-agent system that helps design, implement, test, and document features collaboratively.
+
+🏗️ **Agent Team**: Architect • Coder • Test • Reviewer • Docs • Debug  
+📋 **Workflow**: All changes go through structured review and testing before merge  
+🤖 **Bot Account**: [@VoidBeacon-bot](https://github.com/VoidBeacon-bot) handles commits and pull requests  
+✅ **Quality**: Every PR is reviewed by humans before merging to maintain code quality
+
+*Want to contribute? Check out our [Contributing Guidelines](CONTRIBUTING.md) to get started!*
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License.
