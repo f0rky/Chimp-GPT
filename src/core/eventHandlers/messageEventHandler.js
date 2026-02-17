@@ -573,8 +573,20 @@ class MessageEventHandler {
                     .setStyle(ButtonStyle.Secondary)
                 );
 
+                // Build metadata footer line
+                let metaLine = '';
+                if (flowResult.imageMetadata) {
+                  const meta = flowResult.imageMetadata;
+                  const elapsedSec = (meta.elapsedMs / 1000).toFixed(1);
+                  const metaParts = [`${meta.model} (${meta.quality})`, `${elapsedSec}s`];
+                  if (meta.usage && meta.usage.total_tokens) {
+                    metaParts.push(`${meta.usage.total_tokens} tokens`);
+                  }
+                  metaLine = `\n_Model: ${metaParts.join(' · ')}_`;
+                }
+
                 await feedbackMessage.edit({
-                  content: flowResult.response || '🎨 Here you go!',
+                  content: (flowResult.response || '🎨 Here you go!') + metaLine,
                   files: [
                     {
                       attachment: flowResult.attachment.buffer,

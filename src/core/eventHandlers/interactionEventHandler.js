@@ -81,11 +81,13 @@ class InteractionEventHandler {
       await interaction.editReply({ components: [pendingRow] });
 
       // Generate HD image: chatgpt-image-latest, 1024×1024, high quality
+      const hdGenStart = Date.now();
       const imageResult = await generateImage(originalPrompt, {
         model: 'chatgpt-image-latest',
         size: '1024x1024',
         quality: 'high',
       });
+      const hdElapsedSec = ((Date.now() - hdGenStart) / 1000).toFixed(1);
 
       if (!imageResult.success) {
         discordLogger.warn(
@@ -118,10 +120,11 @@ class InteractionEventHandler {
       }
 
       const fileName = `hd_image_${Date.now()}.png`;
+      const hdMetaLine = `\n_Model: chatgpt-image-latest (high) · ${hdElapsedSec}s_`;
 
       // Edit the original message with the HD image, remove button
       await interaction.editReply({
-        content: `🖼️ **HD Version** — ${originalPrompt.substring(0, 100)}${originalPrompt.length > 100 ? '...' : ''}`,
+        content: `🖼️ **HD Version** — ${originalPrompt.substring(0, 100)}${originalPrompt.length > 100 ? '...' : ''}${hdMetaLine}`,
         files: [{ attachment: imageBuffer, name: fileName }],
         components: [],
       });

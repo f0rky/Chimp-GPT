@@ -224,18 +224,28 @@ class SimpleChimpGPTFlow {
       const { OpenAI } = require('openai');
       const openaiClient = new OpenAI({ apiKey: configFile.OPENAI_API_KEY });
 
+      // Track generation timing
+      const imageGenModel = 'chatgpt-image-latest';
+      const imageGenQuality = 'low';
+      const imageGenStartTime = Date.now();
+
       // Call OpenAI image API (Tier 1: chatgpt-image-latest, low quality = fast)
       const imageResponse = await openaiClient.images.generate({
-        model: 'chatgpt-image-latest',
+        model: imageGenModel,
         prompt: prompt,
         n: 1,
         size: '1024x1024',
-        quality: 'low',
+        quality: imageGenQuality,
       });
+
+      const imageGenElapsedMs = Date.now() - imageGenStartTime;
 
       // chatgpt-image-latest returns b64_json; fall back to url for older models
       const imageData = imageResponse.data[0];
       const imageUrl = imageData.url || null;
+
+      // Extract token/cost info from API response if available
+      const usageData = imageResponse.usage || null;
 
       try {
         const downloadImage = url => {
@@ -303,6 +313,13 @@ class SimpleChimpGPTFlow {
             buffer: imageBuffer,
             name: fileName,
           },
+          // Metadata for footer display
+          imageMetadata: {
+            model: imageGenModel,
+            quality: imageGenQuality,
+            elapsedMs: imageGenElapsedMs,
+            usage: usageData,
+          },
         };
       } catch (downloadError) {
         logger.warn('Failed to process image data:', downloadError.message);
@@ -316,6 +333,13 @@ class SimpleChimpGPTFlow {
           type: 'image',
           imageUrl: imageUrl,
           originalPrompt: prompt,
+          // Metadata for footer display
+          imageMetadata: {
+            model: imageGenModel,
+            quality: imageGenQuality,
+            elapsedMs: imageGenElapsedMs,
+            usage: usageData,
+          },
         };
       }
     } catch (error) {
