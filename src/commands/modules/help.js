@@ -303,17 +303,10 @@ module.exports = {
       fields: [],
     };
 
-    // Add each category and its commands
+    // Add each category and its commands (chunked to respect 1024 char field limit)
     for (const [category, cmds] of Object.entries(categories)) {
-      helpEmbed.fields.push({
-        name: category,
-        value: cmds
-          .map(
-            cmd =>
-              `\`${primaryPrefix}${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`
-          )
-          .join('\n'),
-      });
+      const categoryFields = this.buildCommandFields(category, cmds, primaryPrefix);
+      helpEmbed.fields.push(...categoryFields);
     }
 
     // Add note about prefixes
@@ -324,6 +317,50 @@ module.exports = {
     });
 
     await message.reply({ embeds: [helpEmbed] });
+  },
+
+  /**
+   * Build embed fields for a category, chunking to respect Discord's 1024 char field limit.
+   *
+   * @param {string} category - The category name (used as the field name)
+   * @param {Array} cmds - Commands in this category
+   * @param {string} prefix - Command prefix string (e.g. '/' or '!')
+   * @returns {Array<{name: string, value: string}>} One or more embed field objects
+   */
+  buildCommandFields(category, cmds, prefix) {
+    const MAX_FIELD_LENGTH = 1024;
+    const fields = [];
+    let currentLines = [];
+    let currentLength = 0;
+
+    for (const cmd of cmds) {
+      const line = `\`${prefix}${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`;
+      // +1 accounts for the '\n' separator when joining
+      const lineLength = line.length + 1;
+
+      if (currentLength + lineLength > MAX_FIELD_LENGTH && currentLines.length > 0) {
+        // Flush current chunk into a field
+        fields.push({
+          name: fields.length === 0 ? category : `${category} (cont.)`,
+          value: currentLines.join('\n'),
+        });
+        currentLines = [];
+        currentLength = 0;
+      }
+
+      currentLines.push(line);
+      currentLength += lineLength;
+    }
+
+    // Flush any remaining lines
+    if (currentLines.length > 0) {
+      fields.push({
+        name: fields.length === 0 ? category : `${category} (cont.)`,
+        value: currentLines.join('\n'),
+      });
+    }
+
+    return fields;
   },
 
   /**
@@ -421,17 +458,10 @@ module.exports = {
           fields: [],
         };
 
-        // Add each category and its commands
+        // Add each category and its commands (chunked to respect 1024 char field limit)
         for (const [category, cmds] of Object.entries(categories)) {
-          helpEmbed.fields.push({
-            name: category,
-            value: cmds
-              .map(
-                cmd =>
-                  `\`/${cmd.name || '[MISSING NAME]'}\` - ${cmd.description || 'No description'}`
-              )
-              .join('\n'),
-          });
+          const categoryFields = this.buildCommandFields(category, cmds, '/');
+          helpEmbed.fields.push(...categoryFields);
         }
 
         await interaction.reply({ embeds: [helpEmbed], ephemeral: false });
