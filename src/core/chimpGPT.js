@@ -87,6 +87,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions, // Required for reaction collectors
     GatewayIntentBits.DirectMessageReactions, // Required for DM reaction collectors
   ],
+  // Fix for image upload hang on Node.js 22:
+  // @discordjs/rest builds multipart bodies using `new FormData()` which on Node 22 creates a
+  // *native* FormData. The standalone undici package (used by @discordjs/rest's default strategy)
+  // only recognises its own FormData class via instanceof — native FormData fails that check,
+  // so extractBody() creates a ReadableStream that never receives data and the request hangs
+  // until the AbortController timeout fires (AbortError after 15 s).
+  // Switching to globalThis.fetch (Node 22's built-in, backed by the same runtime as native
+  // FormData) routes around the broken undici code path entirely.
+  rest: { makeRequest: globalThis.fetch },
 });
 
 // Import conversation manager - dynamically selected based on configuration
