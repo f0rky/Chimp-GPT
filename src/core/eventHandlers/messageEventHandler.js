@@ -38,6 +38,16 @@ class MessageEventHandler {
     // Initialize PocketFlow for conversation processing with PFPManager
     this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
 
+    // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
+    // so the RegExp objects are created once per handler instance, not on every message).
+    this.imageRequestPatterns = [
+      /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
+      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+      /(?:image|picture|photo)\s+of/i,
+      /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
+      /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+    ];
+
     // Set up periodic cleanup for enhanced message relationships
     if (maliciousUserManager.DETECTION_CONFIG.ENHANCED_MESSAGE_MANAGEMENT) {
       this.cleanupInterval = setInterval(
@@ -418,14 +428,8 @@ class MessageEventHandler {
 
       // Check if this looks like an image request and update thinking message proactively
       // This prevents the "stuck" feeling during the ~13s image generation wait
-      const imageRequestPatterns = [
-        /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
-        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
-        /(?:image|picture|photo)\s+of/i,
-        /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-        /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
-      ];
-      if (imageRequestPatterns.some(pattern => pattern.test(message.content))) {
+      // (patterns are pre-compiled in the constructor — not rebuilt on every message)
+      if (this.imageRequestPatterns.some(pattern => pattern.test(message.content))) {
         try {
           await feedbackMessage.edit('🎨 Generating your image, this may take a moment...');
           addTiming('image_status_update_sent');
