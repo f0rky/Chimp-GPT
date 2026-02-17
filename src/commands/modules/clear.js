@@ -1,14 +1,13 @@
 const { createLogger } = require('../../core/logger');
 const logger = createLogger('commands:clear');
 const {
-  userConversations,
   clearConversation,
   getConversationStorageStatus,
   loadConversationsFromStorage,
-} = require('../../conversation/conversationManager');
+} = require('../../conversation/conversationManagerSelector');
 const fs = require('fs').promises;
 const path = require('path');
-const { formatBytes } = require('../../../utils/formatters');
+const { formatBytes } = require('../../utils/formatters');
 
 /**
  * Clear command - Clears the conversation history for the current channel
@@ -39,19 +38,21 @@ module.exports = {
 
     try {
       try {
-        // Get conversation storage status
+        // Get conversation storage status before clearing
         const storageStatus = getConversationStorageStatus();
 
-        // Get in-memory conversation status
+        // Get in-memory conversation status from storage status
+        const activeCount = storageStatus.individual?.active || 0;
         const inMemoryStatus = {
-          hasConversation: userConversations.has(userId),
-          totalConversations: userConversations.size,
+          hasConversation: activeCount > 0,
+          totalConversations: activeCount,
           userId,
           userIdType: typeof userId,
         };
 
         // Try to clear the conversation
-        const wasCleared = clearConversation(userId);
+        clearConversation(userId);
+        const wasCleared = true; // clearConversation runs successfully if no exception
 
         // Get storage file info if it exists
         let fileStats = null;
@@ -127,8 +128,6 @@ module.exports = {
             userId,
             username,
             channelId,
-            userConversationsSize: userConversations.size,
-            userConversationsKeys: Array.from(userConversations.keys()),
           },
           'Failed to clear conversation'
         );
@@ -142,8 +141,6 @@ module.exports = {
           userId,
           username,
           channelId,
-          userConversationsSize: userConversations.size,
-          userConversationsKeys: Array.from(userConversations.keys()),
         },
         'Failed to clear conversation'
       );
