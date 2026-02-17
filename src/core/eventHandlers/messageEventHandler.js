@@ -479,7 +479,7 @@ class MessageEventHandler {
             }
           }
         } catch (debugError) {
-          discordLogger.error('Image flowResult - Debug Failed:', String(debugError.message));
+          discordLogger.error({ err: debugError }, 'Image flowResult - Debug Failed');
         }
       }
 
@@ -530,8 +530,11 @@ class MessageEventHandler {
                   bufferType: typeof flowResult.attachment.buffer,
                 });
 
-                // Enhanced logging for message edit operation
-                discordLogger.info('Attempting to edit message with image attachment:', {
+                // Discord.js v14: you cannot add file attachments when editing a message
+                // that originally had no attachments (like the thinking message). The fix
+                // is to delete the thinking message and send a brand-new message with the
+                // image file attached.
+                discordLogger.info('Sending image as new message (deleting thinking message):', {
                   messageId: feedbackMessage.id,
                   channelId: feedbackMessage.channelId,
                   contentLength: flowResult.response.length,
@@ -539,7 +542,8 @@ class MessageEventHandler {
                   fileName: flowResult.attachment.name,
                 });
 
-                await feedbackMessage.edit({
+                await feedbackMessage.delete();
+                const sentImageMessage = await message.channel.send({
                   content: flowResult.response,
                   files: [
                     {
@@ -549,90 +553,59 @@ class MessageEventHandler {
                   ],
                 });
 
-                discordLogger.info('Successfully edited message with image attachment:', {
-                  messageId: feedbackMessage.id,
-                  operation: 'edit_with_file_attachment',
+                discordLogger.info('Successfully sent image as new message:', {
+                  newMessageId: sentImageMessage.id,
+                  operation: 'delete_thinking_send_new_with_file',
                 });
               } catch (discordError) {
-                // Log detailed error information separately to avoid truncation
+                // Use pino-compatible error format: { err: error } as first arg
                 discordLogger.error(
-                  'Discord API call failed - Error Message:',
-                  String(discordError.message)
+                  {
+                    err: discordError,
+                    messageId: feedbackMessage.id,
+                    channelId: feedbackMessage.channelId,
+                    bufferSize: flowResult.attachment.buffer?.length || 'unknown',
+                    fileName: flowResult.attachment.name || 'unknown',
+                  },
+                  'Discord API call failed - image send/delete error'
                 );
-                discordLogger.error(
-                  'Discord API call failed - Error Name:',
-                  String(discordError.name || 'Unknown')
-                );
-                discordLogger.error(
-                  'Discord API call failed - Error Code:',
-                  String(discordError.code || 'No code')
-                );
-                discordLogger.error('Discord API call failed - Message Info:', {
-                  messageId: feedbackMessage.id,
-                  channelId: feedbackMessage.channelId,
-                  messageExists: !!feedbackMessage,
-                  hasEditFunction: typeof feedbackMessage.edit === 'function',
-                });
 
-                if (discordError.stack) {
-                  discordLogger.error(
-                    'Discord API call failed - Stack trace:',
-                    String(discordError.stack)
-                  );
-                }
-
-                discordLogger.error('Discord API call failed - Buffer Info:', {
-                  bufferExists: !!flowResult.attachment.buffer,
-                  bufferSize: flowResult.attachment.buffer?.length || 'unknown',
-                  fileName: flowResult.attachment.name || 'unknown',
-                  bufferIsBuffer: Buffer.isBuffer(flowResult.attachment.buffer),
-                  bufferType: typeof flowResult.attachment.buffer,
-                });
-
-                // Fallback to embed if Discord upload fails
+                // Fallback to embed if image send fails
                 try {
                   if (flowResult.imageUrl) {
-                    discordLogger.info('Attempting fallback to embed after upload failure:', {
-                      messageId: feedbackMessage.id,
-                      imageUrl: flowResult.imageUrl.substring(0, 50) + '...',
-                    });
+                    discordLogger.info('Attempting fallback to embed after upload failure');
                     const imageEmbed = this.createImageEmbed(
                       flowResult.imageUrl,
                       flowResult.response
                     );
 
-                    // Clear content and files, only use embed
-                    await feedbackMessage.edit({
-                      content: null,
-                      embeds: [imageEmbed],
-                      files: [], // Explicitly clear files
-                    });
+                    // Thinking message may already be deleted; try edit first, then send new
+                    try {
+                      await feedbackMessage.edit({
+                        content: null,
+                        embeds: [imageEmbed],
+                        files: [],
+                      });
+                    } catch {
+                      await message.channel.send({ embeds: [imageEmbed] });
+                    }
 
-                    discordLogger.info('Successfully edited message with embed fallback:', {
-                      messageId: feedbackMessage.id,
-                      operation: 'edit_with_embed_fallback',
-                    });
+                    discordLogger.info('Successfully sent embed fallback');
                   } else {
-                    discordLogger.info('Attempting fallback to text-only response:', {
-                      messageId: feedbackMessage.id,
-                    });
-                    await feedbackMessage.edit({
-                      content: `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`,
-                      embeds: [],
-                      files: [],
-                    });
-                    discordLogger.info('Successfully edited message with text fallback:', {
-                      messageId: feedbackMessage.id,
-                      operation: 'edit_with_text_fallback',
-                    });
+                    discordLogger.info('Attempting fallback to text-only response');
+                    const fallbackText = `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`;
+                    try {
+                      await feedbackMessage.edit({ content: fallbackText, embeds: [], files: [] });
+                    } catch {
+                      await message.channel.send(fallbackText);
+                    }
+                    discordLogger.info('Successfully sent text fallback');
                   }
                 } catch (fallbackError) {
-                  discordLogger.error('Fallback edit operation also failed:', {
-                    messageId: feedbackMessage.id,
-                    fallbackError: String(fallbackError.message),
-                    fallbackErrorCode: fallbackError.code || 'unknown',
-                    originalError: String(discordError.message),
-                  });
+                  discordLogger.error(
+                    { err: fallbackError, originalErr: discordError },
+                    'Fallback operation also failed'
+                  );
                   throw fallbackError; // Re-throw to trigger higher-level error handling
                 }
               }
