@@ -28,7 +28,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
     this.config = {
       updateInterval: 3000, // 3 seconds between status updates
       enableEnhancement: true,
-      defaultSize: '512x512',
+      defaultSize: '1024x1024',
       maxRetries: 2,
       ...options.config,
     };
@@ -168,10 +168,9 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       await this.updatePhase(store, progressKey, 'generating');
 
       const imageOptions = {
-        model: parameters.model || 'dall-e-2',
+        model: parameters.model || 'chatgpt-image-latest',
         size: parameters.size || this.config.defaultSize,
-        // quality is omitted: DALL-E 2 does not support quality param
-        // (imageGeneration.js strips it for DALL-E 2 automatically)
+        quality: parameters.quality || 'low',
         username,
         rateLimitInfo: rateLimitResult,
       };

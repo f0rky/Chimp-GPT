@@ -80,11 +80,11 @@ class InteractionEventHandler {
 
       await interaction.editReply({ components: [pendingRow] });
 
-      // Generate HD image: DALL-E 3, 1024×1024, hd quality
+      // Generate HD image: chatgpt-image-latest, 1024×1024, high quality
       const imageResult = await generateImage(originalPrompt, {
-        model: 'dall-e-3',
+        model: 'chatgpt-image-latest',
         size: '1024x1024',
-        quality: 'hd',
+        quality: 'high',
       });
 
       if (!imageResult.success) {

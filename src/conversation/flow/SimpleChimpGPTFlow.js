@@ -224,23 +224,23 @@ class SimpleChimpGPTFlow {
       const { OpenAI } = require('openai');
       const openaiClient = new OpenAI({ apiKey: configFile.OPENAI_API_KEY });
 
-      // Call OpenAI DALL-E API (Tier 1: fast + cheap DALL-E 2)
+      // Call OpenAI image API (Tier 1: chatgpt-image-latest, low quality = fast)
       const imageResponse = await openaiClient.images.generate({
-        model: 'dall-e-2',
+        model: 'chatgpt-image-latest',
         prompt: prompt,
         n: 1,
-        size: '512x512',
-        response_format: 'url',
+        size: '1024x1024',
+        quality: 'low',
       });
 
-      const imageUrl = imageResponse.data[0].url;
+      // chatgpt-image-latest returns b64_json; fall back to url for older models
+      const imageData = imageResponse.data[0];
+      const imageUrl = imageData.url || null;
 
       try {
-        // Download the image for attachment
-        const https = require('https');
-        const http = require('http');
-
         const downloadImage = url => {
+          const https = require('https');
+          const http = require('http');
           return new Promise((resolve, reject) => {
             const client = url.startsWith('https') ? https : http;
 
@@ -262,7 +262,9 @@ class SimpleChimpGPTFlow {
           });
         };
 
-        const imageBuffer = await downloadImage(imageUrl);
+        const imageBuffer = imageData.b64_json
+          ? Buffer.from(imageData.b64_json, 'base64')
+          : await downloadImage(imageUrl);
         const fileName = `generated_image_${Date.now()}.png`;
 
         // Validate buffer before using it
@@ -303,12 +305,14 @@ class SimpleChimpGPTFlow {
           },
         };
       } catch (downloadError) {
-        logger.warn('Failed to download image, falling back to URL:', downloadError.message);
+        logger.warn('Failed to process image data:', downloadError.message);
 
-        // Fallback to clean link if download fails
+        // Fallback message if buffer processing fails
         return {
           success: true,
-          response: `Your image has been generated! [Click to view](${imageUrl})`,
+          response: imageUrl
+            ? `Your image has been generated! [Click to view](${imageUrl})`
+            : 'Your image has been generated but could not be retrieved. Please try again.',
           type: 'image',
           imageUrl: imageUrl,
           originalPrompt: prompt,
