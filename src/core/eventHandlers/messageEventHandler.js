@@ -1,5 +1,5 @@
 const { discord: discordLogger } = require('../logger');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { checkUserRateLimit } = require('../../middleware/rateLimiter');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
@@ -561,6 +561,18 @@ class MessageEventHandler {
                   fileName: flowResult.attachment.name,
                 });
 
+                // Build HD upgrade button — prompt encoded in customId (max 100 chars total)
+                const rawPromptForButton = (flowResult.originalPrompt || message.content).substring(
+                  0,
+                  80
+                );
+                const hdRow = new ActionRowBuilder().addComponents(
+                  new ButtonBuilder()
+                    .setCustomId(`hd_upgrade:${encodeURIComponent(rawPromptForButton)}`)
+                    .setLabel('🔍 Upgrade to HD')
+                    .setStyle(ButtonStyle.Secondary)
+                );
+
                 await feedbackMessage.edit({
                   content: flowResult.response || '🎨 Here you go!',
                   files: [
@@ -569,6 +581,7 @@ class MessageEventHandler {
                       name: flowResult.attachment.name,
                     },
                   ],
+                  components: [hdRow],
                 });
 
                 discordLogger.info('Successfully edited thinking message with image:', {

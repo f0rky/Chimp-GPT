@@ -224,13 +224,12 @@ class SimpleChimpGPTFlow {
       const { OpenAI } = require('openai');
       const openaiClient = new OpenAI({ apiKey: configFile.OPENAI_API_KEY });
 
-      // Call OpenAI DALL-E API
+      // Call OpenAI DALL-E API (Tier 1: fast + cheap DALL-E 2)
       const imageResponse = await openaiClient.images.generate({
-        model: 'dall-e-3',
+        model: 'dall-e-2',
         prompt: prompt,
         n: 1,
-        size: '1024x1024',
-        quality: 'standard',
+        size: '512x512',
         response_format: 'url',
       });
 
@@ -297,6 +296,7 @@ class SimpleChimpGPTFlow {
           response: `Here's your generated image for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
           type: 'image',
           imageUrl: imageUrl,
+          originalPrompt: prompt,
           attachment: {
             buffer: imageBuffer,
             name: fileName,
@@ -311,6 +311,7 @@ class SimpleChimpGPTFlow {
           response: `Your image has been generated! [Click to view](${imageUrl})`,
           type: 'image',
           imageUrl: imageUrl,
+          originalPrompt: prompt,
         };
       }
     } catch (error) {
