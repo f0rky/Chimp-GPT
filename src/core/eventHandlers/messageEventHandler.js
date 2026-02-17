@@ -416,6 +416,27 @@ class MessageEventHandler {
 
       // PocketFlow now handles all message types including image generation
 
+      // Check if this looks like an image request and update thinking message proactively
+      // This prevents the "stuck" feeling during the ~13s image generation wait
+      const imageRequestPatterns = [
+        /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
+        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+        /(?:image|picture|photo)\s+of/i,
+        /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
+        /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+      ];
+      if (imageRequestPatterns.some(pattern => pattern.test(message.content))) {
+        try {
+          await feedbackMessage.edit('🎨 Generating your image, this may take a moment...');
+          addTiming('image_status_update_sent');
+        } catch (editErr) {
+          discordLogger.warn(
+            { error: editErr },
+            'Failed to update thinking message for image request'
+          );
+        }
+      }
+
       // Use PocketFlow for conversation processing
       addTiming('before_pocketflow_processing');
 
@@ -530,11 +551,9 @@ class MessageEventHandler {
                   bufferType: typeof flowResult.attachment.buffer,
                 });
 
-                // Discord.js v14: you cannot add file attachments when editing a message
-                // that originally had no attachments (like the thinking message). The fix
-                // is to delete the thinking message and send a brand-new message with the
-                // image file attached.
-                discordLogger.info('Sending image as new message (deleting thinking message):', {
+                // Discord supports editing messages to add file attachments.
+                // Edit the thinking/status message in-place with the image attached.
+                discordLogger.info('Editing thinking message with image attachment:', {
                   messageId: feedbackMessage.id,
                   channelId: feedbackMessage.channelId,
                   contentLength: flowResult.response.length,
@@ -542,9 +561,8 @@ class MessageEventHandler {
                   fileName: flowResult.attachment.name,
                 });
 
-                await feedbackMessage.delete();
-                const sentImageMessage = await message.channel.send({
-                  content: flowResult.response,
+                await feedbackMessage.edit({
+                  content: flowResult.response || '🎨 Here you go!',
                   files: [
                     {
                       attachment: flowResult.attachment.buffer,
@@ -553,9 +571,9 @@ class MessageEventHandler {
                   ],
                 });
 
-                discordLogger.info('Successfully sent image as new message:', {
-                  newMessageId: sentImageMessage.id,
-                  operation: 'delete_thinking_send_new_with_file',
+                discordLogger.info('Successfully edited thinking message with image:', {
+                  messageId: feedbackMessage.id,
+                  operation: 'edit_thinking_with_image_file',
                 });
               } catch (discordError) {
                 // Use pino-compatible error format: { err: error } as first arg
