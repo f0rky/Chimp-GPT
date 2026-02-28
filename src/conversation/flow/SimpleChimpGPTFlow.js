@@ -367,7 +367,8 @@ class SimpleChimpGPTFlow {
         error: error.message,
         stack: error.stack,
         errorType: error.constructor.name,
-        errorCode: error.code || 'unknown',
+        errorCode: error.code || error.status || 'unknown',
+        errorBody: error.error || undefined,
       });
 
       // Handle specific error types with user-friendly messages
@@ -385,7 +386,12 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤔 Hmm, something about that request confused my artistic brain. Could you try describing the image a bit differently?';
-      } else if (error.message?.includes('content_policy')) {
+      } else if (
+        error.code === 'moderation_blocked' ||
+        error.code === 'content_policy_violation' ||
+        error.message?.includes('content_policy') ||
+        error.message?.includes('safety system')
+      ) {
         userMessage =
           "🚫 Uh oh! That image request bumped into OpenAI's content policy. Let's try something a bit more family-friendly!";
       }
@@ -839,7 +845,12 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤷‍♂️ Something about your message scrambled my circuits a bit. Could you try rephrasing that?';
-      } else if (error.message?.includes('content_policy')) {
+      } else if (
+        error.code === 'moderation_blocked' ||
+        error.code === 'content_policy_violation' ||
+        error.message?.includes('content_policy') ||
+        error.message?.includes('safety system')
+      ) {
         userMessage =
           "🚫 Oops! That topic bumped into my content guidelines. Let's chat about something else! 😊";
       }
