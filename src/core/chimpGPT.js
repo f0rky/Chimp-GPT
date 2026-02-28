@@ -11,7 +11,7 @@ require('dotenv').config();
  * @version 1.9.2
  */
 
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const OpenAI = require('openai');
 // Service imports moved to respective processors/handlers:
 // - lookupWeather, lookupExtendedForecast, simplifiedWeather moved to functionCallProcessor.js
@@ -87,6 +87,16 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions, // Required for reaction collectors
     GatewayIntentBits.DirectMessageReactions, // Required for DM reaction collectors
   ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction], // Required to catch reactions on non-cached messages
+  // Fix for image upload hang on Node.js 22:
+  // @discordjs/rest builds multipart bodies using `new FormData()` which on Node 22 creates a
+  // *native* FormData. The standalone undici package (used by @discordjs/rest's default strategy)
+  // only recognises its own FormData class via instanceof — native FormData fails that check,
+  // so extractBody() creates a ReadableStream that never receives data and the request hangs
+  // until the AbortController timeout fires (AbortError after 15 s).
+  // Switching to globalThis.fetch (Node 22's built-in, backed by the same runtime as native
+  // FormData) routes around the broken undici code path entirely.
+  rest: { makeRequest: globalThis.fetch },
 });
 
 // Import conversation manager - dynamically selected based on configuration
@@ -230,29 +240,12 @@ async function startBot() {
     statusManager = initStatusManager(client);
     discordLogger.info('Status manager initialized for main file functions');
 
-    // Log conversation mode configuration
+    // PocketFlow is the sole conversation architecture
     const conversationMode = {
-      blended: config.USE_BLENDED_CONVERSATIONS,
       replyContext: config.ENABLE_REPLY_CONTEXT,
       maxPerUser: config.MAX_MESSAGES_PER_USER_BLENDED,
-      pocketFlow: config.ENABLE_POCKETFLOW,
-      parallelTesting: config.POCKETFLOW_PARALLEL_TESTING,
     };
-
-    let modeDescription;
-    if (config.ENABLE_POCKETFLOW) {
-      modeDescription = 'PocketFlow (Graph-based Architecture)';
-    } else if (config.POCKETFLOW_PARALLEL_TESTING) {
-      modeDescription = 'Parallel Testing (PocketFlow + Legacy)';
-    } else {
-      modeDescription = conversationMode.blended
-        ? conversationMode.replyContext
-          ? 'Legacy: Blended with Reply Context'
-          : 'Legacy: Blended Only'
-        : conversationMode.replyContext
-          ? 'Legacy: Individual with Reply Context'
-          : 'Legacy: Individual Only';
-    }
+    const modeDescription = 'PocketFlow (Graph-based Architecture)';
 
     discordLogger.info(
       {

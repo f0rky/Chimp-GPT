@@ -76,6 +76,7 @@ const MODELS = {
   DALL_E_3: 'dall-e-3', // Standard DALL-E 3 model
   DALL_E_2: 'dall-e-2', // Standard DALL-E 2 model
   GPT_IMAGE_1: 'gpt-image-1', // Legacy name - maps to dall-e-3
+  CHATGPT_IMAGE_LATEST: 'chatgpt-image-latest', // gpt-image-1 API model (HD button uses this)
 };
 
 /**
@@ -210,6 +211,13 @@ async function generateImage(prompt, options = {}) {
         logger.warn(`Invalid quality ${quality} for DALL-E 3, using 'standard'`);
         quality = 'standard';
       }
+    } else if (actualModel === MODELS.CHATGPT_IMAGE_LATEST) {
+      // gpt-image-1 (chatgpt-image-latest) supports 'low', 'medium', 'high', 'auto'
+      quality = quality || 'auto';
+      if (!['low', 'medium', 'high', 'auto'].includes(quality)) {
+        logger.warn(`Invalid quality ${quality} for chatgpt-image-latest, using 'auto'`);
+        quality = 'auto';
+      }
     } else {
       // DALL-E 2 doesn't support quality parameter
       quality = undefined;
@@ -221,11 +229,19 @@ async function generateImage(prompt, options = {}) {
       prompt,
       size,
       n: 1, // Generate 1 image
-      response_format: 'b64_json', // Request base64 format for better reliability
     };
 
-    // Add quality for DALL-E 3 only
-    if (actualModel === MODELS.DALL_E_3 && quality) {
+    // response_format is only supported by DALL-E 2 and DALL-E 3.
+    // gpt-image-1 / chatgpt-image-latest always returns base64 and does NOT accept this param.
+    if (actualModel === MODELS.DALL_E_2 || actualModel === MODELS.DALL_E_3) {
+      imageParams.response_format = 'b64_json';
+    }
+
+    // Add quality for models that support it
+    if (
+      (actualModel === MODELS.DALL_E_3 || actualModel === MODELS.CHATGPT_IMAGE_LATEST) &&
+      quality
+    ) {
       imageParams.quality = quality;
     }
 

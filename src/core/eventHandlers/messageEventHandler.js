@@ -1,5 +1,5 @@
 const { discord: discordLogger } = require('../logger');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const performanceMonitor = require('../../middleware/performanceMonitor');
 const { checkUserRateLimit } = require('../../middleware/rateLimiter');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
@@ -37,6 +37,16 @@ class MessageEventHandler {
 
     // Initialize PocketFlow for conversation processing with PFPManager
     this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
+
+    // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
+    // so the RegExp objects are created once per handler instance, not on every message).
+    this.imageRequestPatterns = [
+      /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
+      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+      /(?:image|picture|photo)\s+of/i,
+      /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
+      /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+    ];
 
     // Set up periodic cleanup for enhanced message relationships
     if (maliciousUserManager.DETECTION_CONFIG.ENHANCED_MESSAGE_MANAGEMENT) {
@@ -416,6 +426,21 @@ class MessageEventHandler {
 
       // PocketFlow now handles all message types including image generation
 
+      // Check if this looks like an image request and update thinking message proactively
+      // This prevents the "stuck" feeling during the ~13s image generation wait
+      // (patterns are pre-compiled in the constructor — not rebuilt on every message)
+      if (this.imageRequestPatterns.some(pattern => pattern.test(message.content))) {
+        try {
+          await feedbackMessage.edit('🎨 Generating your image, this may take a moment...');
+          addTiming('image_status_update_sent');
+        } catch (editErr) {
+          discordLogger.warn(
+            { error: editErr },
+            'Failed to update thinking message for image request'
+          );
+        }
+      }
+
       // Use PocketFlow for conversation processing
       addTiming('before_pocketflow_processing');
 
@@ -479,7 +504,7 @@ class MessageEventHandler {
             }
           }
         } catch (debugError) {
-          discordLogger.error('Image flowResult - Debug Failed:', String(debugError.message));
+          discordLogger.error({ err: debugError }, 'Image flowResult - Debug Failed');
         }
       }
 
@@ -530,8 +555,9 @@ class MessageEventHandler {
                   bufferType: typeof flowResult.attachment.buffer,
                 });
 
-                // Enhanced logging for message edit operation
-                discordLogger.info('Attempting to edit message with image attachment:', {
+                // Discord supports editing messages to add file attachments.
+                // Edit the thinking/status message in-place with the image attached.
+                discordLogger.info('Editing thinking message with image attachment:', {
                   messageId: feedbackMessage.id,
                   channelId: feedbackMessage.channelId,
                   contentLength: flowResult.response.length,
@@ -539,100 +565,94 @@ class MessageEventHandler {
                   fileName: flowResult.attachment.name,
                 });
 
+                // Build HD upgrade button — prompt encoded in customId (max 100 chars total)
+                const rawPromptForButton = (flowResult.originalPrompt || message.content).substring(
+                  0,
+                  80
+                );
+                const hdRow = new ActionRowBuilder().addComponents(
+                  new ButtonBuilder()
+                    .setCustomId(`hd_upgrade:${encodeURIComponent(rawPromptForButton)}`)
+                    .setLabel('🔍 Upgrade to HD')
+                    .setStyle(ButtonStyle.Secondary)
+                );
+
+                // Build metadata footer line
+                let metaLine = '';
+                if (flowResult.imageMetadata) {
+                  const meta = flowResult.imageMetadata;
+                  const elapsedSec = (meta.elapsedMs / 1000).toFixed(1);
+                  const metaParts = [`${meta.model} (${meta.quality})`, `${elapsedSec}s`];
+                  if (meta.usage && meta.usage.total_tokens) {
+                    metaParts.push(`${meta.usage.total_tokens} tokens`);
+                  }
+                  metaLine = `\n_Model: ${metaParts.join(' · ')}_`;
+                }
+
                 await feedbackMessage.edit({
-                  content: flowResult.response,
+                  content: (flowResult.response || '🎨 Here you go!') + metaLine,
                   files: [
                     {
                       attachment: flowResult.attachment.buffer,
                       name: flowResult.attachment.name,
                     },
                   ],
+                  components: [hdRow],
                 });
 
-                discordLogger.info('Successfully edited message with image attachment:', {
+                discordLogger.info('Successfully edited thinking message with image:', {
                   messageId: feedbackMessage.id,
-                  operation: 'edit_with_file_attachment',
+                  operation: 'edit_thinking_with_image_file',
                 });
               } catch (discordError) {
-                // Log detailed error information separately to avoid truncation
+                // Use pino-compatible error format: { err: error } as first arg
                 discordLogger.error(
-                  'Discord API call failed - Error Message:',
-                  String(discordError.message)
+                  {
+                    err: discordError,
+                    messageId: feedbackMessage.id,
+                    channelId: feedbackMessage.channelId,
+                    bufferSize: flowResult.attachment.buffer?.length || 'unknown',
+                    fileName: flowResult.attachment.name || 'unknown',
+                  },
+                  'Discord API call failed - image send/delete error'
                 );
-                discordLogger.error(
-                  'Discord API call failed - Error Name:',
-                  String(discordError.name || 'Unknown')
-                );
-                discordLogger.error(
-                  'Discord API call failed - Error Code:',
-                  String(discordError.code || 'No code')
-                );
-                discordLogger.error('Discord API call failed - Message Info:', {
-                  messageId: feedbackMessage.id,
-                  channelId: feedbackMessage.channelId,
-                  messageExists: !!feedbackMessage,
-                  hasEditFunction: typeof feedbackMessage.edit === 'function',
-                });
 
-                if (discordError.stack) {
-                  discordLogger.error(
-                    'Discord API call failed - Stack trace:',
-                    String(discordError.stack)
-                  );
-                }
-
-                discordLogger.error('Discord API call failed - Buffer Info:', {
-                  bufferExists: !!flowResult.attachment.buffer,
-                  bufferSize: flowResult.attachment.buffer?.length || 'unknown',
-                  fileName: flowResult.attachment.name || 'unknown',
-                  bufferIsBuffer: Buffer.isBuffer(flowResult.attachment.buffer),
-                  bufferType: typeof flowResult.attachment.buffer,
-                });
-
-                // Fallback to embed if Discord upload fails
+                // Fallback to embed if image send fails
                 try {
                   if (flowResult.imageUrl) {
-                    discordLogger.info('Attempting fallback to embed after upload failure:', {
-                      messageId: feedbackMessage.id,
-                      imageUrl: flowResult.imageUrl.substring(0, 50) + '...',
-                    });
+                    discordLogger.info('Attempting fallback to embed after upload failure');
                     const imageEmbed = this.createImageEmbed(
                       flowResult.imageUrl,
                       flowResult.response
                     );
 
-                    // Clear content and files, only use embed
-                    await feedbackMessage.edit({
-                      content: null,
-                      embeds: [imageEmbed],
-                      files: [], // Explicitly clear files
-                    });
+                    // Thinking message may already be deleted; try edit first, then send new
+                    try {
+                      await feedbackMessage.edit({
+                        content: null,
+                        embeds: [imageEmbed],
+                        files: [],
+                      });
+                    } catch {
+                      await message.channel.send({ embeds: [imageEmbed] });
+                    }
 
-                    discordLogger.info('Successfully edited message with embed fallback:', {
-                      messageId: feedbackMessage.id,
-                      operation: 'edit_with_embed_fallback',
-                    });
+                    discordLogger.info('Successfully sent embed fallback');
                   } else {
-                    discordLogger.info('Attempting fallback to text-only response:', {
-                      messageId: feedbackMessage.id,
-                    });
-                    await feedbackMessage.edit({
-                      content: `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`,
-                      embeds: [],
-                      files: [],
-                    });
-                    discordLogger.info('Successfully edited message with text fallback:', {
-                      messageId: feedbackMessage.id,
-                      operation: 'edit_with_text_fallback',
-                    });
+                    discordLogger.info('Attempting fallback to text-only response');
+                    const fallbackText = `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`;
+                    try {
+                      await feedbackMessage.edit({ content: fallbackText, embeds: [], files: [] });
+                    } catch {
+                      await message.channel.send(fallbackText);
+                    }
+                    discordLogger.info('Successfully sent text fallback');
                   }
                 } catch (fallbackError) {
-                  discordLogger.error('Fallback edit operation also failed:', {
-                    messageId: feedbackMessage.id,
-                    fallbackError: String(fallbackError.message),
-                    fallbackErrorCode: fallbackError.code || 'unknown',
-                    originalError: String(discordError.message),
-                  });
+                  discordLogger.error(
+                    { err: fallbackError, originalErr: discordError },
+                    'Fallback operation also failed'
+                  );
                   throw fallbackError; // Re-throw to trigger higher-level error handling
                 }
               }

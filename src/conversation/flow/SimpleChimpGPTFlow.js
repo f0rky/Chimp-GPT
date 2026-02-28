@@ -10,6 +10,29 @@ const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
 const KnowledgeFlow = require('./KnowledgeFlow');
 
+// Hoist service requires out of hot-path functions so Node's module cache is
+// hit on first use and subsequent calls skip the require() lookup entirely.
+const { OpenAI } = require('openai');
+const https = require('https');
+const http = require('http');
+// Services are loaded lazily on first import (Node caches them after that).
+// Capture references here so handleXxx functions don't re-resolve on every call.
+let _weatherService = null;
+let _timeLookup = null;
+let _quakeLookup = null;
+function getWeatherService() {
+  if (!_weatherService) _weatherService = require('../../services/simplified-weather');
+  return _weatherService;
+}
+function getTimeLookup() {
+  if (!_timeLookup) _timeLookup = require('../../services/timeLookup');
+  return _timeLookup;
+}
+function getQuakeLookup() {
+  if (!_quakeLookup) _quakeLookup = require('../../services/quakeLookup');
+  return _quakeLookup;
+}
+
 const logger = createLogger('SimpleChimpGPTFlow');
 
 class SimpleChimpGPTFlow {
@@ -219,29 +242,35 @@ class SimpleChimpGPTFlow {
 
       logger.info(`Processing image generation request: ${prompt.substring(0, 50)}...`);
 
-      // Create OpenAI client (same approach as PocketFlowFunctionProcessor)
-      const configFile = require('../../core/configValidator');
-      const { OpenAI } = require('openai');
-      const openaiClient = new OpenAI({ apiKey: configFile.OPENAI_API_KEY });
+      // Create OpenAI client using the already-required config and OpenAI class
+      const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
-      // Call OpenAI DALL-E API
+      // Track generation timing
+      const imageGenModel = 'chatgpt-image-latest';
+      const imageGenQuality = 'low';
+      const imageGenStartTime = Date.now();
+
+      // Call OpenAI image API (Tier 1: chatgpt-image-latest, low quality = fast)
       const imageResponse = await openaiClient.images.generate({
-        model: 'dall-e-3',
+        model: imageGenModel,
         prompt: prompt,
         n: 1,
         size: '1024x1024',
-        quality: 'standard',
-        response_format: 'url',
+        quality: imageGenQuality,
       });
 
-      const imageUrl = imageResponse.data[0].url;
+      const imageGenElapsedMs = Date.now() - imageGenStartTime;
+
+      // chatgpt-image-latest returns b64_json; fall back to url for older models
+      const imageData = imageResponse.data[0];
+      const imageUrl = imageData.url || null;
+
+      // Extract token/cost info from API response if available
+      const usageData = imageResponse.usage || null;
 
       try {
-        // Download the image for attachment
-        const https = require('https');
-        const http = require('http');
-
         const downloadImage = url => {
+          // https/http are hoisted to module scope — no re-require needed
           return new Promise((resolve, reject) => {
             const client = url.startsWith('https') ? https : http;
 
@@ -263,7 +292,9 @@ class SimpleChimpGPTFlow {
           });
         };
 
-        const imageBuffer = await downloadImage(imageUrl);
+        const imageBuffer = imageData.b64_json
+          ? Buffer.from(imageData.b64_json, 'base64')
+          : await downloadImage(imageUrl);
         const fileName = `generated_image_${Date.now()}.png`;
 
         // Validate buffer before using it
@@ -297,20 +328,38 @@ class SimpleChimpGPTFlow {
           response: `Here's your generated image for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
           type: 'image',
           imageUrl: imageUrl,
+          originalPrompt: prompt,
           attachment: {
             buffer: imageBuffer,
             name: fileName,
           },
+          // Metadata for footer display
+          imageMetadata: {
+            model: imageGenModel,
+            quality: imageGenQuality,
+            elapsedMs: imageGenElapsedMs,
+            usage: usageData,
+          },
         };
       } catch (downloadError) {
-        logger.warn('Failed to download image, falling back to URL:', downloadError.message);
+        logger.warn('Failed to process image data:', downloadError.message);
 
-        // Fallback to clean link if download fails
+        // Fallback message if buffer processing fails
         return {
           success: true,
-          response: `Your image has been generated! [Click to view](${imageUrl})`,
+          response: imageUrl
+            ? `Your image has been generated! [Click to view](${imageUrl})`
+            : 'Your image has been generated but could not be retrieved. Please try again.',
           type: 'image',
           imageUrl: imageUrl,
+          originalPrompt: prompt,
+          // Metadata for footer display
+          imageMetadata: {
+            model: imageGenModel,
+            quality: imageGenQuality,
+            elapsedMs: imageGenElapsedMs,
+            usage: usageData,
+          },
         };
       }
     } catch (error) {
@@ -458,7 +507,7 @@ class SimpleChimpGPTFlow {
       logger.info(`Extracted location: ${location}`);
 
       // Use the simplified weather service for structured data
-      const { getWeatherResponse } = require('../../services/simplified-weather');
+      const { getWeatherResponse } = getWeatherService();
       weatherData = await getWeatherResponse(location, message.content);
 
       // If we got structured weather data, format it with the bot's personality
@@ -594,7 +643,7 @@ class SimpleChimpGPTFlow {
       logger.info(`Extracted location for time lookup: ${location}`);
 
       // Use the existing time lookup service
-      const lookupTime = require('../../services/timeLookup');
+      const lookupTime = getTimeLookup();
       const timeData = await lookupTime(location);
 
       // Format response with bot personality
@@ -682,7 +731,7 @@ class SimpleChimpGPTFlow {
       logger.info('Processing quake stats request');
 
       // Use the underlying quake lookup service directly
-      const lookupQuakeServer = require('../../services/quakeLookup');
+      const lookupQuakeServer = getQuakeLookup();
 
       // Get default server stats (no specific server specified)
       const serverData = await lookupQuakeServer(null, 1); // Default server, elo mode 1

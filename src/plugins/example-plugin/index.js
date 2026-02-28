@@ -174,31 +174,16 @@ module.exports = {
         logger.error({ error }, 'Failed to add plugin status to startup message');
       }
 
-      // Schedule periodic status reports (every 6 hours)
-      const REPORT_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-
-      // Store the interval ID so we can clear it on shutdown
-      client.examplePluginInterval = setInterval(async () => {
-        try {
-          await sendStatusReport(client);
-          logger.info('Scheduled status report sent to owner');
-        } catch (error) {
-          logger.error({ error }, 'Failed to send scheduled status report');
-        }
-      }, REPORT_INTERVAL);
-
-      logger.info(`Scheduled status reports every ${REPORT_INTERVAL / (60 * 60 * 1000)} hours`);
+      // Periodic status reports disabled - use /status-report on demand instead.
+      // Automated 6-hourly DMs to the owner were noisy and unhelpful.
+      logger.info('Periodic status reports disabled (on-demand only via /status-report)');
     },
 
     // Called when the bot is shutting down
     onBotShutdown: async client => {
       logger.info('Bot is shutting down. Example plugin says goodbye!');
 
-      // Clear the scheduled status reports interval
-      if (client && client.examplePluginInterval) {
-        clearInterval(client.examplePluginInterval);
-        logger.info('Cleared scheduled status reports interval');
-      }
+      // No interval to clear (periodic reports were disabled).
     },
 
     // Called when a message is received before processing

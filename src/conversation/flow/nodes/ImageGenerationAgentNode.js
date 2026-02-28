@@ -168,9 +168,9 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       await this.updatePhase(store, progressKey, 'generating');
 
       const imageOptions = {
-        model: parameters.model || 'gpt-image-1',
+        model: parameters.model || 'chatgpt-image-latest',
         size: parameters.size || this.config.defaultSize,
-        quality: parameters.quality || 'standard',
+        quality: parameters.quality || 'low',
         username,
         rateLimitInfo: rateLimitResult,
       };
@@ -280,24 +280,15 @@ class ImageGenerationAgentNode extends BaseConversationNode {
     const sizeMatch = prompt.match(/(?:size|dimensions?)[:\s]+(\d+x\d+)/i);
     if (sizeMatch) {
       const requestedSize = sizeMatch[1];
-      if (['1024x1024', '1536x1024', '1024x1536'].includes(requestedSize)) {
+      if (['256x256', '512x512', '1024x1024'].includes(requestedSize)) {
         size = requestedSize;
         prompt = prompt.replace(sizeMatch[0], '').trim();
       }
     }
 
-    // Extract quality if specified
-    let quality = 'standard';
-    const qualityMatch = prompt.match(/(?:quality|resolution)[:\s]+(low|medium|high|standard)/i);
-    if (qualityMatch) {
-      quality = qualityMatch[1].toLowerCase();
-      prompt = prompt.replace(qualityMatch[0], '').trim();
-    }
-
     return {
       prompt: prompt.trim(),
       size,
-      quality,
       enhance: true, // Default to enhancing prompts
     };
   }
