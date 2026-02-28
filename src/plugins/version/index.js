@@ -58,7 +58,7 @@ module.exports = {
         const mem = process.memoryUsage();
         const env = process.env.NODE_ENV || 'development';
         const hostname = os.hostname();
-        const statusUrl = `http://localhost:${process.env.PORT || 3001}`;
+        const statusUrl = `http://localhost:${process.env.ACTUAL_STATUS_PORT || process.env.PORT || 3001}`;
         // Get loaded plugins from global plugin manager if available
         let loadedPlugins = 'None';
         try {

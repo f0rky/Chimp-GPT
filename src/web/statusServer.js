@@ -501,6 +501,10 @@ function initStatusServer(options = {}) {
             logger.error({ error }, 'Error running startup rate limiter test');
           }
 
+          // Store the actual port so other modules (version, healthCheck) can report it correctly
+          // even when the configured port was in use and we incremented to the next available one
+          process.env.ACTUAL_STATUS_PORT = String(portNumber);
+
           // Resolve the promise with the server instance
           resolve({ server, port: portNumber });
         });

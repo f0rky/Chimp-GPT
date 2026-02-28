@@ -571,7 +571,7 @@ function generateHealthReport(isStartup = false) {
 
   // Add status page and logs if it's a startup report
   if (isStartup) {
-    const determinedStatusPort = config.PORT || 3001;
+    const determinedStatusPort = process.env.ACTUAL_STATUS_PORT || config.PORT || 3001;
     const actualHostname = process.env.STATUS_HOSTNAME || 'localhost'; // Fallback just in case, though configValidator should ensure it's set
     report += `\n\n**Status Page:** http://${actualHostname}:${determinedStatusPort}`;
     report += `\n\n**Recent Logs:**\n\`\`\`\n${getRecentLogs(15)}\n\`\`\``;
