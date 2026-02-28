@@ -58,22 +58,43 @@ function createRouter(deps) {
     }
   });
 
-  // GET /settings — delegates to original statusServer logic (kept inline, not duplicated)
-  // This route is complex (rebuilds CONFIG_SCHEMA inline) — kept as a passthrough stub
-  // TODO: extract CONFIG_SCHEMA to a shared module so settings can be served cleanly
+  // GET /settings — builds response from CONFIG_SCHEMA, omitting sensitive fields
   router.get('/settings', async (req, res) => {
     try {
-      // Re-require fresh config for settings display
       const config = require('../../core/configValidator');
-      const safeSettings = {
-        BOT_NAME: config.BOT_NAME,
-        NODE_ENV: process.env.NODE_ENV,
-        ENABLE_REPLY_CONTEXT: config.ENABLE_REPLY_CONTEXT,
-        MAX_MESSAGES_PER_USER_BLENDED: config.MAX_MESSAGES_PER_USER_BLENDED,
-        LOG_LEVEL: config.LOG_LEVEL,
-        conversationMode: 'PocketFlow (Graph-based Architecture)',
+      const { CONFIG_SCHEMA } = config;
+
+      // Keys that contain secrets and must never be exposed
+      const SENSITIVE_KEYS = new Set([
+        'DISCORD_TOKEN',
+        'OPENAI_API_KEY',
+        'X_RAPIDAPI_KEY',
+        'SERPAPI_API_KEY',
+        'BRAVE_SEARCH_API_KEY',
+        'WOLFRAM_APP_ID',
+        'TELNYX_API_KEY',
+        'OWNER_ID',
+      ]);
+
+      const settings = {};
+      for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
+        if (SENSITIVE_KEYS.has(key)) continue;
+        settings[key] = {
+          value: config[key],
+          description: schema.description,
+          required: schema.required ?? false,
+          default: schema.default,
+        };
+      }
+
+      // Append non-schema runtime values
+      settings.NODE_ENV = { value: process.env.NODE_ENV, description: 'Node environment' };
+      settings.conversationMode = {
+        value: 'PocketFlow (Graph-based Architecture)',
+        description: 'Active conversation engine',
       };
-      res.json({ success: true, settings: safeSettings, timestamp: new Date().toISOString() });
+
+      res.json({ success: true, settings, timestamp: new Date().toISOString() });
     } catch (error) {
       logger.error({ error }, 'Error getting settings');
       res.status(500).json({ success: false, error: error.message });

@@ -20,6 +20,7 @@ const {
   handleOpenAIError,
   handleDiscordError,
   logError,
+  isModerationError,
 } = require('../utils/errorHandler');
 
 /**
@@ -841,7 +842,7 @@ async function handleImageGeneration(
 
       let errorMessage = '❌ **Image Generation Failed**\n\n';
 
-      if (error.message?.includes('content_policy_violation')) {
+      if (isModerationError(error)) {
         errorMessage +=
           "🚫 Your request violates OpenAI's content policy. Please try a different prompt.";
       } else if (error.message?.includes('rate_limit')) {
@@ -889,7 +890,7 @@ async function handleImageGeneration(
 
     let errorMessage = '❌ **Image Generation Failed**\n\n';
 
-    if (error.message?.includes('content_policy_violation')) {
+    if (isModerationError(error)) {
       errorMessage +=
         "🚫 Your request violates OpenAI's content policy. Please try a different prompt.";
     } else if (error.message?.includes('rate_limit')) {

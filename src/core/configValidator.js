@@ -468,4 +468,5 @@ try {
  * @exports ConfigValidator
  * @type {ConfigValidator}
  */
+validatedConfig.CONFIG_SCHEMA = CONFIG_SCHEMA;
 module.exports = validatedConfig;

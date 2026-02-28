@@ -8,6 +8,7 @@
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
+const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
 
 // Hoist service requires out of hot-path functions so Node's module cache is

@@ -40,6 +40,7 @@ const {
   enhanceError,
   handleOpenAIError,
   logError,
+  isModerationError,
 } = require('../utils/errorHandler');
 const logger = createLogger('image');
 const { trackApiCall, trackError } = require('../core/healthCheck');
@@ -360,12 +361,7 @@ async function generateImage(prompt, options = {}) {
       );
 
       // Check for content policy violation
-      if (
-        error.status === 400 &&
-        (error.code === 'moderation_blocked' ||
-          error.message?.includes('safety system') ||
-          error.message?.includes('content policy'))
-      ) {
+      if (error.status === 400 && isModerationError(error)) {
         const policyError = handleOpenAIError(error, {
           prompt: prompt.substring(0, 100),
           operation: 'image_generation_content_policy',
@@ -682,7 +678,7 @@ async function generateImage(prompt, options = {}) {
     trackError('gptimage');
 
     // Check if this is a content policy violation that wasn't caught earlier
-    const isContentPolicyViolation = error.status === 400 && error.code === 'moderation_blocked';
+    const isContentPolicyViolation = error.status === 400 && isModerationError(error);
 
     // Store the error result in the function results storage
     const errorResult = {

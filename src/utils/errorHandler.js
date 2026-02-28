@@ -663,6 +663,23 @@ async function tryExec(fn, options = {}, defaultValue = null) {
   }
 }
 
+/**
+ * Returns true if the error is a content moderation / policy rejection from OpenAI.
+ * Covers all known error codes and message patterns across the OpenAI API.
+ *
+ * @param {Error} err
+ * @returns {boolean}
+ */
+function isModerationError(err) {
+  return (
+    err.code === 'moderation_blocked' ||
+    err.code === 'content_policy_violation' ||
+    err.message?.includes('content_policy') ||
+    err.message?.includes('content_policy_violation') ||
+    err.message?.includes('safety system')
+  );
+}
+
 module.exports = {
   ChimpError,
   ApiError,
@@ -682,6 +699,7 @@ module.exports = {
   withTimeout,
   createError,
   wrapError,
+  isModerationError,
   // Legacy functions for backward compatibility
   handleError,
   tryExec,
