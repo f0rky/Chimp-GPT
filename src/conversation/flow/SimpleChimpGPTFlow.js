@@ -35,6 +35,21 @@ function getQuakeLookup() {
 
 const logger = createLogger('SimpleChimpGPTFlow');
 
+/**
+ * Returns true if the error is a content moderation / policy rejection from OpenAI.
+ *
+ * @param {Error} err
+ * @returns {boolean}
+ */
+function isModerationError(err) {
+  return (
+    err.code === 'moderation_blocked' ||
+    err.code === 'content_policy_violation' ||
+    err.message?.includes('content_policy') ||
+    err.message?.includes('safety system')
+  );
+}
+
 class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
     this.openaiClient = openaiClient;
@@ -266,11 +281,7 @@ class SimpleChimpGPTFlow {
       try {
         imageResponse = await attemptImageGenerate(prompt);
       } catch (firstError) {
-        if (
-          firstError.code === 'moderation_blocked' ||
-          firstError.code === 'content_policy_violation' ||
-          firstError.message?.includes('safety system')
-        ) {
+        if (isModerationError(firstError)) {
           logger.info('Image prompt blocked by moderation, retrying with creative framing prefix');
           const prefixedPrompt = `Digital artwork, creative illustration: ${prompt}`;
           imageResponse = await attemptImageGenerate(prefixedPrompt); // may throw — caught by outer catch
@@ -408,12 +419,7 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤔 Hmm, something about that request confused my artistic brain. Could you try describing the image a bit differently?';
-      } else if (
-        error.code === 'moderation_blocked' ||
-        error.code === 'content_policy_violation' ||
-        error.message?.includes('content_policy') ||
-        error.message?.includes('safety system')
-      ) {
+      } else if (isModerationError(error)) {
         userMessage =
           "🚫 Uh oh! That image request bumped into OpenAI's content policy. Let's try something a bit more family-friendly!";
       }
@@ -867,12 +873,7 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤷‍♂️ Something about your message scrambled my circuits a bit. Could you try rephrasing that?';
-      } else if (
-        error.code === 'moderation_blocked' ||
-        error.code === 'content_policy_violation' ||
-        error.message?.includes('content_policy') ||
-        error.message?.includes('safety system')
-      ) {
+      } else if (isModerationError(error)) {
         userMessage =
           "🚫 Oops! That topic bumped into my content guidelines. Let's chat about something else! 😊";
       }
