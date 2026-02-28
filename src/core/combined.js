@@ -114,17 +114,25 @@ async function startCombinedApp() {
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT signal, shutting down gracefully...');
-  // Add cleanup code here if needed
+// Handle graceful shutdown with dying gasp
+async function shutdown(reason) {
+  logger.info({ reason }, 'Shutting down gracefully...');
+  try {
+    const coordinator = require('../utils/startupMessageCoordinator');
+    await coordinator.dyingGasp(reason);
+  } catch (_) {}
   process.exit(0);
-});
+}
 
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM signal, shutting down gracefully...');
-  // Add cleanup code here if needed
-  process.exit(0);
+process.on('SIGINT', () => shutdown('SIGINT (Ctrl+C)'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('uncaughtException', async error => {
+  logger.error({ error }, 'Uncaught exception — shutting down');
+  try {
+    const coordinator = require('../utils/startupMessageCoordinator');
+    await coordinator.dyingGasp('crash', error);
+  } catch (_) {}
+  process.exit(1);
 });
 
 // Export validated environment for use by other modules

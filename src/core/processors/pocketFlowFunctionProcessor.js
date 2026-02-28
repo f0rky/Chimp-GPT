@@ -269,14 +269,17 @@ class PocketFlowFunctionProcessor {
       const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
       // Call OpenAI DALL-E API directly
-      const imageResponse = await openaiClient.images.generate({
+      // response_format is only supported by DALL-E 2/3; gpt-image-1/chatgpt-image-latest omit it
+      const gptImage1Models = ['gpt-image-1', 'chatgpt-image-latest'];
+      const imageGenParams = {
         model: model,
         prompt: prompt,
         n: 1,
         size: size,
         quality: 'standard',
-        response_format: 'url',
-      });
+        ...(gptImage1Models.includes(model) ? {} : { response_format: 'url' }),
+      };
+      const imageResponse = await openaiClient.images.generate(imageGenParams);
 
       const imageUrl = imageResponse.data[0].url;
       const revisedPrompt = imageResponse.data[0].revised_prompt || prompt;

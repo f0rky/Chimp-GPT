@@ -11,7 +11,7 @@ require('dotenv').config();
  * @version 1.9.2
  */
 
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const OpenAI = require('openai');
 // Service imports moved to respective processors/handlers:
 // - lookupWeather, lookupExtendedForecast, simplifiedWeather moved to functionCallProcessor.js
@@ -87,6 +87,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions, // Required for reaction collectors
     GatewayIntentBits.DirectMessageReactions, // Required for DM reaction collectors
   ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction], // Required to catch reactions on non-cached messages
   // Fix for image upload hang on Node.js 22:
   // @discordjs/rest builds multipart bodies using `new FormData()` which on Node 22 creates a
   // *native* FormData. The standalone undici package (used by @discordjs/rest's default strategy)

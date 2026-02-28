@@ -10,6 +10,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const os = require('os');
+const { execSync } = require('child_process');
 const { createLogger } = require('../core/logger');
 const config = require('../core/configValidator');
 const { version: botVersion } = require('../../package.json');
@@ -93,6 +94,20 @@ function generateStartupReport() {
  * @returns {Object} Formatted greeting as an embed
  */
 function generateChannelGreeting() {
+  // Get git branch and short commit hash for traceability
+  let gitInfo = 'unknown';
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: __dirname, timeout: 2000 })
+      .toString()
+      .trim();
+    const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname, timeout: 2000 })
+      .toString()
+      .trim();
+    gitInfo = `${branch}@${commit}`;
+  } catch (_) {
+    /* git not available or not a repo */
+  }
+
   // Create an embed for the greeting
   const embed = new EmbedBuilder()
     .setColor(0x00aaff)
@@ -101,7 +116,9 @@ function generateChannelGreeting() {
     .addFields(
       { name: 'Status', value: 'All systems operational', inline: true },
       { name: 'Version', value: botVersion, inline: true },
-      { name: 'AI Model', value: getOpenAIModel(), inline: true }
+      { name: 'AI Model', value: getOpenAIModel(), inline: true },
+      { name: 'PID', value: `${process.pid}`, inline: true },
+      { name: 'Branch', value: gitInfo, inline: true }
     )
     .setFooter({ text: `Type "help" or use /help to see available commands` });
 
@@ -139,9 +156,12 @@ async function sendChannelGreeting(client) {
       try {
         const channel = await client.channels.fetch(channelID);
         if (channel && channel.isTextBased()) {
-          await channel.send({ embeds: [greeting] });
+          const msg = await channel.send({ embeds: [greeting] });
           successCount++;
           logger.info(`Greeting sent to channel ${channel.name} (${channelID})`);
+
+          // Add reaction controls for the owner
+          await attachGreetingReactions(client, msg);
         }
       } catch (error) {
         logger.error({ error, channelID }, 'Failed to send greeting to channel');
@@ -213,9 +233,90 @@ function formatTime(seconds) {
   return `${hours} hours, ${minutes} minutes`;
 }
 
+/**
+ * Attach emoji reaction controls to a channel greeting message.
+ * Bot adds the reactions; owner can react to manage the message.
+ *
+ * 🗑️ → delete this message
+ * 📌 → hold/archive (clear other reactions, leave message)
+ * 🧹 → delete this message + next 5 in channel
+ *
+ * @param {import('discord.js').Client} client
+ * @param {import('discord.js').Message} msg
+ */
+async function attachGreetingReactions(client, msg) {
+  const { PermissionFlagsBits } = require('discord.js');
+
+  // Check we have Manage Messages before proceeding
+  const perms = msg.channel.permissionsFor(client.user);
+  if (!perms || !perms.has(PermissionFlagsBits.ManageMessages)) {
+    logger.warn('Missing ManageMessages permission — skipping reaction controls');
+    return;
+  }
+
+  const REACTIONS = ['🗑️', '📌', '🧹'];
+
+  try {
+    for (const emoji of REACTIONS) {
+      await msg.react(emoji);
+    }
+    logger.info('Reaction controls added to greeting message');
+  } catch (error) {
+    logger.warn({ error }, 'Failed to add reactions to greeting');
+    return;
+  }
+
+  // Listen for owner reactions (60 min window — long enough to catch a late response)
+  const filter = (reaction, user) =>
+    REACTIONS.includes(reaction.emoji.name) && user.id === config.OWNER_ID;
+
+  const collector = msg.createReactionCollector({ filter, time: 60 * 60 * 1000 });
+
+  collector.on('collect', async (reaction, user) => {
+    const emoji = reaction.emoji.name;
+    logger.info({ emoji, userId: user.id }, 'Owner reacted to greeting');
+
+    try {
+      if (emoji === '🗑️') {
+        // Delete this message
+        await msg.delete();
+        logger.info('Greeting message deleted by owner reaction');
+      } else if (emoji === '📌') {
+        // Hold — remove all bot-added reactions, leave message
+        await msg.reactions.removeAll();
+        logger.info('Greeting message held/archived by owner reaction');
+        collector.stop('held');
+      } else if (emoji === '🧹') {
+        // Delete this message + next 5
+        try {
+          const channel = msg.channel;
+          const messages = await channel.messages.fetch({ after: msg.id, limit: 5 });
+          const toDelete = [msg, ...messages.values()];
+          // bulkDelete requires messages < 14 days old
+          await channel.bulkDelete(toDelete, true);
+          logger.info({ count: toDelete.length }, 'Bulk deleted greeting + next messages');
+        } catch (bulkErr) {
+          logger.warn({ error: bulkErr }, 'Bulk delete failed, deleting greeting only');
+          await msg.delete().catch(() => {});
+        }
+      }
+    } catch (actionErr) {
+      logger.warn({ error: actionErr, emoji }, 'Reaction action failed');
+    }
+  });
+
+  collector.on('end', (_, reason) => {
+    if (reason !== 'held' && !msg.deleted) {
+      // Clean up our reaction buttons when collector expires
+      msg.reactions.removeAll().catch(() => {});
+    }
+  });
+}
+
 module.exports = {
   sendChannelGreeting,
   sendOwnerStartupReport,
   generateStartupReport,
   generateChannelGreeting,
+  attachGreetingReactions,
 };

@@ -122,11 +122,16 @@ class InteractionEventHandler {
       const fileName = `hd_image_${Date.now()}.png`;
       const hdMetaLine = `\n_Model: chatgpt-image-latest (high) · ${hdElapsedSec}s_`;
 
-      // Edit the original message with the HD image, remove button
+      // Edit the original message to remove the button, keep original image intact
       await interaction.editReply({
+        content: `${interaction.message.content}\n⬆️ HD version below ↓`,
+        components: [],
+      });
+
+      // Post HD image as a new follow-up so users can compare
+      await interaction.followUp({
         content: `🖼️ **HD Version** — ${originalPrompt.substring(0, 100)}${originalPrompt.length > 100 ? '...' : ''}${hdMetaLine}`,
         files: [{ attachment: imageBuffer, name: fileName }],
-        components: [],
       });
 
       discordLogger.info(

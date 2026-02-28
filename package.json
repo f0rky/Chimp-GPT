@@ -113,6 +113,7 @@
   },
   "overrides": {
     "undici": "^7.16.0",
-    "diff": "^8.0.3"
+    "diff": "^8.0.3",
+    "serialize-javascript": "7.0.3"
   }
 }
