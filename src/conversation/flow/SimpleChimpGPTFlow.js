@@ -36,21 +36,6 @@ function getQuakeLookup() {
 
 const logger = createLogger('SimpleChimpGPTFlow');
 
-/**
- * Returns true if the error is a content moderation / policy rejection from OpenAI.
- *
- * @param {Error} err
- * @returns {boolean}
- */
-function isModerationError(err) {
-  return (
-    err.code === 'moderation_blocked' ||
-    err.code === 'content_policy_violation' ||
-    err.message?.includes('content_policy') ||
-    err.message?.includes('safety system')
-  );
-}
-
 class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
     this.openaiClient = openaiClient;
