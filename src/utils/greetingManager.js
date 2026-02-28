@@ -97,12 +97,11 @@ function generateChannelGreeting() {
   // Get git branch and short commit hash for traceability
   let gitInfo = 'unknown';
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: __dirname, timeout: 2000 })
-      .toString()
-      .trim();
-    const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname, timeout: 2000 })
-      .toString()
-      .trim();
+    // Use fixed PATH to satisfy static analysis (prevents PATH injection warnings)
+    const safeEnv = { ...process.env, PATH: '/usr/bin:/usr/local/bin:/bin' };
+    const opts = { cwd: __dirname, timeout: 2000, env: safeEnv };
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', opts).toString().trim();
+    const commit = execSync('git rev-parse --short HEAD', opts).toString().trim();
     gitInfo = `${branch}@${commit}`;
   } catch (_) {
     /* git not available or not a repo */
