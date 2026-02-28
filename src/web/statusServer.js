@@ -750,30 +750,10 @@ function initStatusServer(options = {}) {
       // Get detailed version information
       const versionInfo = getDetailedVersionInfo();
 
-      // Get conversation mode information
-      const blendedConversations = config.USE_BLENDED_CONVERSATIONS;
+      // PocketFlow is the sole conversation architecture — no legacy modes
       const replyContext = config.ENABLE_REPLY_CONTEXT;
-      const pocketFlow = config.ENABLE_POCKETFLOW;
-      const parallelTesting = config.POCKETFLOW_PARALLEL_TESTING;
       const maxMessagesPerUser = parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5;
-
-      // Determine mode description with PocketFlow support
-      let mode;
-      if (pocketFlow) {
-        mode = 'PocketFlow (Graph-based Architecture)';
-      } else if (parallelTesting) {
-        mode = 'Parallel Testing (PocketFlow + Legacy)';
-      } else if (blendedConversations === true && replyContext === true) {
-        mode = 'Legacy: Blended with Reply Context';
-      } else if (blendedConversations === true && replyContext === false) {
-        mode = 'Legacy: Blended Only';
-      } else if (blendedConversations === false && replyContext === true) {
-        mode = 'Legacy: Individual with Reply Context';
-      } else if (blendedConversations === false && replyContext === false) {
-        mode = 'Legacy: Individual Only';
-      } else {
-        mode = `Unknown (blended: ${blendedConversations}, reply: ${replyContext})`;
-      }
+      const mode = 'PocketFlow (Graph-based Architecture)';
 
       const health = {
         status: discordStatus === 'ok' ? 'ok' : 'offline', // overall status reflects Discord status
@@ -827,7 +807,6 @@ function initStatusServer(options = {}) {
           lastChecked: new Date().toISOString(),
         },
         conversationMode: {
-          blendedConversations: blendedConversations,
           replyContext: replyContext,
           mode: mode,
           maxMessagesPerUser: maxMessagesPerUser,
