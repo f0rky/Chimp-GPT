@@ -8,6 +8,7 @@
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
+const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
@@ -34,21 +35,6 @@ function getQuakeLookup() {
 }
 
 const logger = createLogger('SimpleChimpGPTFlow');
-
-/**
- * Returns true if the error is a content moderation / policy rejection from OpenAI.
- *
- * @param {Error} err
- * @returns {boolean}
- */
-function isModerationError(err) {
-  return (
-    err.code === 'moderation_blocked' ||
-    err.code === 'content_policy_violation' ||
-    err.message?.includes('content_policy') ||
-    err.message?.includes('safety system')
-  );
-}
 
 class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
