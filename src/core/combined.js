@@ -26,7 +26,7 @@ const { validateEnvironmentVariables } = require('../utils/securityUtils');
 let validatedEnv;
 try {
   validatedEnv = validateEnvironmentVariables();
-  console.log('✅ Environment variables validated successfully');
+  console.info('✅ Environment variables validated successfully'); // logger not yet initialised here
 } catch (error) {
   console.error('❌ Environment validation failed:', error.message);
   process.exit(1);
