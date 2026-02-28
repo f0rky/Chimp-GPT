@@ -35,6 +35,21 @@ function getQuakeLookup() {
 
 const logger = createLogger('SimpleChimpGPTFlow');
 
+/**
+ * Returns true if the error is a content moderation / policy rejection from OpenAI.
+ *
+ * @param {Error} err
+ * @returns {boolean}
+ */
+function isModerationError(err) {
+  return (
+    err.code === 'moderation_blocked' ||
+    err.code === 'content_policy_violation' ||
+    err.message?.includes('content_policy') ||
+    err.message?.includes('safety system')
+  );
+}
+
 class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
     this.openaiClient = openaiClient;
@@ -250,14 +265,31 @@ class SimpleChimpGPTFlow {
       const imageGenQuality = 'low';
       const imageGenStartTime = Date.now();
 
-      // Call OpenAI image API (Tier 1: chatgpt-image-latest, low quality = fast)
-      const imageResponse = await openaiClient.images.generate({
-        model: imageGenModel,
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: imageGenQuality,
-      });
+      // Helper: attempt image generation with a given prompt string
+      const attemptImageGenerate = async attemptPrompt =>
+        openaiClient.images.generate({
+          model: imageGenModel,
+          prompt: attemptPrompt,
+          n: 1,
+          size: '1024x1024',
+          quality: imageGenQuality,
+        });
+
+      // Call OpenAI image API — retry once with creative framing prefix if moderation blocks it
+      let imageResponse;
+      let usedFallbackPrefix = false;
+      try {
+        imageResponse = await attemptImageGenerate(prompt);
+      } catch (firstError) {
+        if (isModerationError(firstError)) {
+          logger.info('Image prompt blocked by moderation, retrying with creative framing prefix');
+          const prefixedPrompt = `Digital artwork, creative illustration: ${prompt}`;
+          imageResponse = await attemptImageGenerate(prefixedPrompt); // may throw — caught by outer catch
+          usedFallbackPrefix = true;
+        } else {
+          throw firstError; // not a moderation error, let outer catch handle it
+        }
+      }
 
       const imageGenElapsedMs = Date.now() - imageGenStartTime;
 
@@ -339,6 +371,7 @@ class SimpleChimpGPTFlow {
             quality: imageGenQuality,
             elapsedMs: imageGenElapsedMs,
             usage: usageData,
+            usedFallbackPrefix,
           },
         };
       } catch (downloadError) {
@@ -367,7 +400,8 @@ class SimpleChimpGPTFlow {
         error: error.message,
         stack: error.stack,
         errorType: error.constructor.name,
-        errorCode: error.code || 'unknown',
+        errorCode: error.code || error.status || 'unknown',
+        errorBody: error.error || undefined,
       });
 
       // Handle specific error types with user-friendly messages
@@ -385,7 +419,7 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤔 Hmm, something about that request confused my artistic brain. Could you try describing the image a bit differently?';
-      } else if (error.message?.includes('content_policy')) {
+      } else if (isModerationError(error)) {
         userMessage =
           "🚫 Uh oh! That image request bumped into OpenAI's content policy. Let's try something a bit more family-friendly!";
       }
@@ -839,7 +873,7 @@ class SimpleChimpGPTFlow {
       } else if (error.code === 'invalid_request_error' || error.message?.includes('invalid')) {
         userMessage =
           '🤷‍♂️ Something about your message scrambled my circuits a bit. Could you try rephrasing that?';
-      } else if (error.message?.includes('content_policy')) {
+      } else if (isModerationError(error)) {
         userMessage =
           "🚫 Oops! That topic bumped into my content guidelines. Let's chat about something else! 😊";
       }

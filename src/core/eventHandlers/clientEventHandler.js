@@ -7,6 +7,7 @@ const InteractionEventHandler = require('./interactionEventHandler');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
 const { loadConversationsFromStorage } = require('../../conversation/conversationManagerSelector');
 const { initDebugSkip } = require('../../utils/debugSkipManager');
+const { initReactionDelete } = require('../../utils/reactionDeleteManager');
 const PFPManager = require('../../utils/pfpManager');
 const commandHandler = require('../../commands/commandHandler');
 const { shouldDeploy, recordSuccessfulDeployment } = require('../../utils/deploymentManager');
@@ -235,6 +236,14 @@ class ClientEventHandler {
       discordLogger.info('Debug skip functionality initialized');
     } catch (error) {
       discordLogger.error({ error }, 'Error initializing debug skip functionality');
+    }
+
+    // Initialize global wastebasket reaction delete handler
+    try {
+      initReactionDelete(this.client, this.config);
+      discordLogger.info('Wastebasket reaction delete handler initialized');
+    } catch (error) {
+      discordLogger.error({ error }, 'Error initializing reaction delete handler');
     }
   }
 }
