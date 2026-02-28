@@ -44,7 +44,13 @@ module.exports = {
         startDate: startDate.toISOString(),
       };
 
-      const stats = imageUsageTracker.getUsageStats(options);
+      const stats = await imageUsageTracker.getUsageStats(options);
+
+      // Handle empty/no-data case
+      if (!stats || !stats.period) {
+        await message.reply('📊 No image generation data yet — generate some images first!');
+        return;
+      }
 
       // Create a rich embed for the response
       const embed = {
@@ -133,7 +139,15 @@ module.exports = {
         startDate: startDate.toISOString(),
       };
 
-      const stats = imageUsageTracker.getUsageStats(options);
+      const stats = await imageUsageTracker.getUsageStats(options);
+
+      // Handle empty/no-data case
+      if (!stats || !stats.period) {
+        await interaction.editReply(
+          '📊 No image generation data yet — generate some images first!'
+        );
+        return;
+      }
 
       // Create a rich embed for the response
       const embed = {
