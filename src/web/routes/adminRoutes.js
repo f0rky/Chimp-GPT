@@ -76,25 +76,44 @@ function createRouter(deps) {
         'OWNER_ID',
       ]);
 
-      const settings = {};
+      const settings = [];
+
       for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
         if (SENSITIVE_KEYS.has(key)) continue;
-        settings[key] = {
-          value: config[key],
+        const value = config[key];
+        const isSet = value !== undefined && value !== '' && value !== schema.default;
+        const displayValue = SENSITIVE_KEYS.has(key)
+          ? '••••••••'
+          : Array.isArray(value)
+            ? value.join(', ')
+            : String(value ?? '');
+
+        settings.push({
+          key,
           description: schema.description,
           required: schema.required ?? false,
-          default: schema.default,
-        };
+          isSet,
+          displayValue,
+        });
       }
 
       // Append non-schema runtime values
-      settings.NODE_ENV = { value: process.env.NODE_ENV, description: 'Node environment' };
-      settings.conversationMode = {
-        value: 'PocketFlow (Graph-based Architecture)',
-        description: 'Active conversation engine',
+      settings.push({
+        key: 'NODE_ENV',
+        description: 'Node environment',
+        required: false,
+        isSet: !!process.env.NODE_ENV,
+        displayValue: process.env.NODE_ENV || '',
+      });
+
+      const summary = {
+        total: settings.length,
+        required: settings.filter(s => s.required).length,
+        set: settings.filter(s => s.isSet).length,
+        valid: settings.filter(s => !s.required || s.isSet).length,
       };
 
-      res.json({ success: true, settings, timestamp: new Date().toISOString() });
+      res.json({ success: true, settings, summary, timestamp: new Date().toISOString() });
     } catch (error) {
       logger.error({ error }, 'Error getting settings');
       res.status(500).json({ success: false, error: error.message });
