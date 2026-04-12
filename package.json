@@ -5,7 +5,7 @@
   "main": "src/core/combined.js",
   "private": true,
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "test": "node tests/unit/testRunner.js",
