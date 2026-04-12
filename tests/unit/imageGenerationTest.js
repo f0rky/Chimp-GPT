@@ -239,7 +239,7 @@ async function testImageGenerationWorkflow() {
         name: 'Successful image generation',
         parameters: {
           prompt: 'a beautiful sunset over the ocean',
-          model: 'gpt-image-1',
+          model: 'gpt-image-1.5',
           size: '1024x1024',
           enhance: true,
         },
@@ -249,7 +249,7 @@ async function testImageGenerationWorkflow() {
         name: 'Image generation with custom parameters',
         parameters: {
           prompt: 'abstract art with vibrant colors',
-          model: 'gpt-image-1',
+          model: 'gpt-image-1.5',
           size: '512x512',
           enhance: false,
         },
@@ -259,7 +259,7 @@ async function testImageGenerationWorkflow() {
         name: 'Empty prompt handling',
         parameters: {
           prompt: '',
-          model: 'gpt-image-1',
+          model: 'gpt-image-1.5',
           size: '1024x1024',
         },
         expectSuccess: false,

@@ -41,11 +41,11 @@ class MessageEventHandler {
     // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
     // so the RegExp objects are created once per handler instance, not on every message).
     this.imageRequestPatterns = [
-      /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
+      /^(?:<@\d+>\s*)?(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
       /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
       /(?:image|picture|photo)\s+of/i,
       /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-      /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+      /^(?:<@\d+>\s*)?(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
     ];
 
     // Set up periodic cleanup for enhanced message relationships
@@ -585,6 +585,9 @@ class MessageEventHandler {
                   const metaParts = [`${meta.model} (${meta.quality})`, `${elapsedSec}s`];
                   if (meta.usage && meta.usage.total_tokens) {
                     metaParts.push(`${meta.usage.total_tokens} tokens`);
+                  }
+                  if (meta.estimatedCost) {
+                    metaParts.push(`$${meta.estimatedCost.toFixed(4)}`);
                   }
                   metaLine = `\n_Model: ${metaParts.join(' · ')}_`;
                 }

@@ -183,7 +183,7 @@ function generateImageData() {
   const prompt = randomItem(SAMPLE_DATA.imagePrompts);
   return {
     prompt,
-    model: randomInt(0, 1) === 0 ? 'dall-e-2' : 'dall-e-3',
+    model: randomInt(0, 1) === 0 ? 'gpt-image-1.5' : 'gpt-image-1-mini',
     size: randomItem(['256x256', '512x512', '1024x1024']),
     url: `https://example.com/mock-image-${Date.now()}.png`,
     created: Date.now(),

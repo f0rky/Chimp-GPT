@@ -56,9 +56,13 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('model')
-        .setDescription('Which GPT Image-1 model to use')
+        .setDescription('Which image model to use')
         .setRequired(false)
-        .addChoices({ name: 'GPT Image-1 (Latest model)', value: MODELS.GPT_IMAGE_1 })
+        .addChoices(
+          { name: 'GPT Image 1.5 (Best quality)', value: MODELS.GPT_IMAGE_1_5 },
+          { name: 'GPT Image 1 (Standard)', value: MODELS.GPT_IMAGE_1 },
+          { name: 'GPT Image 1 Mini (Fast & cheap)', value: MODELS.GPT_IMAGE_1_MINI }
+        )
     )
     .addStringOption(option =>
       option

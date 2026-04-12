@@ -1,6 +1,6 @@
 /**
  * @typedef {Object} ImageGenerationOptions
- * @property {string} [model] - The model to use (gpt-image-1)
+ * @property {string} [model] - The model to use (gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
  * @property {string} [size] - Image size (1024x1024, 1536x1024, 1024x1536, or auto)
  * @property {string} [quality] - Image quality (low, medium, high, auto)
  * @property {string} [format] - Output format (png, jpeg, webp)
@@ -23,8 +23,9 @@
 /**
  * Image Generation Module for ChimpGPT
  *
- * This module provides image generation capabilities using OpenAI's GPT Image-1 model.
- * It allows the bot to generate images based on text prompts and send them to Discord.
+ * This module provides image generation capabilities using OpenAI's GPT Image models
+ * (gpt-image-1.5, gpt-image-1, gpt-image-1-mini). DALL-E 2/3 models are deprecated
+ * and automatically remapped to their current equivalents.
  *
  * @module ImageGeneration
  * @author Brett
@@ -74,10 +75,13 @@ const IMAGE_BREAKER_CONFIG = {
  * @enum {string}
  */
 const MODELS = {
-  DALL_E_3: 'dall-e-3', // Standard DALL-E 3 model
-  DALL_E_2: 'dall-e-2', // Standard DALL-E 2 model
-  GPT_IMAGE_1: 'gpt-image-1', // Legacy name - maps to dall-e-3
-  CHATGPT_IMAGE_LATEST: 'chatgpt-image-latest', // gpt-image-1 API model (HD button uses this)
+  GPT_IMAGE_1: 'gpt-image-1', // Standard model
+  GPT_IMAGE_1_5: 'gpt-image-1.5', // Latest flagship model (replaces dall-e-3)
+  GPT_IMAGE_1_MINI: 'gpt-image-1-mini', // Fast, cost-efficient model (replaces dall-e-2)
+  CHATGPT_IMAGE_LATEST: 'chatgpt-image-latest', // Alias for latest model (HD button uses this)
+  // Legacy aliases — remapped to current models at call time
+  DALL_E_3: 'dall-e-3', // DEPRECATED: remapped to gpt-image-1.5
+  DALL_E_2: 'dall-e-2', // DEPRECATED: remapped to gpt-image-1-mini
 };
 
 /**
@@ -123,7 +127,7 @@ const BACKGROUND = {
 };
 
 /**
- * Generate an image using GPT Image-1.
+ * Generate an image using OpenAI's GPT Image models.
  *
  * Standardized error handling: always returns either an ImageResult or ImageErrorResult.
  * Errors are always logged with stack trace and context.
@@ -174,55 +178,55 @@ async function generateImage(prompt, options = {}) {
     'Image generation configuration check'
   );
   try {
-    // Map legacy model names to current OpenAI API models
-    const requestedModel = options.model || MODELS.GPT_IMAGE_1;
+    // Map model names — resolve legacy/deprecated models to current ones
+    const requestedModel = options.model || MODELS.GPT_IMAGE_1_MINI;
     let actualModel = requestedModel;
 
-    // Map legacy GPT Image 1 to DALL-E 3 (current best model)
-    if (requestedModel === MODELS.GPT_IMAGE_1) {
-      actualModel = MODELS.DALL_E_3;
-      logger.debug('Mapping legacy gpt-image-1 model to dall-e-3');
+    // Remap deprecated DALL-E models to current equivalents
+    if (requestedModel === MODELS.DALL_E_3) {
+      actualModel = MODELS.GPT_IMAGE_1_5;
+      logger.info('Remapping deprecated dall-e-3 to gpt-image-1.5');
+    } else if (requestedModel === MODELS.DALL_E_2) {
+      actualModel = MODELS.GPT_IMAGE_1_MINI;
+      logger.info('Remapping deprecated dall-e-2 to gpt-image-1-mini');
+    } else if (requestedModel === MODELS.GPT_IMAGE_1) {
+      // gpt-image-1 is still valid — use as-is
+      logger.debug('Using gpt-image-1 directly');
     }
 
     // Set default size to square if not specified
     let size = options.size || SIZES.SQUARE;
 
     // Validate the model and size combination based on OpenAI API documentation
-    const validDALLE3Sizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE];
-    const validDALLE2Sizes = ['256x256', '512x512', SIZES.SQUARE];
+    // All current models (gpt-image-1, gpt-image-1.5, gpt-image-1-mini, chatgpt-image-latest)
+    // support square, portrait, landscape, and auto sizes
+    const validSizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE, SIZES.AUTO];
 
-    if (actualModel === MODELS.DALL_E_3) {
-      if (!validDALLE3Sizes.includes(size)) {
-        logger.warn(`DALL-E 3 does not support ${size} size, falling back to square`);
-        size = SIZES.SQUARE;
-      }
-    } else if (actualModel === MODELS.DALL_E_2) {
-      if (!validDALLE2Sizes.includes(size)) {
-        logger.warn(`DALL-E 2 does not support ${size} size, falling back to square`);
-        size = SIZES.SQUARE;
-      }
+    if (!validSizes.includes(size)) {
+      logger.warn(`Model ${actualModel} does not support ${size} size, falling back to square`);
+      size = SIZES.SQUARE;
     }
 
     // Set quality based on model capabilities
+    // All current models support: low, medium, high, auto
     let quality = options.quality;
-    if (actualModel === MODELS.DALL_E_3) {
-      // DALL-E 3 supports quality parameter
-      quality = quality || 'standard'; // OpenAI standard is 'standard' or 'hd'
-      if (!['standard', 'hd'].includes(quality)) {
-        logger.warn(`Invalid quality ${quality} for DALL-E 3, using 'standard'`);
-        quality = 'standard';
-      }
-    } else if (actualModel === MODELS.CHATGPT_IMAGE_LATEST) {
-      // gpt-image-1 (chatgpt-image-latest) supports 'low', 'medium', 'high', 'auto'
-      quality = quality || 'auto';
-      if (!['low', 'medium', 'high', 'auto'].includes(quality)) {
-        logger.warn(`Invalid quality ${quality} for chatgpt-image-latest, using 'auto'`);
+    if (quality && !['low', 'medium', 'high', 'auto', 'standard', 'hd'].includes(quality)) {
+      logger.warn(`Invalid quality ${quality} for ${actualModel}, using 'auto'`);
+      quality = 'auto';
+    }
+    // Default quality per model
+    if (!quality) {
+      if (actualModel === MODELS.CHATGPT_IMAGE_LATEST || actualModel === MODELS.GPT_IMAGE_1_5) {
+        quality = 'high';
+      } else if (actualModel === MODELS.GPT_IMAGE_1_MINI) {
+        quality = 'medium';
+      } else {
         quality = 'auto';
       }
-    } else {
-      // DALL-E 2 doesn't support quality parameter
-      quality = undefined;
     }
+    // DALL-E legacy quality values (standard/hd) — map to current equivalents
+    if (quality === 'standard') quality = 'medium';
+    if (quality === 'hd') quality = 'high';
 
     // Build the image parameters object according to OpenAI API standards
     const imageParams = {
@@ -232,17 +236,12 @@ async function generateImage(prompt, options = {}) {
       n: 1, // Generate 1 image
     };
 
-    // response_format is only supported by DALL-E 2 and DALL-E 3.
-    // gpt-image-1 / chatgpt-image-latest always returns base64 and does NOT accept this param.
-    if (actualModel === MODELS.DALL_E_2 || actualModel === MODELS.DALL_E_3) {
-      imageParams.response_format = 'b64_json';
-    }
+    // response_format: gpt-image-1/1.5/1-mini and chatgpt-image-latest always return base64
+    // and do NOT accept response_format. Only legacy DALL-E models needed it.
+    // Since all dall-e models are remapped above, no response_format needed.
 
     // Add quality for models that support it
-    if (
-      (actualModel === MODELS.DALL_E_3 || actualModel === MODELS.CHATGPT_IMAGE_LATEST) &&
-      quality
-    ) {
+    if (quality) {
       imageParams.quality = quality;
     }
 
@@ -444,39 +443,108 @@ async function generateImage(prompt, options = {}) {
       'Successfully generated images'
     );
 
-    // Calculate cost based on current OpenAI pricing (December 2024)
+    // Calculate cost based on current OpenAI pricing (April 2026)
     // https://openai.com/pricing
     let estimatedCost = 0;
 
-    if (actualModel === MODELS.DALL_E_3) {
-      // DALL-E 3 pricing (USD per image)
-      const dalle3Costs = {
-        standard: {
-          '1024x1024': 0.04, // $0.040 per image
-          '1024x1792': 0.08, // $0.080 per image
-          '1792x1024': 0.08, // $0.080 per image
+    if (actualModel === MODELS.GPT_IMAGE_1_5 || actualModel === MODELS.CHATGPT_IMAGE_LATEST) {
+      // gpt-image-1.5 pricing (USD per image)
+      // Approximate pricing based on OpenAI rates — update when official pricing is confirmed
+      const gptImage15Costs = {
+        low: {
+          '1024x1024': 0.011,
+          '1536x1024': 0.017,
+          '1024x1536': 0.017,
+          auto: 0.014,
         },
-        hd: {
-          '1024x1024': 0.08, // $0.080 per image
-          '1024x1792': 0.12, // $0.120 per image
-          '1792x1024': 0.12, // $0.120 per image
+        medium: {
+          '1024x1024': 0.042,
+          '1536x1024': 0.063,
+          '1024x1536': 0.063,
+          auto: 0.055,
+        },
+        high: {
+          '1024x1024': 0.167,
+          '1536x1024': 0.25,
+          '1024x1536': 0.25,
+          auto: 0.2,
+        },
+        auto: {
+          '1024x1024': 0.042,
+          '1536x1024': 0.063,
+          '1024x1536': 0.063,
+          auto: 0.055,
         },
       };
 
-      // Convert size format for lookup
       const sizeKey =
-        size === '1536x1024' ? '1792x1024' : size === '1024x1536' ? '1024x1792' : size;
-
-      estimatedCost = dalle3Costs[quality]?.[sizeKey] || dalle3Costs.standard['1024x1024'];
-    } else if (actualModel === MODELS.DALL_E_2) {
-      // DALL-E 2 pricing (USD per image)
-      const dalle2Costs = {
-        '1024x1024': 0.02, // $0.020 per image
-        '512x512': 0.018, // $0.018 per image
-        '256x256': 0.016, // $0.016 per image
+        size === SIZES.PORTRAIT
+          ? '1536x1024'
+          : size === SIZES.LANDSCAPE
+            ? '1024x1536'
+            : size === SIZES.SQUARE
+              ? '1024x1024'
+              : 'auto';
+      estimatedCost =
+        gptImage15Costs[quality]?.[sizeKey] || gptImage15Costs.auto?.['1024x1024'] || 0.042;
+    } else if (actualModel === MODELS.GPT_IMAGE_1) {
+      // gpt-image-1 pricing (USD per image)
+      const gptImage1Costs = {
+        low: {
+          '1024x1024': 0.011,
+          '1536x1024': 0.017,
+          '1024x1536': 0.017,
+          auto: 0.014,
+        },
+        medium: {
+          '1024x1024': 0.042,
+          '1536x1024': 0.063,
+          '1024x1536': 0.063,
+          auto: 0.055,
+        },
+        high: {
+          '1024x1024': 0.167,
+          '1536x1024': 0.25,
+          '1024x1536': 0.25,
+          auto: 0.2,
+        },
+        auto: {
+          '1024x1024': 0.042,
+          '1536x1024': 0.063,
+          '1024x1536': 0.063,
+          auto: 0.055,
+        },
       };
 
-      estimatedCost = dalle2Costs[size] || dalle2Costs['1024x1024'];
+      const sizeKey =
+        size === SIZES.PORTRAIT
+          ? '1536x1024'
+          : size === SIZES.LANDSCAPE
+            ? '1024x1536'
+            : size === SIZES.SQUARE
+              ? '1024x1024'
+              : 'auto';
+      estimatedCost =
+        gptImage1Costs[quality]?.[sizeKey] || gptImage1Costs.auto?.['1024x1024'] || 0.042;
+    } else if (actualModel === MODELS.GPT_IMAGE_1_MINI) {
+      // gpt-image-1-mini pricing (USD per image) — lower cost model
+      const gptImage1MiniCosts = {
+        low: { '1024x1024': 0.002, auto: 0.003 },
+        medium: { '1024x1024': 0.01, auto: 0.012 },
+        high: { '1024x1024': 0.04, auto: 0.048 },
+        auto: { '1024x1024': 0.01, auto: 0.012 },
+      };
+
+      const sizeKey =
+        size === SIZES.PORTRAIT
+          ? '1536x1024'
+          : size === SIZES.LANDSCAPE
+            ? '1024x1536'
+            : size === SIZES.SQUARE
+              ? '1024x1024'
+              : 'auto';
+      estimatedCost =
+        gptImage1MiniCosts[quality]?.[sizeKey] || gptImage1MiniCosts.auto?.['1024x1024'] || 0.01;
     }
 
     // Log the cost calculation

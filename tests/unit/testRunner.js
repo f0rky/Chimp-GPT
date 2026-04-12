@@ -574,7 +574,7 @@ async function runConversationPersistenceTests() {
 /**
  * Run image generation tests
  *
- * Tests the image generation functionality including DALL-E integration, image downloads, and circuit breaker patterns
+ * Tests the image generation functionality including GPT Image model integration, image downloads, and circuit breaker patterns
  *
  * @returns {Promise<Object>} Test results
  */

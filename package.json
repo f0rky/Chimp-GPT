@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "2.1.6",
+  "version": "2.2.0",
   "description": "A Discord chatbot with revolutionary PocketFlow architecture and OpenAI GPT integration for intelligent conversations.",
   "main": "src/core/combined.js",
   "private": true,
@@ -114,6 +114,6 @@
   "overrides": {
     "undici": "^7.16.0",
     "diff": "^8.0.3",
-    "serialize-javascript": "7.0.3"
+    "serialize-javascript": "^7.0.5"
   }
 }
