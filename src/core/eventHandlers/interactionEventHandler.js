@@ -80,7 +80,7 @@ class InteractionEventHandler {
 
       await interaction.editReply({ components: [pendingRow] });
 
-      // Generate HD image: chatgpt-image-latest, 1024×1024, high quality
+      // Generate HD image: chatgpt-image-latest (points to best available model), 1024×1024, high quality
       const hdGenStart = Date.now();
       const imageResult = await generateImage(originalPrompt, {
         model: 'chatgpt-image-latest',

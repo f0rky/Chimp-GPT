@@ -50,7 +50,7 @@ function detectLLMProviders() {
     },
     imageGeneration: {
       provider: 'OpenAI',
-      model: 'DALL-E 3',
+      model: 'GPT Image 1.5',
       configured: !!process.env.OPENAI_API_KEY && config.ENABLE_IMAGE_GENERATION,
       usage: ['Image Creation', 'Art Generation'],
     },
@@ -343,7 +343,7 @@ async function generateStatusEmbed(client) {
       statsText += `  ├─ OpenAI: ${stats.apiCalls.openai || 0}\n`;
     }
     if (stats.apiCalls && stats.apiCalls.dalle) {
-      statsText += `  ├─ DALL-E: ${stats.apiCalls.dalle || 0}\n`;
+      statsText += `  ├─ Images: ${stats.apiCalls.dalle || 0}\n`;
     }
     const totalErrors = Object.values(stats.errors || {}).reduce((a, b) => a + b, 0);
     const errorRate =

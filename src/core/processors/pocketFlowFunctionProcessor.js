@@ -255,7 +255,7 @@ class PocketFlowFunctionProcessor {
    * Returns structured data that the flow can properly process
    */
   async handleImageGeneration(args, _message) {
-    const { prompt, model = 'dall-e-3', size = '1024x1024', enhance = true } = args;
+    const { prompt, model = 'gpt-image-1-mini', size = '1024x1024', enhance = true } = args;
     if (!prompt) {
       throw new Error('Prompt parameter is required for image generation');
     }
@@ -269,15 +269,21 @@ class PocketFlowFunctionProcessor {
       const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
       // Call OpenAI DALL-E API directly
-      // response_format is only supported by DALL-E 2/3; gpt-image-1/chatgpt-image-latest omit it
-      const gptImage1Models = ['gpt-image-1', 'chatgpt-image-latest'];
+      // response_format: gpt-image-1/1.5/1-mini and chatgpt-image-latest return base64 by default;
+      // DALL-E models (now deprecated) used response_format. All current models omit it.
+      const gptImageModels = [
+        'gpt-image-1',
+        'gpt-image-1.5',
+        'gpt-image-1-mini',
+        'chatgpt-image-latest',
+      ];
       const imageGenParams = {
         model: model,
         prompt: prompt,
         n: 1,
         size: size,
         quality: 'standard',
-        ...(gptImage1Models.includes(model) ? {} : { response_format: 'url' }),
+        ...(gptImageModels.includes(model) ? {} : { response_format: 'url' }),
       };
       const imageResponse = await openaiClient.images.generate(imageGenParams);
 

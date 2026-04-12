@@ -247,7 +247,7 @@ async function handleImageGeneration(
       }
 
       // Extract and validate parameters
-      const { prompt, model = 'gpt-image-1', size = '1024x1024', enhance = true } = parameters;
+      const { prompt, model = 'gpt-image-1-mini', size = '1024x1024', enhance = true } = parameters;
 
       if (!prompt || prompt.trim() === '') {
         await feedbackMessage.edit(
@@ -488,7 +488,7 @@ async function handleImageGeneration(
           return;
         }
 
-        const fileExtension = model === 'gpt-image-1' ? 'png' : 'png'; // Default to PNG
+        const fileExtension = 'png'; // All current models return PNG
         const fileName = `generated_image_${Date.now()}.${fileExtension}`;
 
         // Create Discord attachment from processed image

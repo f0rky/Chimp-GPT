@@ -21,6 +21,7 @@ const http = require('http');
 let _weatherService = null;
 let _timeLookup = null;
 let _quakeLookup = null;
+let _imageGeneration = null;
 function getWeatherService() {
   if (!_weatherService) _weatherService = require('../../services/simplified-weather');
   return _weatherService;
@@ -32,6 +33,10 @@ function getTimeLookup() {
 function getQuakeLookup() {
   if (!_quakeLookup) _quakeLookup = require('../../services/quakeLookup');
   return _quakeLookup;
+}
+function getImageGeneration() {
+  if (!_imageGeneration) _imageGeneration = require('../../services/imageGeneration');
+  return _imageGeneration;
 }
 
 const logger = createLogger('SimpleChimpGPTFlow');
@@ -80,13 +85,41 @@ class SimpleChimpGPTFlow {
   async handleUnifiedProcessing(store, data) {
     try {
       const { message } = data;
-      const content = message.content.toLowerCase();
+      // Strip Discord mentions (e.g. "<@1140418202678083625>") from the front of the message
+      // so pattern matching works on the actual text content.
+      const content = message.content
+        .replace(/^<@\d+>\s*/i, '')
+        .trim()
+        .toLowerCase();
 
       logger.debug(`Processing unified request for user ${message.author?.id}`);
 
       // Detect intent and process accordingly
 
-      // Check for knowledge system patterns first (if enabled)
+      // CHECK IMAGE PATTERNS FIRST — before knowledge system.
+      // This prevents "draw a python" from being intercepted as a programming question.
+      // Patterns kept simple to stay under SonarCloud regex complexity threshold (20).
+      const imagePatterns = [
+        // "draw a cat", "make me a landscape" — verb + filler/pronoun
+        /^(?:draw|create|generate|make)\s+(?:me|us)\s/i,
+        // Bare verb at start — "draw cat", "create something"
+        /^(?:draw|create|generate|make)\s/i,
+        // "create an image", "draw the picture" — verb + optional article + art noun
+        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|art)/i,
+        // "image of a cat", "picture of sunset"
+        /(?:image|picture|photo)\s+of/i,
+        // "show me an image", "give me a picture"
+        /(?:show|give)\s+me\s+(?:an?\s+)?(?:image|picture|photo)/i,
+        // "I want a", "I need an image", "I would like you to draw"
+        /^i\s+(?:want|need|would like)\s/i,
+      ];
+
+      if (imagePatterns.some(pattern => pattern.test(content))) {
+        logger.info('Processing as image generation request');
+        return await this.handleImageGeneration(store, data);
+      }
+
+      // Check for knowledge system patterns (if enabled)
       if (config.ENABLE_KNOWLEDGE_SYSTEM && this.knowledgeFlow) {
         // Skip knowledge system for natural conversation requests
         if (
@@ -157,23 +190,6 @@ class SimpleChimpGPTFlow {
         logger.debug(`No knowledge patterns matched for: "${content.substring(0, 50)}..."`);
       }
 
-      // Check for image generation patterns
-      const imagePatterns = [
-        // Direct drawing/creation requests
-        /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
-        // Specific image/picture requests
-        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
-        /(?:image|picture|photo)\s+of/i,
-        /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-        // "I want/need" patterns
-        /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
-      ];
-
-      if (imagePatterns.some(pattern => pattern.test(content))) {
-        logger.info('Processing as image generation request');
-        return await this.handleImageGeneration(store, data);
-      }
-
       // Check for weather patterns
       const weatherPatterns = [
         /(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
@@ -227,9 +243,10 @@ class SimpleChimpGPTFlow {
     try {
       const { message } = data;
 
-      // Extract prompt from message content
+      // Extract prompt from message content — strip Discord mentions and command phrases
       const prompt =
         message.content
+          .replace(/^<@\d+>\s*/i, '') // Strip leading Discord mention
           .replace(
             /^(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)\s+(?:of\s+)?/i,
             ''
@@ -239,66 +256,69 @@ class SimpleChimpGPTFlow {
             /^(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)\s+(?:of\s+)?/i,
             ''
           )
+          .replace(/^(?:draw|create|generate|make)\s+(?:me\s+|us\s+)?/i, '') // "draw me a cat" -> "a cat" -> "cat"
+          .replace(/^(?:a|an|the)\s+/i, '') // Strip leading article
           .trim() || message.content;
 
-      logger.info(`Processing image generation request: ${prompt.substring(0, 50)}...`);
+      logger.info(`Processing image generation request via service: ${prompt.substring(0, 50)}...`);
 
-      // Create OpenAI client using the already-required config and OpenAI class
-      const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
-
-      // Track generation timing
-      const imageGenModel = 'chatgpt-image-latest';
-      const imageGenQuality = 'low';
+      // Use the proper imageGeneration service for model remapping, rate limiting, and cost tracking
+      const imageService = getImageGeneration();
       const imageGenStartTime = Date.now();
 
-      // Helper: attempt image generation with a given prompt string
-      const attemptImageGenerate = async attemptPrompt =>
-        openaiClient.images.generate({
-          model: imageGenModel,
-          prompt: attemptPrompt,
-          n: 1,
-          size: '1024x1024',
-          quality: imageGenQuality,
-        });
-
-      // Call OpenAI image API — retry once with creative framing prefix if moderation blocks it
-      let imageResponse;
-      let usedFallbackPrefix = false;
-      try {
-        imageResponse = await attemptImageGenerate(prompt);
-      } catch (firstError) {
-        if (isModerationError(firstError)) {
-          logger.info('Image prompt blocked by moderation, retrying with creative framing prefix');
-          const prefixedPrompt = `Digital artwork, creative illustration: ${prompt}`;
-          imageResponse = await attemptImageGenerate(prefixedPrompt); // may throw — caught by outer catch
-          usedFallbackPrefix = true;
-        } else {
-          throw firstError; // not a moderation error, let outer catch handle it
-        }
-      }
+      const result = await imageService.generateImage(prompt, {
+        model: 'gpt-image-1-mini',
+        size: '1024x1024',
+        quality: 'medium',
+      });
 
       const imageGenElapsedMs = Date.now() - imageGenStartTime;
 
-      // chatgpt-image-latest returns b64_json; fall back to url for older models
-      const imageData = imageResponse.data[0];
-      const imageUrl = imageData.url || null;
+      if (!result.success) {
+        logger.error('Image generation service returned failure:', {
+          error: result.error,
+          prompt: prompt.substring(0, 50),
+        });
 
-      // Extract token/cost info from API response if available
-      const usageData = imageResponse.usage || null;
+        // Map service errors to user-friendly messages
+        let userMessage = "I'm having trouble generating that image right now. Please try again.";
+        if (result.error?.includes('disabled')) {
+          userMessage = '🎨 Image generation is currently disabled. Ask an admin to enable it!';
+        } else if (result.error?.includes('rate limit') || result.error?.includes('Rate limit')) {
+          userMessage =
+            "🐌 Whoa there, speed racer! I'm generating images too fast. Let me catch my breath for a moment and try again in a few seconds!";
+        }
 
-      try {
+        return {
+          success: false,
+          error: result.error,
+          response: userMessage,
+        };
+      }
+
+      // result.images is an array of { url, revisedPrompt } objects
+      const imageResult = result.images[0];
+      const imageUrl = imageResult?.url || null;
+      const revisedPrompt = imageResult?.revisedPrompt || prompt;
+      const estimatedCost = result.estimatedCost;
+
+      // Download or decode the image from the service result
+      let imageBuffer;
+      const fileName = `generated_image_${Date.now()}.png`;
+
+      if (imageResult.b64_json) {
+        imageBuffer = Buffer.from(imageResult.b64_json, 'base64');
+      } else if (imageUrl) {
+        // Download image from URL
         const downloadImage = url => {
-          // https/http are hoisted to module scope — no re-require needed
           return new Promise((resolve, reject) => {
             const client = url.startsWith('https') ? https : http;
-
             client
               .get(url, response => {
                 if (response.statusCode !== 200) {
                   reject(new Error(`Failed to download image: ${response.statusCode}`));
                   return;
                 }
-
                 const chunks = [];
                 response.on('data', chunk => chunks.push(chunk));
                 response.on('end', () => {
@@ -309,78 +329,66 @@ class SimpleChimpGPTFlow {
               .on('error', reject);
           });
         };
+        imageBuffer = await downloadImage(imageUrl);
+      }
 
-        const imageBuffer = imageData.b64_json
-          ? Buffer.from(imageData.b64_json, 'base64')
-          : await downloadImage(imageUrl);
-        const fileName = `generated_image_${Date.now()}.png`;
-
-        // Validate buffer before using it
-        if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
-          logger.error('Downloaded image buffer is invalid:', {
-            bufferExists: !!imageBuffer,
-            isBuffer: Buffer.isBuffer(imageBuffer),
-            bufferType: typeof imageBuffer,
-          });
-          throw new Error('Failed to download image - invalid buffer');
-        }
-
-        logger.debug('Image downloaded successfully:', {
-          bufferSize: imageBuffer.length,
-          fileName: fileName,
+      // Validate buffer
+      if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
+        logger.error('Image buffer is invalid after service call:', {
+          hasBuffer: !!imageBuffer,
+          isBuffer: Buffer.isBuffer(imageBuffer),
+          hasUrl: !!imageUrl,
         });
 
-        // Save image to PFP rotation if PFPManager is available
-        if (this.pfpManager) {
-          try {
-            const savedPath = await this.pfpManager.addImage(imageBuffer, fileName);
-            logger.info(`Image saved to PFP rotation: ${savedPath}`);
-          } catch (pfpError) {
-            logger.warn('Failed to save image to PFP rotation:', pfpError.message);
-            // Don't fail the whole request if PFP save fails
-          }
+        // Fallback: if we have a URL, return it as a link
+        if (imageUrl) {
+          return {
+            success: true,
+            response: `Your image has been generated! [Click to view](${imageUrl})`,
+            type: 'image',
+            imageUrl: imageUrl,
+            originalPrompt: prompt,
+            imageMetadata: {
+              model: 'gpt-image-1-mini',
+              quality: 'medium',
+              elapsedMs: imageGenElapsedMs,
+              estimatedCost,
+            },
+          };
         }
-
-        return {
-          success: true,
-          response: `Here's your generated image for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
-          type: 'image',
-          imageUrl: imageUrl,
-          originalPrompt: prompt,
-          attachment: {
-            buffer: imageBuffer,
-            name: fileName,
-          },
-          // Metadata for footer display
-          imageMetadata: {
-            model: imageGenModel,
-            quality: imageGenQuality,
-            elapsedMs: imageGenElapsedMs,
-            usage: usageData,
-            usedFallbackPrefix,
-          },
-        };
-      } catch (downloadError) {
-        logger.warn('Failed to process image data:', downloadError.message);
-
-        // Fallback message if buffer processing fails
-        return {
-          success: true,
-          response: imageUrl
-            ? `Your image has been generated! [Click to view](${imageUrl})`
-            : 'Your image has been generated but could not be retrieved. Please try again.',
-          type: 'image',
-          imageUrl: imageUrl,
-          originalPrompt: prompt,
-          // Metadata for footer display
-          imageMetadata: {
-            model: imageGenModel,
-            quality: imageGenQuality,
-            elapsedMs: imageGenElapsedMs,
-            usage: usageData,
-          },
-        };
+        throw new Error('Failed to process image — no buffer or URL available');
       }
+
+      // Save image to PFP rotation if PFPManager is available
+      if (this.pfpManager) {
+        try {
+          const savedPath = await this.pfpManager.addImage(imageBuffer, fileName);
+          logger.info(`Image saved to PFP rotation: ${savedPath}`);
+        } catch (pfpError) {
+          logger.warn('Failed to save image to PFP rotation:', pfpError.message);
+        }
+      }
+
+      return {
+        success: true,
+        response: `Here's your generated image for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
+        type: 'image',
+        imageUrl: imageUrl,
+        originalPrompt: prompt,
+        revisedPrompt,
+        attachment: {
+          buffer: imageBuffer,
+          name: fileName,
+        },
+        // Metadata for footer display
+        imageMetadata: {
+          model: 'gpt-image-1-mini',
+          quality: 'medium',
+          elapsedMs: imageGenElapsedMs,
+          estimatedCost,
+          usedService: true,
+        },
+      };
     } catch (error) {
       logger.error('Error generating image:', {
         error: error.message,

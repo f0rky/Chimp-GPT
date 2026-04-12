@@ -81,7 +81,7 @@ const mockOpenAIClient = {
                     arguments: JSON.stringify({
                       prompt:
                         content.replace(/.*draw|.*image|.*generate/, '').trim() || 'test image',
-                      model: 'gpt-image-1',
+                      model: 'gpt-image-1.5',
                       size: '1024x1024',
                     }),
                   },

@@ -40,12 +40,13 @@ class MessageEventHandler {
 
     // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
     // so the RegExp objects are created once per handler instance, not on every message).
+    // Patterns kept simple to stay under SonarCloud regex complexity threshold (20).
     this.imageRequestPatterns = [
-      /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
-      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+      /^(?:<@\d+>\s*)?(?:draw|create|generate|make)\s+/i,
+      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|art)/i,
       /(?:image|picture|photo)\s+of/i,
-      /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-      /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+      /(?:show|give)\s+me\s+(?:an?\s+)?(?:image|picture|photo)/i,
+      /^(?:<@\d+>\s*)?i\s+(?:want|need|would like)\s/i,
     ];
 
     // Set up periodic cleanup for enhanced message relationships
@@ -566,13 +567,26 @@ class MessageEventHandler {
                 });
 
                 // Build HD upgrade button — prompt encoded in customId (max 100 chars total)
-                const rawPromptForButton = (flowResult.originalPrompt || message.content).substring(
-                  0,
-                  80
-                );
+                // Strip Discord mentions and ensure encoded form fits in 100-char limit
+                const strippedForButton = (flowResult.originalPrompt || message.content)
+                  .replace(/<@\d+>/g, '')
+                  .trim();
+                // Encode and truncate — don't cut mid-%XX, walk back to last complete char
+                let encodedPrompt = encodeURIComponent(strippedForButton);
+                const prefix = 'hd_upgrade:';
+                const maxEncoded = 100 - prefix.length;
+                if (encodedPrompt.length > maxEncoded) {
+                  encodedPrompt = encodedPrompt.substring(0, maxEncoded);
+                  // Avoid cutting mid-%XX: remove trailing incomplete percent-sequence
+                  const trailingPercent = encodedPrompt.match(/%[0-9A-Fa-f]?$/);
+                  if (trailingPercent)
+                    encodedPrompt = encodedPrompt.slice(0, -trailingPercent[0].length);
+                  // Also remove trailing lone % to be safe
+                  if (encodedPrompt.endsWith('%')) encodedPrompt = encodedPrompt.slice(0, -1);
+                }
                 const hdRow = new ActionRowBuilder().addComponents(
                   new ButtonBuilder()
-                    .setCustomId(`hd_upgrade:${encodeURIComponent(rawPromptForButton)}`)
+                    .setCustomId(`${prefix}${encodedPrompt}`)
                     .setLabel('🔍 Upgrade to HD')
                     .setStyle(ButtonStyle.Secondary)
                 );
@@ -585,6 +599,9 @@ class MessageEventHandler {
                   const metaParts = [`${meta.model} (${meta.quality})`, `${elapsedSec}s`];
                   if (meta.usage && meta.usage.total_tokens) {
                     metaParts.push(`${meta.usage.total_tokens} tokens`);
+                  }
+                  if (meta.estimatedCost) {
+                    metaParts.push(`$${meta.estimatedCost.toFixed(4)}`);
                   }
                   metaLine = `\n_Model: ${metaParts.join(' · ')}_`;
                 }
@@ -617,27 +634,37 @@ class MessageEventHandler {
                   'Discord API call failed - image send/delete error'
                 );
 
-                // Fallback to embed if image send fails
+                // Fallback: try sending as a new file attachment message (not embed — Discord
+                // embeds don't support data: URIs, so we must use the raw buffer)
                 try {
-                  if (flowResult.imageUrl) {
-                    discordLogger.info('Attempting fallback to embed after upload failure');
-                    const imageEmbed = this.createImageEmbed(
-                      flowResult.imageUrl,
-                      flowResult.response
+                  if (flowResult.attachment?.buffer) {
+                    discordLogger.info(
+                      'Attempting fallback: send image as new message with file attachment'
                     );
-
-                    // Thinking message may already be deleted; try edit first, then send new
                     try {
-                      await feedbackMessage.edit({
-                        content: null,
-                        embeds: [imageEmbed],
-                        files: [],
+                      await message.channel.send({
+                        content: flowResult.response || '🎨 Here you go!',
+                        files: [
+                          {
+                            attachment: flowResult.attachment.buffer,
+                            name: flowResult.attachment.name || 'image.png',
+                          },
+                        ],
                       });
-                    } catch {
-                      await message.channel.send({ embeds: [imageEmbed] });
+                    } catch (sendErr) {
+                      discordLogger.error({ err: sendErr }, 'Fallback file send also failed');
+                      const fallbackText = `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`;
+                      try {
+                        await feedbackMessage.edit({
+                          content: fallbackText,
+                          embeds: [],
+                          files: [],
+                        });
+                      } catch {
+                        await message.channel.send(fallbackText);
+                      }
                     }
-
-                    discordLogger.info('Successfully sent embed fallback');
+                    discordLogger.info('Successfully sent image via fallback file attachment');
                   } else {
                     discordLogger.info('Attempting fallback to text-only response');
                     const fallbackText = `${flowResult.response}\n\n⚠️ Image generated but could not be displayed.`;

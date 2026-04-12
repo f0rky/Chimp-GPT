@@ -234,8 +234,8 @@ class MessageProcessor {
                   },
                   model: {
                     type: 'string',
-                    enum: ['gpt-image-1'],
-                    description: 'The image generation model to use (gpt-image-1 is the default)',
+                    enum: ['gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini'],
+                    description: 'The image generation model to use (default: gpt-image-1-mini)',
                   },
                   size: {
                     type: 'string',
