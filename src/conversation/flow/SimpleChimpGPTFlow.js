@@ -98,18 +98,20 @@ class SimpleChimpGPTFlow {
 
       // CHECK IMAGE PATTERNS FIRST — before knowledge system.
       // This prevents "draw a python" from being intercepted as a programming question.
+      // Patterns kept simple to stay under SonarCloud regex complexity threshold (20).
       const imagePatterns = [
-        // Direct drawing/creation requests — anchor to start of meaningful content
-        /(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?(?:image|picture|photo|artwork|art\s)/i,
-        /^(?:draw|create|generate|make)\s+/i,
-        // "draw a cat", "make me a landscape" — verb + filler + noun
-        /^(?:draw|create|generate|make)\s+(?:me\s+|us\s+)?/i,
-        // Specific image/picture requests
-        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+        // "draw a cat", "make me a landscape" — verb + filler/pronoun
+        /^(?:draw|create|generate|make)\s+(?:me|us)\s/i,
+        // Bare verb at start — "draw cat", "create something"
+        /^(?:draw|create|generate|make)\s/i,
+        // "create an image", "draw the picture" — verb + optional article + art noun
+        /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|art)/i,
+        // "image of a cat", "picture of sunset"
         /(?:image|picture|photo)\s+of/i,
-        /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-        // "I want/need" patterns
-        /^(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+        // "show me an image", "give me a picture"
+        /(?:show|give)\s+me\s+(?:an?\s+)?(?:image|picture|photo)/i,
+        // "I want a", "I need an image", "I would like you to draw"
+        /^i\s+(?:want|need|would like)\s/i,
       ];
 
       if (imagePatterns.some(pattern => pattern.test(content))) {

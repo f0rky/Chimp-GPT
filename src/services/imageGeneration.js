@@ -445,106 +445,51 @@ async function generateImage(prompt, options = {}) {
 
     // Calculate cost based on current OpenAI pricing (April 2026)
     // https://openai.com/pricing
-    let estimatedCost = 0;
+    let estimatedCost;
 
-    if (actualModel === MODELS.GPT_IMAGE_1_5 || actualModel === MODELS.CHATGPT_IMAGE_LATEST) {
-      // gpt-image-1.5 pricing (USD per image)
-      // Approximate pricing based on OpenAI rates — update when official pricing is confirmed
-      const gptImage15Costs = {
-        low: {
-          '1024x1024': 0.011,
-          '1536x1024': 0.017,
-          '1024x1536': 0.017,
-          auto: 0.014,
-        },
-        medium: {
-          '1024x1024': 0.042,
-          '1536x1024': 0.063,
-          '1024x1536': 0.063,
-          auto: 0.055,
-        },
-        high: {
-          '1024x1024': 0.167,
-          '1536x1024': 0.25,
-          '1024x1536': 0.25,
-          auto: 0.2,
-        },
-        auto: {
-          '1024x1024': 0.042,
-          '1536x1024': 0.063,
-          '1024x1536': 0.063,
-          auto: 0.055,
-        },
-      };
+    // Map size enum values to cost table keys
+    const sizeToKey = s => {
+      if (s === SIZES.PORTRAIT) return '1536x1024';
+      if (s === SIZES.LANDSCAPE) return '1024x1536';
+      if (s === SIZES.SQUARE) return '1024x1024';
+      return 'auto';
+    };
 
-      const sizeKey =
-        size === SIZES.PORTRAIT
-          ? '1536x1024'
-          : size === SIZES.LANDSCAPE
-            ? '1024x1536'
-            : size === SIZES.SQUARE
-              ? '1024x1024'
-              : 'auto';
+    // gpt-image-1.5 and gpt-image-1 share the same pricing structure
+    const fullSizeCosts = {
+      low: { '1024x1024': 0.011, '1536x1024': 0.017, '1024x1536': 0.017, auto: 0.014 },
+      medium: { '1024x1024': 0.042, '1536x1024': 0.063, '1024x1536': 0.063, auto: 0.055 },
+      high: { '1024x1024': 0.167, '1536x1024': 0.25, '1024x1536': 0.25, auto: 0.2 },
+      auto: { '1024x1024': 0.042, '1536x1024': 0.063, '1024x1536': 0.063, auto: 0.055 },
+    };
+
+    // gpt-image-1-mini only supports square and auto sizes
+    const miniSizeCosts = {
+      low: { '1024x1024': 0.002, auto: 0.003 },
+      medium: { '1024x1024': 0.01, auto: 0.012 },
+      high: { '1024x1024': 0.04, auto: 0.048 },
+      auto: { '1024x1024': 0.01, auto: 0.012 },
+    };
+
+    const COST_TABLES = {
+      [MODELS.GPT_IMAGE_1_5]: fullSizeCosts,
+      [MODELS.CHATGPT_IMAGE_LATEST]: fullSizeCosts,
+      [MODELS.GPT_IMAGE_1]: fullSizeCosts,
+      [MODELS.GPT_IMAGE_1_MINI]: miniSizeCosts,
+    };
+
+    const DEFAULT_COSTS = { fullSize: 0.042, miniSize: 0.01 };
+
+    const costTable = COST_TABLES[actualModel];
+    const key = sizeToKey(size);
+    if (costTable) {
       estimatedCost =
-        gptImage15Costs[quality]?.[sizeKey] || gptImage15Costs.auto?.['1024x1024'] || 0.042;
-    } else if (actualModel === MODELS.GPT_IMAGE_1) {
-      // gpt-image-1 pricing (USD per image)
-      const gptImage1Costs = {
-        low: {
-          '1024x1024': 0.011,
-          '1536x1024': 0.017,
-          '1024x1536': 0.017,
-          auto: 0.014,
-        },
-        medium: {
-          '1024x1024': 0.042,
-          '1536x1024': 0.063,
-          '1024x1536': 0.063,
-          auto: 0.055,
-        },
-        high: {
-          '1024x1024': 0.167,
-          '1536x1024': 0.25,
-          '1024x1536': 0.25,
-          auto: 0.2,
-        },
-        auto: {
-          '1024x1024': 0.042,
-          '1536x1024': 0.063,
-          '1024x1536': 0.063,
-          auto: 0.055,
-        },
-      };
-
-      const sizeKey =
-        size === SIZES.PORTRAIT
-          ? '1536x1024'
-          : size === SIZES.LANDSCAPE
-            ? '1024x1536'
-            : size === SIZES.SQUARE
-              ? '1024x1024'
-              : 'auto';
-      estimatedCost =
-        gptImage1Costs[quality]?.[sizeKey] || gptImage1Costs.auto?.['1024x1024'] || 0.042;
-    } else if (actualModel === MODELS.GPT_IMAGE_1_MINI) {
-      // gpt-image-1-mini pricing (USD per image) — lower cost model
-      const gptImage1MiniCosts = {
-        low: { '1024x1024': 0.002, auto: 0.003 },
-        medium: { '1024x1024': 0.01, auto: 0.012 },
-        high: { '1024x1024': 0.04, auto: 0.048 },
-        auto: { '1024x1024': 0.01, auto: 0.012 },
-      };
-
-      const sizeKey =
-        size === SIZES.PORTRAIT
-          ? '1536x1024'
-          : size === SIZES.LANDSCAPE
-            ? '1024x1536'
-            : size === SIZES.SQUARE
-              ? '1024x1024'
-              : 'auto';
-      estimatedCost =
-        gptImage1MiniCosts[quality]?.[sizeKey] || gptImage1MiniCosts.auto?.['1024x1024'] || 0.01;
+        costTable[quality]?.[key] ||
+        costTable[quality]?.['1024x1024'] ||
+        costTable.auto?.['1024x1024'] ||
+        (costTable === miniSizeCosts ? DEFAULT_COSTS.miniSize : DEFAULT_COSTS.fullSize);
+    } else {
+      estimatedCost = DEFAULT_COSTS.fullSize;
     }
 
     // Log the cost calculation

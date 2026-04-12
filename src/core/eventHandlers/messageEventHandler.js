@@ -40,12 +40,13 @@ class MessageEventHandler {
 
     // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
     // so the RegExp objects are created once per handler instance, not on every message).
+    // Patterns kept simple to stay under SonarCloud regex complexity threshold (20).
     this.imageRequestPatterns = [
-      /^(?:<@\d+>\s*)?(?:draw|create|generate|make)\s+(?:me\s+|us\s+|a\s+|an\s+|the\s+)?/i,
-      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|artwork|art)/i,
+      /^(?:<@\d+>\s*)?(?:draw|create|generate|make)\s+/i,
+      /(?:draw|create|generate|make)\s+(?:an?\s+)?(?:image|picture|photo|art)/i,
       /(?:image|picture|photo)\s+of/i,
-      /(?:show\s+me|give\s+me)\s+(?:an?\s+)?(?:image|picture|photo)/i,
-      /^(?:<@\d+>\s*)?(?:i\s+(?:want|need|would\s+like))\s+(?:a|an|you\s+to\s+draw)/i,
+      /(?:show|give)\s+me\s+(?:an?\s+)?(?:image|picture|photo)/i,
+      /^(?:<@\d+>\s*)?i\s+(?:want|need|would like)\s/i,
     ];
 
     // Set up periodic cleanup for enhanced message relationships
