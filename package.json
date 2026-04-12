@@ -4,6 +4,9 @@
   "description": "A Discord chatbot with revolutionary PocketFlow architecture and OpenAI GPT integration for intelligent conversations.",
   "main": "src/core/combined.js",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "test": "node tests/unit/testRunner.js",
     "test:comprehensive": "node tests/comprehensiveTestRunner.js",
