@@ -36,7 +36,6 @@ class PocketFlowFunctionProcessor {
       'lookupExtendedForecast',
       'getWolframShortAnswer',
       'quakeLookup',
-      'generateImage',
       'getVersion',
       // Web search functions
       'web_search',
@@ -86,14 +85,6 @@ class PocketFlowFunctionProcessor {
         case 'quakeLookup':
           result = await this.handleQuakeLookup(functionArgs, message);
           break;
-
-        case 'generateImage':
-          // Image generation is now handled directly by SimpleChimpGPTFlow
-          return {
-            success: false,
-            error: 'Image generation is handled by SimpleChimpGPTFlow, not function calls',
-            functionName,
-          };
 
         case 'getVersion':
           result = await this.handleVersionLookup(functionArgs);
@@ -247,125 +238,6 @@ class PocketFlowFunctionProcessor {
       };
     } catch (error) {
       throw new Error(`Quake stats lookup failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Handle image generation using PocketFlow pattern
-   * Returns structured data that the flow can properly process
-   */
-  async handleImageGeneration(args, _message) {
-    const { prompt, model = 'gpt-image-1-mini', size = '1024x1024', enhance = true } = args;
-    if (!prompt) {
-      throw new Error('Prompt parameter is required for image generation');
-    }
-
-    try {
-      logger.info(`Processing image generation request: ${prompt.substring(0, 50)}...`);
-
-      // Get OpenAI client from config
-      const config = require('../configValidator');
-      const { OpenAI } = require('openai');
-      const openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
-
-      // Call OpenAI DALL-E API directly
-      // response_format: gpt-image-1/1.5/1-mini and chatgpt-image-latest return base64 by default;
-      // DALL-E models (now deprecated) used response_format. All current models omit it.
-      const gptImageModels = [
-        'gpt-image-1',
-        'gpt-image-1.5',
-        'gpt-image-1-mini',
-        'chatgpt-image-latest',
-      ];
-      const imageGenParams = {
-        model: model,
-        prompt: prompt,
-        n: 1,
-        size: size,
-        quality: 'standard',
-        ...(gptImageModels.includes(model) ? {} : { response_format: 'url' }),
-      };
-      const imageResponse = await openaiClient.images.generate(imageGenParams);
-
-      const imageUrl = imageResponse.data[0].url;
-      const revisedPrompt = imageResponse.data[0].revised_prompt || prompt;
-
-      logger.info(`Image generated successfully: ${imageUrl}`);
-
-      try {
-        // Download the image for attachment
-        const https = require('https');
-        const http = require('http');
-
-        const downloadImage = url => {
-          return new Promise((resolve, reject) => {
-            const client = url.startsWith('https') ? https : http;
-
-            client
-              .get(url, response => {
-                if (response.statusCode !== 200) {
-                  reject(new Error(`Failed to download image: ${response.statusCode}`));
-                  return;
-                }
-
-                const chunks = [];
-                response.on('data', chunk => chunks.push(chunk));
-                response.on('end', () => {
-                  const buffer = Buffer.concat(chunks);
-                  resolve(buffer);
-                });
-              })
-              .on('error', reject);
-          });
-        };
-
-        const imageBuffer = await downloadImage(imageUrl);
-        const fileName = `generated_image_${Date.now()}.png`;
-
-        // Save image to PFP rotation if PFPManager is available
-        if (this.pfpManager) {
-          try {
-            const savedPath = await this.pfpManager.addImage(imageBuffer, fileName);
-            logger.info(`Image saved to PFP rotation: ${savedPath}`);
-          } catch (pfpError) {
-            logger.warn('Failed to save image to PFP rotation:', pfpError.message);
-            // Don't fail the whole request if PFP save fails
-          }
-        }
-
-        // Return PocketFlow-compatible result with attachment
-        return {
-          success: true,
-          response: `🎨 **Image Generated Successfully!** ${this.pfpManager ? '*(Added to PFP rotation)*' : ''}`,
-          type: 'image',
-          prompt: prompt,
-          revisedPrompt: revisedPrompt,
-          imageUrl: imageUrl,
-          attachment: {
-            buffer: imageBuffer,
-            name: fileName,
-          },
-          formatted: `🎨 **Image Generated Successfully!**\n\n**Original Prompt:** ${prompt}${
-            enhance && revisedPrompt !== prompt ? `\n**Enhanced Prompt:** ${revisedPrompt}` : ''
-          }\n**Model:** ${model} | **Size:** ${size}`,
-        };
-      } catch (downloadError) {
-        logger.warn('Failed to download image, returning URL only:', downloadError.message);
-
-        // Return PocketFlow-compatible result with URL only
-        return {
-          success: true,
-          response: `🎨 **Image Generated!** [Click to view your image](${imageUrl})`,
-          type: 'image',
-          prompt: prompt,
-          revisedPrompt: revisedPrompt,
-          imageUrl: imageUrl,
-          formatted: `🎨 **Image Generated!** [Click to view your image](${imageUrl})`,
-        };
-      }
-    } catch (error) {
-      logger.error('Error generating image in PocketFlow processor:', error);
-      throw new Error(`Image generation failed: ${error.message}`);
     }
   }
 
