@@ -35,7 +35,7 @@ class ClientEventHandler {
   }
 
   setupEventHandlers() {
-    this.client.on('ready', this.handleReady.bind(this));
+    this.client.on('clientReady', this.handleReady.bind(this));
     this.client.on('reconnecting', this.updateDiscordStats.bind(this));
     this.client.on('disconnect', this.updateDiscordStats.bind(this));
     this.client.on('shardResume', this.updateDiscordStats.bind(this));

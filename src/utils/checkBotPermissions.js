@@ -15,7 +15,7 @@ const client = new Client({
   ],
 });
 
-client.on('ready', async () => {
+client.on('clientReady', async () => {
   logger.info(`Logged in as ${client.user.tag}`);
 
   // Get all guilds the bot is in
