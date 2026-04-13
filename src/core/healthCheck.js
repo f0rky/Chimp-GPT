@@ -391,8 +391,8 @@ function scheduleHealthReports(client) {
     // Client is already ready, start after 10 seconds
     setTimeout(tryStartupMessage, 10000);
   } else {
-    // Wait for the ready event before starting
-    client.once('ready', () => {
+    // Wait for the clientReady event before starting
+    client.once('clientReady', () => {
       logger.info('Client ready event fired, scheduling startup message');
       setTimeout(tryStartupMessage, 10000);
     });
