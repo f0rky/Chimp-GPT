@@ -1,25 +1,25 @@
 # Chimp-GPT
 
-A Discord bot powered by OpenAI. Handles conversations, image generation, weather, time, Quake Live server stats, and web search. Built around a PocketFlow graph architecture for clean conversation flow and context management.
+Discord bot with OpenAI. Conversations, image generation, weather, web search, and Quake Live stats. Runs on a PocketFlow graph for conversation flow and context management.
 
 ## Features
 
-- **AI conversations** — context-aware replies using GPT, with reply chain tracking and group chat support
-- **Image generation** — GPT Image-1 with HD upgrade, real-time progress, delivered as file attachments
-- **Weather** — current conditions and forecasts via WeatherAPI (through RapidAPI)
-- **Time lookup** — timezone-aware time queries for any location
-- **Quake Live stats** — live server stats with team assignments and Glicko ratings
-- **Web search** — fact-checking and general search with circuit breaker protection
-- **Slash commands** — full Discord slash command support with auto-deployment
-- **Plugin system** — extend with custom commands, functions, and lifecycle hooks
-- **Status dashboard** — web UI with stats, image gallery, and performance metrics
+- AI conversations with reply chain tracking and group chat support
+- Image generation — GPT Image models, HD upgrade button, progress indicators
+- Weather via WeatherAPI through RapidAPI
+- Timezone-aware time lookup
+- Quake Live server stats with Glicko ratings
+- Web search with circuit breaker
+- Slash commands with auto-deployment
+- Plugin system — custom commands, functions, lifecycle hooks
+- Status dashboard — web UI with stats and image gallery
 
 ## Requirements
 
-- Node.js v18+
-- A Discord bot token and application
+- Node.js 20+
+- Discord bot token + application
 - OpenAI API key
-- RapidAPI key (for weather via WeatherAPI.com)
+- RapidAPI key (weather)
 - Optional: Wolfram Alpha App ID
 
 ## Setup
@@ -29,78 +29,69 @@ git clone https://github.com/f0rky/Chimp-GPT.git
 cd Chimp-GPT
 npm install
 cp .env.example .env
-# Fill in your values in .env
+# Fill in your values
 npm start
 ```
 
-### Key environment variables
+### Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | ✅ | Discord bot token |
-| `CLIENT_ID` | ✅ | Discord application ID (for slash commands) |
-| `OWNER_ID` | ✅ | Your Discord user ID (owner-only commands) |
-| `CHANNEL_ID` | ✅ | Channel(s) the bot responds in (comma-separated) |
+| `CLIENT_ID` | ✅ | Discord application ID |
+| `OWNER_ID` | ✅ | Your Discord user ID |
+| `CHANNEL_ID` | ✅ | Channel(s) to respond in (comma-separated) |
 | `OPENAI_API_KEY` | ✅ | OpenAI API key |
 | `X_RAPIDAPI_KEY` | ✅ | RapidAPI key (weather) |
 | `BOT_NAME` | ❌ | Bot display name (default: Solvis) |
 | `BOT_PERSONALITY` | ❌ | System prompt personality |
 | `ENABLE_IMAGE_GENERATION` | ❌ | Enable image gen (default: true) |
-| `ENABLE_REPLY_CONTEXT` | ❌ | Follow Discord reply chains (default: true) |
+| `ENABLE_REPLY_CONTEXT` | ❌ | Follow reply chains (default: true) |
 | `LOG_LEVEL` | ❌ | Pino log level (default: info) |
 
 See `.env.example` for the full list.
 
-## Run modes
+## Running
 
 ```bash
-# Development (default, nodemon, debug port)
-npm start
-
-# Production
-./start.sh -m production
-
-# Bot only (no status server)
-./start.sh -c bot
-
-# Status server only
-./start.sh -c status
-
-# With pm2
-npx pm2 start ecosystem.config.js --env production
+npm start                          # Development (nodemon, debug port)
+./start.sh -m production           # Production
+./start.sh -c bot                  # Bot only (no status server)
+./start.sh -c status               # Status server only
+npx pm2 start ecosystem.config.js   # With pm2
 ```
 
 ## Docker
 
 ```bash
 cp .env.example .env
-# Edit .env with your values
+# Edit .env
 docker-compose up -d
 docker-compose logs -f
 ```
 
-Status page available at `http://localhost:3000` (or your configured port).
-
-See [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md) for details.
+Status page at `http://localhost:3000`. See [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md).
 
 ## Architecture
 
-Messages flow through `SimpleChimpGPTFlow` (PocketFlow graph architecture):
+Message flow through `SimpleChimpGPTFlow`:
 
 ```
 Message → Intent detection → Context management → Function routing → Response
 ```
 
-- **`src/core/`** — bot initialisation, event handlers, config
-- **`src/conversation/flow/`** — PocketFlow nodes and conversation state
-- **`src/services/`** — external API integrations (weather, search, Quake, image gen)
-- **`src/commands/`** — slash and prefix command modules
-- **`src/plugins/`** — plugin loader and bundled plugins
-- **`src/web/`** — status dashboard and API server
+| Directory | Purpose |
+|-----------|---------|
+| `src/core/` | Bot init, event handlers, config |
+| `src/conversation/flow/` | PocketFlow nodes, conversation state |
+| `src/services/` | External APIs (weather, search, Quake, images) |
+| `src/commands/` | Slash and prefix command modules |
+| `src/plugins/` | Plugin loader and bundled plugins |
+| `src/web/` | Status dashboard and API server |
 
-## Plugin system
+## Plugins
 
-Plugins live in `plugins/`, each in their own folder with an `index.js`. They can add commands, OpenAI function definitions, and respond to lifecycle hooks.
+Plugins live in `plugins/`, each with an `index.js`:
 
 ```js
 module.exports = {
@@ -113,18 +104,18 @@ module.exports = {
 };
 ```
 
-See [plugins/README.md](plugins/README.md) for the full template and API.
+See [plugins/README.md](plugins/README.md) for the template and API.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `/help` | List available commands |
+| `/help` | List commands |
 | `/ping` | Latency check |
-| `/serverstats` | Quake Live server stats |
+| `/serverstats` | Quake Live stats |
 | `/image` | Generate an image |
-| `/cleanupdm` | Delete bot's DM messages (owner only) |
-| `/restart` | Restart the bot (owner only) |
+| `/cleanupdm` | Delete bot DMs (owner) |
+| `/restart` | Restart bot (owner) |
 
 Prefix commands also work with `!`, `?`, or `/`.
 
@@ -133,10 +124,10 @@ Prefix commands also work with `!`, `?`, or `/`.
 ```bash
 npm run lint          # ESLint
 npm test              # Unit tests
-npm run test:comprehensive  # Full test suite
+npm run test:comprehensive
 ```
 
-Logs are written to `assets/logs/` via Pino structured logging.
+Logs go to `assets/logs/` via Pino.
 
 ## License
 
