@@ -616,9 +616,15 @@ async function generateImage(prompt, options = {}) {
     }
 
     // Store the function result for the status page
+    // Strip base64 image data to prevent unbounded file growth
+    const lightweightImages = images.map(img => ({
+      revisedPrompt: img.revisedPrompt,
+      // Only keep URL if it's a real URL (not a data URI with embedded base64)
+      ...(img.url && !img.url.startsWith('data:') ? { url: img.url } : {}),
+    }));
     const result = {
       success: true,
-      images: images,
+      images: lightweightImages,
       estimatedCost: estimatedCost,
     };
 

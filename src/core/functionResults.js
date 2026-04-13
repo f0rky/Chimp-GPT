@@ -49,6 +49,42 @@ const FILE_CONFIG = {
 // Maximum number of results to store per function type
 const MAX_RESULTS_PER_TYPE = 10;
 
+// Maximum size of any individual string value in a stored result (10KB)
+// Prevents base64 image data and data URIs from bloating the file
+const MAX_STRING_VALUE_LENGTH = 10 * 1024;
+
+/**
+ * Recursively truncate large string values in an object.
+ * Base64 image data and data URIs can be megabytes — this strips them
+ * down to a reasonable size while keeping the rest of the structure intact.
+ *
+ * @param {*} obj - The value to sanitize
+ * @returns {*} The sanitized value
+ */
+function sanitizeEntry(obj) {
+  if (typeof obj === 'string') {
+    if (obj.length > MAX_STRING_VALUE_LENGTH) {
+      // Truncate with a marker so it's clear data was trimmed
+      return (
+        obj.substring(0, MAX_STRING_VALUE_LENGTH) +
+        `...[truncated ${obj.length - MAX_STRING_VALUE_LENGTH} chars]`
+      );
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeEntry);
+  }
+  if (obj && typeof obj === 'object') {
+    const sanitized = {};
+    for (const key of Object.keys(obj)) {
+      sanitized[key] = sanitizeEntry(obj[key]);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
 /**
  * Default results object structure
  * @type {Object}
@@ -407,6 +443,12 @@ async function loadResults() {
  */
 async function storeResult(functionType, params, result) {
   try {
+    // Sanitize inputs to prevent large payloads (e.g. base64 images) from
+    // bloating the results file. This is a defense-in-depth measure —
+    // callers should also strip large data, but we guard here too.
+    const safeParams = sanitizeEntry(params);
+    const safeResult = sanitizeEntry(result);
+
     // Load existing results
     const results = await loadResults();
 
@@ -427,8 +469,8 @@ async function storeResult(functionType, params, result) {
       // Add the new result to the beginning of the array
       results.plugins[pluginId].unshift({
         timestamp: new Date().toISOString(),
-        params,
-        result,
+        params: safeParams,
+        result: safeResult,
       });
 
       // Limit the number of results
@@ -445,8 +487,8 @@ async function storeResult(functionType, params, result) {
       // Add the new result to the beginning of the array
       results[functionType].unshift({
         timestamp: new Date().toISOString(),
-        params,
-        result,
+        params: safeParams,
+        result: safeResult,
       });
 
       // Limit the number of results
