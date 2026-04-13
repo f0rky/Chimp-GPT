@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Discord bot with OpenAI — conversations, image generation, weather, search, and Quake stats.",
   "main": "src/core/combined.js",
   "private": true,
