@@ -390,38 +390,17 @@ async function generateImage(prompt, options = {}) {
 
         logError(breakerError);
 
-        // Try to reset the circuit breaker and attempt one direct call
-        logger.info('Attempting to reset circuit breaker and retry image generation');
-        try {
-          // Reset the circuit breaker
-          if (typeof breakerManager.resetBreaker === 'function') {
-            breakerManager.resetBreaker('image_generation');
-          }
-
-          // Make one direct attempt without the circuit breaker
-          const directResponse = await openai.images.generate(imageParams);
-
-          if (directResponse && directResponse.data) {
-            logger.info('Direct image generation call succeeded after breaker reset');
-            response = directResponse;
-            trackApiCall('gptimage');
-          } else {
-            throw new Error('Direct call returned no data');
-          }
-        } catch (directError) {
-          logger.error({ directError }, 'Direct image generation call also failed');
-          return {
-            success: false,
-            error:
-              'Image generation service is temporarily unavailable. Please try again in a few minutes.',
-            isCircuitBreakerOpen: true,
-            prompt,
-          };
-        }
-      } else {
-        // For other errors, re-throw to be handled by the outer try-catch
-        throw error;
+        // Circuit breaker is open — return error to caller instead of bypassing
+        return {
+          success: false,
+          error:
+            'Image generation service is temporarily unavailable. Please try again in a few minutes.',
+          isCircuitBreakerOpen: true,
+          prompt,
+        };
       }
+      // For other errors, re-throw to be handled by the outer try-catch
+      throw error;
     }
 
     // Log response metadata without exposing base64 data

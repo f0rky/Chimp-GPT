@@ -13,9 +13,7 @@ const KnowledgeFlow = require('./KnowledgeFlow');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
 // hit on first use and subsequent calls skip the require() lookup entirely.
-const { OpenAI } = require('openai');
-const https = require('https');
-const http = require('http');
+const { downloadImage } = require('../../utils/imageDownloader');
 // Services are loaded lazily on first import (Node caches them after that).
 // Capture references here so handleXxx functions don't re-resolve on every call.
 let _weatherService = null;
@@ -310,25 +308,6 @@ class SimpleChimpGPTFlow {
         imageBuffer = Buffer.from(imageResult.b64_json, 'base64');
       } else if (imageUrl) {
         // Download image from URL
-        const downloadImage = url => {
-          return new Promise((resolve, reject) => {
-            const client = url.startsWith('https') ? https : http;
-            client
-              .get(url, response => {
-                if (response.statusCode !== 200) {
-                  reject(new Error(`Failed to download image: ${response.statusCode}`));
-                  return;
-                }
-                const chunks = [];
-                response.on('data', chunk => chunks.push(chunk));
-                response.on('end', () => {
-                  const buffer = Buffer.concat(chunks);
-                  resolve(buffer);
-                });
-              })
-              .on('error', reject);
-          });
-        };
         imageBuffer = await downloadImage(imageUrl);
       }
 

@@ -68,15 +68,23 @@ class ClientEventHandler {
       };
 
       // Persist Discord status to statsStorage for health endpoint
-      try {
-        await statsStorage.updateStat('discord', {
-          status,
-          ping,
-          guilds,
-          channels,
-        });
-      } catch (persistError) {
-        discordLogger.warn({ error: persistError }, 'Failed to persist Discord status to storage');
+      // Only write when data has changed to avoid unnecessary I/O
+      const currentDiscordJson = JSON.stringify({ status, ping, guilds, channels });
+      if (currentDiscordJson !== this._lastDiscordStatsJson) {
+        this._lastDiscordStatsJson = currentDiscordJson;
+        try {
+          await statsStorage.updateStat('discord', {
+            status,
+            ping,
+            guilds,
+            channels,
+          });
+        } catch (persistError) {
+          discordLogger.warn(
+            { error: persistError },
+            'Failed to persist Discord status to storage'
+          );
+        }
       }
 
       discordLogger.debug(

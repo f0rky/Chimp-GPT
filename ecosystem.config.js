@@ -11,7 +11,7 @@ module.exports = {
       node_args: '--no-deprecation', // Suppress deprecation warnings - lodash issue from Discord.js dependency
       env_file: '.env', // Tell PM2 to load .env file
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
         PORT: 3006,
       },
       env_production: {

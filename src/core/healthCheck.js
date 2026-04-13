@@ -206,6 +206,7 @@ function scheduleHealthReports(client) {
   // Register health check as a component that will contribute to the startup message
   startupCoordinator.registerComponent('healthCheck');
   startupCoordinator.registerComponent('conversationSystem');
+  startupCoordinator.registerComponent('greetingManager');
 
   // Send the startup message after a short delay
   // Use a retry mechanism to wait for client to be ready

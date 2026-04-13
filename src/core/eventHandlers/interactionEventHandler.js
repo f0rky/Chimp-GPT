@@ -2,6 +2,7 @@ const { discord: discordLogger } = require('../logger');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const commandHandler = require('../../commands/commandHandler');
 const { generateImage } = require('../../services/imageGeneration');
+const { downloadImage } = require('../../utils/imageDownloader');
 
 class InteractionEventHandler {
   constructor(client, config) {
@@ -58,7 +59,24 @@ class InteractionEventHandler {
   async handleHdUpgrade(interaction) {
     // Extract the original prompt from the customId
     const encodedPrompt = interaction.customId.slice('hd_upgrade:'.length);
-    const originalPrompt = decodeURIComponent(encodedPrompt);
+    let originalPrompt;
+    try {
+      originalPrompt = decodeURIComponent(encodedPrompt);
+    } catch (decodeError) {
+      discordLogger.error(
+        { encodedPrompt, error: decodeError.message },
+        'Failed to decode HD upgrade prompt'
+      );
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: '❌ HD upgrade failed — invalid prompt data.',
+          ephemeral: true,
+        });
+      } else {
+        await interaction.editReply('❌ HD upgrade failed — invalid prompt data.');
+      }
+      return;
+    }
 
     discordLogger.info(
       { promptPreview: originalPrompt.substring(0, 60), messageId: interaction.message.id },
@@ -112,7 +130,7 @@ class InteractionEventHandler {
         imageBuffer = Buffer.from(hdImage.b64_json, 'base64');
       } else if (hdImage.url) {
         // URL response — download
-        imageBuffer = await this.downloadImageBuffer(hdImage.url);
+        imageBuffer = await downloadImage(hdImage.url);
       }
 
       if (!imageBuffer) {
@@ -151,31 +169,6 @@ class InteractionEventHandler {
         discordLogger.error({ editError }, 'Failed to update message after HD upgrade error');
       }
     }
-  }
-
-  /**
-   * Download an image from a URL and return a Buffer.
-   * @param {string} url
-   * @returns {Promise<Buffer>}
-   */
-  downloadImageBuffer(url) {
-    return new Promise((resolve, reject) => {
-      const https = require('https');
-      const http = require('http');
-      const client = url.startsWith('https') ? https : http;
-
-      client
-        .get(url, response => {
-          if (response.statusCode !== 200) {
-            reject(new Error(`Failed to download HD image: HTTP ${response.statusCode}`));
-            return;
-          }
-          const chunks = [];
-          response.on('data', chunk => chunks.push(chunk));
-          response.on('end', () => resolve(Buffer.concat(chunks)));
-        })
-        .on('error', reject);
-    });
   }
 }
 
