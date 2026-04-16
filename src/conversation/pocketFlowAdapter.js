@@ -9,6 +9,8 @@
 
 const config = require('../core/configValidator');
 const { createLogger } = require('../core/logger');
+const { toPocketFlowMessage } = require('../utils/discordMessage');
+const { buildPocketFlowOptions, createMockCommandHandler } = require('./pocketFlowDefaults');
 const PocketFlowConversationManager = require('./flow/PocketFlowConversationManager');
 
 // Import existing services that PocketFlow needs
@@ -22,43 +24,11 @@ let pocketFlowManager;
 
 function initializePocketFlow(pfpManager = null) {
   if (!pocketFlowManager) {
-    const pocketFlowOptions = {
+    const pocketFlowOptions = buildPocketFlowOptions({
       enableParallelTesting: false,
-      cleanupInterval: config.POCKETFLOW_CLEANUP_INTERVAL,
-      maxConcurrentFlows: config.POCKETFLOW_MAX_CONCURRENT_FLOWS,
-      flows: {
-        individual: {
-          timeout: 15000,
-          config: {
-            charsPerToken: 4,
-            defaultMaxTokens: config.POCKETFLOW_CONTEXT_MAX_TOKENS,
-            maxConversationLength: 20,
-          },
-        },
-        blended: {
-          confidenceThreshold: config.POCKETFLOW_INTENT_CONFIDENCE_THRESHOLD,
-          config: {
-            maxConversationLength: 15,
-            defaultMaxTokens: config.POCKETFLOW_CONTEXT_MAX_TOKENS * 1.25,
-            blendedChannelThreshold: 3,
-            blendedModeTimeout: 300000,
-          },
-        },
-        command: {
-          enableBuiltins: true,
-        },
-      },
-    };
+    });
 
-    // Create mock command handler for now (will integrate with real one later)
-    const mockCommandHandler = {
-      executeCommand: async (commandName, _context) => {
-        logger.debug(`Mock command execution: ${commandName}`);
-        return {
-          response: `Command ${commandName} executed (PocketFlow mode)`,
-        };
-      },
-    };
+    const mockCommandHandler = createMockCommandHandler('PocketFlow');
 
     // Create PocketFlow function processor instance
     const pocketFlowFunctionProcessor = new PocketFlowFunctionProcessor(pfpManager);
@@ -97,26 +67,7 @@ async function manageConversation(
     }
 
     // Convert Discord message to PocketFlow format
-    const pocketFlowMessage = {
-      id: discordMessage.id,
-      content: discordMessage.content,
-      createdTimestamp: discordMessage.createdTimestamp,
-      author: {
-        id: discordMessage.author.id,
-        username: discordMessage.author.username,
-        displayName: discordMessage.author.displayName || discordMessage.author.username,
-      },
-      channel: {
-        id: discordMessage.channel.id,
-        type: discordMessage.channel.isDMBased() ? 'DM' : 'GUILD_TEXT',
-      },
-      guild: discordMessage.guild
-        ? {
-            id: discordMessage.guild.id,
-          }
-        : null,
-      reference: discordMessage.reference,
-    };
+    const pocketFlowMessage = toPocketFlowMessage(discordMessage);
 
     // Process message through PocketFlow
     const result = await manager.processMessage(pocketFlowMessage, {

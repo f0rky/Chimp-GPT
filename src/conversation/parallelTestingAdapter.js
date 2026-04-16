@@ -10,6 +10,8 @@
 
 const config = require('../core/configValidator');
 const { createLogger } = require('../core/logger');
+const { toPocketFlowMessage } = require('../utils/discordMessage');
+const { buildPocketFlowOptions, createMockCommandHandler } = require('./pocketFlowDefaults');
 const ParallelConversationTester = require('./flow/ParallelConversationTester');
 
 // Import existing services
@@ -31,47 +33,15 @@ function initializeParallelTester() {
       legacyManager = require('./useSimpleOptimizer');
     }
 
-    // Create mock command handler for now
-    const mockCommandHandler = {
-      executeCommand: async (commandName, _context) => {
-        logger.debug(`Mock command execution: ${commandName}`);
-        return {
-          response: `Command ${commandName} executed (parallel testing mode)`,
-        };
-      },
-    };
+    const mockCommandHandler = createMockCommandHandler('parallel testing');
 
+    const pocketFlowConfig = buildPocketFlowOptions();
     const parallelOptions = {
       enableTesting: true,
       testPercentage: config.POCKETFLOW_TEST_PERCENTAGE,
       logComparisons: config.POCKETFLOW_LOG_COMPARISONS,
       testOnlyForUsers: config.POCKETFLOW_TEST_USERS,
-      pocketFlow: {
-        cleanupInterval: config.POCKETFLOW_CLEANUP_INTERVAL,
-        maxConcurrentFlows: config.POCKETFLOW_MAX_CONCURRENT_FLOWS,
-        flows: {
-          individual: {
-            timeout: 15000,
-            config: {
-              charsPerToken: 4,
-              defaultMaxTokens: config.POCKETFLOW_CONTEXT_MAX_TOKENS,
-              maxConversationLength: 20,
-            },
-          },
-          blended: {
-            confidenceThreshold: config.POCKETFLOW_INTENT_CONFIDENCE_THRESHOLD,
-            config: {
-              maxConversationLength: 15,
-              defaultMaxTokens: config.POCKETFLOW_CONTEXT_MAX_TOKENS * 1.25,
-              blendedChannelThreshold: 3,
-              blendedModeTimeout: 300000,
-            },
-          },
-          command: {
-            enableBuiltins: true,
-          },
-        },
-      },
+      pocketFlow: pocketFlowConfig,
     };
 
     parallelTester = new ParallelConversationTester(
@@ -108,26 +78,7 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     }
 
     // Convert Discord message to format expected by parallel tester
-    const testMessage = {
-      id: discordMessage.id,
-      content: discordMessage.content,
-      createdTimestamp: discordMessage.createdTimestamp,
-      author: {
-        id: discordMessage.author.id,
-        username: discordMessage.author.username,
-        displayName: discordMessage.author.displayName || discordMessage.author.username,
-      },
-      channel: {
-        id: discordMessage.channel.id,
-        type: discordMessage.channel.isDMBased() ? 'DM' : 'GUILD_TEXT',
-      },
-      guild: discordMessage.guild
-        ? {
-            id: discordMessage.guild.id,
-          }
-        : null,
-      reference: discordMessage.reference,
-    };
+    const testMessage = toPocketFlowMessage(discordMessage);
 
     // Process through parallel tester (this will decide whether to test or use legacy)
     const result = await tester.processMessage(testMessage, {
