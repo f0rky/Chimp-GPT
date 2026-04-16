@@ -666,4 +666,6 @@ module.exports = {
   clearResults,
   repairResultsFile,
   DEFAULT_RESULTS,
+  sanitizeEntry,
+  MAX_STRING_VALUE_LENGTH,
 };
