@@ -32,12 +32,12 @@ This guide explains how to deploy ChimpGPT using Docker and Docker Compose for s
 4. Build and start the container:
 
    ```bash
-   docker-compose up -d
+   docker-compose -f deploy/docker-compose.yml up -d
    ```
 
 5. Check the logs:
    ```bash
-   docker-compose logs -f
+   docker-compose -f deploy/docker-compose.yml logs -f
    ```
 
 ## Configuration
@@ -65,8 +65,8 @@ To update to a new version:
 
 2. Rebuild and restart the container:
    ```bash
-   docker-compose down
-   docker-compose up -d --build
+   docker-compose -f deploy/docker-compose.yml down
+   docker-compose -f deploy/docker-compose.yml up -d --build
    ```
 
 ## Troubleshooting
@@ -76,7 +76,7 @@ To update to a new version:
 Check the logs for errors:
 
 ```bash
-docker-compose logs
+docker-compose -f deploy/docker-compose.yml logs
 ```
 
 ### Status page is not accessible
@@ -84,7 +84,7 @@ docker-compose logs
 Verify the container is running and the port mapping is correct:
 
 ```bash
-docker-compose ps
+docker-compose -f deploy/docker-compose.yml ps
 ```
 
 ### Discord bot is not responding
@@ -98,12 +98,12 @@ Check if the Discord token is correctly set in the `.env` file and that the bot 
 To use a different port for the status page, set the `STATUS_PORT` environment variable:
 
 ```bash
-STATUS_PORT=8080 docker-compose up -d
+STATUS_PORT=8080 docker-compose -f deploy/docker-compose.yml up -d
 ```
 
 ### Custom Time Zone
 
-The default time zone is UTC. To use a different time zone, modify the `TZ` environment variable in the `docker-compose.yml` file.
+The default time zone is UTC. To use a different time zone, modify the `TZ` environment variable in the `deploy/docker-compose.yml` file.
 
 ## GitHub Actions CI/CD
 

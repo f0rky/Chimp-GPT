@@ -61,9 +61,9 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 **📂 Current Clean Folder Structure:**
 ```
 ├── 📦 Package Management: package.json, package-lock.json
-├── ⚙️ Configuration: ecosystem.config.js, eslint.config.js
-├── 🐳 Deployment: Dockerfile, docker-compose.yml
-├── 📚 Key Documentation: README.md, LICENSE, CONTRIBUTING.md, CLAUDE.md
+├── ⚙️ Configuration: config/eslint.config.js, deploy/ecosystem.config.js
+├── 🐳 Deployment: deploy/Dockerfile, deploy/docker-compose.yml
+├── 📚 Key Documentation: README.md, LICENSE, docs/CONTRIBUTING.md, docs/CLAUDE.md
 ├── 🏗️ Source Code: src/ (fully organized)
 │   ├── commands/      # Discord commands & handlers
 │   ├── conversation/  # Chat management & optimization
@@ -77,7 +77,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 ├── 📖 Documentation: docs/ (consolidated from root)
 ├── 💾 Runtime Data: data/, assets/
 ├── 🧪 Development: tests/, utils/, scripts/
-└── 📁 Archive: archive/ (historical files)
+└── 📁 Archive: docs/archive/ (historical files)
 ```
 
 **🎯 Current State: FULLY FUNCTIONAL**
@@ -101,11 +101,11 @@ npm run format:check  # Check formatting without changes
 
 # Production
 node src/core/combined.js    # Direct execution (NEW PATH)
-pm2 start ecosystem.config.js  # PM2 process manager (updated config)
-docker-compose up -d         # Docker deployment
+pm2 start deploy/ecosystem.config.js  # PM2 process manager (updated config)
+docker-compose -f deploy/docker-compose.yml up -d         # Docker deployment
 
 # Deployment & Utilities  
-node commands/deploySlashCommands.js  # Deploy Discord slash commands
+node src/commands/deploySlashCommands.js  # Deploy Discord slash commands
 ./scripts/start.sh -m debug           # Start in debug mode (NEW PATH)
 ./scripts/start.sh -m demo            # Start in demo mode (NEW PATH)
 ```
@@ -131,7 +131,7 @@ node commands/deploySlashCommands.js  # Deploy Discord slash commands
 **Legacy Components:**
 - **src/core/chimpGPT.js**: Main bot initialization and Discord client setup (reduced from 2,999 to ~1,400 lines)
 - **src/conversation/conversationManager.js**: Legacy conversation history management with automatic pruning
-- **commands/commandHandler.js**: Processes Discord commands with alias support
+- **src/commands/commandHandler.js**: Processes Discord commands with alias support
 - **src/plugins/pluginManager.js**: Loads and manages plugins with event hooks
 - **src/middleware/circuitBreaker.js**: Implements circuit breaker pattern for API resilience
 - **utils/humanCircuitBreaker.js**: Discord reaction-based approval system for sensitive operations
@@ -302,7 +302,7 @@ POCKETFLOW_CLEANUP_INTERVAL=300000  # Cleanup interval in milliseconds
 
 2. **Verify Functionality** (Priority 2)
    - Run full test suite: `npm test`
-   - Test PM2 deployment: `pm2 start ecosystem.config.js`
+   - Test PM2 deployment: `pm2 start deploy/ecosystem.config.js`
    - Verify all features work in Discord
 
 3. **Complete Documentation** (Priority 3)
@@ -319,6 +319,6 @@ POCKETFLOW_CLEANUP_INTERVAL=300000  # Cleanup interval in milliseconds
 ### Success Criteria
 - ✅ Bot starts without import errors: `node src/core/combined.js`
 - ✅ Tests pass: `npm test` 
-- ✅ Production deployment works: `pm2 start ecosystem.config.js`
+- ✅ Production deployment works: `pm2 start deploy/ecosystem.config.js`
 - ✅ All Discord functionality operational
 - ✅ Clean git status with all changes committed

@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "2.2.7",
+  "version": "2.2.8",
   "description": "Discord bot with OpenAI — conversations, image generation, weather, search, and Quake stats.",
   "main": "src/core/combined.js",
   "private": true,
@@ -16,7 +16,7 @@
     "test:high-priority": "node tests/comprehensiveTestRunner.js --priority high",
     "test:medium-priority": "node tests/comprehensiveTestRunner.js --priority medium",
     "test:advanced": "node tests/unit/commandHandlerAdvancedTest.js",
-    "lint": "eslint .",
+    "lint": "eslint . --config config/eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "security:audit": "npm audit --audit-level moderate",
@@ -31,7 +31,7 @@
   },
   "lint-staged": {
     "*.{js,jsx}": [
-      "eslint --fix",
+      "eslint --fix --config config/eslint.config.js",
       "prettier --write"
     ],
     "*.{json,md,html,css}": [

@@ -12,7 +12,7 @@ QUIET=false
 # Display help message
 function show_help {
   echo "ChimpGPT Startup Script"
-  echo "Usage: ./start.sh [options]"
+  echo "Usage: ./scripts/start.sh [options]"
   echo ""
   echo "Options:"
   echo "  -m, --mode MODE       Set run mode (production, development, test, demo)"
@@ -23,11 +23,11 @@ function show_help {
   echo "  -h, --help            Show this help message"
   echo ""
   echo "Examples:"
-  echo "  ./start.sh                        # Start in development mode"
-  echo "  ./start.sh -m production          # Start in production mode"
-  echo "  ./start.sh -c status --demo       # Start only status server in demo mode"
-  echo "  ./start.sh -m test                # Run tests"
-  echo "  ./start.sh --debug                # Start with debug logging enabled"
+  echo "  ./scripts/start.sh                        # Start in development mode"
+  echo "  ./scripts/start.sh -m production          # Start in production mode"
+  echo "  ./scripts/start.sh -c status --demo       # Start only status server in demo mode"
+  echo "  ./scripts/start.sh -m test                # Run tests"
+  echo "  ./scripts/start.sh --debug                # Start with debug logging enabled"
 }
 
 # Parse command line arguments
@@ -78,7 +78,7 @@ if [[ "$COMPONENT" != "all" && "$COMPONENT" != "bot" && "$COMPONENT" != "status"
 fi
 
 # Build command
-CMD="node ../src/core/combined.js --mode $MODE"
+CMD="node src/core/combined.js --mode $MODE"
 
 # Add component flags
 if [[ "$COMPONENT" == "bot" ]]; then

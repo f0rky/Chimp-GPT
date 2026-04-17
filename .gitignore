@@ -126,7 +126,6 @@ dist
 .vuepress/dist
 
 # Project specific
-/archive/
 CHECKLIST.md
 
 # Claude Code AI assistant cache

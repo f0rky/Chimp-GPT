@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   chimpgpt:
-    build: .
+    build: ..
     container_name: chimpgpt
     restart: unless-stopped
     ports:
       - '${STATUS_PORT:-3000}:3000'
     volumes:
-      - ./data:/usr/src/app/data
-      - ./.env:/usr/src/app/.env:ro
+      - ../data:/usr/src/app/data
+      - ../.env:/usr/src/app/.env:ro
     environment:
       - NODE_ENV=production
       - TZ=UTC

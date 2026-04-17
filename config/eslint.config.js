@@ -31,7 +31,7 @@ module.exports = [
       '**/.Trashes',
       '**/ehthumbs.db',
       '**/Thumbs.db',
-      'archive/',
+      'docs/archive/',
       'docs/',
       'src/web/public/dashboard/',
       '**/*.md',
