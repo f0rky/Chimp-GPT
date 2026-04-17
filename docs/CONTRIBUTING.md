@@ -141,7 +141,7 @@ We use ESLint and Prettier to maintain code quality and consistency:
 - Run `npm run lint` to check for linting issues
 - Run `npm run format` to automatically format code
 
-See [FORMATTING.md](./docs/FORMATTING.md) for detailed formatting guidelines.
+See [FORMATTING.md](./FORMATTING.md) for detailed formatting guidelines.
 
 ### Documentation
 

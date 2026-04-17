@@ -38,4 +38,4 @@ ENTRYPOINT ["/sbin/tini", "--"]
 USER nodejs
 
 # Start the application
-CMD ["node", "combined.js"]
+CMD ["node", "src/core/combined.js"]

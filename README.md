@@ -55,10 +55,10 @@ See `.env.example` for the full list.
 
 ```bash
 npm start                          # Development (nodemon, debug port)
-./start.sh -m production           # Production
-./start.sh -c bot                  # Bot only (no status server)
-./start.sh -c status               # Status server only
-npx pm2 start ecosystem.config.js   # With pm2
+./scripts/start.sh -m production           # Production
+./scripts/start.sh -c bot                  # Bot only (no status server)
+./scripts/start.sh -c status               # Status server only
+npx pm2 start deploy/ecosystem.config.js   # With pm2
 ```
 
 ## Docker
@@ -66,8 +66,8 @@ npx pm2 start ecosystem.config.js   # With pm2
 ```bash
 cp .env.example .env
 # Edit .env
-docker-compose up -d
-docker-compose logs -f
+docker-compose -f deploy/docker-compose.yml up -d
+docker-compose -f deploy/docker-compose.yml logs -f
 ```
 
 Status page at `http://localhost:3000`. See [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md).
@@ -88,6 +88,9 @@ Message → Intent detection → Context management → Function routing → Res
 | `src/commands/` | Slash and prefix command modules |
 | `src/plugins/` | Plugin loader and bundled plugins |
 | `src/web/` | Status dashboard and API server |
+| `deploy/` | Dockerfile, docker-compose, PM2 config |
+| `config/` | ESLint and tooling configuration |
+| `docs/` | Documentation and archive |
 
 ## Plugins
 
