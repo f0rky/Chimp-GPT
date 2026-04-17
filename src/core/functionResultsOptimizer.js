@@ -15,6 +15,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { createLogger } = require('./logger');
+const { sanitizeEntry } = require('../utils/sanitize');
 const logger = createLogger('functionOptimizer');
 
 // Path to the function results file
@@ -25,37 +26,6 @@ const MAX_RESULTS_PER_TYPE = 10;
 const MAX_RESULTS_AGE_DAYS = 7; // Remove results older than 7 days
 const SAVE_INTERVAL_MS = 5 * 60 * 1000; // Save every 5 minutes
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB limit for results file
-const MAX_STRING_VALUE_LENGTH = 10 * 1024; // 10KB max for any string value
-
-/**
- * Recursively truncate large string values in an object.
- * Prevents base64 image data and data URIs from bloating the cache.
- *
- * @param {*} obj - The value to sanitize
- * @returns {*} The sanitized value
- */
-function sanitizeEntry(obj) {
-  if (typeof obj === 'string') {
-    if (obj.length > MAX_STRING_VALUE_LENGTH) {
-      return (
-        obj.substring(0, MAX_STRING_VALUE_LENGTH) +
-        `...[truncated ${obj.length - MAX_STRING_VALUE_LENGTH} chars]`
-      );
-    }
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeEntry);
-  }
-  if (obj && typeof obj === 'object') {
-    const sanitized = {};
-    for (const key of Object.keys(obj)) {
-      sanitized[key] = sanitizeEntry(obj[key]);
-    }
-    return sanitized;
-  }
-  return obj;
-}
 
 // In-memory cache of results
 let resultsCache = null;

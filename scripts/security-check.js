@@ -183,6 +183,14 @@ class SecurityManager {
   async runTests() {
     if (!CONFIG.testAfterFix || !this.fixesApplied) return true;
 
+    // In CI environments, skip the embedded test run — the workflow has a
+    // dedicated test step that will catch regressions. Running npm test inside
+    // postinstall creates a nested process that can hang or misbehave in CI.
+    if (process.env.CI === 'true') {
+      this.log('info', 'Skipping embedded test run in CI environment');
+      return true;
+    }
+
     this.log('info', 'Running tests after security fixes...');
 
     try {

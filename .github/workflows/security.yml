@@ -29,8 +29,22 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
+
+      - name: Create .env file for CI
+        run: |
+          cp .env.example .env
+          # Overwrite placeholder values with valid-looking dummies for CI
+          # ConfigValidator requires non-empty strings for required vars
+          # This must run BEFORE npm ci because postinstall triggers security:auto
+          # which loads configValidator and FATALs on missing required env vars
+          sed -i 's/^DISCORD_TOKEN=.*/DISCORD_TOKEN=ci-test-token/' .env
+          sed -i 's/^OPENAI_API_KEY=.*/OPENAI_API_KEY=sk-ci-test-key-placeholder/' .env
+          sed -i 's/^CHANNEL_ID=.*/CHANNEL_ID=000000000000000001/' .env
+          sed -i 's/^CLIENT_ID=.*/CLIENT_ID=000000000000000002/' .env
+          sed -i 's/^OWNER_ID=.*/OWNER_ID="000000000000000003"/' .env
+          echo 'ENABLE_IMAGE_GENERATION=false' >> .env
 
       - name: Install dependencies
         run: npm ci

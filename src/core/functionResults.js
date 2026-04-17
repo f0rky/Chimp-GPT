@@ -34,6 +34,7 @@ const _fsSync = require('fs');
 const path = require('path');
 const { createLogger } = require('./logger');
 const { atomicWriteFile, safeReadFile, validateFilePath } = require('../utils/securityUtils');
+const { sanitizeEntry } = require('../utils/sanitize');
 const logger = createLogger('functions');
 
 // Path to the function results file
@@ -48,42 +49,6 @@ const FILE_CONFIG = {
 
 // Maximum number of results to store per function type
 const MAX_RESULTS_PER_TYPE = 10;
-
-// Maximum size of any individual string value in a stored result (10KB)
-// Prevents base64 image data and data URIs from bloating the file
-const MAX_STRING_VALUE_LENGTH = 10 * 1024;
-
-/**
- * Recursively truncate large string values in an object.
- * Base64 image data and data URIs can be megabytes — this strips them
- * down to a reasonable size while keeping the rest of the structure intact.
- *
- * @param {*} obj - The value to sanitize
- * @returns {*} The sanitized value
- */
-function sanitizeEntry(obj) {
-  if (typeof obj === 'string') {
-    if (obj.length > MAX_STRING_VALUE_LENGTH) {
-      // Truncate with a marker so it's clear data was trimmed
-      return (
-        obj.substring(0, MAX_STRING_VALUE_LENGTH) +
-        `...[truncated ${obj.length - MAX_STRING_VALUE_LENGTH} chars]`
-      );
-    }
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeEntry);
-  }
-  if (obj && typeof obj === 'object') {
-    const sanitized = {};
-    for (const key of Object.keys(obj)) {
-      sanitized[key] = sanitizeEntry(obj[key]);
-    }
-    return sanitized;
-  }
-  return obj;
-}
 
 /**
  * Default results object structure
