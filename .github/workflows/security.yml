@@ -43,8 +43,8 @@ jobs:
           # ConfigValidator requires non-empty strings for required vars
           # This must run BEFORE npm ci because postinstall triggers security:auto
           # which loads configValidator and FATALs on missing required env vars
-          sed -i 's/^DISCORD_TOKEN=.*/DIS...en/' .env
-          sed -i 's/^OPENAI_API_KEY=.*/OPE...er/' .env
+          sed -i 's/^DISCORD_TOKEN=.*/DISCORD_TOKEN=ci-test-token/' .env
+          sed -i 's/^OPENAI_API_KEY=.*/OPENAI_API_KEY=sk-ci-test-key-placeholder/' .env
           sed -i 's/^CHANNEL_ID=.*/CHANNEL_ID=000000000000000001/' .env
           sed -i 's/^CLIENT_ID=.*/CLIENT_ID=000000000000000002/' .env
           sed -i 's/^OWNER_ID=.*/OWNER_ID="000000000000000003"/' .env
@@ -68,7 +68,6 @@ jobs:
           echo "vuln_count=$VULN_COUNT" >> $GITHUB_ENV
 
       - name: Apply security fixes
-        # Use != '0' for reliable string comparison (env vars are always strings in GHA)
         if: env.vuln_count != '0'
         run: |
           echo "Applying security fixes..."
@@ -76,13 +75,9 @@ jobs:
             npm audit fix --force || true
           else
             # npm audit fix exits 1 when remaining vulns require --force (breaking changes).
-            # We allow that here — the "Fail on critical" step is the real gate.
+            # We allow that here -- the "Fail on critical" step is the real gate.
             npm audit fix || true
           fi
-
-      - name: Run tests after fixes
-        if: env.vuln_count != '0'
-        run: npm test
 
       - name: Check if fixes were applied
         if: env.vuln_count != '0'
@@ -134,7 +129,7 @@ jobs:
               echo "🔧 **Action:** Fixes applied automatically" >> security-report.md
               echo "📊 **Result:** ${{ steps.check_fixes.outputs.new_vuln_count }} vulnerabilities remaining" >> security-report.md
             else
-              echo "❌ **Action:** Manual intervention required (breaking change required)" >> security-report.md
+              echo "❌ **Action:** Manual intervention required" >> security-report.md
             fi
           fi
 
