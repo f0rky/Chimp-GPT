@@ -1,6 +1,6 @@
 {
   "name": "chimp-gpt",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "description": "Discord bot with OpenAI — conversations, image generation, weather, search, and Quake stats.",
   "main": "src/core/combined.js",
   "private": true,
@@ -95,7 +95,7 @@
     "playwright-extra": "^4.3.6",
     "playwright-extra-plugin-stealth": "^0.0.1",
     "rate-limiter-flexible": "^7.1.0",
-    "uuid": "^11.1.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
