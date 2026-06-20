@@ -88,8 +88,10 @@ function initializeOpenAI() {
   try {
     // Try to get API key from secure manager
     const apiKey = apiKeyManager.getApiKey('OPENAI_API_KEY');
+    // Native fetch avoids the bundled node-fetch "Premature close" failure.
     openai = new OpenAI({
       apiKey: apiKey,
+      fetch: globalThis.fetch,
     });
     quakeLogger.debug('OpenAI client initialized with API key from secure manager');
   } catch (error) {
@@ -112,8 +114,10 @@ function initializeOpenAI() {
         },
       };
     } else {
+      // Native fetch avoids the bundled node-fetch "Premature close" failure.
       openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
+        fetch: globalThis.fetch,
       });
     }
   }

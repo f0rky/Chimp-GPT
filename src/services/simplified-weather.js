@@ -9,9 +9,11 @@ const { OpenAI } = require('openai');
 const { weather: weatherLogger } = require('../core/logger');
 const functionResults = require('../core/functionResults');
 
-// Initialize OpenAI client
+// Initialize OpenAI client.
+// Native fetch avoids the bundled node-fetch "Premature close" failure (see core/chimpGPT.js).
 const _openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  fetch: globalThis.fetch,
 });
 
 // Mock weather data for fallback when API fails

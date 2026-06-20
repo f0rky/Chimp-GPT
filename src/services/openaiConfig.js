@@ -19,9 +19,13 @@ try {
   apiKey = process.env.OPENAI_API_KEY;
 }
 
-// Initialize the OpenAI client with the API key
+// Initialize the OpenAI client with the API key.
+// Use Node's native fetch (undici): the SDK's bundled node-fetch hits a broken
+// decompression path on this runtime and fails with "Premature close". This is
+// the same workaround used for Discord REST in core/chimpGPT.js.
 const openai = new OpenAI({
   apiKey: apiKey,
+  fetch: globalThis.fetch,
 });
 
 // Wrapper function to log OpenAI API calls

@@ -69,9 +69,12 @@ const statsStorage = require('./statsStorage');
 
 // Status manager already imported above
 
-// Initialize OpenAI client
+// Initialize OpenAI client.
+// Native fetch avoids the bundled node-fetch "Premature close" failure — same
+// reasoning as the Discord REST makeRequest override below.
 const openai = new OpenAI({
   apiKey: config.OPENAI_API_KEY,
+  fetch: globalThis.fetch,
 });
 
 // Log bot version at startup

@@ -50,9 +50,11 @@ const config = require('../core/configValidator');
 const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 
-// Initialize OpenAI client
+// Initialize OpenAI client.
+// Native fetch avoids the bundled node-fetch "Premature close" failure (see core/chimpGPT.js).
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  fetch: globalThis.fetch,
 });
 
 // Circuit breaker configuration for image generation API calls
