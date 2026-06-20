@@ -13,6 +13,7 @@
 const { Node, Flow } = require('./PocketFlow');
 const PersistentSharedStore = require('./PersistentSharedStore');
 const { createLogger } = require('../../core/logger');
+const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 const { searchForFactCheck, formatSearchResults } = require('../../services/webSearch');
 const { fetchDocumentation } = require('../../services/webFetch');
 const config = require('../../core/configValidator');
@@ -1280,10 +1281,9 @@ Please provide a natural, friendly, conversational response based on this inform
       }
 
       // Use OpenAI for natural conversation with current date/time context
-      const currentDateTime = new Date().toISOString();
-      const systemPrompt =
-        "You are ChimpGPT, a friendly AI assistant. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them." +
-        `\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+      const systemPrompt = buildSystemPrompt(
+        "You are Solvis, a friendly AI assistant running in Chimp-GPT. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them."
+      );
 
       const completion = await this.openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',

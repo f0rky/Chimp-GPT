@@ -14,6 +14,7 @@
 
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const { createLogger } = require('../../core/logger');
+const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 
 const logger = createLogger('OptimizedPocketFlow');
 
@@ -78,8 +79,9 @@ class OptimizedPocketFlow {
       }
 
       // Call OpenAI with simple conversation and current date/time context
-      const currentDateTime = new Date().toISOString();
-      const systemPrompt = `You are ChimpGPT, a helpful AI assistant.\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+      const systemPrompt = buildSystemPrompt(
+        'You are Solvis, a helpful AI assistant running in Chimp-GPT.'
+      );
 
       const completion = await this.openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',

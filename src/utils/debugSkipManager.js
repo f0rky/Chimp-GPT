@@ -53,8 +53,11 @@ function initDebugSkip(client, config) {
         return;
       }
 
-      // Only respond to reactions on bot messages
-      if (reaction.message.author.id !== client.user.id) {
+      const messageAuthorId = reaction.message?.author?.id;
+      const clientUserId = client.user?.id;
+
+      // Only respond to reactions on bot messages. Partial/system messages may not have authors.
+      if (!messageAuthorId || !clientUserId || messageAuthorId !== clientUserId) {
         return;
       }
 

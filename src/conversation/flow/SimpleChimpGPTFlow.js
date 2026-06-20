@@ -10,6 +10,7 @@ const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
 const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
+const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
 // hit on first use and subsequent calls skip the require() lookup entirely.
@@ -117,6 +118,24 @@ class SimpleChimpGPTFlow {
         return await this.handleImageGeneration(store, data);
       }
 
+      // Handle high-confidence built-in intents before the broad knowledge/search patterns.
+      if (/(?:weather|forecast|temperature)/i.test(content)) {
+        logger.info('Processing as weather request');
+        return await this.handleWeatherRequest(store, data);
+      }
+
+      if (
+        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i.test(content)
+      ) {
+        logger.info('Processing as time request');
+        return await this.handleTimeRequest(store, data);
+      }
+
+      if (content.includes('quake') && (content.includes('stats') || content.includes('server'))) {
+        logger.info('Processing as quake stats request');
+        return await this.handleQuakeStats(store, data);
+      }
+
       // Check for knowledge system patterns (if enabled)
       if (config.ENABLE_KNOWLEDGE_SYSTEM && this.knowledgeFlow) {
         // Skip knowledge system for natural conversation requests
@@ -188,36 +207,8 @@ class SimpleChimpGPTFlow {
         logger.debug(`No knowledge patterns matched for: "${content.substring(0, 50)}..."`);
       }
 
-      // Check for weather patterns
-      const weatherPatterns = [
-        /(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
-        /(?:what'?s|how'?s|tell me)\s+(?:the\s+)?(?:weather|forecast|temperature).*(?:in|for|at|of)\s+(.+)/i,
-        /(?:weather|forecast|temperature)\s+(.+)/i,
-      ];
-
-      if (weatherPatterns.some(pattern => pattern.test(content))) {
-        logger.info('Processing as weather request');
-        return await this.handleWeatherRequest(store, data);
-      }
-
-      // Check for time patterns
-      const timePatterns = [
-        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
-        /(?:current\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
-        /(?:what\s+time\s+is\s+it)\s+(?:in|for|at|of)\s+(.+)/i,
-        /time\s+(.+)/i,
-      ];
-
-      if (timePatterns.some(pattern => pattern.test(content))) {
-        logger.info('Processing as time request');
-        return await this.handleTimeRequest(store, data);
-      }
-
-      // Check for quake stats patterns
-      if (content.includes('quake') && (content.includes('stats') || content.includes('server'))) {
-        logger.info('Processing as quake stats request');
-        return await this.handleQuakeStats(store, data);
-      }
+      // Weather/time/quake intents are handled earlier (before the knowledge
+      // system) so search/knowledge routing can't intercept them.
 
       // Default to conversation
       logger.info('Processing as conversation request');
@@ -525,8 +516,7 @@ class SimpleChimpGPTFlow {
 
         try {
           // Generate response with bot personality and current date/time context
-          const currentDateTime = new Date().toISOString();
-          const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+          const systemPrompt = buildSystemPrompt(botPersonality);
 
           const completion = await this.openaiClient.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -659,8 +649,7 @@ class SimpleChimpGPTFlow {
 
       try {
         // Generate response with bot personality and current date/time context
-        const currentDateTime = new Date().toISOString();
-        const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+        const systemPrompt = buildSystemPrompt(botPersonality);
 
         const completion = await this.openaiClient.chat.completions.create({
           model: 'gpt-4o-mini',
@@ -785,8 +774,7 @@ class SimpleChimpGPTFlow {
 
       // Build OpenAI conversation with personality and current date/time context
       const botPersonality = store.get('botPersonality');
-      const currentDateTime = new Date().toISOString();
-      const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}\nNote: When users ask for the current time, use the time lookup function to get their local timezone.`;
+      const systemPrompt = buildSystemPrompt(botPersonality);
 
       const openaiMessages = [
         {

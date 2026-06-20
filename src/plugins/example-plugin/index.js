@@ -180,7 +180,7 @@ module.exports = {
     },
 
     // Called when the bot is shutting down
-    onBotShutdown: async client => {
+    onBotShutdown: async _client => {
       logger.info('Bot is shutting down. Example plugin says goodbye!');
 
       // No interval to clear (periodic reports were disabled).

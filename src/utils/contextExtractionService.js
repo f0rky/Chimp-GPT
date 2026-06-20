@@ -23,6 +23,7 @@ const ANALYSIS_PATTERNS = {
   // Image generation patterns
   imageGeneration: [
     /\b(draw|generate|create|make|show|design)\b.*\b(image|picture|photo|art|artwork|illustration)\b/i,
+    /\b(draw|generate|create|make)\s+(me\s+)?(a|an|the)?\s*.+/i,
     /\b(paint|sketch|render|visualize)\b/i,
     /\b(logo|banner|icon|avatar|wallpaper)\b/i,
   ],
@@ -180,16 +181,16 @@ class ContextExtractionService {
    * @returns {string} Message type
    */
   detectMessageType(content) {
-    if (this.matchesPatterns(content, ANALYSIS_PATTERNS.questions)) {
-      return 'question';
-    }
-
     if (this.matchesPatterns(content, ANALYSIS_PATTERNS.imageGeneration)) {
       return 'image_request';
     }
 
     if (this.matchesPatterns(content, ANALYSIS_PATTERNS.functionCalls)) {
       return 'function_call';
+    }
+
+    if (this.matchesPatterns(content, ANALYSIS_PATTERNS.questions)) {
+      return 'question';
     }
 
     // Check for commands
@@ -220,12 +221,12 @@ class ContextExtractionService {
    * @returns {string} Detected intent
    */
   detectIntent(content) {
-    if (this.matchesPatterns(content, ANALYSIS_PATTERNS.questions)) {
-      return 'seeking_information';
-    }
-
     if (this.matchesPatterns(content, ANALYSIS_PATTERNS.imageGeneration)) {
       return 'requesting_creation';
+    }
+
+    if (this.matchesPatterns(content, ANALYSIS_PATTERNS.questions)) {
+      return 'seeking_information';
     }
 
     if (content.includes('help') || content.includes('assist')) {
@@ -292,7 +293,9 @@ class ContextExtractionService {
     }
 
     if (contextStart > -1 && contextStart < words.length) {
-      const contextWords = words.slice(contextStart, Math.min(contextStart + 5, words.length));
+      const contextWords = words
+        .slice(contextStart)
+        .filter(word => !['me', 'a', 'an', 'the'].includes(word));
       return (
         contextWords
           .join(' ')
@@ -537,7 +540,7 @@ class ContextExtractionService {
   getDefaultContext(content = '') {
     return {
       content,
-      summary: content ? this.generateSummary(content) : 'No content',
+      summary: content ? this.generateSummary(content) : 'Empty message',
       type: 'unknown',
       theme: 'general',
       intent: 'unknown',

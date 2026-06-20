@@ -107,6 +107,7 @@ class EnhancedMessageRelationshipManager {
       context: {
         originalContent: context.content || '',
         responseType: context.type || 'unknown',
+        type: context.type || 'unknown',
         timestamp: Date.now(),
         conversationLength: context.conversationLength || 0,
         summary: this.generateContextSummary(context.content || ''),
@@ -497,6 +498,7 @@ class EnhancedMessageRelationshipManager {
       .replace('{imageContext}', relationship.context.imageContext || 'image request')
       .replace('{functionType}', relationship.context.functionType || 'function call')
       .replace('{conversationTheme}', relationship.context.conversationTheme || 'conversation')
+      .replace('{lastContext}', deletionContext.lastContext || relationship.context.summary)
       .replace('{count}', deletionContext.totalDeletions)
       .replace('{deleteCount}', deletionContext.totalDeletions);
   }

@@ -1,4 +1,5 @@
 const BaseConversationNode = require('./BaseNode');
+const { buildSystemPrompt } = require('../../../utils/systemPromptBuilder');
 const { createLogger } = require('../../../core/logger');
 const ImageGenerationFlow = require('../ImageGenerationFlow');
 const { storeUserLocation, normalizeLocation } = require('../../../utils/userLocationManager');
@@ -329,8 +330,7 @@ class FunctionExecutorNode extends BaseConversationNode {
         store?.get('botPersonality') ||
         'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
 
-      const currentDateTime = new Date().toISOString();
-      const systemPrompt = `${botPersonality}\n\nCurrent UTC date and time: ${currentDateTime}`;
+      const systemPrompt = buildSystemPrompt(botPersonality);
 
       const responseContext = [
         {

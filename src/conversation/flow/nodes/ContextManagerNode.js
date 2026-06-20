@@ -1,6 +1,7 @@
 const BaseConversationNode = require('./BaseNode');
 const { createLogger } = require('../../../core/logger');
 const config = require('../../../core/configValidator');
+const { buildSystemPrompt } = require('../../../utils/systemPromptBuilder');
 
 const logger = createLogger('ContextManagerNode');
 
@@ -213,8 +214,6 @@ class ContextManagerNode extends BaseConversationNode {
       config.BOT_PERSONALITY ||
       'You are a helpful AI assistant. Respond naturally and helpfully to user messages.';
 
-    const currentDateTime = new Date().toISOString();
-
     // Build user-specific context
     let userContextInfo = '';
     if (userContext && userContext.preferences) {
@@ -226,7 +225,7 @@ class ContextManagerNode extends BaseConversationNode {
       }
     }
 
-    return `${personality}\n\nCurrent UTC date and time: ${currentDateTime}${userContextInfo}\n\nIMPORTANT: When users ask for the time without specifying a location, use the lookupTime function with their saved location if available, otherwise ask them where they are or assume New Zealand (Auckland) or Australia (Sydney) as most users are from these regions.`;
+    return buildSystemPrompt(personality, { userContextInfo });
   }
 }
 

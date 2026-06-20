@@ -51,7 +51,7 @@ class BaseConversationNode extends Node {
 
   logExecution(store, data, result, duration) {
     if (this.options.logLevel === 'debug') {
-      const logger = require('../../core/logger').createLogger('BaseNode');
+      const logger = require('../../../core/logger').createLogger('BaseNode');
       logger.debug(`[${this.id}] Executed in ${duration}ms`, {
         input: data,
         output: result,
@@ -60,7 +60,7 @@ class BaseConversationNode extends Node {
   }
 
   logError(store, data, error, duration) {
-    const logger = require('../../core/logger').createLogger('BaseNode');
+    const logger = require('../../../core/logger').createLogger('BaseNode');
     logger.error(`[${this.id}] Error after ${duration}ms:`, error.message);
   }
 
