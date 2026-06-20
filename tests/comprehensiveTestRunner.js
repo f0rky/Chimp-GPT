@@ -127,11 +127,7 @@ const testSuites = {
     category: 'Integration',
     priority: 'High',
     fn: testMessageHandlingIntegration,
-    covers: [
-      'src/core/eventHandlers/messageEventHandler.js',
-      'src/core/processors/messageProcessor.js',
-      'src/handlers/responseFormatter.js',
-    ],
+    covers: ['src/core/eventHandlers/messageEventHandler.js', 'src/handlers/responseFormatter.js'],
   },
 
   'Weather API Integration': {

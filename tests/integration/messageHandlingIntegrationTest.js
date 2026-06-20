@@ -127,9 +127,8 @@ async function testMessageProcessingPipeline() {
   logger.info('Test 1: Complete message processing pipeline');
 
   try {
-    // Import required modules
-    const messageProcessor = require('../../src/core/processors/messageProcessor');
-    const conversationManagerSelector = require('../../src/conversation/conversationManagerSelector');
+    // Note: message processing is exercised here through a mock conversation
+    // manager (below), so no real processor/selector module is imported.
 
     // Create test messages
     const testCases = [

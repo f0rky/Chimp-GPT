@@ -68,6 +68,24 @@ const mockPFPManager = {
   },
 };
 
+// Mock image-generation service matching the real service contract
+// ({ success, images: [{ b64_json | url, revisedPrompt }], estimatedCost }).
+// Returns b64_json so the flow decodes locally and never hits the network.
+const TINY_PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const mockImageService = {
+  generateImage: async (prompt /* , options */) => {
+    if (prompt.includes('error') || prompt.includes('fail')) {
+      return { success: false, error: 'Test image generation error' };
+    }
+    return {
+      success: true,
+      images: [{ b64_json: TINY_PNG_B64, revisedPrompt: `Enhanced: ${prompt}` }],
+      estimatedCost: 0.01,
+    };
+  },
+};
+
 // Create mock message objects
 const createMockMessage = (content, authorId = 'test-user-123') => ({
   content,
@@ -92,6 +110,7 @@ async function testIntentDetection() {
     const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager, {
       maxConversationLength: 5,
       maxTokens: 500,
+      imageService: mockImageService,
     });
 
     const testCases = [
@@ -259,7 +278,9 @@ async function testErrorHandling() {
     };
 
     const SimpleChimpGPTFlow = require('../../src/conversation/flow/SimpleChimpGPTFlow');
-    const flow = new SimpleChimpGPTFlow(mockErrorOpenAI, mockPFPManager);
+    const flow = new SimpleChimpGPTFlow(mockErrorOpenAI, mockPFPManager, {
+      imageService: mockImageService,
+    });
 
     const testCases = [
       {

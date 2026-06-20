@@ -50,6 +50,10 @@ class SimpleChimpGPTFlow {
       ...options,
     };
 
+    // Optional injected image-generation service (used by tests to avoid real
+    // network calls). Defaults to the lazily-required service in production.
+    this.imageService = this.options.imageService || null;
+
     // Initialize knowledge system if enabled
     if (config.ENABLE_KNOWLEDGE_SYSTEM) {
       this.knowledgeFlow = new KnowledgeFlow(openaiClient, {
@@ -124,9 +128,16 @@ class SimpleChimpGPTFlow {
         return await this.handleWeatherRequest(store, data);
       }
 
-      if (
-        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i.test(content)
-      ) {
+      const timePatterns = [
+        // "what's the time in X", "time in X", "time for X"
+        /(?:what'?s|what\s+is|tell me)?\s*(?:the\s+)?time\s+(?:in|for|at|of)\s+(.+)/i,
+        // "what time is it in X" — the "is it" breaks the pattern above
+        /what\s+time\s+is\s+it\s+(?:in|for|at|of)\s+(.+)/i,
+        // bare "what time is it"
+        /what\s+time\s+is\s+it/i,
+      ];
+
+      if (timePatterns.some(pattern => pattern.test(content))) {
         logger.info('Processing as time request');
         return await this.handleTimeRequest(store, data);
       }
@@ -252,7 +263,8 @@ class SimpleChimpGPTFlow {
       logger.info(`Processing image generation request via service: ${prompt.substring(0, 50)}...`);
 
       // Use the proper imageGeneration service for model remapping, rate limiting, and cost tracking
-      const imageService = getImageGeneration();
+      // (an injected service takes precedence so unit tests can avoid real network calls)
+      const imageService = this.imageService || getImageGeneration();
       const imageGenStartTime = Date.now();
 
       const result = await imageService.generateImage(prompt, {
