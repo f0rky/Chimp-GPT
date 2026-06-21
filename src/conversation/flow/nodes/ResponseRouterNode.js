@@ -57,7 +57,7 @@ class ResponseRouterNode extends BaseConversationNode {
         context: data.context,
       };
     } catch (error) {
-      logger.error('Error routing response:', error);
+      logger.error({ error }, 'Error routing response:');
       return {
         success: false,
         error: error.message,

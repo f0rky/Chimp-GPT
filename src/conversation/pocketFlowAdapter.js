@@ -92,8 +92,8 @@ async function manageConversation(
     }
 
     logger.warn(
-      'PocketFlow processing failed, providing basic conversation context for fallback:',
-      result.error
+      { error: result.error },
+      'PocketFlow processing failed, providing basic conversation context for fallback:'
     );
 
     // Provide basic conversation context for legacy fallback processing
@@ -119,7 +119,7 @@ async function manageConversation(
 
     return fallbackConversationLog;
   } catch (error) {
-    logger.error('Error in PocketFlow adapter, providing minimal conversation context:', error);
+    logger.error({ error }, 'Error in PocketFlow adapter, providing minimal conversation context:');
 
     // Provide minimal conversation context for error fallback
     const errorFallbackLog = [];
@@ -160,7 +160,7 @@ function clearConversation(userId) {
       logger.info(`Cleared PocketFlow conversation for user ${userId}`);
     }
   } catch (error) {
-    logger.error('Error clearing PocketFlow conversation:', error);
+    logger.error({ error }, 'Error clearing PocketFlow conversation:');
   }
 }
 
@@ -201,7 +201,7 @@ function getActiveConversationCount() {
     const stats = manager.getStats();
     return stats.flows.individual.totalConversations + stats.flows.blended.totalChannels;
   } catch (error) {
-    logger.error('Error getting PocketFlow conversation count:', error);
+    logger.error({ error }, 'Error getting PocketFlow conversation count:');
     return 0;
   }
 }
@@ -239,7 +239,7 @@ function getConversationStorageStatus() {
       },
     };
   } catch (error) {
-    logger.error('Error getting PocketFlow status:', error);
+    logger.error({ error }, 'Error getting PocketFlow status:');
     return {
       mode: 'pocketflow',
       info: 'PocketFlow conversation system (status unavailable)',
@@ -268,7 +268,7 @@ async function saveConversationsToStorage() {
     logger.info('PocketFlow state cleanup completed');
     return true;
   } catch (error) {
-    logger.error('Error saving PocketFlow state:', error);
+    logger.error({ error }, 'Error saving PocketFlow state:');
     return false;
   }
 }
@@ -298,7 +298,7 @@ async function shutdown() {
       pocketFlowManager = null;
     }
   } catch (error) {
-    logger.error('Error during PocketFlow shutdown:', error);
+    logger.error({ error }, 'Error during PocketFlow shutdown:');
   }
 }
 

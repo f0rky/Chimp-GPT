@@ -118,7 +118,7 @@ async function manageConversation(userId, newMessage = null, discordMessage = nu
     logger.warn('Parallel testing failed, falling back to legacy');
     return await legacyManager.manageConversation(userId, newMessage, discordMessage);
   } catch (error) {
-    logger.error('Error in parallel testing adapter:', error);
+    logger.error({ error }, 'Error in parallel testing adapter:');
     // Always fallback to legacy on error
     return await legacyManager.manageConversation(userId, newMessage, discordMessage);
   }
@@ -174,7 +174,7 @@ function getActiveConversationCount() {
 
     return legacyCount;
   } catch (error) {
-    logger.error('Error getting parallel testing stats:', error);
+    logger.error({ error }, 'Error getting parallel testing stats:');
     return legacyCount;
   }
 }
@@ -209,7 +209,7 @@ function getConversationStorageStatus() {
       pocketflow: pocketFlowStats,
     };
   } catch (error) {
-    logger.error('Error getting parallel testing status:', error);
+    logger.error({ error }, 'Error getting parallel testing status:');
     return {
       ...legacyStatus,
       mode: 'parallel_testing',
@@ -240,7 +240,7 @@ async function saveConversationsToStorage() {
 
     return legacyResult;
   } catch (error) {
-    logger.error('Error saving parallel testing data:', error);
+    logger.error({ error }, 'Error saving parallel testing data:');
     return false;
   }
 }
@@ -272,7 +272,7 @@ async function shutdown() {
       parallelTester = null;
     }
   } catch (error) {
-    logger.error('Error during parallel testing shutdown:', error);
+    logger.error({ error }, 'Error during parallel testing shutdown:');
   }
 }
 
@@ -285,7 +285,7 @@ function getParallelTestingStats() {
     const tester = initializeParallelTester();
     return tester.getTestStats();
   } catch (error) {
-    logger.error('Error getting parallel testing stats:', error);
+    logger.error({ error }, 'Error getting parallel testing stats:');
     return null;
   }
 }

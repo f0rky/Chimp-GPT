@@ -137,14 +137,14 @@ class KnowledgeFlow {
       logger.info(`Knowledge processing completed successfully`);
       return responseResult;
     } catch (error) {
-      logger.error('Error in knowledge processing:', error);
+      logger.error({ error }, 'Error in knowledge processing:');
 
       // Clean up progress message on error
       if (progressMessage) {
         try {
           await progressMessage.delete();
         } catch (deleteError) {
-          logger.warn('Could not delete progress message:', deleteError.message);
+          logger.warn({ error: deleteError }, 'Could not delete progress message:');
         }
       }
 
@@ -328,7 +328,7 @@ class KnowledgeFlow {
         message: data.message, // Pass message through for subsequent processing
       };
     } catch (error) {
-      logger.error('Error in intent detection:', error);
+      logger.error({ error }, 'Error in intent detection:');
       return {
         success: false,
         error: error.message,
@@ -476,7 +476,7 @@ class KnowledgeFlow {
         informationData,
       };
     } catch (error) {
-      logger.error('Error in information gathering:', error);
+      logger.error({ error }, 'Error in information gathering:');
       return {
         success: false,
         error: error.message,
@@ -573,7 +573,7 @@ class KnowledgeFlow {
         confirmationData,
       };
     } catch (error) {
-      logger.error('Error in information confirmation:', error);
+      logger.error({ error }, 'Error in information confirmation:');
       return {
         success: false,
         error: error.message,
@@ -751,7 +751,7 @@ class KnowledgeFlow {
 
       return finalResponse;
     } catch (error) {
-      logger.error('Error in response generation:', error);
+      logger.error({ error }, 'Error in response generation:');
       return {
         success: false,
         error: error.message,
@@ -930,7 +930,7 @@ class KnowledgeFlow {
         truncated: true,
       };
     } catch (error) {
-      logger.error('Error in Discord formatting:', error);
+      logger.error({ error }, 'Error in Discord formatting:');
       return data; // Return original data if formatting fails
     }
   }
@@ -1315,7 +1315,7 @@ Please provide a natural, friendly, conversational response based on this inform
         isNatural: true,
       };
     } catch (error) {
-      logger.error('Error generating natural response:', error);
+      logger.error({ error }, 'Error generating natural response:');
       return {
         success: false,
         error: error.message,

@@ -112,7 +112,7 @@ class OptimizedPocketFlow {
       const stats = store.get('stats');
       stats.errors++;
 
-      logger.error('Processing error:', error);
+      logger.error({ error }, 'Processing error:');
       return {
         success: false,
         error: error.message,

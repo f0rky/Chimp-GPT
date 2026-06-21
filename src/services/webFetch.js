@@ -235,7 +235,7 @@ async function parseHtmlContent(html) {
 
     result.markdown = markdown;
   } catch (error) {
-    logger.warn('HTML parsing error:', error.message);
+    logger.warn({ error }, 'HTML parsing error:');
     // Fallback to raw text extraction
     result.text = html
       .replace(/<[^>]+>/g, ' ')

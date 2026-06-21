@@ -234,7 +234,7 @@ function createRouter(deps) {
         },
       });
     } catch (error) {
-      logger.error('Error generating detailed health report:', error);
+      logger.error({ error }, 'Error generating detailed health report:');
       res.status(500).json({
         status: 'error',
         message: 'Failed to generate detailed health report',

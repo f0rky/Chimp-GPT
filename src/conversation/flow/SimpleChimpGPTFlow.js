@@ -347,7 +347,7 @@ class SimpleChimpGPTFlow {
           const savedPath = await this.pfpManager.addImage(imageBuffer, fileName);
           logger.info(`Image saved to PFP rotation: ${savedPath}`);
         } catch (pfpError) {
-          logger.warn('Failed to save image to PFP rotation:', pfpError.message);
+          logger.warn({ error: pfpError }, 'Failed to save image to PFP rotation:');
         }
       }
 
@@ -557,8 +557,8 @@ class SimpleChimpGPTFlow {
           };
         } catch (personalityError) {
           logger.warn(
-            'Failed to apply personality to weather response, using formatted summary',
-            personalityError
+            { error: personalityError },
+            'Failed to apply personality to weather response, using formatted summary'
           );
           // Fallback to the formatted summary if personality application fails
           return {
@@ -690,8 +690,8 @@ class SimpleChimpGPTFlow {
         };
       } catch (personalityError) {
         logger.warn(
-          'Failed to apply personality to time response, using raw data',
-          personalityError
+          { error: personalityError },
+          'Failed to apply personality to time response, using raw data'
         );
         // Fallback to the raw time data if personality application fails
         return {
@@ -750,7 +750,7 @@ class SimpleChimpGPTFlow {
         type: 'quake',
       };
     } catch (error) {
-      logger.error('Error fetching quake stats:', error);
+      logger.error({ error }, 'Error fetching quake stats:');
       return {
         success: false,
         error: error.message,

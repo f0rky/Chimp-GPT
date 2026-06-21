@@ -114,7 +114,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
 
       return result;
     } catch (error) {
-      logger.error('Error in image generation agent:', error);
+      logger.error({ error }, 'Error in image generation agent:');
       store.delete(`image_progress_${message.id}`);
 
       return {
@@ -209,7 +209,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
         phases: store.get(progressKey).phases,
       };
     } catch (error) {
-      logger.error('Error in image generation workflow:', error);
+      logger.error({ error }, 'Error in image generation workflow:');
       throw error;
     }
   }

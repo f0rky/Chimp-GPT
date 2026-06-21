@@ -179,7 +179,7 @@ class ImageGenerationFlow {
 
       return result;
     } catch (error) {
-      this.logger.error('Error in image generation flow:', error);
+      this.logger.error({ error }, 'Error in image generation flow:');
 
       // Ensure cleanup
       if (this.activeGenerations.has(message.id)) {
@@ -275,13 +275,13 @@ class ImageGenerationFlow {
         );
       }
     } catch (error) {
-      this.logger.error('Error sending successful result:', error);
+      this.logger.error({ error }, 'Error sending successful result:');
       try {
         await feedbackMessage.edit(
           `${result.responseText}\n\n⚠️ Image generated but encountered an error displaying it.`
         );
       } catch (editError) {
-        this.logger.error('Error editing message after display error:', editError);
+        this.logger.error({ error: editError }, 'Error editing message after display error:');
       }
     }
   }
@@ -294,7 +294,7 @@ class ImageGenerationFlow {
       const errorResponse = `❌ **Image Generation Failed**\n\n${errorMessage}`;
       await feedbackMessage.edit(errorResponse);
     } catch (error) {
-      this.logger.error('Error sending error result:', error);
+      this.logger.error({ error }, 'Error sending error result:');
     }
   }
 

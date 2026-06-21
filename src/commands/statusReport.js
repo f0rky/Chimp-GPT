@@ -366,7 +366,7 @@ async function generateStatusEmbed(client) {
 
     return embed;
   } catch (error) {
-    logger.error('Error generating status embed:', error);
+    logger.error({ error }, 'Error generating status embed:');
 
     // Return error embed
     return new EmbedBuilder()
@@ -403,7 +403,7 @@ async function sendStatusReport(client, target) {
     logger.warn('No target specified for status report');
     return false;
   } catch (error) {
-    logger.error('Error sending status report:', error);
+    logger.error({ error }, 'Error sending status report:');
     return false;
   }
 }
@@ -431,7 +431,7 @@ async function handleStatusCommand(message) {
 
     logger.info(`Status report generated for ${message.author.tag}`);
   } catch (error) {
-    logger.error('Error handling status command:', error);
+    logger.error({ error }, 'Error handling status command:');
     await message.reply('❌ Failed to generate status report. Please check logs.');
   }
 }

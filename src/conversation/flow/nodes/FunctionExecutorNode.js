@@ -244,7 +244,7 @@ class FunctionExecutorNode extends BaseConversationNode {
         executionTime: Date.now() - startTime,
       };
     } catch (error) {
-      logger.error('Error executing function:', error);
+      logger.error({ error }, 'Error executing function:');
       return {
         success: false,
         error: error.message,
@@ -314,7 +314,7 @@ class FunctionExecutorNode extends BaseConversationNode {
 
       return result;
     } catch (error) {
-      logger.error('Error executing function call:', error);
+      logger.error({ error }, 'Error executing function call:');
       return {
         success: false,
         error: error.message,
@@ -353,7 +353,7 @@ class FunctionExecutorNode extends BaseConversationNode {
       const naturalCompletion = await this.callOpenAI(responseContext, false);
       return naturalCompletion.choices[0].message.content;
     } catch (error) {
-      logger.error('Error generating natural response:', error);
+      logger.error({ error }, 'Error generating natural response:');
       return `I executed the ${toolCall.function.name} function, but encountered an error generating a natural response: ${error.message}`;
     }
   }
@@ -405,7 +405,7 @@ class FunctionExecutorNode extends BaseConversationNode {
         executionTime: result.executionTime,
       };
     } catch (error) {
-      logger.error('Error handling direct image request with PocketFlow:', error);
+      logger.error({ error }, 'Error handling direct image request with PocketFlow:');
 
       // Fallback to original method if PocketFlow fails
       return await this.handleDirectImageRequestFallback(store, message);
@@ -448,7 +448,7 @@ class FunctionExecutorNode extends BaseConversationNode {
           : `I couldn't generate the image: ${functionResult.error}`,
       };
     } catch (error) {
-      logger.error('Error in fallback image request handler:', error);
+      logger.error({ error }, 'Error in fallback image request handler:');
       return {
         success: false,
         error: error.message,

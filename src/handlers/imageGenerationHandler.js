@@ -439,7 +439,7 @@ async function handleImageGeneration(
               const savedPath = await pfpManager.addImage(imageBuffer, fileName);
               discordLogger.info(`Image saved to PFP rotation: ${savedPath}`);
             } catch (pfpError) {
-              discordLogger.warn('Failed to save image to PFP rotation:', pfpError.message);
+              discordLogger.warn({ error: pfpError }, 'Failed to save image to PFP rotation:');
               // Don't fail the whole request if PFP save fails
             }
           }
@@ -616,8 +616,8 @@ async function handleImageGeneration(
               discordLogger.info(`Image saved to PFP rotation from data URL: ${savedPath}`);
             } catch (pfpError) {
               discordLogger.warn(
-                'Failed to save data URL image to PFP rotation:',
-                pfpError.message
+                { error: pfpError },
+                'Failed to save data URL image to PFP rotation:'
               );
               // Don't fail the whole request if PFP save fails
             }

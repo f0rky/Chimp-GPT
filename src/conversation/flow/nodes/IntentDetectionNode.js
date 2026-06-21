@@ -218,7 +218,7 @@ class IntentDetectionNode extends BaseConversationNode {
 
       return false;
     } catch (error) {
-      logger.warn('Error checking reply to bot message:', error.message);
+      logger.warn({ error }, 'Error checking reply to bot message:');
       return false;
     }
   }

@@ -53,7 +53,7 @@ class PerformanceHistory {
 
       logger.info('Performance history initialized');
     } catch (error) {
-      logger.error('Error initializing performance history:', error);
+      logger.error({ error }, 'Error initializing performance history:');
     }
   }
 
@@ -74,7 +74,7 @@ class PerformanceHistory {
       if (error.code === 'ENOENT') {
         logger.info('No existing performance history found, starting fresh');
       } else {
-        logger.error('Error loading performance history:', error);
+        logger.error({ error }, 'Error loading performance history:');
       }
     }
   }
@@ -91,7 +91,7 @@ class PerformanceHistory {
 
       await fs.writeFile(this.historyFile, JSON.stringify(this.currentData, null, 2), 'utf8');
     } catch (error) {
-      logger.error('Error saving performance history:', error);
+      logger.error({ error }, 'Error saving performance history:');
     }
   }
 

@@ -32,7 +32,7 @@ class PersistentSharedStore extends SharedStore {
       const dir = path.dirname(this.persistencePath);
       await fs.mkdir(dir, { recursive: true });
     } catch (error) {
-      logger.warn('Could not create data directory:', error.message);
+      logger.warn({ error }, 'Could not create data directory:');
     }
   }
 
@@ -69,7 +69,7 @@ class PersistentSharedStore extends SharedStore {
       });
     } catch (error) {
       if (error.code !== 'ENOENT') {
-        logger.warn('Error loading knowledge from disk:', error.message);
+        logger.warn({ error }, 'Error loading knowledge from disk:');
       } else {
         logger.info('No existing knowledge file found, starting fresh');
       }
@@ -120,7 +120,7 @@ class PersistentSharedStore extends SharedStore {
         confidenceScores: Object.keys(dataToSave.confidenceScores || {}).length,
       });
     } catch (error) {
-      logger.error('Error saving knowledge to disk:', error.message);
+      logger.error({ error }, 'Error saving knowledge to disk:');
     }
   }
 

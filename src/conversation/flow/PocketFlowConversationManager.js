@@ -268,14 +268,14 @@ class PocketFlowConversationManager {
 
       logger.info('PocketFlow cleanup completed');
     } catch (error) {
-      logger.error('Error during cleanup:', error);
+      logger.error({ error }, 'Error during cleanup:');
     }
   }
 
   setupCleanupInterval() {
     this.cleanupIntervalId = setInterval(() => {
       this.cleanup().catch(error => {
-        logger.error('Scheduled cleanup failed:', error);
+        logger.error({ error }, 'Scheduled cleanup failed:');
       });
     }, this.options.cleanupInterval);
   }
@@ -296,7 +296,7 @@ class PocketFlowConversationManager {
 
       logger.info('PocketFlow conversation manager shutdown complete');
     } catch (error) {
-      logger.error('Error during shutdown:', error);
+      logger.error({ error }, 'Error during shutdown:');
     }
   }
 

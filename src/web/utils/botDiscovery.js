@@ -118,7 +118,8 @@ async function discoverDockerBots() {
 
       dockerProcess.on('close', code => {
         if (code !== 0) {
-          logger.warn({ error }, 'Docker command failed, skipping Docker discovery');
+          // Expected when Docker isn't installed/used (e.g. PM2-run bots); debug to avoid log spam.
+          logger.debug({ error }, 'Docker command failed, skipping Docker discovery');
           resolve([]);
           return;
         }
@@ -156,7 +157,8 @@ async function discoverDockerBots() {
       });
 
       dockerProcess.on('error', err => {
-        logger.warn({ error: err }, 'Docker command execution failed');
+        // Expected when the docker binary is absent; debug to avoid log spam.
+        logger.debug({ error: err }, 'Docker command execution failed');
         resolve([]);
       });
     } catch (validationError) {
