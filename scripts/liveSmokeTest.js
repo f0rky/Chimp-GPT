@@ -103,8 +103,10 @@ function getJSON(path) {
   // 5. Conversation (direct OpenAI chat completion)
   await run('OpenAI conversation', async () => {
     const { OpenAI } = require('openai');
-    // Mirror the bot: native fetch avoids the node-fetch "Premature close" failure.
-    const client = new OpenAI({ apiKey: config.OPENAI_API_KEY, fetch: globalThis.fetch });
+    // Mirror the bot: dedicated undici dispatcher (avoids node-fetch "Premature
+    // close" and the discord.js global-dispatcher hijack).
+    const { openaiFetch } = require('../src/core/openaiFetch');
+    const client = new OpenAI({ apiKey: config.OPENAI_API_KEY, fetch: openaiFetch });
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'Reply with exactly: SMOKE_OK' }],

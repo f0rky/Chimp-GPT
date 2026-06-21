@@ -65,6 +65,9 @@ const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 const apiKeyManager = require('../utils/apiKeyManager');
 const OpenAI = require('openai');
+// Dedicated undici dispatcher for OpenAI (see ../core/openaiFetch) — avoids the
+// node-fetch "Premature close" bug and the discord.js global-dispatcher hijack.
+const { openaiFetch } = require('../core/openaiFetch');
 const { getServerDetails } = require('./qlSyncoreScraper');
 const { getEnhancedServerData } = require('./qlstatsScraper');
 
@@ -88,10 +91,9 @@ function initializeOpenAI() {
   try {
     // Try to get API key from secure manager
     const apiKey = apiKeyManager.getApiKey('OPENAI_API_KEY');
-    // Native fetch avoids the bundled node-fetch "Premature close" failure.
     openai = new OpenAI({
       apiKey: apiKey,
-      fetch: globalThis.fetch,
+      fetch: openaiFetch,
     });
     quakeLogger.debug('OpenAI client initialized with API key from secure manager');
   } catch (error) {
@@ -114,10 +116,9 @@ function initializeOpenAI() {
         },
       };
     } else {
-      // Native fetch avoids the bundled node-fetch "Premature close" failure.
       openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
-        fetch: globalThis.fetch,
+        fetch: openaiFetch,
       });
     }
   }

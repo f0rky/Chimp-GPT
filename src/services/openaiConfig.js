@@ -20,12 +20,13 @@ try {
 }
 
 // Initialize the OpenAI client with the API key.
-// Use Node's native fetch (undici): the SDK's bundled node-fetch hits a broken
-// decompression path on this runtime and fails with "Premature close". This is
-// the same workaround used for Discord REST in core/chimpGPT.js.
+// Dedicated undici dispatcher (see ../core/openaiFetch): bundled node-fetch hits
+// a broken decompression path ("Premature close"), and globalThis.fetch is
+// hijacked by discord.js's global dispatcher, which breaks OpenAI requests.
+const { openaiFetch } = require('../core/openaiFetch');
 const openai = new OpenAI({
   apiKey: apiKey,
-  fetch: globalThis.fetch,
+  fetch: openaiFetch,
 });
 
 // Wrapper function to log OpenAI API calls

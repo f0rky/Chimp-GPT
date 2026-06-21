@@ -829,7 +829,16 @@ class SimpleChimpGPTFlow {
         conversationLength: conversation.messages.length,
       };
     } catch (error) {
-      logger.error('Error in conversation handling:', error);
+      logger.error(
+        {
+          err: error,
+          message: error.message,
+          name: error.name,
+          code: error.code,
+          cause: error.cause ? { code: error.cause.code, message: error.cause.message } : undefined,
+        },
+        'Error in conversation handling'
+      );
 
       // Handle specific error types with user-friendly messages
       let userMessage = "I'm having trouble processing your message right now. Please try again.";
