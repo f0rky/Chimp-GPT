@@ -109,13 +109,16 @@ class InteractionEventHandler {
 
       await interaction.editReply({ components: [pendingRow] });
 
-      // Generate HD image with gpt-image-2, 1024×1024, high quality
+      // Generate HD image with gpt-image-2, 1024×1024, medium quality.
+      // quality:'high' measured 182s end to end here, in line with its ~195s
+      // median - too long to sit behind a button. Medium runs closer to 80s and
+      // is still a clear step up from the conversational fast path.
       const hdGenStart = Date.now();
       const imageResult = await generateImage(originalPrompt, {
         provider: 'openai',
         model: 'gpt-image-2',
         size: '1024x1024',
-        quality: 'high',
+        quality: 'medium',
       });
       const hdElapsedSec = ((Date.now() - hdGenStart) / 1000).toFixed(1);
 
@@ -150,7 +153,7 @@ class InteractionEventHandler {
       }
 
       const fileName = `hd_image_${Date.now()}.png`;
-      const hdMetaLine = `\n_Model: ${imageResult.model || 'gpt-image-2'} (${imageResult.quality || 'high'}) · ${hdElapsedSec}s_`;
+      const hdMetaLine = `\n_Model: ${imageResult.model || 'gpt-image-2'} (${imageResult.quality || 'medium'}) · ${hdElapsedSec}s_`;
 
       // Edit the original message to remove the button, keep original image intact
       await interaction.editReply({
