@@ -40,6 +40,33 @@ function getImageGeneration() {
 
 const logger = createLogger('SimpleChimpGPTFlow');
 
+// Tools exposed to the conversation fallback. The regex fast-path in
+// handleUnifiedProcessing only catches explicitly phrased requests ("draw an
+// image of X"); anything it misses used to reach a tool-less completion, so the
+// model replied "I can't create images" instead of generating one. Handing it
+// the tool lets it make that call itself.
+const CONVERSATION_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'generateImage',
+      description:
+        'Generate an image using AI from a text description. Use this whenever the user asks for a picture to be drawn, created, generated, illustrated or visualised, however the request is phrased.',
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: {
+            type: 'string',
+            description:
+              'A clear, self-contained description of the image to generate, based on what the user asked for.',
+          },
+        },
+        required: ['prompt'],
+      },
+    },
+  },
+];
+
 class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
     this.openaiClient = openaiClient;
@@ -239,12 +266,20 @@ class SimpleChimpGPTFlow {
     }
   }
 
-  async handleImageGeneration(store, data) {
+  /**
+   * @param {object} store - PocketFlow shared store
+   * @param {object} data - Flow data containing the Discord message
+   * @param {string} [promptOverride] - Prompt supplied by a generateImage tool call.
+   *   When present it is used verbatim, since the model has already extracted a
+   *   clean subject and the regex stripping below would only mangle it.
+   */
+  async handleImageGeneration(store, data, promptOverride) {
     try {
       const { message } = data;
 
       // Extract prompt from message content — strip Discord mentions and command phrases
       const prompt =
+        promptOverride?.trim() ||
         message.content
           .replace(/^<@\d+>\s*/i, '') // Strip leading Discord mention
           .replace(
@@ -258,7 +293,8 @@ class SimpleChimpGPTFlow {
           )
           .replace(/^(?:draw|create|generate|make)\s+(?:me\s+|us\s+)?/i, '') // "draw me a cat" -> "a cat" -> "cat"
           .replace(/^(?:a|an|the)\s+/i, '') // Strip leading article
-          .trim() || message.content;
+          .trim() ||
+        message.content;
 
       logger.info(`Processing image generation request via service: ${prompt.substring(0, 50)}...`);
 
@@ -805,15 +841,53 @@ class SimpleChimpGPTFlow {
         `Processing conversation for user ${userId} with ${openaiMessages.length} messages`
       );
 
-      // Call OpenAI
+      // Call OpenAI with tools available so requests the regex fast-path missed
+      // (e.g. "hey solvis, draw the moon casting a duck shadow") can still be
+      // answered with a real image instead of "I can't create images".
       const completion = await this.openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: openaiMessages,
         max_tokens: this.options.maxTokens,
         temperature: 0.7,
+        tools: CONVERSATION_TOOLS,
+        tool_choice: 'auto',
       });
 
-      const response = completion.choices[0].message.content;
+      const choice = completion.choices[0];
+      const imageToolCall = choice.message?.tool_calls?.find(
+        call => call.function?.name === 'generateImage'
+      );
+
+      if (imageToolCall) {
+        let toolPrompt = null;
+        try {
+          toolPrompt = JSON.parse(imageToolCall.function.arguments || '{}').prompt || null;
+        } catch (parseError) {
+          logger.warn(
+            { error: parseError.message },
+            'Could not parse generateImage tool arguments; falling back to raw message text'
+          );
+        }
+
+        logger.info(
+          `Conversation fallback routed to image generation via tool call: ${(
+            toolPrompt || message.content
+          ).substring(0, 50)}...`
+        );
+
+        // Drop the user turn we optimistically appended above. handleImageGeneration
+        // records its own outcome, and leaving an unanswered user message here would
+        // desync the transcript on the next turn.
+        conversation.messages.pop();
+
+        return await this.handleImageGeneration(store, data, toolPrompt);
+      }
+
+      // finish_reason 'tool_calls' leaves content null; guard so history and the
+      // logging below never receive a non-string.
+      const response =
+        choice.message?.content ||
+        "I wasn't able to put together a response for that. Could you rephrase?";
 
       // Add bot response to conversation history
       conversation.messages.push({
