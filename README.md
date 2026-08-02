@@ -118,17 +118,53 @@ See [plugins/README.md](plugins/README.md) for the template and API.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/help` | List commands |
-| `/ping` | Latency check |
-| `/serverstats` | Quake Live stats |
-| `/image` | Generate an image |
-| `/smoke` | Owner-only safe setup check; optional live provider canary |
-| `/cleanupdm` | Delete bot DMs (owner) |
-| `/restart` | Restart bot (owner) |
+Registered prefixes are `!`, `.` and `/` (`src/commands/commandHandler.js`). In practice use **`!`** — `.` is swallowed by `IGNORE_MESSAGE_PREFIX` (default `.`), which is checked before command routing, and `/` is claimed by Discord's slash UI. Most commands are also registered as slash commands.
 
-Prefix commands also work with `!`, `?`, or `/`.
+Prefix commands only run in the channels listed in `CHANNEL_ID`; the message handler returns early on DMs before reaching the command handler, so the "DM" column below applies to the slash-command form.
+
+### General
+
+| Command | Aliases | DM | Description |
+|---------|---------|----|-------------|
+| `!help [command]` | `commands`, `info` | ✅ | List commands, or show detail for one |
+| `!ping` | `pong`, `test` | ✅ | Bot and Discord API latency |
+| `!stats` | `status`, `health` | ✅ | Bot health and status information |
+| `!version` | `ver`, `v` | ✅ | Bot version information |
+| `!clear` | `reset` | ✅ | Clear this channel's conversation history |
+| `!serverstats` | `server`, `ql`, `quake` | ✅ | Quake Live server statistics |
+
+### Images
+
+| Command | Aliases | Access | Description |
+|---------|---------|--------|-------------|
+| `!image <prompt>` | `img`, `gptimage` | Everyone | Generate an image. Slash form adds `model` and `size` options |
+| `!toggleimage` | `toggleimages`, `imagetoggle`, `toggleimg` | Admin | **Enable/disable image generation.** A straight toggle — it flips the current state rather than taking `on`/`off`. Requires owner approval |
+| `!imagestats [days]` | `imgstats`, `imagecosts` | Owner | Image generation usage and cost totals |
+
+Natural-language requests ("draw me a sunset over Auckland") also generate images — no command needed.
+
+### Moderation
+
+| Command | Aliases | Access | Description |
+|---------|---------|--------|-------------|
+| `!blocklist` | `blocked`, `listblocked` | Admin | List all blocked users |
+| `!unblockuser <userId>` | `unblock` | Admin | Unblock a previously blocked user |
+| `!testapproval` | `approvaltest`, `testcircuitbreaker` | Everyone | Exercise the approval system. Requires owner approval |
+
+### Owner
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `!restart` | `reboot`, `reset-bot` | Restart the bot. Requires approval |
+| `!pfp` | `setpfp`, `updatepfp`, `newpfp` | Update the bot's profile picture |
+| `!cleanupdm` | — | Delete the bot's own messages from your DM with it |
+| `!smoke [live]` | — | Safe setup checks; `live` exercises every provider tool |
+| `!smoketest` | `selftest`, `diag` | Live self-test of the AI and all functions |
+| `!circuitbreaker <approve\|deny\|list\|status\|version>` | `cb`, `breaker` | Manage pending approvals and breaker state |
+| `!debugskip [off\|disable\|clear]` | `ds`, `skipstatus` | Check or clear debug skip status |
+| `!admin <subcommand>` | `deletion-admin`, `del-admin` | Message deletion system admin. Subcommands: `help`, `stats`, `list-pending`, `review`, `bulk-review`, `reprocess`, `bulk-reprocess`, `simulate`, `analyze`, `export` |
+
+Admin commands require the Administrator permission; owner commands are restricted to `OWNER_ID`. Commands marked "requires approval" prompt the owner before running.
 
 ## Development
 
