@@ -168,7 +168,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       await this.updatePhase(store, progressKey, 'generating');
 
       const imageOptions = {
-        model: parameters.model || 'chatgpt-image-latest',
+        model: parameters.model || 'gpt-image-2',
         size: parameters.size || this.config.defaultSize,
         quality: parameters.quality || 'low',
         username,
@@ -181,6 +181,15 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       });
 
       const imageResult = await generateImage(enhancedPrompt, imageOptions);
+
+      if (!imageResult.success) {
+        return {
+          success: false,
+          error: imageResult.error || 'Image generation failed',
+          type: 'image_generation_error',
+          executionTime: Date.now() - progress.startTime,
+        };
+      }
 
       // Phase 4: Processing and downloading
       await this.updatePhase(store, progressKey, 'downloading');
@@ -305,7 +314,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       metadata: {
         originalPrompt: metadata.originalPrompt,
         enhancedPrompt: metadata.enhancedPrompt,
-        model: metadata.model,
+        model: imageResult.model || metadata.model,
         size: metadata.size,
         quality: metadata.quality,
         executionTime: metadata.executionTime,
@@ -323,7 +332,7 @@ class ImageGenerationAgentNode extends BaseConversationNode {
       responseText += `**Enhanced Prompt:** ${metadata.enhancedPrompt}\n`;
     }
 
-    responseText += `**Specifications:** ${metadata.size} • ${metadata.quality} quality\n`;
+    responseText += `**Specifications:** ${imageResult.model || metadata.model} • ${metadata.size} • ${metadata.quality} quality\n`;
     responseText += `**Creation Time:** ${timeFormatted}\n\n`;
     responseText += `✨ *Generated with AI artistic intelligence*`;
 

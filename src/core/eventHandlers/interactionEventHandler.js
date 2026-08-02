@@ -47,8 +47,19 @@ class InteractionEventHandler {
   async handleButtonInteraction(interaction) {
     const { customId } = interaction;
 
+    if (customId.startsWith('image_upscale:')) {
+      await this.handleHdUpgrade(interaction, 'image_upscale:');
+      return;
+    }
+
+    if (customId.startsWith('image_remix:')) {
+      await this.handleRemix(interaction);
+      return;
+    }
+
+    // Backward compatibility for image messages created before the action buttons.
     if (customId.startsWith('hd_upgrade:')) {
-      await this.handleHdUpgrade(interaction);
+      await this.handleHdUpgrade(interaction, 'hd_upgrade:');
       return;
     }
 
@@ -56,9 +67,9 @@ class InteractionEventHandler {
     discordLogger.debug({ customId }, 'Unhandled button interaction');
   }
 
-  async handleHdUpgrade(interaction) {
-    // Extract the original prompt from the customId
-    const encodedPrompt = interaction.customId.slice('hd_upgrade:'.length);
+  async handleHdUpgrade(interaction, prefix = 'image_upscale:') {
+    // Extract the original prompt from the custom ID.
+    const encodedPrompt = interaction.customId.slice(prefix.length);
     let originalPrompt;
     try {
       originalPrompt = decodeURIComponent(encodedPrompt);
@@ -98,10 +109,11 @@ class InteractionEventHandler {
 
       await interaction.editReply({ components: [pendingRow] });
 
-      // Generate HD image: chatgpt-image-latest (points to best available model), 1024×1024, high quality
+      // Generate HD image with gpt-image-2, 1024×1024, high quality
       const hdGenStart = Date.now();
       const imageResult = await generateImage(originalPrompt, {
-        model: 'chatgpt-image-latest',
+        provider: 'openai',
+        model: 'gpt-image-2',
         size: '1024x1024',
         quality: 'high',
       });
@@ -138,7 +150,7 @@ class InteractionEventHandler {
       }
 
       const fileName = `hd_image_${Date.now()}.png`;
-      const hdMetaLine = `\n_Model: chatgpt-image-latest (high) · ${hdElapsedSec}s_`;
+      const hdMetaLine = `\n_Model: ${imageResult.model || 'gpt-image-2'} (${imageResult.quality || 'high'}) · ${hdElapsedSec}s_`;
 
       // Edit the original message to remove the button, keep original image intact
       await interaction.editReply({
@@ -167,6 +179,84 @@ class InteractionEventHandler {
         });
       } catch (editError) {
         discordLogger.error({ editError }, 'Failed to update message after HD upgrade error');
+      }
+    }
+  }
+  async handleRemix(interaction) {
+    const encodedPrompt = interaction.customId.slice('image_remix:'.length);
+    let originalPrompt;
+    try {
+      originalPrompt = decodeURIComponent(encodedPrompt);
+    } catch (error) {
+      discordLogger.error({ error, encodedPrompt }, 'Failed to decode remix prompt');
+      await interaction.reply({
+        content: '❌ Remix failed — invalid prompt data.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const remixPrompt = `${originalPrompt}\n\nCreate a clearly distinct creative remix of this concept. Preserve the main subject and intent, but vary the composition, visual details, lighting, and artistic interpretation. Do not add text unless the original prompt asks for it.`;
+
+    try {
+      await interaction.deferUpdate();
+      const pendingRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('image_remix_pending')
+          .setLabel('🔀 Creating remix...')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true)
+      );
+      await interaction.editReply({ components: [pendingRow] });
+
+      const startedAt = Date.now();
+      const imageResult = await generateImage(remixPrompt, {
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        quality: 'low',
+        enhance: false,
+      });
+      const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(1);
+      if (!imageResult.success) {
+        await interaction.editReply({
+          content: `${interaction.message.content}\n\n⚠️ Remix failed: ${imageResult.error}`,
+          components: [],
+        });
+        return;
+      }
+
+      const remixedImage = imageResult.images[0];
+      const imageBuffer = remixedImage.b64_json
+        ? Buffer.from(remixedImage.b64_json, 'base64')
+        : remixedImage.url
+          ? await downloadImage(remixedImage.url)
+          : null;
+      if (!imageBuffer) throw new Error('No image data in remix generation response');
+
+      await interaction.editReply({
+        content: `${interaction.message.content}\n🔀 Remix version below ↓`,
+        components: [],
+      });
+      await interaction.followUp({
+        content: `🔀 **Remix** — ${originalPrompt.substring(0, 100)}${originalPrompt.length > 100 ? '...' : ''}\n_Model: ${imageResult.model || 'gpt-image-2'} (${imageResult.quality || 'low'}) · ${elapsedSec}s_`,
+        files: [{ attachment: imageBuffer, name: `remix_image_${Date.now()}.png` }],
+      });
+      discordLogger.info(
+        { messageId: interaction.message.id, promptPreview: originalPrompt.substring(0, 60) },
+        'Image remix completed successfully'
+      );
+    } catch (error) {
+      discordLogger.error(
+        { error, promptPreview: originalPrompt.substring(0, 60) },
+        'Image remix error'
+      );
+      try {
+        await interaction.editReply({
+          content: `${interaction.message.content}\n\n❌ Remix failed. Please try again.`,
+          components: [],
+        });
+      } catch (editError) {
+        discordLogger.error({ editError }, 'Failed to update message after remix error');
       }
     }
   }

@@ -566,29 +566,30 @@ class MessageEventHandler {
                   fileName: flowResult.attachment.name,
                 });
 
-                // Build HD upgrade button — prompt encoded in customId (max 100 chars total)
-                // Strip Discord mentions and ensure encoded form fits in 100-char limit
+                // Image actions store the source prompt in the Discord custom ID (max 100 chars).
+                // These are explicit, billable follow-up generations; the interaction handler never retries them.
                 const strippedForButton = (flowResult.originalPrompt || message.content)
                   .replace(/<@\d+>/g, '')
                   .trim();
-                // Encode and truncate — don't cut mid-%XX, walk back to last complete char
                 let encodedPrompt = encodeURIComponent(strippedForButton);
-                const prefix = 'hd_upgrade:';
-                const maxEncoded = 100 - prefix.length;
+                const prefixes = ['image_upscale:', 'image_remix:'];
+                const maxEncoded = 100 - Math.max(...prefixes.map(prefix => prefix.length));
                 if (encodedPrompt.length > maxEncoded) {
                   encodedPrompt = encodedPrompt.substring(0, maxEncoded);
-                  // Avoid cutting mid-%XX: remove trailing incomplete percent-sequence
                   const trailingPercent = encodedPrompt.match(/%[0-9A-Fa-f]?$/);
                   if (trailingPercent)
                     encodedPrompt = encodedPrompt.slice(0, -trailingPercent[0].length);
-                  // Also remove trailing lone % to be safe
                   if (encodedPrompt.endsWith('%')) encodedPrompt = encodedPrompt.slice(0, -1);
                 }
-                const hdRow = new ActionRowBuilder().addComponents(
+                const imageActionRow = new ActionRowBuilder().addComponents(
                   new ButtonBuilder()
-                    .setCustomId(`${prefix}${encodedPrompt}`)
-                    .setLabel('🔍 Upgrade to HD')
-                    .setStyle(ButtonStyle.Secondary)
+                    .setCustomId(`image_upscale:${encodedPrompt}`)
+                    .setLabel('⬆️ Upscale')
+                    .setStyle(ButtonStyle.Secondary),
+                  new ButtonBuilder()
+                    .setCustomId(`image_remix:${encodedPrompt}`)
+                    .setLabel('🔀 Remix')
+                    .setStyle(ButtonStyle.Primary)
                 );
 
                 // Build metadata footer line
@@ -614,7 +615,7 @@ class MessageEventHandler {
                       name: flowResult.attachment.name,
                     },
                   ],
-                  components: [hdRow],
+                  components: [imageActionRow],
                 });
 
                 discordLogger.info('Successfully edited thinking message with image:', {

@@ -86,6 +86,8 @@ web_modules/
 # Debug and test files
 debug-*.js
 test-*.js
+# Local live API diagnostic; reads .env and must never be committed.
+test_image.js
 direct-*.js
 
 # Backup files

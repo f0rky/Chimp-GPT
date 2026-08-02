@@ -11,6 +11,7 @@ const {
   cleanupTempFile,
   shouldUseStreaming,
 } = require('../utils/streamingBuffer');
+const { buildImageActionRow } = require('../utils/imageActionButtons');
 const {
   ChimpError,
   ERROR_CATEGORIES,
@@ -247,7 +248,7 @@ async function handleImageGeneration(
       }
 
       // Extract and validate parameters
-      const { prompt, model = 'gpt-image-1-mini', size = '1024x1024', enhance = true } = parameters;
+      const { prompt, model = 'gpt-image-2', size = '1024x1024', enhance = true } = parameters;
 
       if (!prompt || prompt.trim() === '') {
         await feedbackMessage.edit(
@@ -310,12 +311,6 @@ async function handleImageGeneration(
         }
       }
 
-      // Track the API call
-      trackApiCall('gptimage');
-      if (apiCalls.gptimage) {
-        apiCalls.gptimage = (apiCalls.gptimage || 0) + 1;
-      }
-
       // Move to downloading phase
       updateProgress('downloading');
 
@@ -337,6 +332,16 @@ async function handleImageGeneration(
         username,
         rateLimitInfo: rateLimitResult,
       });
+
+      // generateImage records successful OpenAI generations globally. Update
+      // this request's display counter only, and only after a success.
+      if (imageResult.success && apiCalls) {
+        apiCalls.gptimage = (apiCalls.gptimage || 0) + 1;
+      }
+
+      if (!imageResult.success) {
+        throw new Error(imageResult.error || 'Image generation failed');
+      }
 
       // Move to uploading phase
       updateProgress('uploading');
@@ -550,6 +555,7 @@ async function handleImageGeneration(
           await feedbackMessage.edit({
             content: finalMessage,
             files: [attachment],
+            components: [buildImageActionRow(prompt)],
           });
 
           // Clean up (no-op for simple objects)
@@ -712,6 +718,7 @@ async function handleImageGeneration(
             await feedbackMessage.edit({
               content: finalMessage,
               files: [attachment],
+              components: [buildImageActionRow(prompt)],
             });
 
             // Clean up (no-op for simple objects)

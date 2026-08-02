@@ -49,10 +49,16 @@ function detectLLMProviders() {
       usage: ['Conversations', 'Knowledge', 'Weather', 'Time'],
     },
     imageGeneration: {
-      provider: 'OpenAI',
-      model: 'GPT Image 1.5',
-      configured: !!process.env.OPENAI_API_KEY && config.ENABLE_IMAGE_GENERATION,
-      usage: ['Image Creation', 'Art Generation'],
+      provider: process.env.OPENROUTER_API_KEY
+        ? 'OpenRouter (default) + OpenAI (upscale)'
+        : 'OpenAI',
+      model: process.env.OPENROUTER_API_KEY
+        ? 'Nano Banana 2 Lite + GPT Image 2 High'
+        : 'GPT Image 2',
+      configured:
+        config.ENABLE_IMAGE_GENERATION &&
+        (!!process.env.OPENROUTER_API_KEY || !!process.env.OPENAI_API_KEY),
+      usage: ['Fast Image Creation', 'OpenAI Upscale', 'Prompt-based Remix'],
     },
     searchEngines: {
       serpapi: {

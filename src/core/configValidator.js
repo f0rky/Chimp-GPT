@@ -59,6 +59,12 @@ const CONFIG_SCHEMA = {
     default: '',
     validate: value => typeof value === 'string',
   },
+  OPENROUTER_API_KEY: {
+    required: false,
+    description: 'OpenRouter API key for the default fast image-generation provider',
+    default: '',
+    validate: value => typeof value === 'string',
+  },
   X_RAPIDAPI_KEY: {
     required: false,
     description: 'RapidAPI Key for weather and other external services',

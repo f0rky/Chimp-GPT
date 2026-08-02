@@ -1,6 +1,6 @@
 /**
  * @typedef {Object} ImageGenerationOptions
- * @property {string} [model] - The model to use (gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
+ * @property {string} [model] - The model to use (gpt-image-2; deprecated aliases are remapped to gpt-image-2)
  * @property {string} [size] - Image size (1024x1024, 1536x1024, 1024x1536, or auto)
  * @property {string} [quality] - Image quality (low, medium, high, auto)
  * @property {string} [format] - Output format (png, jpeg, webp)
@@ -23,9 +23,11 @@
 /**
  * Image Generation Module for ChimpGPT
  *
- * This module provides image generation capabilities using OpenAI's GPT Image models
- * (gpt-image-1.5, gpt-image-1, gpt-image-1-mini). DALL-E 2/3 models are deprecated
- * and automatically remapped to their current equivalents.
+ * This module provides image generation capabilities using OpenAI's GPT Image models,
+ * primarily gpt-image-2 (current flagship). Deprecated models (gpt-image-1, gpt-image-1.5,
+ * gpt-image-1-mini, chatgpt-image-latest) are automatically remapped to gpt-image-2 with
+ * appropriate quality mappings. DALL-E 2/3 models are also deprecated and remapped through
+ * the chain to gpt-image-2.
  *
  * @module ImageGeneration
  * @author Brett
@@ -49,6 +51,16 @@ const functionResults = require('../core/functionResults');
 const config = require('../core/configValidator');
 const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
+const { inspectPngPixels } = require('../utils/imageIntegrity');
+
+// Image generations are billable and not idempotent: never replay a request
+// after a transport failure or client-side timeout.
+const IMAGE_REQUEST_POLICY = Object.freeze({
+  maxRetries: 0,
+  // A real gpt-image-2 response took 46 seconds in production. Keep enough
+  // headroom for normal queueing while still using the SDK abort path.
+  timeout: 120000,
+});
 
 // Initialize OpenAI client.
 // Dedicated undici dispatcher (see ../core/openaiFetch) — avoids the node-fetch
@@ -57,15 +69,18 @@ const { openaiFetch } = require('../core/openaiFetch');
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   fetch: openaiFetch,
+  ...IMAGE_REQUEST_POLICY,
 });
 
 // Circuit breaker configuration for image generation API calls
 const IMAGE_BREAKER_CONFIG = {
-  maxRetries: 2, // Increase retries for better reliability
+  // Retrying could produce and bill for a second image if the first request
+  // reached OpenAI but its response was delayed or lost.
+  maxRetries: 0,
   breakerLimit: 5, // Increase failure threshold before opening (was 3)
   breakerTimeoutMs: 180000, // Reduce breaker timeout to 3 minutes (was 5)
-  initialBackoffMs: 1000, // Increase initial backoff
-  maxBackoffMs: 5000, // Increase max backoff
+  initialBackoffMs: 2000, // Increased initial backoff for rate-limited scenarios
+  maxBackoffMs: 10000, // Increased max backoff
   onBreakerOpen: error => {
     logger.error({ error }, 'Image generation API circuit breaker opened');
     breakerManager.notifyOwnerBreakerTriggered(
@@ -79,13 +94,14 @@ const IMAGE_BREAKER_CONFIG = {
  * @enum {string}
  */
 const MODELS = {
-  GPT_IMAGE_1: 'gpt-image-1', // Standard model
-  GPT_IMAGE_1_5: 'gpt-image-1.5', // Latest flagship model (replaces dall-e-3)
-  GPT_IMAGE_1_MINI: 'gpt-image-1-mini', // Fast, cost-efficient model (replaces dall-e-2)
-  CHATGPT_IMAGE_LATEST: 'chatgpt-image-latest', // Alias for latest model (HD button uses this)
+  GPT_IMAGE_2: 'gpt-image-2', // Current flagship model (successor to gpt-image-1 series)
+  GPT_IMAGE_1: 'gpt-image-1', // DEPRECATED: remapped to gpt-image-2
+  GPT_IMAGE_1_5: 'gpt-image-1.5', // DEPRECATED: remapped to gpt-image-2
+  GPT_IMAGE_1_MINI: 'gpt-image-1-mini', // DEPRECATED: remapped to gpt-image-2
+  CHATGPT_IMAGE_LATEST: 'chatgpt-image-latest', // DEPRECATED: remapped to gpt-image-2
   // Legacy aliases — remapped to current models at call time
-  DALL_E_3: 'dall-e-3', // DEPRECATED: remapped to gpt-image-1.5
-  DALL_E_2: 'dall-e-2', // DEPRECATED: remapped to gpt-image-1-mini
+  DALL_E_3: 'dall-e-3', // DEPRECATED: remapped to gpt-image-1.5 (then to gpt-image-2)
+  DALL_E_2: 'dall-e-2', // DEPRECATED: remapped to gpt-image-1-mini (then to gpt-image-2)
 };
 
 /**
@@ -93,10 +109,10 @@ const MODELS = {
  * @enum {string}
  */
 const SIZES = {
-  // GPT Image-1 supported sizes (based on official API documentation)
+  // GPT Image supported sizes (based on official API documentation)
   SQUARE: '1024x1024', // Square (default)
-  PORTRAIT: '1536x1024', // Portrait orientation
-  LANDSCAPE: '1024x1536', // Landscape orientation
+  PORTRAIT: '1024x1536', // Portrait orientation
+  LANDSCAPE: '1536x1024', // Landscape orientation
   AUTO: 'auto', // Let the API choose the best size
 };
 
@@ -154,6 +170,17 @@ async function generateImage(prompt, options = {}) {
     };
   }
 
+  // The conversational fast path uses OpenRouter's Flash Lite image model when
+  // explicitly configured. It is one-shot and has gateway fallback disabled;
+  // an OpenRouter failure is never replayed against OpenAI automatically.
+  if (process.env.OPENROUTER_API_KEY && options.provider !== 'openai') {
+    const openRouterOptions = { ...options };
+    // Existing callers use gpt-image-2 as their former default. Do not forward
+    // that legacy default to OpenRouter; choose the configured Flash Lite model.
+    if (openRouterOptions.model === MODELS.GPT_IMAGE_2) delete openRouterOptions.model;
+    return require('./openRouterImageGeneration').generateImage(prompt, openRouterOptions);
+  }
+
   // Log that we're proceeding with image generation
   logger.info('Image generation is enabled, proceeding with request');
 
@@ -183,27 +210,50 @@ async function generateImage(prompt, options = {}) {
   );
   try {
     // Map model names — resolve legacy/deprecated models to current ones
-    const requestedModel = options.model || MODELS.GPT_IMAGE_1_MINI;
+    const requestedModel = options.model || MODELS.GPT_IMAGE_2;
     let actualModel = requestedModel;
 
-    // Remap deprecated DALL-E models to current equivalents
+    // Remap deprecated DALL-E models to current equivalents (via gpt-image-1.5/mini)
     if (requestedModel === MODELS.DALL_E_3) {
       actualModel = MODELS.GPT_IMAGE_1_5;
       logger.info('Remapping deprecated dall-e-3 to gpt-image-1.5');
     } else if (requestedModel === MODELS.DALL_E_2) {
       actualModel = MODELS.GPT_IMAGE_1_MINI;
       logger.info('Remapping deprecated dall-e-2 to gpt-image-1-mini');
-    } else if (requestedModel === MODELS.GPT_IMAGE_1) {
-      // gpt-image-1 is still valid — use as-is
-      logger.debug('Using gpt-image-1 directly');
+    }
+
+    // Preserve the legacy model's quality default before its API model name is
+    // remapped to gpt-image-2.
+    const qualityProfileModel = actualModel;
+
+    // Remap deprecated gpt-image-* models to gpt-image-2 with quality mappings
+    if (actualModel === MODELS.GPT_IMAGE_1) {
+      actualModel = MODELS.GPT_IMAGE_2;
+      logger.warn(
+        'Deprecation: gpt-image-1 is deprecated, remapping to gpt-image-2 (quality: auto)'
+      );
+    } else if (actualModel === MODELS.GPT_IMAGE_1_5) {
+      actualModel = MODELS.GPT_IMAGE_2;
+      logger.warn(
+        'Deprecation: gpt-image-1.5 is deprecated, remapping to gpt-image-2 (quality: high)'
+      );
+    } else if (actualModel === MODELS.GPT_IMAGE_1_MINI) {
+      actualModel = MODELS.GPT_IMAGE_2;
+      logger.warn(
+        'Deprecation: gpt-image-1-mini is deprecated, remapping to gpt-image-2 (quality: medium)'
+      );
+    } else if (actualModel === MODELS.CHATGPT_IMAGE_LATEST) {
+      actualModel = MODELS.GPT_IMAGE_2;
+      logger.warn(
+        'Deprecation: chatgpt-image-latest is deprecated, remapping to gpt-image-2 (quality: high)'
+      );
     }
 
     // Set default size to square if not specified
     let size = options.size || SIZES.SQUARE;
 
     // Validate the model and size combination based on OpenAI API documentation
-    // All current models (gpt-image-1, gpt-image-1.5, gpt-image-1-mini, chatgpt-image-latest)
-    // support square, portrait, landscape, and auto sizes
+    // Supported current size values. Deprecated aliases are remapped before the API call.
     const validSizes = [SIZES.SQUARE, SIZES.PORTRAIT, SIZES.LANDSCAPE, SIZES.AUTO];
 
     if (!validSizes.includes(size)) {
@@ -211,7 +261,8 @@ async function generateImage(prompt, options = {}) {
       size = SIZES.SQUARE;
     }
 
-    // Set quality based on model capabilities
+    // Set quality based on model capabilities. Resolve legacy defaults from the
+    // requested model before remapping, otherwise every alias becomes medium.
     // All current models support: low, medium, high, auto
     let quality = options.quality;
     if (quality && !['low', 'medium', 'high', 'auto', 'standard', 'hd'].includes(quality)) {
@@ -220,9 +271,15 @@ async function generateImage(prompt, options = {}) {
     }
     // Default quality per model
     if (!quality) {
-      if (actualModel === MODELS.CHATGPT_IMAGE_LATEST || actualModel === MODELS.GPT_IMAGE_1_5) {
+      if (
+        qualityProfileModel === MODELS.CHATGPT_IMAGE_LATEST ||
+        qualityProfileModel === MODELS.GPT_IMAGE_1_5
+      ) {
         quality = 'high';
-      } else if (actualModel === MODELS.GPT_IMAGE_1_MINI) {
+      } else if (qualityProfileModel === MODELS.GPT_IMAGE_2) {
+        // gpt-image-2 default: medium quality (matching current mini behavior as default)
+        quality = 'medium';
+      } else if (qualityProfileModel === MODELS.GPT_IMAGE_1_MINI) {
         quality = 'medium';
       } else {
         quality = 'auto';
@@ -240,9 +297,10 @@ async function generateImage(prompt, options = {}) {
       n: 1, // Generate 1 image
     };
 
-    // response_format: gpt-image-1/1.5/1-mini and chatgpt-image-latest always return base64
-    // and do NOT accept response_format. Only legacy DALL-E models needed it.
-    // Since all dall-e models are remapped above, no response_format needed.
+    // Request a concrete, opaque PNG rather than relying on provider defaults.
+    // GPT Image returns its binary content as b64_json for this endpoint.
+    imageParams.output_format = options.format || FORMAT.PNG;
+    imageParams.background = options.background || BACKGROUND.OPAQUE;
 
     // Add quality for models that support it
     if (quality) {
@@ -301,19 +359,11 @@ async function generateImage(prompt, options = {}) {
       // Log that we're about to make the API call
       logger.debug('Making OpenAI API call for image generation with circuit breaker protection');
 
-      // Make the API call with circuit breaker protection and timeout
+      // Make exactly one abortable API call. The SDK timeout aborts the client
+      // request; Promise.race left a generation running while a retry began.
       response = await retryWithBreaker(async () => {
         const callStart = Date.now();
-
-        // Create a timeout promise with increased timeout for image generation
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(new Error('Image generation request timed out after 90 seconds'));
-          }, 90000); // 90 second timeout (increased from 60)
-        });
-
-        // Race between the API call and timeout
-        const result = await Promise.race([openai.images.generate(imageParams), timeoutPromise]);
+        const result = await openai.images.generate(imageParams);
 
         apiCallDuration = Date.now() - callStart;
         logger.info({ apiCallDuration }, 'OpenAI image generation API call completed');
@@ -323,7 +373,7 @@ async function generateImage(prompt, options = {}) {
       // Track the successful API call
       trackApiCall('gptimage');
 
-      // Debug logging to understand GPT Image 1 response structure
+      // Debug logging to understand GPT Image response structure
       logger.info(
         {
           responseStructure: {
@@ -344,7 +394,7 @@ async function generateImage(prompt, options = {}) {
               : 'no-first-image',
           },
         },
-        'GPT Image 1 API response structure analysis'
+        'GPT Image API response structure analysis'
       );
     } catch (error) {
       // Enhanced error logging for debugging
@@ -416,7 +466,7 @@ async function generateImage(prompt, options = {}) {
         responseId: response?.id,
         created: response?.created,
       },
-      'GPT Image-1 response structure'
+      'GPT Image response structure'
     );
 
     logger.info(
@@ -454,14 +504,24 @@ async function generateImage(prompt, options = {}) {
       auto: { '1024x1024': 0.01, auto: 0.012 },
     };
 
+    // Current GPT Image 2 published output pricing (OpenAI developer docs, August 2026).
+    // These exclude prompt/input token charges, so they remain estimates.
+    const image2Costs = {
+      low: { '1024x1024': 0.006, '1024x1536': 0.005, '1536x1024': 0.005, auto: 0.007 },
+      medium: { '1024x1024': 0.053, '1024x1536': 0.041, '1536x1024': 0.041, auto: 0.05 },
+      high: { '1024x1024': 0.211, '1024x1536': 0.165, '1536x1024': 0.165, auto: 0.2 },
+      auto: { '1024x1024': 0.053, '1024x1536': 0.041, '1536x1024': 0.041, auto: 0.05 },
+    };
+
     const COST_TABLES = {
+      [MODELS.GPT_IMAGE_2]: image2Costs,
       [MODELS.GPT_IMAGE_1_5]: fullSizeCosts,
       [MODELS.CHATGPT_IMAGE_LATEST]: fullSizeCosts,
       [MODELS.GPT_IMAGE_1]: fullSizeCosts,
       [MODELS.GPT_IMAGE_1_MINI]: miniSizeCosts,
     };
 
-    const DEFAULT_COSTS = { fullSize: 0.042, miniSize: 0.01 };
+    const DEFAULT_COSTS = { fullSize: 0.042, miniSize: 0.01, image2Medium: 0.019 };
 
     const costTable = COST_TABLES[actualModel];
     const key = sizeToKey(size);
@@ -487,7 +547,7 @@ async function generateImage(prompt, options = {}) {
     );
 
     // Extract the image URLs based on the response structure
-    // GPT Image 1 returns images in a standard OpenAI format
+    // GPT Image returns images in a standard OpenAI format
     let images = [];
 
     try {
@@ -509,7 +569,7 @@ async function generateImage(prompt, options = {}) {
           }, 0) || 0,
         responseId: response?.id,
       };
-      logger.info(responseMetadata, 'GPT Image 1 response metadata and file size estimation');
+      logger.info(responseMetadata, 'GPT Image response metadata and file size estimation');
 
       // Performance optimization: warn about large images that might impact Discord message limits
       if (responseMetadata.estimatedFileSizeMB > 8) {
@@ -525,6 +585,19 @@ async function generateImage(prompt, options = {}) {
       // According to OpenAI's documentation, the response should have a data array
       // Each item in the array can have either a url or b64_json property
       if (response && response.data) {
+        // Do not present an all-black provider response as a successful image.
+        // This is deliberately detection-only: replaying a billable image request
+        // after an ambiguous bad response could create a duplicate charge.
+        for (const item of response.data) {
+          if (!item.b64_json) continue;
+          const inspection = inspectPngPixels(Buffer.from(item.b64_json, 'base64'));
+          if (inspection.inspectable && inspection.uniformBlack) {
+            throw new Error(
+              'The image provider returned an all-black PNG. It was not uploaded and was not retried automatically.'
+            );
+          }
+        }
+
         // Handle the standard OpenAI v4 SDK response format
         const dataArray = Array.isArray(response.data)
           ? response.data
@@ -650,6 +723,8 @@ async function generateImage(prompt, options = {}) {
       images,
       prompt,
       revisedPrompt: images[0].revisedPrompt,
+      model: actualModel, // The model actually used (after deprecation remapping)
+      quality,
       estimatedCost,
       apiCallDuration: apiCallDuration || null, // Time in ms for the API call
       totalProcessingTime: Date.now() - apiCallStartTime, // Total time including processing
@@ -735,7 +810,7 @@ async function enhanceImagePrompt(basicPrompt) {
         {
           role: 'system',
           content:
-            'You are an expert at creating detailed, vivid prompts for GPT Image-1 image generation. ' +
+            'You are an expert at creating detailed, vivid prompts for GPT Image image generation. ' +
             'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
             'and other elements that will result in a high-quality, visually appealing image. ' +
             'Do not include any text that would violate content policies (no violence, adult content, etc.). ' +
@@ -743,7 +818,7 @@ async function enhanceImagePrompt(basicPrompt) {
         },
         {
           role: 'user',
-          content: `Please enhance this basic image prompt for GPT Image-1: "${basicPrompt}"`,
+          content: `Please enhance this basic image prompt for GPT Image: "${basicPrompt}"`,
         },
       ],
       max_completion_tokens: 300,
@@ -795,6 +870,7 @@ const imageGenerationModule = {
   QUALITY,
   FORMAT,
   BACKGROUND,
+  IMAGE_REQUEST_POLICY,
 };
 
 module.exports = imageGenerationModule;

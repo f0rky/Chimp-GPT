@@ -267,10 +267,15 @@ class SimpleChimpGPTFlow {
       const imageService = this.imageService || getImageGeneration();
       const imageGenStartTime = Date.now();
 
+      // Prefer the model's automatic aspect ratio and low output-token tier for
+      // conversational requests. Users can still select a larger/quality-specific
+      // output via /image; this keeps the default path faster and lower-cost.
       const result = await imageService.generateImage(prompt, {
-        model: 'gpt-image-1-mini',
-        size: '1024x1024',
-        quality: 'medium',
+        model: 'gpt-image-2',
+        size: 'auto',
+        quality: 'low',
+        format: 'png',
+        background: 'opaque',
       });
 
       const imageGenElapsedMs = Date.now() - imageGenStartTime;
@@ -331,8 +336,8 @@ class SimpleChimpGPTFlow {
             imageUrl: imageUrl,
             originalPrompt: prompt,
             imageMetadata: {
-              model: 'gpt-image-1-mini',
-              quality: 'medium',
+              model: result.model || 'gpt-image-2',
+              quality: result.quality || 'medium',
               elapsedMs: imageGenElapsedMs,
               estimatedCost,
             },
@@ -364,8 +369,8 @@ class SimpleChimpGPTFlow {
         },
         // Metadata for footer display
         imageMetadata: {
-          model: 'gpt-image-1-mini',
-          quality: 'medium',
+          model: result.model || 'gpt-image-2',
+          quality: result.quality || 'medium',
           elapsedMs: imageGenElapsedMs,
           estimatedCost,
           usedService: true,

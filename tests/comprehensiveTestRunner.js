@@ -13,6 +13,7 @@ const fs = require('fs').promises;
 // Import test modules
 const { testSimpleChimpGPTFlow } = require('./unit/simpleChimpGPTFlowTest');
 const { testImageGeneration } = require('./unit/imageGenerationTest');
+const { testImageGenerationSafety } = require('./unit/imageGenerationSafetyTest');
 const { testCommandProcessing } = require('./unit/commandProcessingTest');
 const { testMessageHandlingIntegration } = require('./integration/messageHandlingIntegrationTest');
 const { testWeatherAPIIntegration } = require('./integration/weatherApiIntegrationTest');
@@ -114,6 +115,13 @@ const testSuites = {
     priority: 'High',
     fn: testImageGeneration,
     covers: ['src/handlers/imageGenerationHandler.js', 'src/services/imageGeneration.js'],
+  },
+
+  'Image Generation Safety': {
+    category: 'Unit',
+    priority: 'High',
+    fn: testImageGenerationSafety,
+    covers: ['src/services/imageGeneration.js'],
   },
 
   'Command Processing': {

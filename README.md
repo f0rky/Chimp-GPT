@@ -5,7 +5,7 @@ Discord bot with OpenAI. Conversations, image generation, weather, web search, a
 ## Features
 
 - AI conversations with reply chain tracking and group chat support
-- Image generation — GPT Image models, HD upgrade button, progress indicators
+- Image generation — fast OpenRouter default, GPT Image 2 upscale, remix controls, and all-black-output protection
 - Weather via WeatherAPI through RapidAPI
 - Timezone-aware time lookup
 - Quake Live server stats with Glicko ratings
@@ -41,7 +41,8 @@ npm start
 | `CLIENT_ID` | ✅ | Discord application ID |
 | `OWNER_ID` | ✅ | Your Discord user ID |
 | `CHANNEL_ID` | ✅ | Channel(s) to respond in (comma-separated) |
-| `OPENAI_API_KEY` | ✅ | OpenAI API key |
+| `OPENAI_API_KEY` | ✅ | OpenAI API key (upscale and fallback image generation) |
+| `OPENROUTER_API_KEY` | ❌ | Fast default image generation through OpenRouter Nano Banana 2 Lite |
 | `X_RAPIDAPI_KEY` | ✅ | RapidAPI key (weather) |
 | `BOT_NAME` | ❌ | Bot display name (default: Solvis) |
 | `BOT_PERSONALITY` | ❌ | System prompt personality |
@@ -50,6 +51,12 @@ npm start
 | `LOG_LEVEL` | ❌ | Pino log level (default: info) |
 
 See `.env.example` for the full list.
+
+## Image generation
+
+With `OPENROUTER_API_KEY` configured, conversational requests use OpenRouter Nano Banana 2 Lite for fast 1K low-quality PNG output. The visible **⬆️ Upscale** action uses OpenAI GPT Image 2 at high quality; **🔀 Remix** creates a new prompt-based variation.
+
+Image requests are intentionally one-shot: the bot does not retry or provider-race billable calls. It also rejects all-black PNG responses before Discord upload. See [Image generation architecture](docs/image-generation-alternatives-analysis.md) for provider routing, safety, and offline validation.
 
 ## Running
 
@@ -117,6 +124,7 @@ See [plugins/README.md](plugins/README.md) for the template and API.
 | `/ping` | Latency check |
 | `/serverstats` | Quake Live stats |
 | `/image` | Generate an image |
+| `/smoke` | Owner-only safe setup check; optional live provider canary |
 | `/cleanupdm` | Delete bot DMs (owner) |
 | `/restart` | Restart bot (owner) |
 

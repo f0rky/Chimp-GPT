@@ -158,7 +158,7 @@ const inProgressOperations = new Set();
 /**
  * Handles image generation requests
  *
- * This function processes image generation requests using GPT Image-1,
+ * This function processes image generation requests using GPT Image,
  * downloads the generated image, and sends it to the Discord channel.
  *
  * @param {Object} parameters - Parameters for image generation
