@@ -18,19 +18,40 @@
 
 const { Agent, fetch: undiciFetch } = require('undici');
 
-// Generous timeouts: image generation responses can take 30s+.
-const openaiDispatcher = new Agent({
-  connect: { timeout: 30_000 },
-  headersTimeout: 120_000,
-  bodyTimeout: 300_000,
-});
-
 /**
- * fetch implementation bound to the dedicated dispatcher.
- * Signature matches what the OpenAI SDK expects (url, init).
+ * Build a fetch bound to its own undici dispatcher.
+ *
+ * headersTimeout caps the wait for the first response byte. These responses are
+ * not streamed, so headers only arrive once the model has finished - it is an
+ * end-to-end ceiling on the call, independent of any timeout the OpenAI SDK
+ * applies. Callers that legitimately run long (image generation) need their own
+ * dispatcher rather than a raised shared limit, so a hung chat completion still
+ * fails fast.
+ *
+ * @param {Object} [options] - Dispatcher timeouts in milliseconds
+ * @param {number} [options.headersTimeout] - Max wait for response headers
+ * @param {number} [options.bodyTimeout] - Max wait for the response body
+ * @param {number} [options.connectTimeout] - Max wait for the TCP/TLS connect
+ * @returns {{ fetch: Function, dispatcher: import('undici').Agent }}
  */
-function openaiFetch(url, options = {}) {
-  return undiciFetch(url, { ...options, dispatcher: openaiDispatcher });
+function createOpenAIFetch({
+  headersTimeout = 120_000,
+  bodyTimeout = 300_000,
+  connectTimeout = 30_000,
+} = {}) {
+  const dispatcher = new Agent({
+    connect: { timeout: connectTimeout },
+    headersTimeout,
+    bodyTimeout,
+  });
+
+  return {
+    fetch: (url, options = {}) => undiciFetch(url, { ...options, dispatcher }),
+    dispatcher,
+  };
 }
 
-module.exports = { openaiFetch, openaiDispatcher };
+// Shared default for chat, weather and Quake lookups: these should fail fast.
+const { fetch: openaiFetch, dispatcher: openaiDispatcher } = createOpenAIFetch();
+
+module.exports = { openaiFetch, openaiDispatcher, createOpenAIFetch };

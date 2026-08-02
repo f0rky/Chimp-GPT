@@ -55,20 +55,32 @@ const { inspectPngPixels } = require('../utils/imageIntegrity');
 
 // Image generations are billable and not idempotent: never replay a request
 // after a transport failure or client-side timeout.
+// A real gpt-image-2 response took 46 seconds in production, but quality:'high'
+// runs far longer - the HD upgrade button was aborting at the old 120s ceiling
+// after the image had already been generated and billed. Allow 5 minutes, which
+// still lands well inside Discord's 15-minute interaction token.
+const IMAGE_REQUEST_TIMEOUT_MS = 300000;
+
 const IMAGE_REQUEST_POLICY = Object.freeze({
   maxRetries: 0,
-  // A real gpt-image-2 response took 46 seconds in production. Keep enough
-  // headroom for normal queueing while still using the SDK abort path.
-  timeout: 120000,
+  timeout: IMAGE_REQUEST_TIMEOUT_MS,
 });
 
 // Initialize OpenAI client.
 // Dedicated undici dispatcher (see ../core/openaiFetch) — avoids the node-fetch
 // "Premature close" bug and the discord.js global-dispatcher hijack.
-const { openaiFetch } = require('../core/openaiFetch');
+//
+// Image generation gets its own dispatcher: the shared one caps headersTimeout at
+// 120s so chat calls fail fast, and that cap would abort a long HD render before
+// the SDK timeout above ever applied.
+const { createOpenAIFetch } = require('../core/openaiFetch');
+const { fetch: imageFetch } = createOpenAIFetch({
+  headersTimeout: IMAGE_REQUEST_TIMEOUT_MS,
+  bodyTimeout: IMAGE_REQUEST_TIMEOUT_MS,
+});
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  fetch: openaiFetch,
+  fetch: imageFetch,
   ...IMAGE_REQUEST_POLICY,
 });
 
