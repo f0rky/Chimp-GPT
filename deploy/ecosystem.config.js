@@ -11,12 +11,13 @@ module.exports = {
       node_args: '--no-deprecation', // Suppress deprecation warnings - lodash issue from Discord.js dependency
       env_file: '.env', // Tell PM2 to load .env file
       env: {
-        NODE_ENV: 'production',
-        PORT: 3006,
+        // Read from .env so each bot instance gets its own port; 3006 is only a fallback
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        PORT: process.env.PORT || 3006,
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 3005,
+        PORT: process.env.PORT || 3005,
       },
       max_memory_restart: '1G',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
