@@ -13,7 +13,6 @@ const { createLogger } = require('../../core/logger');
 const logger = createLogger('cmd-toggle-img');
 const fs = require('fs');
 const path = require('path');
-const dotenv = require('dotenv');
 const config = require('../../core/configValidator');
 
 // Path to the .env file - use absolute path from project root
@@ -25,34 +24,57 @@ const envPath = path.resolve(process.cwd(), '.env');
 logger.debug({ envPath }, 'Resolved .env path');
 
 /**
+ * Replace a single KEY=value line in raw .env text, appending it if absent.
+ *
+ * Only the target line is rewritten. Regenerating the whole file from a parsed
+ * object drops comments and quoting and flattens multi-line values such as
+ * BOT_PERSONALITY.
+ *
+ * @param {string} contents - Current .env file contents
+ * @param {string} key - The variable to set
+ * @param {string} value - The value to write
+ * @returns {string} The updated file contents
+ */
+function setEnvValue(contents, key, value) {
+  const line = `${key}=${value}`;
+  const existing = new RegExp(`^${key}=.*$`, 'm');
+
+  if (existing.test(contents)) {
+    return contents.replace(existing, line);
+  }
+  if (contents === '' || contents.endsWith('\n')) {
+    return `${contents}${line}\n`;
+  }
+  return `${contents}\n${line}\n`;
+}
+
+/**
  * Toggle the image generation setting
  * @returns {Promise<{newState: boolean, success: boolean}>} The new state and success status
  */
 async function toggleImageGeneration() {
   try {
-    // Read current state from .env
-    let envConfig = {};
-    if (fs.existsSync(envPath)) {
-      const envFile = fs.readFileSync(envPath, 'utf8');
-      envConfig = dotenv.parse(envFile);
-    } else {
-      logger.warn(`Env file not found at ${envPath}`);
-      // Create a basic env config if it doesn't exist
-      envConfig = { ENABLE_IMAGE_GENERATION: process.env.ENABLE_IMAGE_GENERATION || 'false' };
-    }
-
-    // Toggle the state
-    const currentState = envConfig.ENABLE_IMAGE_GENERATION === 'true';
+    // Read current state from the live process rather than from .env. PM2 keeps
+    // its own env snapshot across restarts and dotenv never overrides an
+    // already-set variable, so the file can say `true` while the bot has been
+    // running with `false` for months - toggling off the file value then moves
+    // the flag the wrong way. This mirrors the check in services/imageGeneration.js.
+    const currentState =
+      process.env.ENABLE_IMAGE_GENERATION === 'true' || config.ENABLE_IMAGE_GENERATION === true;
     const newState = !currentState;
 
-    // Update the .env file
-    envConfig.ENABLE_IMAGE_GENERATION = newState.toString();
+    // Persist to .env so the new state survives a restart
+    let envContents = '';
+    if (fs.existsSync(envPath)) {
+      envContents = fs.readFileSync(envPath, 'utf8');
+    } else {
+      logger.warn(`Env file not found at ${envPath}, creating it`);
+    }
 
-    const envContent = Object.entries(envConfig)
-      .map(([key, value]) => `${key}=${value}`)
-      .join('\n');
-
-    fs.writeFileSync(envPath, envContent);
+    fs.writeFileSync(
+      envPath,
+      setEnvValue(envContents, 'ENABLE_IMAGE_GENERATION', newState.toString())
+    );
 
     // Update in-memory config in all relevant places
     process.env.ENABLE_IMAGE_GENERATION = newState.toString();
