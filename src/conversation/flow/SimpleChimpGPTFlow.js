@@ -77,12 +77,16 @@ class SimpleChimpGPTFlow {
       ...options,
     };
 
-    // Optional injected image-generation service (used by tests to avoid real
-    // network calls). Defaults to the lazily-required service in production.
+    // Optional injected services keep unit tests hermetic. Production continues
+    // to use the lazily-required implementations below.
     this.imageService = this.options.imageService || null;
+    this.weatherService = this.options.weatherService || null;
+    this.timeLookup = this.options.timeLookup || null;
+    this.quakeLookup = this.options.quakeLookup || null;
+    this.enableKnowledge = this.options.enableKnowledge ?? config.ENABLE_KNOWLEDGE_SYSTEM;
 
     // Initialize knowledge system if enabled
-    if (config.ENABLE_KNOWLEDGE_SYSTEM) {
+    if (this.enableKnowledge) {
       this.knowledgeFlow = new KnowledgeFlow(openaiClient, {
         maxSearchResults: config.KNOWLEDGE_MAX_SEARCH_RESULTS,
         confidenceThreshold: config.KNOWLEDGE_CONFIDENCE_THRESHOLD,
@@ -175,7 +179,7 @@ class SimpleChimpGPTFlow {
       }
 
       // Check for knowledge system patterns (if enabled)
-      if (config.ENABLE_KNOWLEDGE_SYSTEM && this.knowledgeFlow) {
+      if (this.enableKnowledge && this.knowledgeFlow) {
         // Skip knowledge system for natural conversation requests
         if (
           content.includes('natural') &&
@@ -558,7 +562,7 @@ class SimpleChimpGPTFlow {
       logger.info(`Extracted location: ${location}`);
 
       // Use the simplified weather service for structured data
-      const { getWeatherResponse } = getWeatherService();
+      const { getWeatherResponse } = this.weatherService || getWeatherService();
       weatherData = await getWeatherResponse(location, message.content);
 
       // If we got structured weather data, format it with the bot's personality
@@ -693,7 +697,7 @@ class SimpleChimpGPTFlow {
       logger.info(`Extracted location for time lookup: ${location}`);
 
       // Use the existing time lookup service
-      const lookupTime = getTimeLookup();
+      const lookupTime = this.timeLookup || getTimeLookup();
       const timeData = await lookupTime(location);
 
       // Format response with bot personality
@@ -780,7 +784,7 @@ class SimpleChimpGPTFlow {
       logger.info('Processing quake stats request');
 
       // Use the underlying quake lookup service directly
-      const lookupQuakeServer = getQuakeLookup();
+      const lookupQuakeServer = this.quakeLookup || getQuakeLookup();
 
       // Get default server stats (no specific server specified)
       const serverData = await lookupQuakeServer(null, 1); // Default server, elo mode 1

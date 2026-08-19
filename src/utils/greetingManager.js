@@ -296,7 +296,7 @@ async function attachGreetingReactions(client, msg) {
           logger.info({ count: toDelete.length }, 'Bulk deleted greeting + next messages');
         } catch (bulkErr) {
           logger.warn({ error: bulkErr }, 'Bulk delete failed, deleting greeting only');
-          await msg.delete().catch(() => {});
+          await msg.delete().catch(() => undefined);
         }
       }
     } catch (actionErr) {
@@ -307,7 +307,7 @@ async function attachGreetingReactions(client, msg) {
   collector.on('end', (_, reason) => {
     if (reason !== 'held' && !msg.deleted) {
       // Clean up our reaction buttons when collector expires
-      msg.reactions.removeAll().catch(() => {});
+      msg.reactions.removeAll().catch(() => undefined);
     }
   });
 }

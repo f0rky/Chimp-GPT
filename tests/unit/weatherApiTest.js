@@ -9,11 +9,35 @@
  * @version 1.0.0
  */
 
-// Import required modules
-const { lookupWeather, lookupExtendedForecast } = require('../../src/services/weatherLookup');
-const simplifiedWeather = require('../../src/services/simplified-weather');
 const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('weatherTest');
+
+function buildFixtureWeather(location) {
+  return {
+    location: { name: location, region: 'Fixture Region', country: 'Fixture Country' },
+    current: { temp_c: 20, condition: { text: 'Clear', icon: 'fixture.png' } },
+    forecast: { forecastday: [{ date: '2026-01-01', day: { maxtemp_c: 22, mintemp_c: 15 } }] },
+  };
+}
+
+function buildHermeticDependencies() {
+  return {
+    lookupWeather: async location => {
+      if (location === 'ThisIsNotARealLocationXYZ123') {
+        return { success: false, error: new Error('Fixture location not found') };
+      }
+      return { success: true, data: buildFixtureWeather(location) };
+    },
+    lookupExtendedForecast: async location => ({
+      success: true,
+      data: buildFixtureWeather(location),
+    }),
+    getWeatherResponse: async location => ({
+      formattedSummary: `Fixture weather for ${location}: clear, 20°C.`,
+      weatherData: buildFixtureWeather(location),
+    }),
+  };
+}
 
 /**
  * Test the weather API integration
@@ -27,8 +51,9 @@ const logger = createLogger('weatherTest');
  *
  * @returns {Object} Test results with success/failure status and details
  */
-async function testWeatherApi() {
+async function testWeatherApi(dependencies = buildHermeticDependencies()) {
   logger.info('Starting weather API tests...');
+  const { lookupWeather, lookupExtendedForecast, getWeatherResponse } = dependencies;
 
   const results = {
     success: true,
@@ -49,8 +74,9 @@ async function testWeatherApi() {
 
       // Validate response format - handle both direct response and success/data wrapper
       const actualData = weatherData?.data || weatherData;
-      const validResponse =
-        actualData && actualData.location && actualData.current && actualData.current.condition;
+      const validResponse = Boolean(
+        actualData && actualData.location && actualData.current && actualData.current.condition
+      );
 
       test1Result.success = validResponse;
       test1Result.details = {
@@ -82,7 +108,7 @@ async function testWeatherApi() {
       const weatherData = await lookupWeather('ThisIsNotARealLocationXYZ123');
 
       // This should fail or return an error object
-      test2Result.success = weatherData && weatherData.error;
+      test2Result.success = Boolean(weatherData && weatherData.error);
       test2Result.details = {
         errorHandled: weatherData && weatherData.error ? 'Yes' : 'No',
         errorMessage: weatherData && weatherData.error ? weatherData.error.message : 'N/A',
@@ -150,10 +176,7 @@ async function testWeatherApi() {
     };
 
     try {
-      const response = await simplifiedWeather.getWeatherResponse(
-        'Tokyo',
-        "What's the weather like in Tokyo?"
-      );
+      const response = await getWeatherResponse('Tokyo', "What's the weather like in Tokyo?");
 
       // Validate response - it should be an object with formattedSummary
       const validResponse =

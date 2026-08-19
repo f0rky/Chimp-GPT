@@ -86,6 +86,22 @@ const mockImageService = {
   },
 };
 
+const mockWeatherService = {
+  getWeatherResponse: async location => ({
+    formattedSummary: `Fixture weather for ${location}: clear, 20°C.`,
+    weatherData: { location, current: { temp_c: 20, condition: { text: 'Clear' } } },
+  }),
+};
+const mockTimeLookup = async location => `Fixture time for ${location}: 12:00 PM.`;
+const mockQuakeLookup = async () => 'Fixture Quake server stats.';
+const hermeticFlowOptions = {
+  enableKnowledge: false,
+  imageService: mockImageService,
+  weatherService: mockWeatherService,
+  timeLookup: mockTimeLookup,
+  quakeLookup: mockQuakeLookup,
+};
+
 // Create mock message objects
 const createMockMessage = (content, authorId = 'test-user-123') => ({
   content,
@@ -110,7 +126,7 @@ async function testIntentDetection() {
     const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager, {
       maxConversationLength: 5,
       maxTokens: 500,
-      imageService: mockImageService,
+      ...hermeticFlowOptions,
     });
 
     const testCases = [
@@ -203,6 +219,7 @@ async function testConversationMemory() {
     const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager, {
       maxConversationLength: 3,
       maxTokens: 500,
+      ...hermeticFlowOptions,
     });
 
     const userId = 'test-user-memory';
@@ -279,7 +296,7 @@ async function testErrorHandling() {
 
     const SimpleChimpGPTFlow = require('../../src/conversation/flow/SimpleChimpGPTFlow');
     const flow = new SimpleChimpGPTFlow(mockErrorOpenAI, mockPFPManager, {
-      imageService: mockImageService,
+      ...hermeticFlowOptions,
     });
 
     const testCases = [
@@ -333,7 +350,7 @@ async function testFlowStats() {
 
   try {
     const SimpleChimpGPTFlow = require('../../src/conversation/flow/SimpleChimpGPTFlow');
-    const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager);
+    const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager, hermeticFlowOptions);
 
     // Process some test messages
     await flow.processMessage(createMockMessage('Hello', 'user1'));
@@ -381,7 +398,7 @@ async function testConversationCleanup() {
 
   try {
     const SimpleChimpGPTFlow = require('../../src/conversation/flow/SimpleChimpGPTFlow');
-    const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager);
+    const flow = new SimpleChimpGPTFlow(mockOpenAIClient, mockPFPManager, hermeticFlowOptions);
 
     // Add some conversations
     await flow.processMessage(createMockMessage('Test message 1', 'user1'));

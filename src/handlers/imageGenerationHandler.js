@@ -4,7 +4,7 @@ const {
   checkImageGenerationRateLimit,
   constants: { IMAGE_GEN_POINTS },
 } = require('../middleware/rateLimiter');
-const { trackApiCall, trackError, handleStatsCommand } = require('../core/healthCheck');
+const { trackError, handleStatsCommand } = require('../core/healthCheck');
 const {
   processImageStream,
   createDiscordAttachment,

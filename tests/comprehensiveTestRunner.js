@@ -14,6 +14,7 @@ const fs = require('fs').promises;
 const { testSimpleChimpGPTFlow } = require('./unit/simpleChimpGPTFlowTest');
 const { testImageGeneration } = require('./unit/imageGenerationTest');
 const { testImageGenerationSafety } = require('./unit/imageGenerationSafetyTest');
+const { testImageRoutingAndActions } = require('./unit/imageRoutingAndActionsTest');
 const { testCommandProcessing } = require('./unit/commandProcessingTest');
 const { testMessageHandlingIntegration } = require('./integration/messageHandlingIntegrationTest');
 const { testWeatherAPIIntegration } = require('./integration/weatherApiIntegrationTest');
@@ -122,6 +123,18 @@ const testSuites = {
     priority: 'High',
     fn: testImageGenerationSafety,
     covers: ['src/services/imageGeneration.js'],
+  },
+
+  'Image Routing and Actions': {
+    category: 'Unit',
+    priority: 'High',
+    fn: testImageRoutingAndActions,
+    covers: [
+      'src/services/imageGeneration.js',
+      'src/services/openRouterImageGeneration.js',
+      'src/utils/imageActionButtons.js',
+      'src/core/eventHandlers/interactionEventHandler.js',
+    ],
   },
 
   'Command Processing': {

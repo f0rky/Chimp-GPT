@@ -7,7 +7,6 @@
  * @module PocketFlowAdapter
  */
 
-const config = require('../core/configValidator');
 const { createLogger } = require('../core/logger');
 const { toPocketFlowMessage } = require('../utils/discordMessage');
 const { buildPocketFlowOptions, createMockCommandHandler } = require('./pocketFlowDefaults');

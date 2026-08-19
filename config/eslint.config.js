@@ -54,6 +54,7 @@ module.exports = [
       '**/.tmp/',
       '**/.vercel/',
       '**/.netlify/',
+      'test_image.js',
     ],
   },
 

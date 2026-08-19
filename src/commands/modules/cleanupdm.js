@@ -9,41 +9,6 @@ const { SlashCommandBuilder } = require('discord.js');
 const { createLogger } = require('../../core/logger');
 const logger = createLogger('commands:cleanupdm');
 
-async function cleanupOwnerDMs(client) {
-  const dmChannel = await client.users.cache
-    .get(client.application?.owner?.id)
-    ?.createDM()
-    .catch(() => null);
-
-  if (!dmChannel) return 0;
-
-  let deleted = 0;
-  let lastId;
-
-  while (true) {
-    const options = { limit: 100 };
-    if (lastId) options.before = lastId;
-
-    const messages = await dmChannel.messages.fetch(options);
-    if (!messages.size) break;
-
-    const botMessages = messages.filter(m => m.author.id === client.user.id);
-    for (const msg of botMessages.values()) {
-      try {
-        await msg.delete();
-        deleted++;
-      } catch (e) {
-        logger.warn({ msgId: msg.id, error: e.message }, 'Could not delete DM message');
-      }
-    }
-
-    lastId = messages.last()?.id;
-    if (messages.size < 100) break;
-  }
-
-  return deleted;
-}
-
 module.exports = {
   name: 'cleanupdm',
   description: "Delete the bot's own messages from your DM with it (owner only)",
@@ -57,7 +22,6 @@ module.exports = {
 
   async execute(message, _args, _config) {
     try {
-      const ownerId = message.author.id;
       const dmChannel = await message.author.createDM();
       let deleted = 0;
       let lastId;

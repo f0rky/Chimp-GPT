@@ -74,13 +74,9 @@ if (require.main === module) {
 const express = require('express');
 const path = require('path');
 const { createLogger } = require('../core/logger');
-const { getSafeErrorDetails } = require('../core/errors');
+const { getDetailedVersionInfo } = require('../core/getBotVersion');
 const logger = createLogger('status');
-const os = require('os');
-const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
-const { getConversationStorageStatus } = require('../conversation/conversationManagerSelector');
 const config = require('../core/configValidator');
-const performanceMonitor = require('../middleware/performanceMonitor');
 
 // Import stats storage
 const statsStorage = require('../core/statsStorage');
@@ -93,9 +89,6 @@ const performanceHistory = require('./performanceHistory');
 
 // Import malicious user manager
 const maliciousUserManager = require('../utils/maliciousUserManager');
-
-// Track if malicious user manager is initialized
-const maliciousUserManagerInitialized = false;
 
 // Track server health status
 let serverHealthy = true;
@@ -114,13 +107,7 @@ setInterval(() => {
 }, 30000); // Every 30 seconds
 
 // Import test runners
-const {
-  runConversationLogTests,
-  runOpenAITests,
-  runQuakeTests,
-  runCorsTests,
-  runRateLimiterTests,
-} = require('../../tests/unit/testRunner');
+const { runCorsTests, runRateLimiterTests } = require('../../tests/unit/testRunner');
 
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');

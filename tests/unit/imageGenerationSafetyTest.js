@@ -13,7 +13,7 @@ async function testImageGenerationSafety() {
     'utf8'
   );
 
-  assert.deepStrictEqual(IMAGE_REQUEST_POLICY, { maxRetries: 0, timeout: 120000 });
+  assert.deepStrictEqual(IMAGE_REQUEST_POLICY, { maxRetries: 0, timeout: 300000 });
   assert.match(source, /maxRetries:\s*0/);
   assert.doesNotMatch(source, /Promise\.race\(\[openai\.images\.generate/);
 
