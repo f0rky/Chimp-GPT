@@ -11,13 +11,16 @@ function buildRequest(prompt, options = {}) {
   const request = {
     model: options.model || FAST_MODEL,
     prompt,
+    // Gemini Flash Lite's current OpenRouter image endpoint accepts 1K only.
     resolution: options.resolution || '1K',
-    quality: options.quality || 'low',
-    output_format: options.format || 'png',
     n: 1,
     // Never permit gateway failover/replay for image generation.
     provider: { allow_fallbacks: false },
   };
+
+  // Do not send quality or output_format. The selected Gemini endpoint does
+  // not advertise either parameter, and OpenRouter rejects unknown parameters
+  // with HTTP 400. It returns the provider-default media type in the response.
   if (options.aspectRatio) request.aspect_ratio = options.aspectRatio;
   return request;
 }
@@ -73,13 +76,21 @@ async function generateImage(prompt, options = {}) {
 }
 
 function selftest() {
-  const request = buildRequest('a quick green kiwi');
+  const request = buildRequest('a quick green kiwi', {
+    quality: 'low',
+    format: 'png',
+    aspectRatio: '16:9',
+  });
   assert.strictEqual(request.model, FAST_MODEL);
   assert.strictEqual(request.provider.allow_fallbacks, false);
   assert.strictEqual(request.n, 1);
+  assert.strictEqual(request.resolution, '1K');
+  assert.strictEqual(request.aspect_ratio, '16:9');
+  assert.ok(!Object.hasOwn(request, 'quality'));
+  assert.ok(!Object.hasOwn(request, 'output_format'));
   assert.strictEqual(REQUEST_POLICY.retries, 0);
   console.log(
-    'SELFTEST PASS: OpenRouter fast-image requests are one-shot with gateway fallback disabled'
+    'SELFTEST PASS: Fast-image requests use only Gemini-supported parameters and disable retries/fallbacks'
   );
 }
 
