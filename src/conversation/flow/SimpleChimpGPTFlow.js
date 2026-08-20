@@ -328,7 +328,10 @@ class SimpleChimpGPTFlow {
 
         // Map service errors to user-friendly messages
         let userMessage = "I'm having trouble generating that image right now. Please try again.";
-        if (result.error?.includes('disabled')) {
+        if (/IMAGE_PROHIBITED_CONTENT|content policy/i.test(result.error || '')) {
+          userMessage =
+            '🚫 The image generator blocked that request based on its content policy, so no image was created. Try describing it differently.';
+        } else if (result.error?.includes('disabled')) {
           userMessage = '🎨 Image generation is currently disabled. Ask an admin to enable it!';
         } else if (result.error?.includes('rate limit') || result.error?.includes('Rate limit')) {
           userMessage =
