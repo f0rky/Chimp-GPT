@@ -25,6 +25,17 @@ function buildRequest(prompt, options = {}) {
   return request;
 }
 
+function getOpenRouterErrorMessage(error) {
+  const responseError = error?.response?.data?.error;
+  const providerMessage = responseError?.message || error?.response?.data?.message;
+  const status = error?.response?.status || error?.status;
+
+  if (typeof providerMessage === 'string' && providerMessage.trim()) {
+    return status ? `OpenRouter HTTP ${status}: ${providerMessage.trim()}` : providerMessage.trim();
+  }
+  return error?.message || 'OpenRouter image request failed';
+}
+
 async function generateImage(prompt, options = {}) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -70,8 +81,16 @@ async function generateImage(prompt, options = {}) {
       provider: 'openrouter',
     };
   } catch (error) {
-    logger.warn({ error: error.message, model: request.model }, 'OpenRouter image request failed');
-    return { success: false, error: error.message, prompt, provider: 'openrouter' };
+    const providerError = getOpenRouterErrorMessage(error);
+    logger.warn(
+      {
+        error: providerError,
+        model: request.model,
+        status: error?.response?.status || error?.status,
+      },
+      'OpenRouter image request failed'
+    );
+    return { success: false, error: providerError, prompt, provider: 'openrouter' };
   }
 }
 
@@ -89,6 +108,12 @@ function selftest() {
   assert.ok(!Object.hasOwn(request, 'quality'));
   assert.ok(!Object.hasOwn(request, 'output_format'));
   assert.strictEqual(REQUEST_POLICY.retries, 0);
+  assert.strictEqual(
+    getOpenRouterErrorMessage({
+      response: { status: 400, data: { error: { message: 'Unsupported parameter: quality' } } },
+    }),
+    'OpenRouter HTTP 400: Unsupported parameter: quality'
+  );
   console.log(
     'SELFTEST PASS: Fast-image requests use only Gemini-supported parameters and disable retries/fallbacks'
   );
