@@ -5,7 +5,7 @@
   "main": "src/core/combined.js",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.18.1"
   },
   "scripts": {
     "test": "node tests/unit/testRunner.js",
@@ -24,9 +24,8 @@
     "security:fix-force": "npm audit fix --force",
     "security:check": "npm audit --json | jq '.metadata.vulnerabilities.total'",
     "security:auto": "node scripts/security-check.js",
-    "postinstall": "npm run security:auto",
     "prestart": "npm run security:check && echo 'Starting the app...'",
-    "start": "nodemon --ignore data/ --ignore assets/logs/ src/core/combined.js",
+    "start": "node --watch src/core/combined.js",
     "prepare": "husky install"
   },
   "lint-staged": {
@@ -82,7 +81,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.9.0",
+    "axios": "^1.20.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "discord.js": "^14.19.3",
@@ -109,13 +108,13 @@
     "husky": "^8.0.0",
     "lint-staged": "^16.0.0",
     "mocha": "^11.3.0",
-    "nodemon": "^3.1.10",
     "prettier": "^3.5.3",
     "sinon": "^21.0.1",
     "sinon-chai": "^4.0.0"
   },
   "overrides": {
-    "undici": "^7.16.0",
+    "undici": "^7.29.1",
+    "js-yaml": "^4.3.2",
     "diff": "^8.0.3",
     "serialize-javascript": "^7.0.5"
   }

@@ -16,7 +16,7 @@ Discord bot with OpenAI. Conversations, image generation, weather, web search, a
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 20.18.1+
 - Discord bot token + application
 - OpenAI API key
 - RapidAPI key (weather)
@@ -61,7 +61,7 @@ Image requests are intentionally one-shot: the bot does not retry or provider-ra
 ## Running
 
 ```bash
-npm start                          # Development (nodemon, debug port)
+npm start                          # Development (Node.js watch mode)
 ./scripts/start.sh -m production           # Production
 ./scripts/start.sh -c bot                  # Bot only (no status server)
 ./scripts/start.sh -c status               # Status server only
