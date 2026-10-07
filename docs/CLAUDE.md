@@ -92,7 +92,7 @@ Chimp-GPT is a Discord bot powered by OpenAI's GPT API that provides conversatio
 
 ```bash
 # Development  
-npm start              # Start with nodemon (now points to src/core/combined.js)
+npm start              # Start with Node.js watch mode (src/core/combined.js)
 npm test              # Run all tests (now in tests/unit/)
 npm test <file>       # Run specific test file  
 npm run lint          # ESLint code quality check

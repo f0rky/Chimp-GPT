@@ -5,10 +5,8 @@ WORKDIR /usr/src/app
 
 # Install dependencies
 COPY package*.json ./
-# Skip prepare (husky) and postinstall (security:auto) scripts.
-# postinstall runs scripts/security-check.js which isn't available yet
-# (app source is copied in the next step) and isn't needed in the image.
-RUN npm pkg delete scripts.prepare scripts.postinstall && npm ci --omit=dev
+# Lifecycle scripts are not required for the production dependency layer.
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy app source
 COPY . .
