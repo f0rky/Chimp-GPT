@@ -30,8 +30,8 @@
 
     <!-- Chart.js for graphs -->
     <script
-      src="https://cdn.jsdelivr.net/npm/chart.js"
-      integrity="sha384-XcdcwHqIPULERb2yDEM4R0XaQKU3YnDsrTmjACBZyfdVVqjh6xQ4/DCMd7XLcA6Y"
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"
+      integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
       crossorigin="anonymous"
     ></script>
     <script
@@ -199,6 +199,16 @@
             <!-- LLM Providers -->
             <section class="card llm-providers">
               <h2>🧠 AI MODELS</h2>
+              <p class="text-muted">
+                Provider diagnostics are owner-only and are not loaded automatically.
+              </p>
+              <button
+                class="btn btn-secondary"
+                type="button"
+                onclick="loadDetailedHealthDiagnostics()"
+              >
+                Load detailed provider diagnostics
+              </button>
               <div class="llm-grid">
                 <div class="llm-card primary">
                   <div class="llm-header">
@@ -574,7 +584,7 @@
       </div>
     </div>
 
-    <script src="bot-navigation.js"></script>
     <script src="app-unified.js"></script>
+    <script src="bot-navigation.js"></script>
   </body>
 </html>

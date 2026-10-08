@@ -6,17 +6,26 @@
 const { Router } = require('express');
 const os = require('os');
 const { createLogger } = require('../../core/logger');
-const { getDetailedVersionInfo, formatUptime } = require('../../core/getBotVersion');
-const { getConversationStorageStatus } = require('../../conversation/conversationManagerSelector');
-const config = require('../../core/configValidator');
 
 const logger = createLogger('healthRoutes');
 
 /**
- * @param {{ stats: Object, statsStorage: Object }} deps
+ * @param {{ stats: Object, statsStorage: Object, requireOwnerToken: Function }} deps
  */
 function createRouter(deps) {
-  const { stats, statsStorage } = deps;
+  const { stats, statsStorage, requireOwnerToken } = deps;
+  // These dependencies can initialise conversation/API-key services. Keep them
+  // injectable and lazy so importing this route module is side-effect free and
+  // unit tests can use pure in-memory collaborators.
+  const getVersionInfo =
+    deps.versionInfo?.getDetailedVersionInfo ||
+    (() => require('../../core/getBotVersion').getDetailedVersionInfo());
+  const formatUptime =
+    deps.versionInfo?.formatUptime || require('../../core/getBotVersion').formatUptime;
+  const getConversationStorageStatus =
+    deps.getConversationStorageStatus ||
+    require('../../conversation/conversationManagerSelector').getConversationStorageStatus;
+  const config = deps.config || require('../../core/configValidator');
   const router = Router();
 
   // GET /api — index of available endpoints
@@ -30,6 +39,7 @@ function createRouter(deps) {
         '/function-results',
         '/function-results/summary',
         '/performance',
+        '/performance/detailed',
         '/performance/history/hourly',
         '/performance/history/daily',
         '/performance/history/recent',
@@ -38,8 +48,6 @@ function createRouter(deps) {
         '/repair-function-results',
         '/blocked-users',
         '/unblock-user',
-        '/api/discover-bots',
-        '/api/discover-services',
         '/settings',
         '/run-tests',
       ],
@@ -59,87 +67,92 @@ function createRouter(deps) {
 
   // GET /health
   router.get('/health', async (req, res) => {
-    const uptime = Math.floor((new Date() - stats.startTime) / 1000);
-    const memoryUsage = process.memoryUsage();
-    const persistentStats = await statsStorage.loadStats();
+    try {
+      const uptime = Math.floor((new Date() - stats.startTime) / 1000);
+      const memoryUsage = process.memoryUsage();
+      const persistentStats = await statsStorage.loadStats();
 
-    const mergedStats = {
-      messageCount: persistentStats.messageCount || stats.messageCount,
-      apiCalls: { ...stats.apiCalls, ...persistentStats.apiCalls },
-      errors: { ...stats.errors, ...persistentStats.errors },
-      rateLimits: {
-        hit: persistentStats.rateLimits?.hit || stats.rateLimits.hit,
-        users: persistentStats.rateLimits?.users || stats.rateLimits.users,
-        userCounts: persistentStats.rateLimits?.userCounts || {},
-      },
-    };
-
-    const botName = persistentStats.name || config.BOT_NAME || process.env.BOT_NAME || 'ChimpGPT';
-    const discordStats = persistentStats.discord || {};
-    const discordStatus = typeof discordStats.status === 'string' ? discordStats.status : 'offline';
-    const discordPing = typeof discordStats.ping === 'number' ? discordStats.ping : 0;
-    const discordGuilds = typeof discordStats.guilds === 'number' ? discordStats.guilds : 0;
-    const discordChannels = typeof discordStats.channels === 'number' ? discordStats.channels : 0;
-    const versionInfo = getDetailedVersionInfo();
-
-    res.json({
-      status: discordStatus === 'ok' ? 'ok' : 'offline',
-      name: botName,
-      uptime,
-      formattedUptime: formatUptime(uptime),
-      version: versionInfo.version,
-      versionInfo: {
-        name: versionInfo.name,
-        description: versionInfo.description,
-        author: versionInfo.author,
-        nodeVersion: versionInfo.nodeVersion,
-        environment: versionInfo.environment,
-        startTime: new Date(Date.now() - uptime * 1000).toISOString(),
-      },
-      memory: {
-        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-      },
-      system: {
-        platform: process.platform,
-        arch: process.arch,
-        cpus: os.cpus().length,
-        loadAvg: os.loadavg(),
-        freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
-        totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
-      },
-      stats: {
-        messageCount: mergedStats.messageCount,
-        apiCalls: mergedStats.apiCalls,
-        errors: mergedStats.errors,
+      const mergedStats = {
+        messageCount: persistentStats.messageCount || stats.messageCount,
+        apiCalls: { ...stats.apiCalls, ...persistentStats.apiCalls },
+        errors: { ...stats.errors, ...persistentStats.errors },
         rateLimits: {
-          count: mergedStats.rateLimits.hit,
-          uniqueUsers: Array.isArray(mergedStats.rateLimits.users)
-            ? mergedStats.rateLimits.users.length
-            : mergedStats.rateLimits.users instanceof Set
-              ? mergedStats.rateLimits.users.size
-              : 0,
-          userDetails: mergedStats.rateLimits.userCounts || {},
+          hit: persistentStats.rateLimits?.hit || stats.rateLimits.hit,
+          users: persistentStats.rateLimits?.users || stats.rateLimits.users,
+          userCounts: persistentStats.rateLimits?.userCounts || {},
         },
-      },
-      discord: {
-        ping: discordPing,
-        status: discordStatus,
-        guilds: discordGuilds,
-        channels: discordChannels,
-      },
-      conversations: { ...getConversationStorageStatus(), lastChecked: new Date().toISOString() },
-      conversationMode: {
-        replyContext: config.ENABLE_REPLY_CONTEXT,
-        mode: 'PocketFlow (Graph-based Architecture)',
-        maxMessagesPerUser: parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5,
-      },
-    });
+      };
+
+      const botName = persistentStats.name || config.BOT_NAME || process.env.BOT_NAME || 'ChimpGPT';
+      const discordStats = persistentStats.discord || {};
+      const discordStatus =
+        typeof discordStats.status === 'string' ? discordStats.status : 'offline';
+      const discordPing = typeof discordStats.ping === 'number' ? discordStats.ping : 0;
+      const discordGuilds = typeof discordStats.guilds === 'number' ? discordStats.guilds : 0;
+      const discordChannels = typeof discordStats.channels === 'number' ? discordStats.channels : 0;
+      const versionInfo = getVersionInfo();
+
+      res.json({
+        status: discordStatus === 'ok' ? 'ok' : 'offline',
+        name: botName,
+        uptime,
+        formattedUptime: formatUptime(uptime),
+        version: versionInfo.version,
+        versionInfo: {
+          name: versionInfo.name,
+          description: versionInfo.description,
+          author: versionInfo.author,
+          nodeVersion: versionInfo.nodeVersion,
+          environment: versionInfo.environment,
+          startTime: new Date(Date.now() - uptime * 1000).toISOString(),
+        },
+        memory: {
+          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+          heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+        },
+        system: {
+          platform: process.platform,
+          arch: process.arch,
+          cpus: os.cpus().length,
+          loadAvg: os.loadavg(),
+          freeMemory: `${Math.round(os.freemem() / 1024 / 1024)} MB`,
+          totalMemory: `${Math.round(os.totalmem() / 1024 / 1024)} MB`,
+        },
+        stats: {
+          messageCount: mergedStats.messageCount,
+          apiCalls: mergedStats.apiCalls,
+          errors: mergedStats.errors,
+          rateLimits: {
+            count: mergedStats.rateLimits.hit,
+            uniqueUsers: Array.isArray(mergedStats.rateLimits.users)
+              ? mergedStats.rateLimits.users.length
+              : mergedStats.rateLimits.users instanceof Set
+                ? mergedStats.rateLimits.users.size
+                : 0,
+          },
+        },
+        discord: {
+          ping: discordPing,
+          status: discordStatus,
+          guilds: discordGuilds,
+          channels: discordChannels,
+        },
+        conversations: { ...getConversationStorageStatus(), lastChecked: new Date().toISOString() },
+        conversationMode: {
+          replyContext: config.ENABLE_REPLY_CONTEXT,
+          mode: 'PocketFlow (Graph-based Architecture)',
+          maxMessagesPerUser: parseInt(config.MAX_MESSAGES_PER_USER_BLENDED, 10) || 5,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error generating public health report');
+      res.status(503).json({ status: 'error', message: 'Health check unavailable' });
+    }
   });
 
-  // GET /health/detailed
-  router.get('/health/detailed', async (req, res) => {
+  // GET /health/detailed — includes sensitive provider configuration details.
+  router.get('/health/detailed', requireOwnerToken, async (req, res) => {
     try {
       const {
         detectLLMProviders,
@@ -228,7 +241,7 @@ function createRouter(deps) {
           },
         },
         version: {
-          bot: getDetailedVersionInfo().version,
+          bot: getVersionInfo().version,
           node: process.version,
           platform: process.platform,
         },
@@ -246,7 +259,7 @@ function createRouter(deps) {
   // GET /version
   router.get('/version', (req, res) => {
     try {
-      const versionInfo = getDetailedVersionInfo();
+      const versionInfo = getVersionInfo();
       const uptime = process.uptime();
       res.json({
         success: true,

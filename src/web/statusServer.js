@@ -74,7 +74,7 @@ if (require.main === module) {
 const express = require('express');
 const path = require('path');
 const { createLogger } = require('../core/logger');
-const { getDetailedVersionInfo } = require('../core/getBotVersion');
+const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
 const logger = createLogger('status');
 const config = require('../core/configValidator');
 
@@ -112,20 +112,15 @@ const { runCorsTests, runRateLimiterTests } = require('../../tests/unit/testRunn
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
-// --- Breaker Management API ---
-const OWNER_TOKEN = process.env.OWNER_TOKEN || 'changeme';
-
-// This function is exported for use in future protected endpoints
-function requireOwnerToken(req, res, next) {
-  const token = req.headers['x-owner-token'] || req.query.token || req.body.token;
-  if (token !== OWNER_TOKEN) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  return next();
-}
+const {
+  getConfiguredOwnerToken,
+  constantTimeStringEquals,
+  requireOwnerToken,
+} = require('./ownerTokenAuth');
 
 // Export the middleware for use in route definitions
 module.exports.requireOwnerToken = requireOwnerToken;
+module.exports.constantTimeStringEquals = constantTimeStringEquals;
 
 const stats = {
   startTime: new Date(),
@@ -180,6 +175,12 @@ function initStatusServer(options = {}) {
 
     // Add body parsing middleware
     app.use(express.json());
+
+    if (!getConfiguredOwnerToken()) {
+      logger.error(
+        'OWNER_TOKEN is not set. All owner-protected dashboard endpoints will deny every request until it is configured.'
+      );
+    }
 
     // If demo mode is enabled, import the demo data generator
     if (demoMode) {
@@ -417,12 +418,19 @@ function initStatusServer(options = {}) {
       maliciousUserManager,
       serverState: { healthy: serverHealthy, lastError },
       requireOwnerToken,
+      versionInfo: {
+        getDetailedVersionInfo,
+        formatUptime,
+      },
+      getConversationStorageStatus: require('../conversation/conversationManagerSelector')
+        .getConversationStorageStatus,
+      config,
     };
 
     app.use('/', require('./routes/healthRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/performanceRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/adminRoutes').createRouter(routeDeps));
-    app.use('/', require('./routes/discoveryRoutes').createRouter());
+    app.use('/', require('./routes/discoveryRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/deletedMessagesRoutes').createRouter(routeDeps));
     // ─────────────────────────────────────────────────────────────────────────────
     // Check if this is a secondary deployment
@@ -690,4 +698,6 @@ if (require.main === module) {
 module.exports = {
   initStatusServer,
   shutdownGracefully,
+  requireOwnerToken,
+  constantTimeStringEquals,
 };

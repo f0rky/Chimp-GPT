@@ -8,11 +8,48 @@ const { createLogger } = require('../../core/logger');
 
 const logger = createLogger('performanceRoutes');
 
+const PUBLIC_METRIC_FIELDS = ['count', 'min', 'max', 'avg', 'median', 'p95', 'p99'];
+const PUBLIC_PERFORMANCE_ERROR = 'Performance metrics unavailable';
+const PUBLIC_PERFORMANCE_HISTORY_ERROR = 'Performance history unavailable';
+
+/**
+ * Return only aggregate numbers suitable for a public status page. Timing
+ * records intentionally contain request metadata and must never be copied
+ * into an unauthenticated response.
+ *
+ * @param {Object} metrics
+ * @returns {Object}
+ */
+function toPublicMetrics(metrics) {
+  const publicMetrics = {};
+
+  for (const [operation, metric] of Object.entries(metrics)) {
+    if (!metric || !Number.isFinite(metric.count) || metric.count <= 0) continue;
+
+    const aggregate = {};
+    for (const field of PUBLIC_METRIC_FIELDS) {
+      if (Number.isFinite(metric[field])) {
+        aggregate[field] = field === 'count' ? metric[field] : Math.round(metric[field]);
+      }
+    }
+    publicMetrics[operation] = aggregate;
+  }
+
+  return publicMetrics;
+}
+
 /**
  * @param {{ stats: Object, statsStorage: Object, functionResults: Object, performanceHistory: Object, serverState: Object }} deps
  */
 function createRouter(deps) {
-  const { stats, statsStorage, functionResults, performanceHistory, serverState } = deps;
+  const {
+    stats,
+    statsStorage,
+    functionResults,
+    performanceHistory,
+    serverState,
+    requireOwnerToken,
+  } = deps;
   const router = Router();
 
   // GET /performance
@@ -29,26 +66,29 @@ function createRouter(deps) {
         serverState.healthy = false;
       }
 
-      const summary = {};
-      for (const op in metrics) {
-        if (metrics[op] && metrics[op].count > 0) {
-          summary[op] = {
-            avg: Math.round(metrics[op].avg) || 0,
-            p95: Math.round(metrics[op].p95) || 0,
-            count: metrics[op].count || 0,
-            max: Math.round(metrics[op].max) || 0,
-          };
-        }
-      }
+      const detailed = toPublicMetrics(metrics);
+      const summary = Object.fromEntries(
+        Object.entries(detailed).map(([operation, metric]) => [
+          operation,
+          {
+            avg: metric.avg || 0,
+            p95: metric.p95 || 0,
+            count: metric.count || 0,
+            max: metric.max || 0,
+          },
+        ])
+      );
 
       const memUsage = process.memoryUsage();
       const responseData = {
         success: true,
         summary,
-        detailed: metrics,
+        detailed,
         serverHealth: {
           status: serverState.healthy ? 'healthy' : 'degraded',
-          lastError: serverState.lastError ? serverState.lastError.message : null,
+          // Public status responses must not disclose exception text. Errors can
+          // contain upstream URLs, credentials, or implementation details.
+          lastError: serverState.lastError ? PUBLIC_PERFORMANCE_ERROR : null,
           memory: {
             rss: `${Math.round(memUsage.rss / 1024 / 1024)} MB`,
             heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`,
@@ -70,9 +110,24 @@ function createRouter(deps) {
       logger.error({ error }, 'Critical error getting performance metrics');
       serverState.lastError = error;
       serverState.healthy = false;
-      res
-        .status(500)
-        .json({ success: false, error: error.message, serverHealth: { status: 'critical' } });
+      res.status(500).json({
+        success: false,
+        error: PUBLIC_PERFORMANCE_ERROR,
+        serverHealth: { status: 'critical' },
+      });
+    }
+  });
+
+  // GET /performance/detailed — raw timing records can contain Discord IDs and
+  // other request metadata, so they are available only to the configured owner.
+  router.get('/performance/detailed', requireOwnerToken, (req, res) => {
+    try {
+      const performanceMonitor = require('../../middleware/performanceMonitor');
+      const metrics = performanceMonitor.getAllTimingStats() || {};
+      res.json({ success: true, detailed: metrics, timestamp: new Date().toISOString() });
+    } catch (error) {
+      logger.error({ error }, 'Error retrieving detailed performance metrics');
+      res.status(500).json({ success: false, error: 'Failed to retrieve performance metrics' });
     }
   });
 
@@ -88,7 +143,7 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting hourly performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
@@ -104,7 +159,7 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting daily performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
@@ -122,12 +177,12 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting recent performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
   // POST /reset-stats
-  router.post('/reset-stats', async (req, res) => {
+  router.post('/reset-stats', requireOwnerToken, async (req, res) => {
     try {
       const success = await statsStorage.resetStats();
       if (success) {
@@ -148,7 +203,7 @@ function createRouter(deps) {
   });
 
   // POST /repair-stats
-  router.post('/repair-stats', async (req, res) => {
+  router.post('/repair-stats', requireOwnerToken, async (req, res) => {
     try {
       const repairResult = await statsStorage.repairStatsFile();
       if (repairResult) {
@@ -165,10 +220,9 @@ function createRouter(deps) {
   });
 
   // POST /repair-function-results
-  router.post('/repair-function-results', async (req, res) => {
+  router.post('/repair-function-results', requireOwnerToken, async (req, res) => {
     try {
-      const functionResultsModule = require('../../core/functionResults');
-      const repairResult = await functionResultsModule.repairResultsFile();
+      const repairResult = await functionResults.repairResultsFile();
       if (repairResult) {
         res.json({ success: true, message: 'Function results file repaired successfully' });
       } else {
@@ -187,7 +241,7 @@ function createRouter(deps) {
   // GET /function-results
   let lastLoggedTime = 0;
   const LOG_INTERVAL_MS = 60000;
-  router.get('/function-results', async (req, res) => {
+  router.get('/function-results', requireOwnerToken, async (req, res) => {
     const now = Date.now();
     if (now - lastLoggedTime > LOG_INTERVAL_MS) {
       logger.debug('Getting function results');
@@ -216,7 +270,7 @@ function createRouter(deps) {
   });
 
   // GET /function-results/summary
-  router.get('/function-results/summary', async (req, res) => {
+  router.get('/function-results/summary', requireOwnerToken, async (req, res) => {
     try {
       const allResults = await functionResults.getAllResults();
       const summary = {};

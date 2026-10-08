@@ -10,28 +10,37 @@ const config = require('../../core/configValidator');
 
 const logger = createLogger('discoveryRoutes');
 
-function createRouter() {
+/**
+ * @param {{ requireOwnerToken: Function, discoverPM2Bots?: Function, discoverDockerBots?: Function, checkBotHealth?: Function, discoverServices?: Function, getCurrentBotInfo?: Function }} deps
+ */
+function createRouter(deps = {}) {
+  const {
+    requireOwnerToken,
+    discoverPM2Bots: discoverPM2BotsImpl = discoverPM2Bots,
+    discoverDockerBots: discoverDockerBotsImpl = discoverDockerBots,
+    checkBotHealth: checkBotHealthImpl = checkBotHealth,
+  } = deps;
   const router = Router();
 
   // GET /api/discover-bots
-  router.get('/api/discover-bots', async (req, res) => {
+  router.get('/api/discover-bots', requireOwnerToken, async (req, res) => {
     try {
       const discoveredBots = [];
 
       try {
-        discoveredBots.push(...(await discoverPM2Bots()));
+        discoveredBots.push(...(await discoverPM2BotsImpl()));
       } catch (e) {
         logger.warn({ error: e }, 'PM2 discovery failed');
       }
 
       try {
-        discoveredBots.push(...(await discoverDockerBots()));
+        discoveredBots.push(...(await discoverDockerBotsImpl()));
       } catch (e) {
         logger.warn({ error: e }, 'Docker discovery failed');
       }
 
       const botsWithHealth = await Promise.allSettled(
-        discoveredBots.map(bot => checkBotHealth(bot.port, bot.botName, bot.name))
+        discoveredBots.map(bot => checkBotHealthImpl(bot.port, bot.botName, bot.name))
       );
 
       const healthyBots = botsWithHealth
@@ -57,9 +66,12 @@ function createRouter() {
   });
 
   // GET /api/discover-services
-  router.get('/api/discover-services', async (req, res) => {
+  router.get('/api/discover-services', requireOwnerToken, async (req, res) => {
     try {
-      const { discoverServices, getCurrentBotInfo } = require('../../utils/serviceDiscovery');
+      const {
+        discoverServices = require('../../utils/serviceDiscovery').discoverServices,
+        getCurrentBotInfo = require('../../utils/serviceDiscovery').getCurrentBotInfo,
+      } = deps;
       const startPort = parseInt(req.query.startPort, 10) || 3000;
       const endPort = parseInt(req.query.endPort, 10) || 3020;
       const botsOnly = req.query.botsOnly === 'true';
@@ -83,9 +95,12 @@ function createRouter() {
 
       let legacyBots = [];
       try {
-        const allLegacyBots = [...(await discoverPM2Bots()), ...(await discoverDockerBots())];
+        const allLegacyBots = [
+          ...(await discoverPM2BotsImpl()),
+          ...(await discoverDockerBotsImpl()),
+        ];
         const legacyHealth = await Promise.allSettled(
-          allLegacyBots.map(bot => checkBotHealth(bot.port, bot.botName, bot.name))
+          allLegacyBots.map(bot => checkBotHealthImpl(bot.port, bot.botName, bot.name))
         );
         legacyBots = legacyHealth
           .filter(r => r.status === 'fulfilled' && r.value.accessible)

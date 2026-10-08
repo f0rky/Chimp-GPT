@@ -21,6 +21,7 @@ const url = require('url');
 // This delays loading until the functions are actually called
 let testWeatherApi, testCircuitBreaker, testHumanCircuitBreaker, testInputSanitizer;
 let testApiKeyManager, testErrorClasses, testCommandHandler, testSecurityHardening;
+let testDashboardSecurity;
 
 // Function to load modules dynamically to avoid circular dependencies
 function loadTestModules() {
@@ -33,6 +34,7 @@ function loadTestModules() {
     testErrorClasses = require('./errorClassesTest').testErrorClasses;
     testCommandHandler = require('./commandHandlerTest').testCommandHandler;
     testSecurityHardening = require('./securityHardeningTest');
+    testDashboardSecurity = require('./dashboardSecurityTest');
   }
 }
 
@@ -712,6 +714,24 @@ async function runSecurityHardeningTests() {
   }
 }
 
+async function runDashboardSecurityTests() {
+  try {
+    logger.info('Running dashboard security tests');
+    loadTestModules();
+    const results = await testDashboardSecurity();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running dashboard security tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 /**
  * Run API key manager tests
  *
@@ -776,6 +796,7 @@ if (require.main === module) {
       { name: 'Command Handler', fn: runCommandHandlerTests },
       { name: 'Input Sanitizer', fn: runInputSanitizerTests },
       { name: 'Security Hardening', fn: runSecurityHardeningTests },
+      { name: 'Dashboard Security', fn: runDashboardSecurityTests },
       { name: 'API Key Manager', fn: runApiKeyManagerTests },
       { name: 'Human Circuit Breaker', fn: runHumanCircuitBreakerTests },
       { name: 'Circuit Breaker', fn: runCircuitBreakerTests },
@@ -845,4 +866,6 @@ module.exports = {
   runApiKeyManagerTests,
   runErrorClassesTests,
   runCommandHandlerTests,
+  runSecurityHardeningTests,
+  runDashboardSecurityTests,
 };
