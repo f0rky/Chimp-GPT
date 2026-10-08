@@ -112,13 +112,57 @@ const { runCorsTests, runRateLimiterTests } = require('../../tests/unit/testRunn
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
-// --- Breaker Management API ---
-const OWNER_TOKEN = process.env.OWNER_TOKEN || 'changeme';
+const crypto = require('crypto');
 
-// This function is exported for use in future protected endpoints
+// --- Owner Token Authorization ---
+// There is intentionally NO default/fallback value here. If OWNER_TOKEN is not
+// configured, requireOwnerToken fails closed (denies every request) rather than
+// authorizing against a known/guessable default value.
+function getConfiguredOwnerToken() {
+  const value = process.env.OWNER_TOKEN;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Constant-time string comparison. Returns false (without leaking timing
+ * information proportional to a byte-by-byte comparison) when the inputs are
+ * not both non-empty strings of the same length.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function constantTimeStringEquals(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return false;
+  }
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) {
+    // Still perform a fixed-cost comparison so the response time does not
+    // reveal whether the length matched.
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Owner-only authorization middleware.
+ *
+ * Fails closed: if OWNER_TOKEN is not configured, every request is denied.
+ * Accepts ONLY the `X-Owner-Token` request header — never query strings or
+ * request bodies, which can leak into logs, browser history, or proxies.
+ */
 function requireOwnerToken(req, res, next) {
-  const token = req.headers['x-owner-token'] || req.query.token || req.body.token;
-  if (token !== OWNER_TOKEN) {
+  const configuredToken = getConfiguredOwnerToken();
+  if (!configuredToken) {
+    logger.error('OWNER_TOKEN is not configured; denying owner-protected request (fail closed)');
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const providedToken = req.headers['x-owner-token'];
+  if (!constantTimeStringEquals(providedToken, configuredToken)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   return next();
@@ -126,6 +170,7 @@ function requireOwnerToken(req, res, next) {
 
 // Export the middleware for use in route definitions
 module.exports.requireOwnerToken = requireOwnerToken;
+module.exports.constantTimeStringEquals = constantTimeStringEquals;
 
 const stats = {
   startTime: new Date(),
@@ -180,6 +225,12 @@ function initStatusServer(options = {}) {
 
     // Add body parsing middleware
     app.use(express.json());
+
+    if (!getConfiguredOwnerToken()) {
+      logger.error(
+        'OWNER_TOKEN is not set. All owner-protected dashboard endpoints will deny every request until it is configured.'
+      );
+    }
 
     // If demo mode is enabled, import the demo data generator
     if (demoMode) {
@@ -690,4 +741,6 @@ if (require.main === module) {
 module.exports = {
   initStatusServer,
   shutdownGracefully,
+  requireOwnerToken,
+  constantTimeStringEquals,
 };

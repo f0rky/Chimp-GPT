@@ -1,6 +1,57 @@
 // Unified Dashboard JavaScript
 // Combines functionality from status page, performance dashboard, and settings
 
+// ==================== OWNER TOKEN HELPER ====================
+// The owner token is held ONLY in memory for the lifetime of this page.
+// It is never written to localStorage/sessionStorage, never placed in a
+// query string, and never sent in a request body — it is attached solely
+// via the X-Owner-Token request header. A reload or loss of this in-memory
+// value always requires the user to re-enter the token.
+let _ownerToken = null;
+
+/**
+ * Prompt the user for the owner token if one is not already held in memory.
+ * Returns null if the user cancels the prompt.
+ *
+ * @returns {string|null}
+ */
+function getOwnerToken() {
+  if (_ownerToken) return _ownerToken;
+  const entered = window.prompt('Enter owner token:');
+  if (!entered) return null;
+  _ownerToken = entered;
+  return _ownerToken;
+}
+
+/** Discard the in-memory owner token, forcing re-entry on next use. */
+function clearOwnerToken() {
+  _ownerToken = null;
+}
+
+/**
+ * Fetch wrapper for owner-protected endpoints. Prompts for the token (once,
+ * reused for subsequent calls) and attaches it via the X-Owner-Token header
+ * only. On a 403 response the in-memory token is discarded so the next
+ * protected call re-prompts rather than silently reusing a bad token.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options]
+ * @returns {Promise<Response|null>} null if the user cancelled the prompt
+ */
+async function ownerFetch(url, options = {}) {
+  const token = getOwnerToken();
+  if (!token) return null;
+
+  const headers = new Headers(options.headers || {});
+  headers.set('X-Owner-Token', token);
+
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 403) {
+    clearOwnerToken();
+  }
+  return response;
+}
+
 // Global state
 const state = {
   currentTab: 'status',
@@ -221,57 +272,69 @@ function executeDebugCommand(command) {
 function initializeCharts() {
   logDebug('Initializing charts...', 'info');
 
+  if (typeof Chart === 'undefined') {
+    logDebug('Chart.js is not available; charts will show a no-data placeholder', 'warn');
+    showChartUnavailable('metrics-chart');
+    showChartUnavailable('latencyChart');
+    return;
+  }
+
   // Status page metrics chart
   const metricsCanvas = document.getElementById('metrics-chart');
   logDebug('Metrics canvas found: ' + (metricsCanvas ? 'yes' : 'no'), 'info');
 
   if (metricsCanvas) {
-    const metricsCtx = metricsCanvas.getContext('2d');
-    state.charts.metrics = new Chart(metricsCtx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: 'Response Time (ms)',
-            data: [],
-            borderColor: '#7289da',
-            backgroundColor: 'rgba(114, 137, 218, 0.1)',
-            tension: 0.4,
-          },
-          {
-            label: 'CPU Usage (%)',
-            data: [],
-            borderColor: '#43b581',
-            backgroundColor: 'rgba(67, 181, 129, 0.1)',
-            tension: 0.4,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: 'bottom',
-          },
+    try {
+      const metricsCtx = metricsCanvas.getContext('2d');
+      state.charts.metrics = new Chart(metricsCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Response Time (ms)',
+              data: [],
+              borderColor: '#7289da',
+              backgroundColor: 'rgba(114, 137, 218, 0.1)',
+              tension: 0.4,
+            },
+            {
+              label: 'CPU Usage (%)',
+              data: [],
+              borderColor: '#43b581',
+              backgroundColor: 'rgba(67, 181, 129, 0.1)',
+              tension: 0.4,
+            },
+          ],
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
             },
           },
-          x: {
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)',
+              },
+            },
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)',
+              },
             },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      logDebug('Error initializing metrics chart: ' + error.message, 'error');
+      showChartUnavailable('metrics-chart');
+    }
   }
 
   // Performance dashboard latency chart
@@ -279,58 +342,80 @@ function initializeCharts() {
   logDebug('Latency canvas found: ' + (latencyCanvas ? 'yes' : 'no'), 'info');
 
   if (latencyCanvas) {
-    const latencyCtx = latencyCanvas.getContext('2d');
-    state.charts.latency = new Chart(latencyCtx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: 'OpenAI',
-            data: [],
-            borderColor: '#7289da',
-            tension: 0.4,
-          },
-          {
-            label: 'Weather',
-            data: [],
-            borderColor: '#43b581',
-            tension: 0.4,
-          },
-          {
-            label: 'Other',
-            data: [],
-            borderColor: '#faa61a',
-            tension: 0.4,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false,
-          },
+    try {
+      const latencyCtx = latencyCanvas.getContext('2d');
+      state.charts.latency = new Chart(latencyCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'OpenAI',
+              data: [],
+              borderColor: '#7289da',
+              tension: 0.4,
+            },
+            {
+              label: 'Weather',
+              data: [],
+              borderColor: '#43b581',
+              tension: 0.4,
+            },
+            {
+              label: 'Other',
+              data: [],
+              borderColor: '#faa61a',
+              tension: 0.4,
+            },
+          ],
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false,
             },
           },
-          x: {
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)',
+              },
+            },
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)',
+              },
             },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      logDebug('Error initializing latency chart: ' + error.message, 'error');
+      showChartUnavailable('latencyChart');
+    }
   }
 
   logDebug('Charts initialized: ' + Object.keys(state.charts).length + ' charts', 'info');
+}
+
+/**
+ * Replace a chart canvas with a safe "no data" placeholder when Chart.js is
+ * unavailable or chart construction failed, instead of leaving a blank
+ * canvas or throwing during initialization.
+ *
+ * @param {string} canvasId
+ */
+function showChartUnavailable(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !canvas.parentNode) return;
+  const placeholder = document.createElement('p');
+  placeholder.className = 'text-center chart-unavailable';
+  placeholder.textContent = 'Chart unavailable (no data)';
+  canvas.parentNode.insertBefore(placeholder, canvas);
+  canvas.style.display = 'none';
 }
 
 // Data Fetching
@@ -423,7 +508,15 @@ async function fetchPerformanceDataForStatus() {
 
 async function fetchFunctionResults() {
   try {
-    const response = await fetch('/function-results/summary');
+    const response = await ownerFetch('/function-results/summary');
+    if (!response) {
+      showOwnerTokenRequired('function-summary');
+      return;
+    }
+    if (!response.ok) {
+      showOwnerTokenRequired('function-summary');
+      return;
+    }
     const data = await response.json();
 
     logDebug('Function results summary received', 'info');
@@ -437,7 +530,15 @@ async function fetchFunctionResults() {
 
 async function fetchBlockedUsers() {
   try {
-    const response = await fetch('/blocked-users');
+    const response = await ownerFetch('/blocked-users');
+    if (!response) {
+      showOwnerTokenRequired('blocked-users-container');
+      return;
+    }
+    if (!response.ok) {
+      showOwnerTokenRequired('blocked-users-container');
+      return;
+    }
     const data = await response.json();
 
     updateBlockedUsers(data);
@@ -449,7 +550,15 @@ async function fetchBlockedUsers() {
 
 async function fetchSettings() {
   try {
-    const response = await fetch('/settings');
+    const response = await ownerFetch('/settings');
+    if (!response) {
+      showOwnerTokenRequired('settings-list');
+      return;
+    }
+    if (!response.ok) {
+      showOwnerTokenRequired('settings-list');
+      return;
+    }
     const data = await response.json();
 
     updateSettingsDisplay(data);
@@ -457,6 +566,31 @@ async function fetchSettings() {
   } catch (error) {
     logDebug(`Error fetching settings: ${error.message}`, 'error');
   }
+}
+
+/**
+ * Render a "owner token required" placeholder into a container instead of
+ * rendering protected content. Used whenever an owner-protected tab is
+ * opened without (or with an invalid) owner token in memory.
+ *
+ * @param {string} containerId
+ */
+function showOwnerTokenRequired(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  const message = document.createElement('p');
+  message.className = 'text-center';
+  message.textContent = 'Owner token required. Click to enter it and reload this tab.';
+  const button = document.createElement('button');
+  button.className = 'btn btn-secondary';
+  button.textContent = 'Enter Owner Token';
+  button.addEventListener('click', () => {
+    clearOwnerToken();
+    loadTabData(state.currentTab);
+  });
+  container.appendChild(message);
+  container.appendChild(button);
 }
 
 // Display Updates
@@ -550,8 +684,10 @@ function updateStatusDisplay(data) {
   // Update rate limits
   updateRateLimits(data.stats?.rateLimits);
 
-  // Update the metrics chart with real data
-  updateMetricsChart(data);
+  // Note: the metrics chart is updated exclusively from real performance
+  // data (see updateStatusResponseTime), not from this health payload. The
+  // health endpoint doesn't carry a real responseTime, and plotting from
+  // two independent pollers caused the chart to visibly flicker/reset.
 }
 
 function updateStatusResponseTime(data) {
@@ -564,27 +700,17 @@ function updateStatusResponseTime(data) {
   const avgResponseTimeEl = document.getElementById('avg-response-time');
 
   if (responseTimeEl && avgResponseTimeEl) {
-    // Get response time from the correct field name (with underscores)
-    let avgResponseTime = 0;
+    // Use ONLY the real message_processing summary — no fallback scan over
+    // arbitrary summary fields and no randomly generated value.
+    const messageProcessingAvg = data.summary.message_processing?.avg;
+    const hasRealData = typeof messageProcessingAvg === 'number';
+    const avgResponseTime = hasRealData ? Math.round(messageProcessingAvg) : null;
 
-    if (data.summary.message_processing?.avg) {
-      avgResponseTime = Math.round(data.summary.message_processing.avg);
-    } else if (data.summary.openai_api?.avg) {
-      avgResponseTime = Math.round(data.summary.openai_api.avg);
-    } else {
-      // Fallback to any field with avg
-      for (const [_key, value] of Object.entries(data.summary)) {
-        if (value && value.avg) {
-          avgResponseTime = Math.round(value.avg);
-          break;
-        }
-      }
-    }
-    responseTimeEl.textContent = `${avgResponseTime} ms`;
-    avgResponseTimeEl.textContent = `${avgResponseTime} ms`;
+    responseTimeEl.textContent = hasRealData ? `${avgResponseTime} ms` : '-- ms';
+    avgResponseTimeEl.textContent = hasRealData ? `${avgResponseTime} ms` : '-- ms';
 
-    // Also update the chart if we're on the status tab
-    if (state.currentTab === 'status') {
+    // Also update the chart if we're on the status tab, using only real data
+    if (state.currentTab === 'status' && hasRealData) {
       updateMetricsChart({ stats: { responseTime: avgResponseTime }, system: {} });
     }
   }
@@ -840,19 +966,22 @@ function updateMetricsChart(data) {
     return;
   }
 
-  // Add new data point
-  const now = new Date().toLocaleTimeString();
-  state.performanceData.labels.push(now);
-
-  // Use actual response time from performance data if available
-  const responseTime = data.stats?.responseTime || Math.random() * 100 + 50;
-  state.performanceData.responseTime.push(responseTime);
-
-  // Calculate actual CPU usage from system data
+  // Only plot real data — never fabricate a value with a random number generator.
+  const responseTime =
+    typeof data.stats?.responseTime === 'number' ? data.stats.responseTime : null;
   const cpuUsage =
     data.system?.loadAvg && data.system?.cpus
       ? Math.round((data.system.loadAvg[0] / data.system.cpus) * 100)
-      : Math.random() * 20 + 10;
+      : null;
+
+  if (responseTime === null && cpuUsage === null) {
+    // Nothing real to plot for this update; skip rather than inventing data.
+    return;
+  }
+
+  const now = new Date().toLocaleTimeString();
+  state.performanceData.labels.push(now);
+  state.performanceData.responseTime.push(responseTime);
   state.performanceData.cpuUsage.push(cpuUsage);
 
   // Keep only last 20 points
@@ -1037,7 +1166,15 @@ function updateClock() {
 async function runTests() {
   logDebug('Running tests...', 'info');
   try {
-    const response = await fetch('/run-tests');
+    const response = await ownerFetch('/run-tests');
+    if (!response) {
+      logDebug('Run tests cancelled: owner token required', 'warn');
+      return;
+    }
+    if (!response.ok) {
+      logDebug(`Run tests failed: HTTP ${response.status}`, 'error');
+      return;
+    }
     const _results = await response.json();
     logDebug('Tests completed successfully', 'info');
     logDebug('Test results received from API', 'info');
@@ -1050,7 +1187,15 @@ async function resetStats() {
   if (!confirm('Are you sure you want to reset all statistics?')) return;
 
   try {
-    const response = await fetch('/reset-stats', { method: 'POST' });
+    const response = await ownerFetch('/reset-stats', { method: 'POST' });
+    if (!response) {
+      logDebug('Reset stats cancelled: owner token required', 'warn');
+      return;
+    }
+    if (!response.ok) {
+      logDebug(`Failed to reset statistics: HTTP ${response.status}`, 'error');
+      return;
+    }
     const result = await response.json();
 
     if (result.success) {
@@ -1065,18 +1210,23 @@ async function resetStats() {
 }
 
 async function unblockUser(userId) {
-  const token = prompt('Enter owner token:');
-  if (!token) return;
-
   try {
-    const response = await fetch('/unblock-user', {
+    const response = await ownerFetch('/unblock-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Owner-Token': token,
       },
       body: JSON.stringify({ userId }),
     });
+
+    if (!response) {
+      logDebug('Unblock cancelled: owner token required', 'warn');
+      return;
+    }
+    if (!response.ok) {
+      logDebug(`Failed to unblock user: HTTP ${response.status}`, 'error');
+      return;
+    }
 
     const result = await response.json();
 
@@ -1157,7 +1307,15 @@ function filterSettings(filter) {
 
 async function loadFunctionDetails(func) {
   try {
-    const response = await fetch(`/function-results?limit=10`);
+    const response = await ownerFetch(`/function-results?limit=10`);
+    if (!response) {
+      logDebug(`Skipped loading details for ${func}: owner token required`, 'warn');
+      return;
+    }
+    if (!response.ok) {
+      logDebug(`Error loading details for ${func}: HTTP ${response.status}`, 'error');
+      return;
+    }
     const data = await response.json();
 
     // Display the results for this function
@@ -1225,26 +1383,27 @@ function updateWeatherResults(weatherData) {
   recent.forEach(item => {
     const div = document.createElement('div');
     div.className = 'result-item';
-    if (item.error) {
-      const strongElement = document.createElement('strong');
-      strongElement.textContent = item.location;
 
+    // Stored schema: { params: { location }, result: { location: {...}, current: {...} } }
+    const locationName = item.result?.location?.name || item.params?.location || 'Unknown location';
+    const current = item.result?.current;
+    const temperature = typeof current?.temp_c === 'number' ? current.temp_c : null;
+    const conditionText = current?.condition?.text;
+
+    const strongElement = document.createElement('strong');
+    strongElement.textContent = locationName;
+    div.appendChild(strongElement);
+
+    if (temperature !== null && conditionText) {
+      div.appendChild(document.createTextNode(`: ${temperature}°C, ${conditionText}`));
+    } else {
       const errorSpan = document.createElement('span');
       errorSpan.className = 'error';
-      errorSpan.textContent = item.errorMessage;
-
-      div.appendChild(strongElement);
+      errorSpan.textContent = 'Weather data unavailable';
       div.appendChild(document.createTextNode(': '));
       div.appendChild(errorSpan);
-    } else {
-      const strongElement = document.createElement('strong');
-      strongElement.textContent = item.location;
-
-      div.appendChild(strongElement);
-      div.appendChild(
-        document.createTextNode(`: ${item.temperature}°${item.unit}, ${item.condition}`)
-      );
     }
+
     container.appendChild(div);
   });
 }
@@ -1306,13 +1465,17 @@ function formatDateForInput(date) {
 
 async function checkDeletedMessagesAuthentication() {
   try {
-    const response = await fetch('/api/deleted-messages/auth');
+    const response = await ownerFetch('/api/deleted-messages/auth');
+    if (!response) {
+      showDeletedError('Owner token required to view deleted messages');
+      return;
+    }
     if (!response.ok) {
       showDeletedError('Access denied: Owner privileges required');
       return;
     }
     const data = await response.json();
-    currentDeletedUser = data.userId;
+    currentDeletedUser = data.authenticated === true;
     logDebug('Deleted messages authentication successful', 'info');
   } catch (error) {
     showDeletedError('Authentication failed: ' + error.message);
@@ -1327,8 +1490,12 @@ async function loadDeletedMessages() {
   try {
     const filters = getDeletedMessagesFilters();
     const queryString = new URLSearchParams(filters).toString();
-    const response = await fetch(`/api/deleted-messages?${queryString}`);
+    const response = await ownerFetch(`/api/deleted-messages?${queryString}`);
 
+    if (!response) {
+      showDeletedError('Owner token required to view deleted messages');
+      return;
+    }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -1758,7 +1925,7 @@ async function updateDeletedMessageStatus(messageId, status) {
   try {
     // Validate inputs
     if (!currentDeletedUser) {
-      throw new Error('User not authenticated. Please refresh the page.');
+      throw new Error('Not authenticated. Please enter the owner token and try again.');
     }
     if (!messageId) {
       throw new Error('Invalid message ID');
@@ -1768,13 +1935,12 @@ async function updateDeletedMessageStatus(messageId, status) {
     const notes = window.prompt(`Enter notes for ${status} status (optional):`);
     if (notes === null) return; // User cancelled
 
-    logDebug(`Updating message ${messageId} to ${status} by user ${currentDeletedUser}`, 'info');
+    logDebug(`Updating message ${messageId} to ${status}`, 'info');
 
-    const response = await fetch('/api/deleted-messages/status', {
+    const response = await ownerFetch('/api/deleted-messages/status', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': currentDeletedUser,
       },
       body: JSON.stringify({
         messageId,
@@ -1783,6 +1949,9 @@ async function updateDeletedMessageStatus(messageId, status) {
       }),
     });
 
+    if (!response) {
+      throw new Error('Owner token required');
+    }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -1860,22 +2029,18 @@ async function updateDeletedMessageStatusFromModal(messageId, status) {
   try {
     // Validate inputs
     if (!currentDeletedUser) {
-      throw new Error('User not authenticated. Please refresh the page.');
+      throw new Error('Not authenticated. Please enter the owner token and try again.');
     }
     if (!messageId) {
       throw new Error('Invalid message ID');
     }
 
-    logDebug(
-      `Updating message ${messageId} to ${status} from modal by user ${currentDeletedUser}`,
-      'info'
-    );
+    logDebug(`Updating message ${messageId} to ${status} from modal`, 'info');
 
-    const response = await fetch('/api/deleted-messages/status', {
+    const response = await ownerFetch('/api/deleted-messages/status', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': currentDeletedUser,
       },
       body: JSON.stringify({
         messageId,
@@ -1884,6 +2049,9 @@ async function updateDeletedMessageStatusFromModal(messageId, status) {
       }),
     });
 
+    if (!response) {
+      throw new Error('Owner token required');
+    }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

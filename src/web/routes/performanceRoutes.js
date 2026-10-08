@@ -12,7 +12,14 @@ const logger = createLogger('performanceRoutes');
  * @param {{ stats: Object, statsStorage: Object, functionResults: Object, performanceHistory: Object, serverState: Object }} deps
  */
 function createRouter(deps) {
-  const { stats, statsStorage, functionResults, performanceHistory, serverState } = deps;
+  const {
+    stats,
+    statsStorage,
+    functionResults,
+    performanceHistory,
+    serverState,
+    requireOwnerToken,
+  } = deps;
   const router = Router();
 
   // GET /performance
@@ -127,7 +134,7 @@ function createRouter(deps) {
   });
 
   // POST /reset-stats
-  router.post('/reset-stats', async (req, res) => {
+  router.post('/reset-stats', requireOwnerToken, async (req, res) => {
     try {
       const success = await statsStorage.resetStats();
       if (success) {
@@ -148,7 +155,7 @@ function createRouter(deps) {
   });
 
   // POST /repair-stats
-  router.post('/repair-stats', async (req, res) => {
+  router.post('/repair-stats', requireOwnerToken, async (req, res) => {
     try {
       const repairResult = await statsStorage.repairStatsFile();
       if (repairResult) {
@@ -165,7 +172,7 @@ function createRouter(deps) {
   });
 
   // POST /repair-function-results
-  router.post('/repair-function-results', async (req, res) => {
+  router.post('/repair-function-results', requireOwnerToken, async (req, res) => {
     try {
       const functionResultsModule = require('../../core/functionResults');
       const repairResult = await functionResultsModule.repairResultsFile();
@@ -187,7 +194,7 @@ function createRouter(deps) {
   // GET /function-results
   let lastLoggedTime = 0;
   const LOG_INTERVAL_MS = 60000;
-  router.get('/function-results', async (req, res) => {
+  router.get('/function-results', requireOwnerToken, async (req, res) => {
     const now = Date.now();
     if (now - lastLoggedTime > LOG_INTERVAL_MS) {
       logger.debug('Getting function results');
@@ -216,7 +223,7 @@ function createRouter(deps) {
   });
 
   // GET /function-results/summary
-  router.get('/function-results/summary', async (req, res) => {
+  router.get('/function-results/summary', requireOwnerToken, async (req, res) => {
     try {
       const allResults = await functionResults.getAllResults();
       const summary = {};

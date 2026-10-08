@@ -17,7 +17,7 @@ function createRouter(deps) {
   let maliciousUserManagerInitialized = false;
 
   // GET /blocked-users
-  router.get('/blocked-users', async (req, res) => {
+  router.get('/blocked-users', requireOwnerToken, async (req, res) => {
     try {
       if (!maliciousUserManagerInitialized) {
         await maliciousUserManager.init();
@@ -59,7 +59,7 @@ function createRouter(deps) {
   });
 
   // GET /settings — builds response from CONFIG_SCHEMA, omitting sensitive fields
-  router.get('/settings', async (req, res) => {
+  router.get('/settings', requireOwnerToken, async (req, res) => {
     try {
       const config = require('../../core/configValidator');
       const { CONFIG_SCHEMA } = config;
@@ -68,6 +68,7 @@ function createRouter(deps) {
       const SENSITIVE_KEYS = new Set([
         'DISCORD_TOKEN',
         'OPENAI_API_KEY',
+        'OPENROUTER_API_KEY',
         'X_RAPIDAPI_KEY',
         'SERPAPI_API_KEY',
         'BRAVE_SEARCH_API_KEY',
@@ -121,7 +122,7 @@ function createRouter(deps) {
   });
 
   // GET /run-tests
-  router.get('/run-tests', async (req, res) => {
+  router.get('/run-tests', requireOwnerToken, async (req, res) => {
     try {
       const { runDiagnostics } = require('../../utils/diagnostics');
       const results = await runDiagnostics();
