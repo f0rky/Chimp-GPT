@@ -13,10 +13,10 @@ const config = require('../../core/configValidator');
 const logger = createLogger('healthRoutes');
 
 /**
- * @param {{ stats: Object, statsStorage: Object }} deps
+ * @param {{ stats: Object, statsStorage: Object, requireOwnerToken: Function }} deps
  */
 function createRouter(deps) {
-  const { stats, statsStorage } = deps;
+  const { stats, statsStorage, requireOwnerToken } = deps;
   const router = Router();
 
   // GET /api — index of available endpoints
@@ -138,8 +138,8 @@ function createRouter(deps) {
     });
   });
 
-  // GET /health/detailed
-  router.get('/health/detailed', async (req, res) => {
+  // GET /health/detailed — includes sensitive provider configuration details.
+  router.get('/health/detailed', requireOwnerToken, async (req, res) => {
     try {
       const {
         detectLLMProviders,

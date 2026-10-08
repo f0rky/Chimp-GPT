@@ -56,7 +56,9 @@ async function ownerFetch(url, options = {}) {
 const state = {
   currentTab: 'status',
   theme: localStorage.getItem('theme') || 'dark',
-  debugCollapsed: localStorage.getItem('debugCollapsed') === 'true',
+  // Keep the intrusive debug console out of the way on first load. Users can
+  // explicitly expand it, and that choice is persisted as "false".
+  debugCollapsed: localStorage.getItem('debugCollapsed') !== 'false',
   updateIntervals: {
     status: 10000, // 10 seconds
     performance: 5000, // 5 seconds
@@ -458,7 +460,11 @@ async function fetchHealthData() {
 
 async function fetchDetailedHealthData() {
   try {
-    const response = await fetch('/health/detailed');
+    const response = await ownerFetch('/health/detailed');
+    if (!response || response.status === 403) {
+      showDetailedHealthOwnerTokenRequired();
+      return;
+    }
     const data = await response.json();
 
     logDebug('Detailed health data received from API', 'info');
@@ -466,8 +472,16 @@ async function fetchDetailedHealthData() {
     logDebug('LLM providers data updated', 'info');
   } catch (error) {
     logDebug('Error fetching detailed health data: ' + error.message, 'error');
-    // Don't show user error for this, just log it
   }
+}
+
+function showDetailedHealthOwnerTokenRequired() {
+  const message = 'Owner token required for detailed provider health';
+  for (const id of ['primaryLLMProvider', 'imageLLMProvider']) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = message;
+  }
+  logDebug(message, 'info');
 }
 
 async function fetchPerformanceData() {

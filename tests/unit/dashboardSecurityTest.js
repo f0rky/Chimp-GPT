@@ -242,28 +242,86 @@ async function testSecurityHardeningDashboard() {
     delete process.env.X_RAPIDAPI_KEY;
   }
 
-  // ---- 5. performanceRoutes: destructive/sensitive routes require the token ----
+  // ---- 5. healthRoutes: detailed diagnostics require the owner token; basic health remains public ----
+  try {
+    process.env.OWNER_TOKEN = 'health-routes-owner-token';
+    let loadStatsCalls = 0;
+    const healthRoutes = require('../../src/web/routes/healthRoutes');
+    const app = express();
+    app.use(
+      '/',
+      healthRoutes.createRouter({
+        stats: {
+          startTime: new Date(),
+          messageCount: 0,
+          apiCalls: {},
+          errors: {},
+          rateLimits: { hit: 0, users: new Set(), userCounts: {} },
+        },
+        statsStorage: {
+          async loadStats() {
+            loadStatsCalls += 1;
+            return { messageCount: 0, apiCalls: {}, errors: {}, rateLimits: {} };
+          },
+        },
+        requireOwnerToken,
+      })
+    );
+    const { url, close } = await startServer(app);
+    try {
+      const detailedNoAuth = await fetch(`${url}/health/detailed`);
+      assert.equal(detailedNoAuth.status, 403);
+      const detailedWrongAuth = await fetch(`${url}/health/detailed`, {
+        headers: { 'X-Owner-Token': 'wrong-token' },
+      });
+      assert.equal(detailedWrongAuth.status, 403);
+      assert.equal(loadStatsCalls, 0, 'detailed health handler must not run before authorization');
+
+      const basicHealth = await fetch(`${url}/health`);
+      assert.equal(basicHealth.status, 200, 'basic health probe remains public');
+      assert.equal(loadStatsCalls, 1);
+    } finally {
+      await close();
+    }
+    results.push({
+      name: 'healthRoutes protects detailed diagnostics before handler execution and keeps basic health public',
+      success: true,
+    });
+  } catch (error) {
+    results.push({
+      name: 'healthRoutes protects detailed diagnostics before handler execution and keeps basic health public',
+      success: false,
+      error: error.message,
+    });
+  }
+
+  // ---- 6. performanceRoutes: destructive/sensitive routes require the token ----
   try {
     process.env.OWNER_TOKEN = 'performance-routes-owner-token';
 
     const stats = { apiCalls: {}, errors: {}, rateLimits: { hit: 0, users: new Set() } };
     const fakeStatsStorage = {
+      repairStatsCalls: 0,
       async resetStats() {
         return true;
       },
       async repairStatsFile() {
+        this.repairStatsCalls += 1;
         return true;
       },
     };
     const fakeFunctionResults = {
+      repairCalls: 0,
       async getAllResults() {
         return { weather: [] };
       },
       async repairResultsFile() {
+        this.repairCalls += 1;
         return true;
       },
     };
     const fakePerformanceHistory = {
+      addMetric: () => undefined,
       getHourlyData: () => [],
       getDailyData: () => [],
       getRecentMetrics: () => [],
@@ -303,23 +361,33 @@ async function testSecurityHardeningDashboard() {
       for (const { method, path: routePath } of protectedRequests) {
         const denied = await fetch(`${url}${routePath}`, { method });
         assert.equal(denied.status, 403, `${method} ${routePath} should deny without token`);
+      }
 
+      // Exercise authorized non-mutating reads only. Do not authorize a repair
+      // request: route authorization is proven above, while executing repairs
+      // would turn this unit test into a data-mutating integration test.
+      for (const routePath of ['/function-results', '/function-results/summary']) {
         const allowed = await fetch(`${url}${routePath}`, {
-          method,
           headers: { 'X-Owner-Token': 'performance-routes-owner-token' },
         });
-        assert.equal(allowed.status, 200, `${method} ${routePath} should allow with token`);
+        assert.equal(allowed.status, 200, `GET ${routePath} should allow with token`);
       }
+      assert.equal(fakeStatsStorage.repairStatsCalls, 0, 'test must not execute stats repair');
+      assert.equal(
+        fakeFunctionResults.repairCalls,
+        0,
+        'test must not execute function-results repair'
+      );
     } finally {
       await close();
     }
     results.push({
-      name: 'performanceRoutes protects destructive/sensitive routes behind owner token',
+      name: 'performanceRoutes rejects destructive routes before repair and permits safe reads',
       success: true,
     });
   } catch (error) {
     results.push({
-      name: 'performanceRoutes protects destructive/sensitive routes behind owner token',
+      name: 'performanceRoutes rejects destructive routes before repair and permits safe reads',
       success: false,
       error: error.message,
     });
@@ -448,6 +516,7 @@ async function testSecurityHardeningDashboard() {
     // No direct unauthenticated fetch to owner-protected endpoints remains.
     for (const protectedPath of [
       "fetch('/settings')",
+      "fetch('/health/detailed')",
       "fetch('/blocked-users')",
       "fetch('/run-tests')",
       "fetch('/reset-stats'",

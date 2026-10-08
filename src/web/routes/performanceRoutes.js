@@ -174,8 +174,7 @@ function createRouter(deps) {
   // POST /repair-function-results
   router.post('/repair-function-results', requireOwnerToken, async (req, res) => {
     try {
-      const functionResultsModule = require('../../core/functionResults');
-      const repairResult = await functionResultsModule.repairResultsFile();
+      const repairResult = await functionResults.repairResultsFile();
       if (repairResult) {
         res.json({ success: true, message: 'Function results file repaired successfully' });
       } else {
