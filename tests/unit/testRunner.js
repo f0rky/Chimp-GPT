@@ -20,7 +20,7 @@ const url = require('url');
 // Import test modules using function-level imports to avoid circular dependencies
 // This delays loading until the functions are actually called
 let testWeatherApi, testCircuitBreaker, testHumanCircuitBreaker, testInputSanitizer;
-let testApiKeyManager, testErrorClasses, testCommandHandler;
+let testApiKeyManager, testErrorClasses, testCommandHandler, testSecurityHardening;
 
 // Function to load modules dynamically to avoid circular dependencies
 function loadTestModules() {
@@ -32,6 +32,7 @@ function loadTestModules() {
     testApiKeyManager = require('./apiKeyManagerTest').testApiKeyManager;
     testErrorClasses = require('./errorClassesTest').testErrorClasses;
     testCommandHandler = require('./commandHandlerTest').testCommandHandler;
+    testSecurityHardening = require('./securityHardeningTest');
   }
 }
 
@@ -693,6 +694,24 @@ async function runInputSanitizerTests() {
   }
 }
 
+async function runSecurityHardeningTests() {
+  try {
+    logger.info('Running security hardening tests');
+    loadTestModules();
+    const results = await testSecurityHardening();
+    return {
+      success: results.success,
+      details: results.results,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Error running security hardening tests');
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 /**
  * Run API key manager tests
  *
@@ -756,6 +775,7 @@ if (require.main === module) {
       { name: 'Error Classes', fn: runErrorClassesTests },
       { name: 'Command Handler', fn: runCommandHandlerTests },
       { name: 'Input Sanitizer', fn: runInputSanitizerTests },
+      { name: 'Security Hardening', fn: runSecurityHardeningTests },
       { name: 'API Key Manager', fn: runApiKeyManagerTests },
       { name: 'Human Circuit Breaker', fn: runHumanCircuitBreakerTests },
       { name: 'Circuit Breaker', fn: runCircuitBreakerTests },

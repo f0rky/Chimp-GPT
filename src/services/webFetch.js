@@ -8,6 +8,7 @@
 const axios = require('axios');
 const { createLogger } = require('../core/logger');
 const retryWithBreaker = require('../utils/retryWithBreaker');
+const { loadFragment, NON_CONTENT_ELEMENTS } = require('../utils/htmlText');
 
 const logger = createLogger('webFetch');
 
@@ -156,10 +157,18 @@ async function fetchWebContent(url, options = {}) {
  * @param {string} html - HTML content
  * @returns {Promise<Object>} Parsed content
  */
-async function parseHtmlContent(html) {
-  // Simple HTML parsing without external dependencies
-  // This is a basic implementation - for production you might want to use cheerio
+function toAbsoluteHttpUrl(value) {
+  if (!value) return null;
 
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+async function parseHtmlContent(html) {
   const result = {
     text: null,
     title: null,
@@ -170,51 +179,39 @@ async function parseHtmlContent(html) {
   };
 
   try {
-    // Extract title
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch) {
-      result.title = titleMatch[1].trim();
-    }
+    const $ = loadFragment(html);
+    result.title = $('title').first().text().trim() || null;
 
-    // Extract meta description
-    const descMatch = html.match(
-      /<meta[^>]*name=['""]description['""][^>]*content=['""]([^'""]+)['""][^>]*>/i
-    );
-    if (descMatch) {
-      result.description = descMatch[1].trim();
-    }
+    const descriptionElement = $('meta')
+      .toArray()
+      .find(element => $(element).attr('name')?.toLowerCase() === 'description');
+    result.description = descriptionElement
+      ? $(descriptionElement).attr('content')?.trim() || null
+      : null;
 
-    // Extract links
-    const linkMatches = html.matchAll(/<a[^>]*href=['""]([^'""]+)['""][^>]*>([^<]*)<\/a>/gi);
-    for (const match of linkMatches) {
-      if (match[1] && match[2] && match[1].startsWith('http')) {
-        result.links.push({
-          url: match[1],
-          text: match[2].trim(),
-        });
+    $('a[href]').each((_, element) => {
+      const href = $(element).attr('href');
+      const url = typeof href === 'string' ? toAbsoluteHttpUrl(href) : null;
+      const text = $(element).text().trim();
+      if (typeof url === 'string' && text.length > 0) {
+        result.links.push({ url, text });
       }
-    }
+    });
 
-    // Extract images
-    const imgMatches = html.matchAll(
-      /<img[^>]*src=['""]([^'""]+)['""][^>]*(?:alt=['""]([^'""]*)['""])?[^>]*>/gi
-    );
-    for (const match of imgMatches) {
-      if (match[1] && match[1].startsWith('http')) {
+    $('img[src]').each((_, element) => {
+      const src = $(element).attr('src');
+      const url = typeof src === 'string' ? toAbsoluteHttpUrl(src) : null;
+      if (typeof url === 'string') {
         result.images.push({
-          url: match[1],
-          alt: match[2] || '',
+          url,
+          alt: $(element).attr('alt') || '',
         });
       }
-    }
+    });
 
-    // Extract text content (very basic - removes HTML tags)
-    let textContent = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
-      .replace(/<[^>]+>/g, ' ') // Remove HTML tags
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
+    // This output is plain text, so discard elements whose bodies are not user-visible content.
+    $(NON_CONTENT_ELEMENTS.join(',')).remove();
+    let textContent = $.root().text().replace(/\s+/g, ' ').trim();
 
     // Limit text content size
     if (textContent.length > 5000) {
@@ -235,13 +232,9 @@ async function parseHtmlContent(html) {
 
     result.markdown = markdown;
   } catch (error) {
-    logger.warn({ error }, 'HTML parsing error:');
-    // Fallback to raw text extraction
-    result.text = html
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    result.markdown = result.text;
+    logger.warn({ error }, 'HTML parsing error');
+    result.text = '';
+    result.markdown = '';
   }
 
   return result;

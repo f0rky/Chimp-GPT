@@ -89,20 +89,24 @@ function isSafeKey(key) {
 }
 
 /**
- * Safely sets a property on an object, preventing prototype pollution
+ * Safely sets a dynamic property without invoking inherited setters.
+ *
  * @param {Object} obj - The target object
- * @param {string} key - The property key
- * @param {*} value - The value to set
- * @returns {boolean} True if the property was set, false if blocked for security
+ * @param {string} key - A validated property key
+ * @param {*} value - The value to store
+ * @returns {boolean} Whether the property was written
  */
-function _safeSetProperty(obj, key, value) {
+function safeSetProperty(obj, key, value) {
   if (!isSafeKey(key)) {
-    logger.warn({ key }, 'Blocked potentially dangerous key from being set');
     return false;
   }
 
-  // Use Object.prototype.hasOwnProperty.call for safe property checking
-  obj[key] = value;
+  Object.defineProperty(obj, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
   return true;
 }
 
@@ -171,6 +175,8 @@ const DEFAULT_STATS = {
     time: 0,
     wolfram: 0,
     quake: 0,
+    gptimage: 0,
+    plugins: Object.create(null),
   },
   errors: {
     openai: 0,
@@ -179,7 +185,10 @@ const DEFAULT_STATS = {
     time: 0,
     wolfram: 0,
     quake: 0,
+    gptimage: 0,
     other: 0,
+    discordHooks: Object.create(null),
+    plugins: Object.create(null),
   },
   rateLimits: {
     hit: 0,
@@ -192,9 +201,208 @@ const DEFAULT_STATS = {
     guilds: 0,
     channels: 0,
   },
+  plugins: {
+    loaded: 0,
+    commands: 0,
+    functions: 0,
+    hooks: 0,
+  },
   lastRestart: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
 };
+
+function ensureObject(value, fallback) {
+  return value && typeof value === 'object' ? value : fallback;
+}
+
+function ensureCounterGroup(group, counterKeys) {
+  for (const counterKey of counterKeys) {
+    if (typeof group[counterKey] !== 'number') {
+      group[counterKey] = 0;
+    }
+  }
+}
+
+function ensureStatsShape(stats) {
+  stats.apiCalls = ensureObject(stats.apiCalls, {});
+  stats.errors = ensureObject(stats.errors, {});
+  stats.rateLimits = ensureObject(stats.rateLimits, {});
+  stats.discord = ensureObject(stats.discord, { ...DEFAULT_STATS.discord });
+  stats.plugins = ensureObject(stats.plugins, { ...DEFAULT_STATS.plugins });
+
+  ensureCounterGroup(stats.apiCalls, ['openai', 'weather', 'time', 'wolfram', 'quake', 'gptimage']);
+  ensureCounterGroup(stats.errors, [
+    'openai',
+    'discord',
+    'weather',
+    'time',
+    'wolfram',
+    'quake',
+    'gptimage',
+    'other',
+  ]);
+  stats.apiCalls.plugins = ensureObject(stats.apiCalls.plugins, Object.create(null));
+  stats.errors.plugins = ensureObject(stats.errors.plugins, Object.create(null));
+  stats.errors.discordHooks = ensureObject(stats.errors.discordHooks, Object.create(null));
+  ensureCounterGroup(stats.rateLimits, ['hit']);
+  stats.rateLimits.userCounts = ensureObject(stats.rateLimits.userCounts, Object.create(null));
+}
+
+function incrementDynamicCounter(container, key, amount) {
+  if (!isSafeKey(key)) return false;
+  const currentValue = Object.hasOwn(container, key) ? container[key] || 0 : 0;
+  return safeSetProperty(container, key, currentValue + amount);
+}
+
+function getPluginErrorStats(stats, pluginId) {
+  if (!isSafeKey(pluginId)) return null;
+  let pluginStats = stats.errors.plugins[pluginId];
+  if (!pluginStats || typeof pluginStats !== 'object') {
+    pluginStats = { count: 0, hooks: Object.create(null) };
+    if (!safeSetProperty(stats.errors.plugins, pluginId, pluginStats)) return null;
+  }
+  if (!pluginStats.hooks || typeof pluginStats.hooks !== 'object') {
+    pluginStats.hooks = Object.create(null);
+  }
+  return pluginStats;
+}
+
+const STAT_WRITERS = new Map([
+  [
+    'messageCount',
+    { get: stats => stats.messageCount, set: (stats, value) => (stats.messageCount = value) },
+  ],
+  [
+    'apiCalls.openai',
+    { get: stats => stats.apiCalls.openai, set: (stats, value) => (stats.apiCalls.openai = value) },
+  ],
+  [
+    'apiCalls.weather',
+    {
+      get: stats => stats.apiCalls.weather,
+      set: (stats, value) => (stats.apiCalls.weather = value),
+    },
+  ],
+  [
+    'apiCalls.time',
+    { get: stats => stats.apiCalls.time, set: (stats, value) => (stats.apiCalls.time = value) },
+  ],
+  [
+    'apiCalls.wolfram',
+    {
+      get: stats => stats.apiCalls.wolfram,
+      set: (stats, value) => (stats.apiCalls.wolfram = value),
+    },
+  ],
+  [
+    'apiCalls.quake',
+    { get: stats => stats.apiCalls.quake, set: (stats, value) => (stats.apiCalls.quake = value) },
+  ],
+  [
+    'apiCalls.gptimage',
+    {
+      get: stats => stats.apiCalls.gptimage,
+      set: (stats, value) => (stats.apiCalls.gptimage = value),
+    },
+  ],
+  [
+    'errors.openai',
+    { get: stats => stats.errors.openai, set: (stats, value) => (stats.errors.openai = value) },
+  ],
+  [
+    'errors.discord',
+    { get: stats => stats.errors.discord, set: (stats, value) => (stats.errors.discord = value) },
+  ],
+  [
+    'errors.weather',
+    { get: stats => stats.errors.weather, set: (stats, value) => (stats.errors.weather = value) },
+  ],
+  [
+    'errors.time',
+    { get: stats => stats.errors.time, set: (stats, value) => (stats.errors.time = value) },
+  ],
+  [
+    'errors.wolfram',
+    { get: stats => stats.errors.wolfram, set: (stats, value) => (stats.errors.wolfram = value) },
+  ],
+  [
+    'errors.quake',
+    { get: stats => stats.errors.quake, set: (stats, value) => (stats.errors.quake = value) },
+  ],
+  [
+    'errors.gptimage',
+    { get: stats => stats.errors.gptimage, set: (stats, value) => (stats.errors.gptimage = value) },
+  ],
+  [
+    'errors.other',
+    { get: stats => stats.errors.other, set: (stats, value) => (stats.errors.other = value) },
+  ],
+  [
+    'rateLimits.hit',
+    { get: stats => stats.rateLimits.hit, set: (stats, value) => (stats.rateLimits.hit = value) },
+  ],
+  ['discord', { get: stats => stats.discord, set: (stats, value) => (stats.discord = value) }],
+  [
+    'plugins.loaded',
+    { get: stats => stats.plugins.loaded, set: (stats, value) => (stats.plugins.loaded = value) },
+  ],
+  [
+    'plugins.commands',
+    {
+      get: stats => stats.plugins.commands,
+      set: (stats, value) => (stats.plugins.commands = value),
+    },
+  ],
+  [
+    'plugins.functions',
+    {
+      get: stats => stats.plugins.functions,
+      set: (stats, value) => (stats.plugins.functions = value),
+    },
+  ],
+  [
+    'plugins.hooks',
+    { get: stats => stats.plugins.hooks, set: (stats, value) => (stats.plugins.hooks = value) },
+  ],
+]);
+
+function setStatValue(stats, key, value, increment = false) {
+  ensureStatsShape(stats);
+
+  const writer = STAT_WRITERS.get(key);
+  if (writer) {
+    writer.set(stats, increment ? (writer.get(stats) || 0) + value : value);
+    return true;
+  }
+
+  const pluginApiMatch = /^apiCalls\.plugins\.([^.]+)$/.exec(key);
+  if (pluginApiMatch && increment) {
+    return incrementDynamicCounter(stats.apiCalls.plugins, pluginApiMatch[1], value);
+  }
+
+  const pluginErrorMatch = /^errors\.plugins\.([^.]+)\.count$/.exec(key);
+  if (pluginErrorMatch && increment) {
+    const pluginStats = getPluginErrorStats(stats, pluginErrorMatch[1]);
+    if (!pluginStats) return false;
+    pluginStats.count = (pluginStats.count || 0) + value;
+    return true;
+  }
+
+  const pluginHookMatch = /^errors\.plugins\.([^.]+)\.hooks\.([^.]+)$/.exec(key);
+  if (pluginHookMatch && increment) {
+    const pluginStats = getPluginErrorStats(stats, pluginHookMatch[1]);
+    return pluginStats
+      ? incrementDynamicCounter(pluginStats.hooks, pluginHookMatch[2], value)
+      : false;
+  }
+
+  const discordHookMatch = /^errors\.discordHooks\.([^.]+)$/.exec(key);
+  if (discordHookMatch && increment) {
+    return incrementDynamicCounter(stats.errors.discordHooks, discordHookMatch[1], value);
+  }
+
+  return false;
+}
 
 /**
  * Save stats to the stats file.
@@ -548,54 +756,9 @@ async function updateStat(key, value, increment = false) {
   try {
     const stats = await loadStats();
 
-    // Validate the main key for safety
-    if (!isSafeKey(key)) {
-      logger.warn({ key }, 'Blocked update to potentially dangerous key');
+    if (!setStatValue(stats, key, value, increment)) {
+      logger.warn({ key }, 'Blocked unsupported or unsafe stat update');
       return false;
-    }
-
-    // Handle nested keys (e.g., 'apiCalls.openai')
-    const keys = key.split('.');
-    let current = stats;
-
-    // Navigate to the nested property with safety checks
-    for (let i = 0; i < keys.length - 1; i++) {
-      const currentKey = keys[i];
-
-      // Validate each key in the path
-      if (!isSafeKey(currentKey)) {
-        logger.warn(
-          { key: currentKey, fullPath: key },
-          'Blocked navigation to potentially dangerous nested key'
-        );
-        return false;
-      }
-
-      // Safe property access using hasOwnProperty check
-      if (!Object.prototype.hasOwnProperty.call(current, currentKey)) {
-        current[currentKey] = {};
-      }
-      current = current[currentKey];
-    }
-
-    // Update the value with final key validation
-    const lastKey = keys[keys.length - 1];
-    if (!isSafeKey(lastKey)) {
-      logger.warn(
-        { key: lastKey, fullPath: key },
-        'Blocked update to potentially dangerous final key'
-      );
-      return false;
-    }
-
-    if (increment) {
-      // Safe property access for increment
-      const currentValue = Object.prototype.hasOwnProperty.call(current, lastKey)
-        ? current[lastKey] || 0
-        : 0;
-      current[lastKey] = currentValue + value;
-    } else {
-      current[lastKey] = value;
     }
 
     // Save the updated stats
@@ -654,7 +817,9 @@ async function addRateLimitedUser(userId) {
     const currentCount = Object.prototype.hasOwnProperty.call(stats.rateLimits.userCounts, userId)
       ? stats.rateLimits.userCounts[userId] || 0
       : 0;
-    stats.rateLimits.userCounts[userId] = currentCount + 1;
+    if (!safeSetProperty(stats.rateLimits.userCounts, userId, currentCount + 1)) {
+      return false;
+    }
 
     // Save the updated stats
     return await saveStats(stats);
@@ -839,5 +1004,7 @@ module.exports = {
   addRateLimitedUser,
   resetStats,
   repairStatsFile,
+  isSafeKey,
+  setStatValue,
   DEFAULT_STATS,
 };
