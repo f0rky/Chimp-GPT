@@ -11,6 +11,7 @@
  */
 
 const { createLogger } = require('../core/logger');
+const { htmlToPlainText } = require('./htmlText');
 const logger = createLogger('sanitizer');
 
 /**
@@ -80,8 +81,9 @@ function sanitizeText(input, type = 'MESSAGE') {
   // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\u0000-\u001F\u007F]/g, '');
 
-  // Remove HTML/XML tags to prevent XSS
-  sanitized = sanitized.replace(/<[^>]*>/g, '');
+  // Parse HTML-like input to plain text before it reaches non-HTML sinks.
+  // Preserve visible text for backwards-compatible Discord/API message handling.
+  sanitized = htmlToPlainText(sanitized);
 
   // Replace tab and newline with spaces
   sanitized = sanitized.replace(/[\t\n\r]/g, ' ');
@@ -203,7 +205,6 @@ function sanitizeOpenAIPrompt(prompt) {
 
   // Remove potential prompt injection
   sanitized = sanitized.replace(/ignore previous instructions?/gi, '');
-  sanitized = sanitized.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
 
   return sanitized;
 }

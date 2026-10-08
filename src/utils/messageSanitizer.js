@@ -10,6 +10,7 @@
  */
 
 const { createLogger } = require('../core/logger');
+const { htmlToPlainText } = require('./htmlText');
 const logger = createLogger('messageSanitizer');
 
 // Maximum allowed message length (in characters)
@@ -17,7 +18,6 @@ const MAX_MESSAGE_LENGTH = 2000;
 
 // Regular expressions for sanitization
 const DANGEROUS_PATTERNS = [
-  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, // Script tags
   /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, // eslint-disable-line no-control-regex -- Control characters except newlines and tabs
   /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, // Invisible formatting characters
   /[\uFFF0-\uFFFF]/g, // Specials
@@ -42,6 +42,10 @@ function sanitizeMessage(content, options = {}) {
   let sanitized = content;
 
   try {
+    // These messages are rendered as plain text. Remove HTML markup and all
+    // non-content element bodies using the parser before applying text rules.
+    sanitized = htmlToPlainText(sanitized, { dropNonContent: true });
+
     // Apply each dangerous pattern replacement
     DANGEROUS_PATTERNS.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
@@ -93,6 +97,13 @@ function validateMessage(content) {
       valid: false,
       reason: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters`,
     };
+  }
+
+  // Script/style/template/noscript content is not valid message content.
+  const plainText = htmlToPlainText(content);
+  const contentOnlyText = htmlToPlainText(content, { dropNonContent: true });
+  if (plainText !== contentOnlyText) {
+    return { valid: false, reason: 'Message contains potentially dangerous content' };
   }
 
   // Check for dangerous patterns
