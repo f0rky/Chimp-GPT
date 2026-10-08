@@ -28,25 +28,33 @@ process.env.CHANNEL_ID = process.env.CHANNEL_ID || '123456789012345678';
 
 const REPO_ROOT = path.join(__dirname, '../..');
 
-/** Snapshot every repository runtime-data file so this test can prove it did
- * not write to the real data directory. */
+/** Snapshot repository runtime data so this test can prove it did not write
+ * to the real data directory. An absent ignored `data/` directory is an
+ * immutable empty state: record its absence instead of creating or reading it. */
 function snapshotRuntimeData() {
   const dataDir = path.join(REPO_ROOT, 'data');
-  return fs
-    .readdirSync(dataDir, { withFileTypes: true })
-    .filter(entry => entry.isFile())
-    .map(entry => {
-      const filePath = path.join(dataDir, entry.name);
-      const contents = fs.readFileSync(filePath);
-      const stat = fs.statSync(filePath);
-      return {
-        name: entry.name,
-        size: stat.size,
-        mtimeMs: stat.mtimeMs,
-        sha256: crypto.createHash('sha256').update(contents).digest('hex'),
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!fs.existsSync(dataDir)) {
+    return { exists: false, files: [] };
+  }
+
+  return {
+    exists: true,
+    files: fs
+      .readdirSync(dataDir, { withFileTypes: true })
+      .filter(entry => entry.isFile())
+      .map(entry => {
+        const filePath = path.join(dataDir, entry.name);
+        const contents = fs.readFileSync(filePath);
+        const stat = fs.statSync(filePath);
+        return {
+          name: entry.name,
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          sha256: crypto.createHash('sha256').update(contents).digest('hex'),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 /**
