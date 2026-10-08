@@ -48,8 +48,6 @@ function createRouter(deps) {
         '/repair-function-results',
         '/blocked-users',
         '/unblock-user',
-        '/api/discover-bots',
-        '/api/discover-services',
         '/settings',
         '/run-tests',
       ],

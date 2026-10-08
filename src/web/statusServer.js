@@ -430,7 +430,7 @@ function initStatusServer(options = {}) {
     app.use('/', require('./routes/healthRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/performanceRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/adminRoutes').createRouter(routeDeps));
-    app.use('/', require('./routes/discoveryRoutes').createRouter());
+    app.use('/', require('./routes/discoveryRoutes').createRouter(routeDeps));
     app.use('/', require('./routes/deletedMessagesRoutes').createRouter(routeDeps));
     // ─────────────────────────────────────────────────────────────────────────────
     // Check if this is a secondary deployment

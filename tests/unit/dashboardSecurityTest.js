@@ -336,6 +336,12 @@ async function testSecurityHardeningDashboard() {
       assert.equal(basicHealthJson.includes('111111111111111111'), false);
       assert.equal(basicHealthJson.includes('222222222222222222'), false);
       assert.equal(loadStatsCalls, 1);
+
+      const apiIndex = await fetch(`${url}/api`);
+      assert.equal(apiIndex.status, 200);
+      const apiIndexBody = await apiIndex.json();
+      assert.equal(apiIndexBody.endpoints.includes('/api/discover-bots'), false);
+      assert.equal(apiIndexBody.endpoints.includes('/api/discover-services'), false);
     } finally {
       await close();
     }
@@ -429,6 +435,43 @@ async function testSecurityHardeningDashboard() {
         'public performance metrics must not expose raw timing records'
       );
 
+      // A public performance error must remain opaque even if the exception
+      // contains a URL and credential-like query parameter.
+      const fakeInternalError =
+        'upstream https://internal.example.test/metrics?api_key=fake-public-leak-key failed';
+      const originalGetAllTimingStats = performanceMonitor.getAllTimingStats;
+      performanceMonitor.getAllTimingStats = () => {
+        throw new Error(fakeInternalError);
+      };
+      try {
+        const failedPerf = await fetch(`${url}/performance`);
+        assert.equal(failedPerf.status, 200);
+        const failedPerfBody = await failedPerf.json();
+        const failedPerfPayload = JSON.stringify(failedPerfBody);
+        assert.equal(failedPerfBody.serverHealth.lastError, 'Performance metrics unavailable');
+        assert.equal(failedPerfPayload.includes(fakeInternalError), false);
+        assert.equal(failedPerfPayload.includes('fake-public-leak-key'), false);
+      } finally {
+        performanceMonitor.getAllTimingStats = originalGetAllTimingStats;
+      }
+
+      // The outer error handler also uses the same opaque public response.
+      const originalMemoryUsage = process.memoryUsage;
+      process.memoryUsage = () => {
+        throw new Error(fakeInternalError);
+      };
+      try {
+        const criticalPerf = await fetch(`${url}/performance`);
+        assert.equal(criticalPerf.status, 500);
+        const criticalPerfBody = await criticalPerf.json();
+        const criticalPerfPayload = JSON.stringify(criticalPerfBody);
+        assert.equal(criticalPerfBody.error, 'Performance metrics unavailable');
+        assert.equal(criticalPerfPayload.includes(fakeInternalError), false);
+        assert.equal(criticalPerfPayload.includes('fake-public-leak-key'), false);
+      } finally {
+        process.memoryUsage = originalMemoryUsage;
+      }
+
       const detailedDenied = await fetch(`${url}/performance/detailed`);
       assert.equal(detailedDenied.status, 403);
       const detailedAllowed = await fetch(`${url}/performance/detailed`, {
@@ -488,7 +531,87 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 6. deletedMessagesRoutes: no x-user-id/OWNER_ID fallback authorization ----
+  // ---- 7. discoveryRoutes: PM2/Docker enumeration and port scans are owner-only ----
+  try {
+    process.env.OWNER_TOKEN = 'discovery-routes-owner-token';
+    const discoveryCalls = {
+      pm2: 0,
+      docker: 0,
+      health: 0,
+      services: 0,
+      currentBot: 0,
+    };
+    const discoveryRoutes = require('../../src/web/routes/discoveryRoutes');
+    const app = express();
+    app.use(
+      '/',
+      discoveryRoutes.createRouter({
+        requireOwnerToken,
+        discoverPM2Bots: async () => {
+          discoveryCalls.pm2 += 1;
+          return [];
+        },
+        discoverDockerBots: async () => {
+          discoveryCalls.docker += 1;
+          return [];
+        },
+        checkBotHealth: async () => {
+          discoveryCalls.health += 1;
+          return { accessible: false };
+        },
+        discoverServices: async () => {
+          discoveryCalls.services += 1;
+          return { services: [], botServices: [] };
+        },
+        getCurrentBotInfo: () => {
+          discoveryCalls.currentBot += 1;
+          return { name: 'Test Bot', port: 3001 };
+        },
+      })
+    );
+    const { url, close } = await startServer(app);
+    try {
+      for (const routePath of [
+        '/api/discover-bots',
+        '/api/discover-services?startPort=1&endPort=2',
+      ]) {
+        const denied = await fetch(`${url}${routePath}`);
+        assert.equal(denied.status, 403, `${routePath} must deny unauthenticated discovery`);
+      }
+      assert.deepEqual(
+        discoveryCalls,
+        { pm2: 0, docker: 0, health: 0, services: 0, currentBot: 0 },
+        'unauthenticated discovery must not inspect processes or scan ports'
+      );
+
+      const botsAllowed = await fetch(`${url}/api/discover-bots`, {
+        headers: { 'X-Owner-Token': 'discovery-routes-owner-token' },
+      });
+      assert.equal(botsAllowed.status, 200);
+      const servicesAllowed = await fetch(`${url}/api/discover-services?startPort=1&endPort=2`, {
+        headers: { 'X-Owner-Token': 'discovery-routes-owner-token' },
+      });
+      assert.equal(servicesAllowed.status, 200);
+      assert.equal(discoveryCalls.pm2, 2);
+      assert.equal(discoveryCalls.docker, 2);
+      assert.equal(discoveryCalls.services, 1);
+      assert.equal(discoveryCalls.currentBot, 1);
+    } finally {
+      await close();
+    }
+    results.push({
+      name: 'discoveryRoutes deny unauthenticated process inspection/port scans and allow the owner',
+      success: true,
+    });
+  } catch (error) {
+    results.push({
+      name: 'discoveryRoutes deny unauthenticated process inspection/port scans and allow the owner',
+      success: false,
+      error: error.message,
+    });
+  }
+
+  // ---- 8. deletedMessagesRoutes: no x-user-id/OWNER_ID fallback authorization ----
   try {
     process.env.OWNER_TOKEN = 'deleted-messages-owner-token';
     process.env.OWNER_ID = '999999999999999999';
@@ -576,7 +699,7 @@ async function testSecurityHardeningDashboard() {
   if (originalOwnerId === undefined) delete process.env.OWNER_ID;
   else process.env.OWNER_ID = originalOwnerId;
 
-  // ---- 7. statusServer.js source no longer has a default/fallback secret ----
+  // ---- 9. statusServer.js source no longer has a default/fallback secret ----
   try {
     const source = fs.readFileSync(path.join(REPO_ROOT, 'src/web/statusServer.js'), 'utf8');
     assert.equal(/changeme/i.test(source), false, 'no "changeme" default token may remain');
@@ -594,7 +717,7 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 8. Frontend static checks ----
+  // ---- 10. Frontend static checks ----
   try {
     const appJs = fs.readFileSync(path.join(REPO_ROOT, 'src/web/public/app-unified.js'), 'utf8');
 
@@ -615,6 +738,19 @@ async function testSecurityHardeningDashboard() {
     const indexHtml = fs.readFileSync(path.join(REPO_ROOT, 'src/web/public/index.html'), 'utf8');
     assert.match(indexHtml, /Load detailed provider diagnostics/);
     assert.match(indexHtml, /onclick="loadDetailedHealthDiagnostics\(\)"/);
+
+    // Discovery is owner-only; its UI uses the shared header-only owner fetch
+    // helper and loads after that helper is defined.
+    const botNavigationJs = fs.readFileSync(
+      path.join(REPO_ROOT, 'src/web/public/bot-navigation.js'),
+      'utf8'
+    );
+    assert.match(botNavigationJs, /ownerProtected:\s*true/);
+    assert.match(botNavigationJs, /window\.ownerFetch/);
+    assert.ok(
+      indexHtml.indexOf('app-unified.js') < indexHtml.indexOf('bot-navigation.js'),
+      'owner fetch helper must load before bot navigation'
+    );
 
     // Token must never be persisted or sent via query/body.
     assert.equal(/localStorage\.(get|set)Item\([^)]*[Oo]wner/i.test(appJs), false);
@@ -660,7 +796,7 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 9. Chart.js SRI pinning ----
+  // ---- 11. Chart.js SRI pinning ----
   try {
     const indexHtml = fs.readFileSync(path.join(REPO_ROOT, 'src/web/public/index.html'), 'utf8');
     assert.match(indexHtml, /chart\.js@4\.5\.1\/dist\/chart\.umd\.js/);
@@ -684,7 +820,7 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 10. Hermeticity: the entire dashboard security test leaves repo runtime data unchanged ----
+  // ---- 12. Hermeticity: the entire dashboard security test leaves repo runtime data unchanged ----
   try {
     assert.deepEqual(snapshotRuntimeData(), runtimeDataBefore);
     results.push({

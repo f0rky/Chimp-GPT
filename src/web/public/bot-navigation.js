@@ -448,6 +448,7 @@ class BotNavigation {
 
       const response = await this.fetchWithTimeout('/api/discover-services', {
         timeout: this.config.discoveryTimeout,
+        ownerProtected: true,
       });
 
       if (!response.ok) {
@@ -693,17 +694,24 @@ class BotNavigation {
    * Fetch with timeout support
    */
   async fetchWithTimeout(url, options = {}) {
-    const { timeout = 5000, ...fetchOptions } = options;
+    const { timeout = 5000, ownerProtected = false, ...fetchOptions } = options;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(url, {
+      const fetchFn = ownerProtected ? window.ownerFetch : fetch;
+      if (ownerProtected && typeof fetchFn !== 'function') {
+        throw new Error('Owner authentication is unavailable');
+      }
+      const response = await fetchFn(url, {
         ...fetchOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
+      if (!response) {
+        throw new Error('Owner authentication was cancelled');
+      }
       return response;
     } catch (error) {
       clearTimeout(timeoutId);

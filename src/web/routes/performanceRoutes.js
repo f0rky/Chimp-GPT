@@ -9,6 +9,8 @@ const { createLogger } = require('../../core/logger');
 const logger = createLogger('performanceRoutes');
 
 const PUBLIC_METRIC_FIELDS = ['count', 'min', 'max', 'avg', 'median', 'p95', 'p99'];
+const PUBLIC_PERFORMANCE_ERROR = 'Performance metrics unavailable';
+const PUBLIC_PERFORMANCE_HISTORY_ERROR = 'Performance history unavailable';
 
 /**
  * Return only aggregate numbers suitable for a public status page. Timing
@@ -84,7 +86,9 @@ function createRouter(deps) {
         detailed,
         serverHealth: {
           status: serverState.healthy ? 'healthy' : 'degraded',
-          lastError: serverState.lastError ? serverState.lastError.message : null,
+          // Public status responses must not disclose exception text. Errors can
+          // contain upstream URLs, credentials, or implementation details.
+          lastError: serverState.lastError ? PUBLIC_PERFORMANCE_ERROR : null,
           memory: {
             rss: `${Math.round(memUsage.rss / 1024 / 1024)} MB`,
             heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`,
@@ -106,9 +110,11 @@ function createRouter(deps) {
       logger.error({ error }, 'Critical error getting performance metrics');
       serverState.lastError = error;
       serverState.healthy = false;
-      res
-        .status(500)
-        .json({ success: false, error: error.message, serverHealth: { status: 'critical' } });
+      res.status(500).json({
+        success: false,
+        error: PUBLIC_PERFORMANCE_ERROR,
+        serverHealth: { status: 'critical' },
+      });
     }
   });
 
@@ -137,7 +143,7 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting hourly performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
@@ -153,7 +159,7 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting daily performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
@@ -171,7 +177,7 @@ function createRouter(deps) {
       });
     } catch (error) {
       logger.error({ error }, 'Error getting recent performance history');
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: PUBLIC_PERFORMANCE_HISTORY_ERROR });
     }
   });
 
