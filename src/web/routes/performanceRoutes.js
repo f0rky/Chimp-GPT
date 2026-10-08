@@ -8,6 +8,34 @@ const { createLogger } = require('../../core/logger');
 
 const logger = createLogger('performanceRoutes');
 
+const PUBLIC_METRIC_FIELDS = ['count', 'min', 'max', 'avg', 'median', 'p95', 'p99'];
+
+/**
+ * Return only aggregate numbers suitable for a public status page. Timing
+ * records intentionally contain request metadata and must never be copied
+ * into an unauthenticated response.
+ *
+ * @param {Object} metrics
+ * @returns {Object}
+ */
+function toPublicMetrics(metrics) {
+  const publicMetrics = {};
+
+  for (const [operation, metric] of Object.entries(metrics)) {
+    if (!metric || !Number.isFinite(metric.count) || metric.count <= 0) continue;
+
+    const aggregate = {};
+    for (const field of PUBLIC_METRIC_FIELDS) {
+      if (Number.isFinite(metric[field])) {
+        aggregate[field] = field === 'count' ? metric[field] : Math.round(metric[field]);
+      }
+    }
+    publicMetrics[operation] = aggregate;
+  }
+
+  return publicMetrics;
+}
+
 /**
  * @param {{ stats: Object, statsStorage: Object, functionResults: Object, performanceHistory: Object, serverState: Object }} deps
  */
@@ -36,23 +64,24 @@ function createRouter(deps) {
         serverState.healthy = false;
       }
 
-      const summary = {};
-      for (const op in metrics) {
-        if (metrics[op] && metrics[op].count > 0) {
-          summary[op] = {
-            avg: Math.round(metrics[op].avg) || 0,
-            p95: Math.round(metrics[op].p95) || 0,
-            count: metrics[op].count || 0,
-            max: Math.round(metrics[op].max) || 0,
-          };
-        }
-      }
+      const detailed = toPublicMetrics(metrics);
+      const summary = Object.fromEntries(
+        Object.entries(detailed).map(([operation, metric]) => [
+          operation,
+          {
+            avg: metric.avg || 0,
+            p95: metric.p95 || 0,
+            count: metric.count || 0,
+            max: metric.max || 0,
+          },
+        ])
+      );
 
       const memUsage = process.memoryUsage();
       const responseData = {
         success: true,
         summary,
-        detailed: metrics,
+        detailed,
         serverHealth: {
           status: serverState.healthy ? 'healthy' : 'degraded',
           lastError: serverState.lastError ? serverState.lastError.message : null,
@@ -80,6 +109,19 @@ function createRouter(deps) {
       res
         .status(500)
         .json({ success: false, error: error.message, serverHealth: { status: 'critical' } });
+    }
+  });
+
+  // GET /performance/detailed — raw timing records can contain Discord IDs and
+  // other request metadata, so they are available only to the configured owner.
+  router.get('/performance/detailed', requireOwnerToken, (req, res) => {
+    try {
+      const performanceMonitor = require('../../middleware/performanceMonitor');
+      const metrics = performanceMonitor.getAllTimingStats() || {};
+      res.json({ success: true, detailed: metrics, timestamp: new Date().toISOString() });
+    } catch (error) {
+      logger.error({ error }, 'Error retrieving detailed performance metrics');
+      res.status(500).json({ success: false, error: 'Failed to retrieve performance metrics' });
     }
   });
 

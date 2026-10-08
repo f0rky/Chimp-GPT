@@ -39,6 +39,7 @@ function createRouter(deps) {
         '/function-results',
         '/function-results/summary',
         '/performance',
+        '/performance/detailed',
         '/performance/history/hourly',
         '/performance/history/daily',
         '/performance/history/recent',

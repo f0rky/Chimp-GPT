@@ -351,7 +351,7 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 6. performanceRoutes: destructive/sensitive routes require the token ----
+  // ---- 6. performanceRoutes: public metrics are aggregate-only; detailed timing metadata is owner-only ----
   try {
     process.env.OWNER_TOKEN = 'performance-routes-owner-token';
 
@@ -384,6 +384,15 @@ async function testSecurityHardeningDashboard() {
     };
     const serverState = { healthy: true, lastError: null };
 
+    const performanceMonitor = require('../../src/middleware/performanceMonitor');
+    performanceMonitor.clearTimings();
+    const timerId = performanceMonitor.startTimer('message_processing', {
+      userId: 'fixture-discord-user-id',
+      channelId: 'fixture-discord-channel-id',
+      messageId: 'fixture-discord-message-id',
+    });
+    performanceMonitor.stopTimer(timerId, { success: true });
+
     const performanceRoutes = require('../../src/web/routes/performanceRoutes');
     const app = express();
     app.use(express.json());
@@ -400,9 +409,38 @@ async function testSecurityHardeningDashboard() {
     );
     const { url, close } = await startServer(app);
     try {
-      // Unprotected read-only routes remain open
+      // Public status data retains aggregate metrics but never timing metadata.
       const perf = await fetch(`${url}/performance`);
       assert.equal(perf.status, 200);
+      const publicPerformance = await perf.json();
+      assert.equal(publicPerformance.summary.message_processing.count, 1);
+      assert.equal(publicPerformance.detailed.message_processing.count, 1);
+      const publicPayload = JSON.stringify(publicPerformance);
+      for (const identifier of [
+        'fixture-discord-user-id',
+        'fixture-discord-channel-id',
+        'fixture-discord-message-id',
+      ]) {
+        assert.doesNotMatch(publicPayload, new RegExp(identifier));
+      }
+      assert.equal(
+        Object.hasOwn(publicPerformance.detailed.message_processing, 'recentTimings'),
+        false,
+        'public performance metrics must not expose raw timing records'
+      );
+
+      const detailedDenied = await fetch(`${url}/performance/detailed`);
+      assert.equal(detailedDenied.status, 403);
+      const detailedAllowed = await fetch(`${url}/performance/detailed`, {
+        headers: { 'X-Owner-Token': 'performance-routes-owner-token' },
+      });
+      assert.equal(detailedAllowed.status, 200);
+      const ownerPerformance = await detailedAllowed.json();
+      assert.equal(
+        ownerPerformance.detailed.message_processing.recentTimings[0].metadata.userId,
+        'fixture-discord-user-id'
+      );
+
       const hourly = await fetch(`${url}/performance/history/hourly`);
       assert.equal(hourly.status, 200);
 
@@ -436,14 +474,15 @@ async function testSecurityHardeningDashboard() {
       );
     } finally {
       await close();
+      performanceMonitor.clearTimings();
     }
     results.push({
-      name: 'performanceRoutes rejects destructive routes before repair and permits safe reads',
+      name: 'performanceRoutes keeps public metrics aggregate-only and protects detailed timing metadata',
       success: true,
     });
   } catch (error) {
     results.push({
-      name: 'performanceRoutes rejects destructive routes before repair and permits safe reads',
+      name: 'performanceRoutes keeps public metrics aggregate-only and protects detailed timing metadata',
       success: false,
       error: error.message,
     });
