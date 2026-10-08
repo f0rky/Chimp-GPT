@@ -357,7 +357,70 @@ async function testSecurityHardeningDashboard() {
     });
   }
 
-  // ---- 6. performanceRoutes: public metrics are aggregate-only; detailed timing metadata is owner-only ----
+  // ---- 6. healthRoutes: public health errors stay opaque while raw failures are logged server-side ----
+  try {
+    const sentinel =
+      'health storage failed: https://internal.example.invalid/stats?api_key=fake-health-api-key';
+    let loadStatsCalls = 0;
+    const healthRoutes = require('../../src/web/routes/healthRoutes');
+    const app = express();
+    app.use(
+      '/',
+      healthRoutes.createRouter({
+        stats: {
+          startTime: new Date(),
+          messageCount: 0,
+          apiCalls: {},
+          errors: {},
+          rateLimits: { hit: 0, users: new Set(), userCounts: {} },
+        },
+        statsStorage: {
+          async loadStats() {
+            loadStatsCalls += 1;
+            throw new Error(sentinel);
+          },
+        },
+        requireOwnerToken,
+        versionInfo: {
+          getDetailedVersionInfo: () => ({ version: 'test' }),
+          formatUptime: seconds => `${seconds}s`,
+        },
+        getConversationStorageStatus: () => ({ mode: 'test' }),
+        config: {
+          BOT_NAME: 'Test Bot',
+          ENABLE_REPLY_CONTEXT: false,
+          MAX_MESSAGES_PER_USER_BLENDED: 5,
+        },
+      })
+    );
+    const { url, close } = await startServer(app);
+    try {
+      const health = await fetch(`${url}/health`);
+      assert.equal(health.status, 503);
+      const healthBody = await health.json();
+      assert.deepEqual(healthBody, { status: 'error', message: 'Health check unavailable' });
+      const healthJson = JSON.stringify(healthBody);
+      assert.equal(healthJson.includes(sentinel), false);
+      assert.equal(healthJson.includes('https://internal.example.invalid'), false);
+      assert.equal(healthJson.includes('fake-health-api-key'), false);
+      assert.equal(healthJson.includes('stack'), false);
+      assert.equal(loadStatsCalls, 1);
+    } finally {
+      await close();
+    }
+    results.push({
+      name: 'healthRoutes returns an opaque public error when stats storage fails',
+      success: true,
+    });
+  } catch (error) {
+    results.push({
+      name: 'healthRoutes returns an opaque public error when stats storage fails',
+      success: false,
+      error: error.message,
+    });
+  }
+
+  // ---- 7. performanceRoutes: public metrics are aggregate-only; detailed timing metadata is owner-only ----
   try {
     process.env.OWNER_TOKEN = 'performance-routes-owner-token';
 
