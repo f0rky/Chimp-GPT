@@ -406,12 +406,9 @@ async function testSecurityHardeningDashboard() {
       const health = await fetch(`${url}/health`);
       assert.equal(health.status, 503);
       const healthBody = await health.json();
+      // Exact equality proves the public payload contains only the opaque error contract,
+      // never the thrown sentinel or any error metadata.
       assert.deepEqual(healthBody, { status: 'error', message: 'Health check unavailable' });
-      const healthJson = JSON.stringify(healthBody);
-      assert.equal(healthJson.includes(sentinel), false);
-      assert.equal(healthJson.includes('https://internal.example.invalid'), false);
-      assert.equal(healthJson.includes('fake-health-api-key'), false);
-      assert.equal(healthJson.includes('stack'), false);
       assert.equal(loadStatsCalls, 1);
     } finally {
       await close();
