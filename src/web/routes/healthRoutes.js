@@ -6,9 +6,6 @@
 const { Router } = require('express');
 const os = require('os');
 const { createLogger } = require('../../core/logger');
-const { getDetailedVersionInfo, formatUptime } = require('../../core/getBotVersion');
-const { getConversationStorageStatus } = require('../../conversation/conversationManagerSelector');
-const config = require('../../core/configValidator');
 
 const logger = createLogger('healthRoutes');
 
@@ -17,6 +14,18 @@ const logger = createLogger('healthRoutes');
  */
 function createRouter(deps) {
   const { stats, statsStorage, requireOwnerToken } = deps;
+  // These dependencies can initialise conversation/API-key services. Keep them
+  // injectable and lazy so importing this route module is side-effect free and
+  // unit tests can use pure in-memory collaborators.
+  const getVersionInfo =
+    deps.versionInfo?.getDetailedVersionInfo ||
+    (() => require('../../core/getBotVersion').getDetailedVersionInfo());
+  const formatUptime =
+    deps.versionInfo?.formatUptime || require('../../core/getBotVersion').formatUptime;
+  const getConversationStorageStatus =
+    deps.getConversationStorageStatus ||
+    require('../../conversation/conversationManagerSelector').getConversationStorageStatus;
+  const config = deps.config || require('../../core/configValidator');
   const router = Router();
 
   // GET /api — index of available endpoints
@@ -80,7 +89,7 @@ function createRouter(deps) {
     const discordPing = typeof discordStats.ping === 'number' ? discordStats.ping : 0;
     const discordGuilds = typeof discordStats.guilds === 'number' ? discordStats.guilds : 0;
     const discordChannels = typeof discordStats.channels === 'number' ? discordStats.channels : 0;
-    const versionInfo = getDetailedVersionInfo();
+    const versionInfo = getVersionInfo();
 
     res.json({
       status: discordStatus === 'ok' ? 'ok' : 'offline',
@@ -120,7 +129,6 @@ function createRouter(deps) {
             : mergedStats.rateLimits.users instanceof Set
               ? mergedStats.rateLimits.users.size
               : 0,
-          userDetails: mergedStats.rateLimits.userCounts || {},
         },
       },
       discord: {
@@ -228,7 +236,7 @@ function createRouter(deps) {
           },
         },
         version: {
-          bot: getDetailedVersionInfo().version,
+          bot: getVersionInfo().version,
           node: process.version,
           platform: process.platform,
         },
@@ -246,7 +254,7 @@ function createRouter(deps) {
   // GET /version
   router.get('/version', (req, res) => {
     try {
-      const versionInfo = getDetailedVersionInfo();
+      const versionInfo = getVersionInfo();
       const uptime = process.uptime();
       res.json({
         success: true,

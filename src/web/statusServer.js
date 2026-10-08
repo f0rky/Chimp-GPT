@@ -74,7 +74,7 @@ if (require.main === module) {
 const express = require('express');
 const path = require('path');
 const { createLogger } = require('../core/logger');
-const { getDetailedVersionInfo } = require('../core/getBotVersion');
+const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
 const logger = createLogger('status');
 const config = require('../core/configValidator');
 
@@ -112,61 +112,11 @@ const { runCorsTests, runRateLimiterTests } = require('../../tests/unit/testRunn
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
-const crypto = require('crypto');
-
-// --- Owner Token Authorization ---
-// There is intentionally NO default/fallback value here. If OWNER_TOKEN is not
-// configured, requireOwnerToken fails closed (denies every request) rather than
-// authorizing against a known/guessable default value.
-function getConfiguredOwnerToken() {
-  const value = process.env.OWNER_TOKEN;
-  return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-/**
- * Constant-time string comparison. Returns false (without leaking timing
- * information proportional to a byte-by-byte comparison) when the inputs are
- * not both non-empty strings of the same length.
- *
- * @param {string} a
- * @param {string} b
- * @returns {boolean}
- */
-function constantTimeStringEquals(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') {
-    return false;
-  }
-  const bufA = Buffer.from(a, 'utf8');
-  const bufB = Buffer.from(b, 'utf8');
-  if (bufA.length !== bufB.length) {
-    // Still perform a fixed-cost comparison so the response time does not
-    // reveal whether the length matched.
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
-/**
- * Owner-only authorization middleware.
- *
- * Fails closed: if OWNER_TOKEN is not configured, every request is denied.
- * Accepts ONLY the `X-Owner-Token` request header — never query strings or
- * request bodies, which can leak into logs, browser history, or proxies.
- */
-function requireOwnerToken(req, res, next) {
-  const configuredToken = getConfiguredOwnerToken();
-  if (!configuredToken) {
-    logger.error('OWNER_TOKEN is not configured; denying owner-protected request (fail closed)');
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  const providedToken = req.headers['x-owner-token'];
-  if (!constantTimeStringEquals(providedToken, configuredToken)) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  return next();
-}
+const {
+  getConfiguredOwnerToken,
+  constantTimeStringEquals,
+  requireOwnerToken,
+} = require('./ownerTokenAuth');
 
 // Export the middleware for use in route definitions
 module.exports.requireOwnerToken = requireOwnerToken;
@@ -468,6 +418,13 @@ function initStatusServer(options = {}) {
       maliciousUserManager,
       serverState: { healthy: serverHealthy, lastError },
       requireOwnerToken,
+      versionInfo: {
+        getDetailedVersionInfo,
+        formatUptime,
+      },
+      getConversationStorageStatus: require('../conversation/conversationManagerSelector')
+        .getConversationStorageStatus,
+      config,
     };
 
     app.use('/', require('./routes/healthRoutes').createRouter(routeDeps));

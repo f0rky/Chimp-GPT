@@ -15,6 +15,7 @@
 
 const assert = require('node:assert');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const http = require('node:http');
 
@@ -26,6 +27,27 @@ process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai-key-0123
 process.env.CHANNEL_ID = process.env.CHANNEL_ID || '123456789012345678';
 
 const REPO_ROOT = path.join(__dirname, '../..');
+
+/** Snapshot every repository runtime-data file so this test can prove it did
+ * not write to the real data directory. */
+function snapshotRuntimeData() {
+  const dataDir = path.join(REPO_ROOT, 'data');
+  return fs
+    .readdirSync(dataDir, { withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => {
+      const filePath = path.join(dataDir, entry.name);
+      const contents = fs.readFileSync(filePath);
+      const stat = fs.statSync(filePath);
+      return {
+        name: entry.name,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        sha256: crypto.createHash('sha256').update(contents).digest('hex'),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 /**
  * Start an express app on an ephemeral port and return { url, close }.
@@ -49,10 +71,11 @@ function startServer(app) {
 
 async function testSecurityHardeningDashboard() {
   const results = [];
+  const runtimeDataBefore = snapshotRuntimeData();
   const express = require('express');
   // requireOwnerToken (and the constant-time comparator) come from the
   // production module under test.
-  const { requireOwnerToken, constantTimeStringEquals } = require('../../src/web/statusServer');
+  const { requireOwnerToken, constantTimeStringEquals } = require('../../src/web/ownerTokenAuth');
 
   const originalOwnerToken = process.env.OWNER_TOKEN;
   const originalOwnerId = process.env.OWNER_ID;
@@ -256,15 +279,41 @@ async function testSecurityHardeningDashboard() {
           messageCount: 0,
           apiCalls: {},
           errors: {},
-          rateLimits: { hit: 0, users: new Set(), userCounts: {} },
+          rateLimits: { hit: 0, users: new Set(['111111111111111111']), userCounts: {} },
         },
         statsStorage: {
           async loadStats() {
             loadStatsCalls += 1;
-            return { messageCount: 0, apiCalls: {}, errors: {}, rateLimits: {} };
+            return {
+              messageCount: 0,
+              apiCalls: {},
+              errors: {},
+              rateLimits: {
+                hit: 7,
+                users: ['111111111111111111', '222222222222222222'],
+                userCounts: { '111111111111111111': 4, '222222222222222222': 3 },
+              },
+            };
           },
         },
         requireOwnerToken,
+        versionInfo: {
+          getDetailedVersionInfo: () => ({
+            version: 'test',
+            name: 'Test',
+            description: 'Test',
+            author: 'Test',
+            nodeVersion: process.version,
+            environment: 'test',
+          }),
+          formatUptime: seconds => `${seconds}s`,
+        },
+        getConversationStorageStatus: () => ({ mode: 'test' }),
+        config: {
+          BOT_NAME: 'Test Bot',
+          ENABLE_REPLY_CONTEXT: false,
+          MAX_MESSAGES_PER_USER_BLENDED: 5,
+        },
       })
     );
     const { url, close } = await startServer(app);
@@ -279,6 +328,13 @@ async function testSecurityHardeningDashboard() {
 
       const basicHealth = await fetch(`${url}/health`);
       assert.equal(basicHealth.status, 200, 'basic health probe remains public');
+      const basicHealthBody = await basicHealth.json();
+      assert.equal(basicHealthBody.stats.rateLimits.count, 7);
+      assert.equal(basicHealthBody.stats.rateLimits.uniqueUsers, 2);
+      assert.equal('userDetails' in basicHealthBody.stats.rateLimits, false);
+      const basicHealthJson = JSON.stringify(basicHealthBody);
+      assert.equal(basicHealthJson.includes('111111111111111111'), false);
+      assert.equal(basicHealthJson.includes('222222222222222222'), false);
       assert.equal(loadStatsCalls, 1);
     } finally {
       await close();
@@ -509,6 +565,18 @@ async function testSecurityHardeningDashboard() {
     assert.match(appJs, /headers\.set\(\s*['"]X-Owner-Token['"]/);
     assert.match(appJs, /window\.prompt\(\s*['"]Enter owner token:['"]/);
 
+    // Public health polling must never reach the protected diagnostics fetch;
+    // diagnostics are loaded only from the explicit owner action in index.html.
+    const healthFetcher = appJs.match(
+      /async function fetchHealthData\(\) \{([\s\S]*?)\n\}\n\nasync function fetchDetailedHealthData/
+    );
+    assert.ok(healthFetcher, 'fetchHealthData must remain a distinct function');
+    assert.equal(/ownerFetch|fetchDetailedHealthData/.test(healthFetcher[1]), false);
+    assert.match(appJs, /async function loadDetailedHealthDiagnostics\(\)/);
+    const indexHtml = fs.readFileSync(path.join(REPO_ROOT, 'src/web/public/index.html'), 'utf8');
+    assert.match(indexHtml, /Load detailed provider diagnostics/);
+    assert.match(indexHtml, /onclick="loadDetailedHealthDiagnostics\(\)"/);
+
     // Token must never be persisted or sent via query/body.
     assert.equal(/localStorage\.(get|set)Item\([^)]*[Oo]wner/i.test(appJs), false);
     assert.equal(/sessionStorage\.(get|set)Item\([^)]*[Oo]wner/i.test(appJs), false);
@@ -572,6 +640,21 @@ async function testSecurityHardeningDashboard() {
   } catch (error) {
     results.push({
       name: 'index.html pins Chart.js 4.5.1 UMD and annotation plugin SRI',
+      success: false,
+      error: error.message,
+    });
+  }
+
+  // ---- 10. Hermeticity: the entire dashboard security test leaves repo runtime data unchanged ----
+  try {
+    assert.deepEqual(snapshotRuntimeData(), runtimeDataBefore);
+    results.push({
+      name: 'dashboard security test does not modify repository runtime data',
+      success: true,
+    });
+  } catch (error) {
+    results.push({
+      name: 'dashboard security test does not modify repository runtime data',
       success: false,
       error: error.message,
     });

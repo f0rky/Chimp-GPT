@@ -29,8 +29,8 @@ function clearOwnerToken() {
 }
 
 /**
- * Fetch wrapper for owner-protected endpoints. Prompts for the token (once,
- * reused for subsequent calls) and attaches it via the X-Owner-Token header
+ * Fetch wrapper for owner-protected endpoints after an explicit owner action.
+ * Prompts for the token once and attaches it via the X-Owner-Token header
  * only. On a 403 response the in-memory token is discarded so the next
  * protected call re-prompts rather than silently reusing a bad token.
  *
@@ -449,9 +449,6 @@ async function fetchHealthData() {
     updateStatusDisplay(data);
     updateConversationMode(data.conversationMode);
     logDebug('Health data updated', 'info');
-
-    // Also fetch detailed health data for LLM providers
-    await fetchDetailedHealthData();
   } catch (error) {
     logDebug('Error fetching health data: ' + error.message, 'error');
     logDebug(`Error fetching health data: ${error.message}`, 'error');
@@ -475,6 +472,13 @@ async function fetchDetailedHealthData() {
   }
 }
 
+// Detailed provider diagnostics are owner-only and deliberately opt-in. Public
+// polling must never trigger a credential prompt or a protected request.
+// eslint-disable-next-line no-unused-vars
+async function loadDetailedHealthDiagnostics() {
+  await fetchDetailedHealthData();
+}
+
 function showDetailedHealthOwnerTokenRequired() {
   const message = 'Owner token required for detailed provider health';
   for (const id of ['primaryLLMProvider', 'imageLLMProvider']) {
@@ -493,9 +497,6 @@ async function fetchPerformanceData() {
     updatePerformanceDisplay(data);
     updateCharts(data);
     logDebug('Performance data updated', 'info');
-
-    // Also fetch detailed health data for LLM providers on performance tab
-    await fetchDetailedHealthData();
   } catch (error) {
     logDebug('Error fetching performance data: ' + error.message, 'error');
     logDebug(`Error fetching performance data: ${error.message}`, 'error');
