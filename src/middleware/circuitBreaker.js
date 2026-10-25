@@ -1,7 +1,7 @@
 // circuitBreaker.js
 // Human-in-the-loop circuit breaker for sensitive bot actions
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const pendingApprovals = new Map();
 
 /**
@@ -12,7 +12,7 @@ const pendingApprovals = new Map();
  * @returns {string} approvalId
  */
 function requestApproval(details, onApprove, onDeny) {
-  const id = uuidv4();
+  const id = randomUUID();
   pendingApprovals.set(id, {
     ...details,
     status: 'pending',

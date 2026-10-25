@@ -130,6 +130,58 @@ async function testHumanCircuitBreaker() {
         error: error.message,
       });
     }
+
+    // Test 6: Approval IDs are unique v4 UUIDs and resolve correctly
+    try {
+      const circuitBreaker = require('../../src/middleware/circuitBreaker');
+      const uuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+      let approved = 0;
+      let denied = 0;
+
+      const approveId = circuitBreaker.requestApproval(
+        { type: 'test' },
+        () => approved++,
+        () => denied++
+      );
+      const denyId = circuitBreaker.requestApproval(
+        { type: 'test' },
+        () => approved++,
+        () => denied++
+      );
+
+      const validIds = uuidV4Pattern.test(approveId) && uuidV4Pattern.test(denyId);
+      const uniqueIds = approveId !== denyId;
+      const listed = circuitBreaker
+        .listPendingApprovals()
+        .filter(a => a.id === approveId || a.id === denyId).length;
+      const approveResult = circuitBreaker.approveRequest(approveId);
+      const denyResult = circuitBreaker.denyRequest(denyId);
+      const repeatResult = circuitBreaker.approveRequest(approveId);
+
+      results.push({
+        name: 'Approval Request Lifecycle',
+        success:
+          validIds &&
+          uniqueIds &&
+          listed === 2 &&
+          approveResult &&
+          denyResult &&
+          !repeatResult &&
+          approved === 1 &&
+          denied === 1,
+        validIds,
+        uniqueIds,
+        listed,
+        approved,
+        denied,
+      });
+    } catch (error) {
+      results.push({
+        name: 'Approval Request Lifecycle',
+        success: false,
+        error: error.message,
+      });
+    }
   } catch (error) {
     logger.error({ error }, 'Error in human circuit breaker tests');
     return {
