@@ -12,7 +12,6 @@
  * @version 1.1.0
  */
 
-const { expect } = require('chai');
 const sinon = require('sinon');
 const commandHandler = require('../../src/commands/commandHandler');
 const { createLogger } = require('../../src/core/logger');
@@ -86,6 +85,8 @@ function formatError(error, context = {}) {
  * @returns {Promise<Object>} Test results
  */
 async function testCommandHandler() {
+  // chai is ESM-only; dynamic import keeps this CommonJS test working on Node 20
+  const { expect } = await import('chai');
   const results = {
     total: 0,
     passed: 0,
