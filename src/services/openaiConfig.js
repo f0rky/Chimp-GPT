@@ -3,7 +3,7 @@
  * Updated to use the latest models and API format with secure API key management
  */
 const OpenAI = require('openai');
-const { CHAT_MODEL } = require('./chatModel');
+const { CHAT_MODEL, buildChatRequest } = require('./chatModel');
 const apiKeyManager = require('../utils/apiKeyManager');
 const { openai: openaiLogger } = require('../core/logger');
 
@@ -31,7 +31,8 @@ const openai = new OpenAI({
 });
 
 // Wrapper function to log OpenAI API calls
-async function logOpenAICall(method, params) {
+async function logOpenAICall(method, parameters) {
+  const params = buildChatRequest(parameters);
   const callId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
   const startTime = Date.now();
 

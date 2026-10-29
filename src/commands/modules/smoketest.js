@@ -18,7 +18,7 @@ const { createLogger } = require('../../core/logger');
 const logger = createLogger('commands:smoketest');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../core/configValidator');
-const { CHAT_MODEL } = require('../../services/chatModel');
+const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 
 // Truncate helper for one-line detail snippets.
 function snip(value, max = 70) {
@@ -35,11 +35,13 @@ function buildChecks(includeImage) {
       name: 'AI conversation (OpenAI)',
       async run() {
         const { client } = require('../../services/openaiConfig');
-        const completion = await client.chat.completions.create({
-          model: CHAT_MODEL,
-          messages: [{ role: 'user', content: 'Reply with exactly: SMOKE_OK' }],
-          max_tokens: 10,
-        });
+        const completion = await client.chat.completions.create(
+          buildChatRequest({
+            model: CHAT_MODEL,
+            messages: [{ role: 'user', content: 'Reply with exactly: SMOKE_OK' }],
+            max_tokens: 10,
+          })
+        );
         const text = completion.choices?.[0]?.message?.content?.trim();
         if (!text) throw new Error('empty completion');
         return `replied "${snip(text, 30)}"`;

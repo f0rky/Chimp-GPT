@@ -1,5 +1,5 @@
 const BaseConversationNode = require('./BaseNode');
-const { CHAT_MODEL } = require('../../../services/chatModel');
+const { CHAT_MODEL, buildChatRequest } = require('../../../services/chatModel');
 const { buildSystemPrompt } = require('../../../utils/systemPromptBuilder');
 const { createLogger } = require('../../../core/logger');
 const ImageGenerationFlow = require('../ImageGenerationFlow');
@@ -267,7 +267,7 @@ class FunctionExecutorNode extends BaseConversationNode {
       requestData.tool_choice = 'auto';
     }
 
-    return await this.openaiClient.chat.completions.create(requestData);
+    return await this.openaiClient.chat.completions.create(buildChatRequest(requestData));
   }
 
   async executeFunctionCall(toolCall, store, message) {

@@ -11,7 +11,7 @@
 
 // Import non-circular dependencies first
 const { OpenAI } = require('openai');
-const { CHAT_MODEL } = require('../../src/services/chatModel');
+const { CHAT_MODEL, buildChatRequest } = require('../../src/services/chatModel');
 const { createLogger } = require('../../src/core/logger');
 const logger = createLogger('tests');
 const { runCorsTests, runRateLimiterTests } = require('../../src/utils/statusDiagnostics');
@@ -89,21 +89,23 @@ async function runOpenAITests() {
     });
 
     // Test a simple completion to verify API access
-    const response = await openai.chat.completions.create({
-      model: CHAT_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a test assistant. Respond with "Test successful" to verify the API is working.',
-        },
-        {
-          role: 'user',
-          content: 'Run test',
-        },
-      ],
-      max_completion_tokens: 20,
-    });
+    const response = await openai.chat.completions.create(
+      buildChatRequest({
+        model: CHAT_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a test assistant. Respond with "Test successful" to verify the API is working.',
+          },
+          {
+            role: 'user',
+            content: 'Run test',
+          },
+        ],
+        max_completion_tokens: 20,
+      })
+    );
 
     const content = response.choices[0].message.content;
     const success = content.includes('Test successful') || content.includes('test successful');

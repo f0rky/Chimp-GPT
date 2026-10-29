@@ -14,7 +14,7 @@
 
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const { createLogger } = require('../../core/logger');
-const { CHAT_MODEL } = require('../../services/chatModel');
+const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 
 const logger = createLogger('OptimizedPocketFlow');
@@ -84,12 +84,14 @@ class OptimizedPocketFlow {
         'You are Solvis, a helpful AI assistant running in Chimp-GPT.'
       );
 
-      const completion = await this.openaiClient.chat.completions.create({
-        model: CHAT_MODEL,
-        messages: [{ role: 'system', content: systemPrompt }, ...conversation.messages],
-        max_tokens: this.options.maxTokens,
-        temperature: 0.7,
-      });
+      const completion = await this.openaiClient.chat.completions.create(
+        buildChatRequest({
+          model: CHAT_MODEL,
+          messages: [{ role: 'system', content: systemPrompt }, ...conversation.messages],
+          max_tokens: this.options.maxTokens,
+          temperature: 0.7,
+        })
+      );
 
       const response = completion.choices[0].message.content;
 
