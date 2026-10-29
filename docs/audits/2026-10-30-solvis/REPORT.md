@@ -61,7 +61,7 @@ The isolated PR snapshot separately passed nine default suites, 12 discovered re
 ## Reproduce
 
 ```sh
-node scripts/benchmarkHost.js http://127.0.0.1:3007 /tmp/solvis-host.json
+node scripts/benchmarkHost.js 3007 > /tmp/solvis-host.json
 npm test
 ```
 

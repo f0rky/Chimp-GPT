@@ -32,25 +32,7 @@ class InteractionEventHandler {
         );
       if (!imageButton && !interaction.isChatInputCommand()) return;
 
-      let denial;
-      if (maliciousUserManager.isUserBlocked(interaction.user.id)) {
-        denial = 'You are not permitted to use this bot.';
-      } else if (
-        !interaction.channel?.isDMBased() &&
-        !this.config.CHANNEL_ID?.includes(interaction.channelId)
-      ) {
-        denial = 'This bot is not enabled in this channel.';
-      } else {
-        const limit = await checkUserRateLimit(interaction.user.id, 1, {
-          points: 30,
-          duration: 30,
-        });
-        if (limit.limited) denial = limit.message;
-        if (!denial && (imageButton || interaction.commandName === 'image')) {
-          const imageLimit = await checkImageGenerationRateLimit(interaction.user.id);
-          if (imageLimit.limited) denial = imageLimit.message;
-        }
-      }
+      const denial = await this.getInteractionDenial(interaction, imageButton);
       if (denial) {
         await interaction.reply({ content: denial, ephemeral: true });
         return;
@@ -87,6 +69,28 @@ class InteractionEventHandler {
     } finally {
       if (timerId) performanceMonitor.stopTimer(timerId);
     }
+  }
+
+  async getInteractionDenial(interaction, imageButton) {
+    if (maliciousUserManager.isUserBlocked(interaction.user.id)) {
+      return 'You are not permitted to use this bot.';
+    }
+    if (
+      !interaction.channel?.isDMBased() &&
+      !this.config.CHANNEL_ID?.includes(interaction.channelId)
+    ) {
+      return 'This bot is not enabled in this channel.';
+    }
+    const limit = await checkUserRateLimit(interaction.user.id, 1, {
+      points: 30,
+      duration: 30,
+    });
+    if (limit.limited) return limit.message;
+    if (imageButton || interaction.commandName === 'image') {
+      const imageLimit = await checkImageGenerationRateLimit(interaction.user.id);
+      if (imageLimit.limited) return imageLimit.message;
+    }
+    return null;
   }
 
   async handleButtonInteraction(interaction) {

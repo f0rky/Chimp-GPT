@@ -1,34 +1,69 @@
-const http = require('http');
-const https = require('https');
-const url = require('url');
+const http = require('node:http');
+const https = require('node:https');
 const { createLogger } = require('../core/logger');
 const logger = createLogger('statusDiagnostics');
 
-/**
- * Run CORS configuration tests
- *
- * Tests the CORS configuration by making requests with different origins
- *
- * @param {string} baseUrl - The base URL of the status server
- * @returns {Promise<Object>} Test results
- */
+function diagnosticTarget(baseUrl) {
+  const target = new URL(baseUrl);
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(target.hostname);
+  if (target.protocol !== 'https:' && !(target.protocol === 'http:' && loopback)) {
+    throw new Error('Diagnostics require HTTPS except on loopback interfaces');
+  }
+  if (target.username || target.password) {
+    throw new Error('Diagnostic URLs must not contain credentials');
+  }
+  return target;
+}
+
+function requestApi(target, headers = {}) {
+  const requester = target.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = requester.request(new URL('/api', target), { method: 'GET', headers }, res => {
+      let data = '';
+      res.on('data', chunk => (data += chunk));
+      res.on('error', reject);
+      res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, data }));
+    });
+    req.setTimeout(5000, () => req.destroy(new Error('Diagnostic request timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function corsSucceeded(testCase, result) {
+  if (!testCase.headers.Origin) return result.statusCode === 200;
+  const origin = result.headers['access-control-allow-origin'];
+  const matches = origin === testCase.headers.Origin || origin === '*';
+  return testCase.expectedResult
+    ? result.statusCode === 200 && matches
+    : result.statusCode !== 200 || !matches;
+}
+
+async function testCorsCase(target, testCase) {
+  try {
+    const result = await requestApi(target, testCase.headers);
+    return {
+      name: testCase.name,
+      success: corsSucceeded(testCase, result),
+      statusCode: result.statusCode,
+      corsHeaders: {
+        'access-control-allow-origin': result.headers['access-control-allow-origin'],
+        'access-control-allow-methods': result.headers['access-control-allow-methods'],
+        'access-control-allow-credentials': result.headers['access-control-allow-credentials'],
+      },
+    };
+  } catch (error) {
+    return { name: testCase.name, success: false, error: error.message };
+  }
+}
+
+/** Check CORS on the status server; remote diagnostic targets must use HTTPS. */
 async function runCorsTests(baseUrl = 'http://localhost:3000') {
   try {
+    const target = diagnosticTarget(baseUrl);
     logger.info({ baseUrl }, 'Running CORS configuration tests');
-
-    // Parse the base URL to get hostname and port
-    const parsedUrl = url.parse(baseUrl);
-    const hostname = parsedUrl.hostname || 'localhost';
-    const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80);
-    const protocol = parsedUrl.protocol || 'http:';
-
-    // Define test cases with different origins
     const testCases = [
-      {
-        name: 'No Origin',
-        headers: {},
-        expectedResult: true,
-      },
+      { name: 'No Origin', headers: {}, expectedResult: true },
       {
         name: 'Allowed Origin (localhost)',
         headers: { Origin: 'http://localhost' },
@@ -41,263 +76,71 @@ async function runCorsTests(baseUrl = 'http://localhost:3000') {
       },
       {
         name: 'Disallowed Origin',
-        headers: { Origin: 'http://evil-site.com' },
+        headers: { Origin: 'https://evil-site.com' },
         expectedResult: false,
       },
     ];
-
-    // Add the current hostname to test cases
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    if (!['localhost', '127.0.0.1'].includes(target.hostname)) {
       testCases.push({
-        name: `Allowed Origin (${hostname})`,
-        headers: { Origin: `http://${hostname}` },
+        name: `Allowed Origin (${target.hostname})`,
+        headers: { Origin: target.origin.replace(/:\d+$/, '') },
         expectedResult: true,
       });
     }
-
-    // Run the test cases
-    const results = [];
-    for (const testCase of testCases) {
-      try {
-        const result = await new Promise((resolve, reject) => {
-          const options = {
-            hostname: hostname,
-            port: port,
-            path: '/api',
-            method: 'GET',
-            headers: testCase.headers,
-          };
-
-          const requester = protocol === 'https:' ? https : http;
-
-          const req = requester.request(options, res => {
-            let data = '';
-            res.on('data', chunk => {
-              data += chunk;
-            });
-
-            res.on('end', () => {
-              resolve({
-                statusCode: res.statusCode,
-                headers: res.headers,
-                data: data,
-              });
-            });
-          });
-
-          req.setTimeout(5000, () => req.destroy(new Error('Diagnostic request timed out')));
-          req.on('error', error => {
-            reject(error);
-          });
-
-          req.end();
-        });
-
-        // Check if the result matches the expected outcome
-        // For requests with no origin, we don't expect CORS headers
-        // For requests with an origin, we expect CORS headers if the origin is allowed
-        let success = false;
-
-        if (testCase.name === 'No Origin') {
-          // No origin requests should succeed without CORS headers
-          success = result.statusCode === 200;
-        } else if (testCase.expectedResult) {
-          // Allowed origins should have CORS headers and succeed
-          const corsHeaderPresent = result.headers['access-control-allow-origin'] !== undefined;
-          success = result.statusCode === 200 && corsHeaderPresent;
-        } else {
-          // Disallowed origins should either fail or not have matching CORS headers
-          const corsHeaderMatches =
-            result.headers['access-control-allow-origin'] === testCase.headers.Origin;
-          success = result.statusCode !== 200 || !corsHeaderMatches;
-        }
-
-        results.push({
-          name: testCase.name,
-          success: success,
-          statusCode: result.statusCode,
-          corsHeaders: {
-            'access-control-allow-origin': result.headers['access-control-allow-origin'],
-            'access-control-allow-methods': result.headers['access-control-allow-methods'],
-            'access-control-allow-credentials': result.headers['access-control-allow-credentials'],
-          },
-        });
-      } catch (error) {
-        results.push({
-          name: testCase.name,
-          success: false,
-          error: error.message,
-        });
-      }
-    }
-
-    // Determine overall success
-    const overallSuccess = results.every(result => result.success);
-
-    return {
-      success: overallSuccess,
-      details: results,
-    };
+    const results = await Promise.all(testCases.map(testCase => testCorsCase(target, testCase)));
+    return { success: results.every(result => result.success), details: results };
   } catch (error) {
     logger.error({ error }, 'Error running CORS tests');
-    return {
-      success: false,
-      error: error.message,
-    };
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Run rate limiter tests
- *
- * Tests the rate limiter configuration by making multiple requests in quick succession
- *
- * @param {string} baseUrl - The base URL of the status server
- * @returns {Promise<Object>} Test results
- */
-async function runRateLimiterTests(baseUrl = 'http://localhost:3000') {
+async function testSingleRequest(target) {
   try {
-    logger.info({ baseUrl }, 'Running rate limiter tests');
-
-    // Parse the base URL to get hostname and port
-    const parsedUrl = url.parse(baseUrl);
-    const hostname = parsedUrl.hostname || 'localhost';
-    const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80);
-    const protocol = parsedUrl.protocol || 'http:';
-
-    // Make a series of requests to test rate limiting
-    const results = [];
-    const requester = protocol === 'https:' ? https : http;
-
-    // Test 1: Single request (should succeed)
-    try {
-      const singleRequestResult = await new Promise((resolve, reject) => {
-        const options = {
-          hostname: hostname,
-          port: port,
-          path: '/api',
-          method: 'GET',
-        };
-
-        const req = requester.request(options, res => {
-          let data = '';
-          res.on('data', chunk => {
-            data += chunk;
-          });
-
-          res.on('end', () => {
-            resolve({
-              statusCode: res.statusCode,
-              headers: res.headers,
-              data: data,
-            });
-          });
-        });
-
-        req.setTimeout(5000, () => req.destroy(new Error('Diagnostic request timed out')));
-        req.on('error', error => {
-          reject(error);
-        });
-
-        req.end();
-      });
-
-      results.push({
-        name: 'Single Request',
-        success: singleRequestResult.statusCode === 200,
-        statusCode: singleRequestResult.statusCode,
-      });
-    } catch (error) {
-      results.push({
-        name: 'Single Request',
-        success: false,
-        error: error.message,
-      });
-    }
-
-    // Test 2: Rate limit test (only in development to avoid overloading production)
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        // We'll only make 5 requests to avoid overloading the server
-        // but this is enough to verify the rate limiter is working
-        const requests = [];
-        for (let i = 0; i < 5; i++) {
-          requests.push(
-            new Promise(resolve => {
-              const options = {
-                hostname: hostname,
-                port: port,
-                path: '/api',
-                method: 'GET',
-              };
-
-              const req = requester.request(options, res => {
-                let data = '';
-                res.on('data', chunk => {
-                  data += chunk;
-                });
-
-                res.on('end', () => {
-                  resolve({
-                    statusCode: res.statusCode,
-                    headers: res.headers,
-                    data: data,
-                  });
-                });
-              });
-
-              req.setTimeout(5000, () => req.destroy(new Error('Diagnostic request timed out')));
-              req.on('error', error => {
-                resolve({
-                  error: error.message,
-                });
-              });
-
-              req.end();
-            })
-          );
-        }
-
-        const multipleResults = await Promise.all(requests);
-
-        // All requests should succeed since our limit is high for testing
-        const allSucceeded = multipleResults.every(result => result.statusCode === 200);
-
-        results.push({
-          name: 'Multiple Requests',
-          success: allSucceeded,
-          requestCount: multipleResults.length,
-          successCount: multipleResults.filter(r => r.statusCode === 200).length,
-        });
-      } catch (error) {
-        results.push({
-          name: 'Multiple Requests',
-          success: false,
-          error: error.message,
-        });
-      }
-    } else {
-      results.push({
-        name: 'Multiple Requests',
-        success: true,
-        skipped: true,
-        message: 'Skipped in production environment',
-      });
-    }
-
-    // Determine overall success
-    const overallSuccess = results.every(result => result.success);
-
+    const result = await requestApi(target);
     return {
-      success: overallSuccess,
-      details: results,
+      name: 'Single Request',
+      success: result.statusCode === 200,
+      statusCode: result.statusCode,
     };
   } catch (error) {
-    logger.error({ error }, 'Error running rate limiter tests');
+    return { name: 'Single Request', success: false, error: error.message };
+  }
+}
+
+async function testMultipleRequests(target) {
+  if (process.env.NODE_ENV !== 'development') {
     return {
-      success: false,
-      error: error.message,
+      name: 'Multiple Requests',
+      success: true,
+      skipped: true,
+      message: 'Skipped in production environment',
     };
+  }
+  const results = await Promise.all(
+    Array.from({ length: 5 }, () => requestApi(target).catch(error => ({ error: error.message })))
+  );
+  const successCount = results.filter(result => result.statusCode === 200).length;
+  return {
+    name: 'Multiple Requests',
+    success: successCount === results.length,
+    requestCount: results.length,
+    successCount,
+  };
+}
+
+/** Verify basic access and, in development only, a five-request burst. */
+async function runRateLimiterTests(baseUrl = 'http://localhost:3000') {
+  try {
+    const target = diagnosticTarget(baseUrl);
+    logger.info({ baseUrl }, 'Running rate limiter tests');
+    const single = await testSingleRequest(target);
+    const multiple = await testMultipleRequests(target);
+    const results = [single, multiple];
+    return { success: results.every(result => result.success), details: results };
+  } catch (error) {
+    logger.error({ error }, 'Error running rate limiter tests');
+    return { success: false, error: error.message };
   }
 }
 
