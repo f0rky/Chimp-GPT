@@ -1,7 +1,7 @@
-const { expect } = require('chai');
+const assert = require('node:assert/strict');
+const { describe, it, before, after } = require('node:test');
 const fs = require('fs').promises;
 const path = require('path');
-const { createCanvas } = require('canvas');
 
 // Mock Discord client
 const mockClient = {
@@ -14,31 +14,16 @@ const mockClient = {
 const PFPManager = require('../../src/utils/pfpManager');
 
 describe('PFP Manager', function () {
-  this.timeout(10000); // Increase timeout for file operations
-
   let pfpManager;
   const testDir = path.join(__dirname, '..', 'test-pfp');
 
   // Create a test image buffer
-  const createTestImage = async () => {
-    const canvas = createCanvas(200, 200);
-    const ctx = canvas.getContext('2d');
-
-    // Draw a simple gradient
-    const gradient = ctx.createLinearGradient(0, 0, 200, 200);
-    gradient.addColorStop(0, 'red');
-    gradient.addColorStop(1, 'blue');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 200, 200);
-
-    // Add some text
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.fillText('Test Image', 50, 100);
-
-    return canvas.toBuffer('image/png');
-  };
+  // Valid 1x1 PNG; these tests exercise file rotation, not image rendering.
+  const createTestImage = () =>
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aH1sAAAAASUVORK5CYII=',
+      'base64'
+    );
 
   before(async () => {
     // Clean up test directory if it exists
@@ -71,12 +56,12 @@ describe('PFP Manager', function () {
     const filename = 'test-image-1';
 
     const result = await pfpManager.addImage(imageBuffer, filename);
-    expect(result).to.be.a('string');
+    assert.equal(typeof result, 'string');
 
     // Check if file exists
     const files = await fs.readdir(testDir);
-    expect(files).to.have.length(1);
-    expect(files[0]).to.include(filename);
+    assert.equal(files.length, 1);
+    assert.ok(files[0].includes(filename));
   });
 
   it('should respect max images limit', async () => {
@@ -88,13 +73,13 @@ describe('PFP Manager', function () {
 
     // Should only keep the 3 most recent images
     const files = await fs.readdir(testDir);
-    expect(files).to.have.length(3);
+    assert.equal(files.length, 3);
   });
 
   it('should get a random image', async () => {
     const imagePath = await pfpManager.getRandomImage();
-    expect(imagePath).to.be.a('string');
-    expect(imagePath).to.include(testDir);
+    assert.equal(typeof imagePath, 'string');
+    assert.ok(imagePath.includes(testDir));
 
     // Verify the file exists
     await fs.access(imagePath);
@@ -119,6 +104,6 @@ describe('PFP Manager', function () {
     pfpManager.stopRotation();
 
     // Check if avatar was updated
-    expect(avatarUpdated).to.be.true;
+    assert.equal(avatarUpdated, true);
   });
 });

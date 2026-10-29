@@ -1,4 +1,5 @@
 const BaseConversationNode = require('./BaseNode');
+const { CHAT_MODEL } = require('../../../services/chatModel');
 const { buildSystemPrompt } = require('../../../utils/systemPromptBuilder');
 const { createLogger } = require('../../../core/logger');
 const ImageGenerationFlow = require('../ImageGenerationFlow');
@@ -29,7 +30,7 @@ class FunctionExecutorNode extends BaseConversationNode {
     });
 
     this.config = {
-      model: 'gpt-4.1-nano',
+      model: CHAT_MODEL,
       maxRetries: 2,
       ...options.config,
     };

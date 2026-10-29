@@ -14,6 +14,7 @@
 
 const { Node, SharedStore, Flow } = require('./PocketFlow');
 const { createLogger } = require('../../core/logger');
+const { CHAT_MODEL } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 
 const logger = createLogger('OptimizedPocketFlow');
@@ -84,7 +85,7 @@ class OptimizedPocketFlow {
       );
 
       const completion = await this.openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: CHAT_MODEL,
         messages: [{ role: 'system', content: systemPrompt }, ...conversation.messages],
         max_tokens: this.options.maxTokens,
         temperature: 0.7,

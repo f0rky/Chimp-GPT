@@ -3,6 +3,7 @@
  * Updated to use the latest models and API format with secure API key management
  */
 const OpenAI = require('openai');
+const { CHAT_MODEL } = require('./chatModel');
 const apiKeyManager = require('../utils/apiKeyManager');
 const { openai: openaiLogger } = require('../core/logger');
 
@@ -251,7 +252,7 @@ async function processMessage(userMessage, conversationLog) {
             'Using new tool calling format with tools array and tool_choice parameter'
           );
           return await openaiWithLogging.chat.completions.create({
-            model: 'gpt-4.1-nano', // Using faster model for better responsiveness
+            model: CHAT_MODEL,
             messages: filteredLog,
             max_completion_tokens: 512, // Limit token usage (optional)
             tools: [
@@ -481,7 +482,7 @@ async function generateResponse(functionResult, conversationLog) {
     async () => {
       try {
         return await openaiWithLogging.chat.completions.create({
-          model: 'gpt-4.1-nano', // Using faster model for better responsiveness
+          model: CHAT_MODEL,
           messages: conversationLog,
           max_completion_tokens: 256,
         });
@@ -512,7 +513,7 @@ async function generateResponse(functionResult, conversationLog) {
  * @returns {string} The model name
  */
 function getOpenAIModel() {
-  return 'gpt-4.1-nano'; // Using faster model for better responsiveness
+  return CHAT_MODEL;
 }
 
 // openaiConfig.js

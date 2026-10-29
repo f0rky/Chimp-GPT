@@ -8,7 +8,7 @@
     "node": ">=20.18.1"
   },
   "scripts": {
-    "test": "node tests/unit/testRunner.js",
+    "test": "node tests/unit/testRunner.js && npm run test:regression",
     "test:comprehensive": "node tests/comprehensiveTestRunner.js",
     "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
     "test:integration": "node tests/comprehensiveTestRunner.js --category integration",
@@ -26,7 +26,8 @@
     "security:auto": "node scripts/security-check.js",
     "prestart": "npm run security:check && echo 'Starting the app...'",
     "start": "node --watch src/core/combined.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test:regression": "node tests/regressionRunner.js"
   },
   "lint-staged": {
     "*.{js,jsx}": [

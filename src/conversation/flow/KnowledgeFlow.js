@@ -17,6 +17,7 @@ const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 const { searchForFactCheck, formatSearchResults } = require('../../services/webSearch');
 const { fetchDocumentation } = require('../../services/webFetch');
 const config = require('../../core/configValidator');
+const { CHAT_MODEL } = require('../../services/chatModel');
 
 const logger = createLogger('KnowledgeFlow');
 
@@ -1286,7 +1287,7 @@ Please provide a natural, friendly, conversational response based on this inform
       );
 
       const completion = await this.openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: CHAT_MODEL,
         messages: [
           {
             role: 'system',

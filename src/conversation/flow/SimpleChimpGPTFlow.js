@@ -10,6 +10,7 @@ const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
 const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
+const { CHAT_MODEL } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
@@ -579,7 +580,7 @@ class SimpleChimpGPTFlow {
           const systemPrompt = buildSystemPrompt(botPersonality);
 
           const completion = await this.openaiClient.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: CHAT_MODEL,
             messages: [
               {
                 role: 'system',
@@ -712,7 +713,7 @@ class SimpleChimpGPTFlow {
         const systemPrompt = buildSystemPrompt(botPersonality);
 
         const completion = await this.openaiClient.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: CHAT_MODEL,
           messages: [
             {
               role: 'system',
@@ -852,7 +853,7 @@ class SimpleChimpGPTFlow {
       // (e.g. "hey solvis, draw the moon casting a duck shadow") can still be
       // answered with a real image instead of "I can't create images".
       const completion = await this.openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: CHAT_MODEL,
         messages: openaiMessages,
         max_tokens: this.options.maxTokens,
         temperature: 0.7,

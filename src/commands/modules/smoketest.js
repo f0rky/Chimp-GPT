@@ -18,6 +18,7 @@ const { createLogger } = require('../../core/logger');
 const logger = createLogger('commands:smoketest');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../core/configValidator');
+const { CHAT_MODEL } = require('../../services/chatModel');
 
 // Truncate helper for one-line detail snippets.
 function snip(value, max = 70) {
@@ -35,7 +36,7 @@ function buildChecks(includeImage) {
       async run() {
         const { client } = require('../../services/openaiConfig');
         const completion = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: CHAT_MODEL,
           messages: [{ role: 'user', content: 'Reply with exactly: SMOKE_OK' }],
           max_tokens: 10,
         });

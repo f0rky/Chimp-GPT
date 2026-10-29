@@ -35,6 +35,7 @@
  */
 
 const { OpenAI } = require('openai');
+const { CHAT_MODEL } = require('./chatModel');
 const { createLogger } = require('../core/logger');
 const {
   ChimpError,
@@ -817,7 +818,7 @@ async function enhanceImagePrompt(basicPrompt) {
     logger.info({ basicPrompt }, 'Enhancing image prompt');
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: CHAT_MODEL,
       messages: [
         {
           role: 'system',

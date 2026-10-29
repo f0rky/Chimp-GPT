@@ -65,6 +65,7 @@ const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 const apiKeyManager = require('../utils/apiKeyManager');
 const OpenAI = require('openai');
+const { CHAT_MODEL } = require('./chatModel');
 // Dedicated undici dispatcher for OpenAI (see ../core/openaiFetch) — avoids the
 // node-fetch "Premature close" bug and the discord.js global-dispatcher hijack.
 const { openaiFetch } = require('../core/openaiFetch');
@@ -930,7 +931,7 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
       const aiResponse = await retryWithBreaker(async () => {
         quakeLogger.debug('Making OpenAI API request for server summary');
         return await openaiClient.chat.completions.create({
-          model: 'gpt-4.1-nano', // Using GPT-4.1-nano for cost efficiency and adequate performance
+          model: CHAT_MODEL,
           messages: [
             {
               role: 'system',
