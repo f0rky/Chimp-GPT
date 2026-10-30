@@ -17,6 +17,7 @@ const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 const { searchForFactCheck, formatSearchResults } = require('../../services/webSearch');
 const { fetchDocumentation } = require('../../services/webFetch');
 const config = require('../../core/configValidator');
+const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 
 const logger = createLogger('KnowledgeFlow');
 
@@ -1285,21 +1286,23 @@ Please provide a natural, friendly, conversational response based on this inform
         "You are Solvis, a friendly AI assistant running in Chimp-GPT. Respond naturally and conversationally. Be helpful but casual and engaging, like you're having a chat with a friend. When you have search results, incorporate them naturally into your response rather than just listing them."
       );
 
-      const completion = await this.openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: conversationalPrompt,
-          },
-        ],
-        max_tokens: 1500,
-        temperature: 0.7,
-      });
+      const completion = await this.openaiClient.chat.completions.create(
+        buildChatRequest({
+          model: CHAT_MODEL,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: conversationalPrompt,
+            },
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+        })
+      );
 
       const naturalResponse = completion.choices[0].message.content;
 

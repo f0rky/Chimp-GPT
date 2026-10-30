@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-10-29T21:55:45.609Z",
+  "model": "gpt-4o-mini",
+  "chat": [
+    {
+      "ms": 1248.631764,
+      "correct": true,
+      "tokens": 16
+    },
+    {
+      "ms": 945.4007829999998,
+      "correct": true,
+      "tokens": 16
+    },
+    {
+      "ms": 925.6640390000002,
+      "correct": true,
+      "tokens": 16
+    }
+  ],
+  "quake": [
+    {
+      "cache": "cold",
+      "ms": 278.61391700000013,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.07298900000000685,
+      "servers": 1
+    },
+    {
+      "cache": "cold",
+      "ms": 159.91268200000013,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.17498599999998987,
+      "servers": 1
+    },
+    {
+      "cache": "cold",
+      "ms": 146.99348099999997,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.08453700000018216,
+      "servers": 1
+    }
+  ]
+}

@@ -145,7 +145,9 @@ class PocketFlowFunctionProcessor {
       throw new Error('Location parameter is required for weather lookup');
     }
 
-    const weatherData = await lookupWeather(location);
+    const weatherResult = await lookupWeather(location);
+    if (!weatherResult.success) throw weatherResult.error;
+    const weatherData = weatherResult.data;
 
     if (weatherData && weatherData.current && weatherData.location) {
       return {
@@ -155,6 +157,7 @@ class PocketFlowFunctionProcessor {
         humidity: `${weatherData.current.humidity}%`,
         windSpeed: `${weatherData.current.wind_kph} km/h`,
         formatted: `Current weather in ${weatherData.location.name}: ${weatherData.current.condition.text}, ${weatherData.current.temp_c}°C`,
+        attribution: weatherData.attribution,
         raw: weatherData,
       };
     }
@@ -171,7 +174,9 @@ class PocketFlowFunctionProcessor {
       throw new Error('Location parameter is required for forecast lookup');
     }
 
-    const forecastData = await lookupExtendedForecast(location, days);
+    const weatherResult = await lookupExtendedForecast(location, days);
+    if (!weatherResult.success) throw weatherResult.error;
+    const forecastData = weatherResult.data;
 
     if (forecastData && forecastData.forecast && forecastData.location) {
       const forecast = forecastData.forecast.forecastday.map(day => ({
@@ -186,6 +191,7 @@ class PocketFlowFunctionProcessor {
         days,
         forecast,
         formatted: `${days}-day forecast for ${forecastData.location.name}`,
+        attribution: forecastData.attribution,
         raw: forecastData,
       };
     }

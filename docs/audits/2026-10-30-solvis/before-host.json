@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-10-29T21:56:13.616Z",
+  "host": "salt",
+  "node": "v22.23.4",
+  "load": [
+    0.36,
+    0.57,
+    0.41
+  ],
+  "availableMemoryBytes": 14493147136,
+  "cpuCount": 8,
+  "methodology": "10 warmups, 100 measured requests per route/concurrency, 50ms between batches; keep-alive; milliseconds",
+  "benchmarks": [
+    {
+      "route": "/health",
+      "concurrency": 1,
+      "failures": 0,
+      "count": 100,
+      "median": 6.822691000000077,
+      "p95": 11.72173600000042,
+      "max": 51.09169900000006
+    },
+    {
+      "route": "/health",
+      "concurrency": 5,
+      "failures": 0,
+      "count": 100,
+      "median": 12.436352000000625,
+      "p95": 25.38336900000013,
+      "max": 175.1243629999999
+    },
+    {
+      "route": "/api",
+      "concurrency": 1,
+      "failures": 0,
+      "count": 100,
+      "median": 2.2825359999987995,
+      "p95": 3.656103000001167,
+      "max": 6.175198000000819
+    },
+    {
+      "route": "/api",
+      "concurrency": 5,
+      "failures": 0,
+      "count": 100,
+      "median": 5.650349999999889,
+      "p95": 9.939386999998533,
+      "max": 14.313428999999815
+    }
+  ],
+  "taskMetrics": {
+    "plugin_execution": {
+      "avg": 0,
+      "p95": 0,
+      "count": 4,
+      "max": 0
+    },
+    "message_processing": {
+      "avg": 4520,
+      "p95": 7123,
+      "count": 4,
+      "max": 7123
+    }
+  },
+  "serverHealth": {
+    "status": "healthy",
+    "lastError": null,
+    "memory": {
+      "rss": "156 MB",
+      "heapTotal": "63 MB",
+      "heapUsed": "42 MB",
+      "external": "4 MB"
+    }
+  },
+  "loadAfter": [
+    0.62,
+    0.62,
+    0.43
+  ]
+}

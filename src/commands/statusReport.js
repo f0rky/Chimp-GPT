@@ -11,6 +11,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const config = require('../core/configValidator');
+const { CHAT_MODEL } = require('../services/chatModel');
 const { getDetailedVersionInfo, formatUptime } = require('../core/getBotVersion');
 const statsStorage = require('../core/statsStorage');
 const { createLogger } = require('../core/logger');
@@ -44,7 +45,7 @@ function detectLLMProviders() {
   const providers = {
     primary: {
       provider: 'OpenAI',
-      model: 'gpt-4o-mini', // Current main model
+      model: CHAT_MODEL,
       configured: !!process.env.OPENAI_API_KEY,
       usage: ['Conversations', 'Knowledge', 'Weather', 'Time'],
     },

@@ -161,7 +161,9 @@ function createRateLimiter(options = {}) {
  * @returns {Promise<RateLimitResult>} Result object with rate limit information
  */
 async function checkImageGenerationRateLimit(userId) {
-  return checkUserRateLimit(userId, 1, {
+  // Use a separate bucket: otherwise the first ordinary-message request fixes
+  // this user's limiter at 30/30 and silently disables the 3/min image quota.
+  return checkUserRateLimit(`image:${userId}`, 1, {
     points: IMAGE_GEN_POINTS,
     duration: IMAGE_GEN_DURATION,
   });

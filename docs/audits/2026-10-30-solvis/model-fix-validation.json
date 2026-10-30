@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-10-29T23:02:01.224Z",
+  "model": "gpt-4o-mini",
+  "checks": [
+    {
+      "name": "text completion",
+      "passed": true,
+      "ms": 1376.207862,
+      "response": "OK",
+      "temperature": 0
+    },
+    {
+      "name": "function calling",
+      "passed": true,
+      "ms": 793.4421659999998
+    }
+  ],
+  "initialTextProbe": {
+    "name": "text completion",
+    "passed": false,
+    "ms": 2192.916937,
+    "note": "API request succeeded; the default-temperature response did not meet the exact OK assertion. A temperature-zero rerun passed."
+  }
+}

@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   chimpgpt:
-    build: ..
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
     container_name: chimpgpt
     restart: unless-stopped
     ports:

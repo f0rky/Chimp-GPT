@@ -1,5 +1,6 @@
 const { openai: openaiLogger } = require('../logger');
 const { trackApiCall, trackError } = require('../healthCheck');
+const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 
 /**
  * Generates a natural language response based on function results
@@ -131,10 +132,12 @@ async function generateNaturalResponse(
     });
 
     const response = await Promise.race([
-      openai.chat.completions.create({
-        model: 'gpt-4.1-nano', // Using faster model for better responsiveness
-        messages: messages,
-      }),
+      openai.chat.completions.create(
+        buildChatRequest({
+          model: CHAT_MODEL,
+          messages: messages,
+        })
+      ),
       timeoutPromise,
     ]);
 

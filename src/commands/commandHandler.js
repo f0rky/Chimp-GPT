@@ -317,19 +317,41 @@ async function handleSlashCommand(interaction, config) {
       'Executing slash command'
     );
 
-    // Check which method is available and use it
-    if (typeof command.interactionExecute === 'function') {
-      await command.interactionExecute(interaction, config);
-    } else if (typeof command.executeSlash === 'function') {
-      await command.executeSlash(interaction, config);
-    } else {
-      throw new Error(
-        `Command ${commandName} does not have an interactionExecute or executeSlash method`
+    const execute = async () => {
+      if (typeof command.interactionExecute === 'function') {
+        return command.interactionExecute(interaction, config);
+      }
+      if (typeof command.executeSlash === 'function') {
+        return command.executeSlash(interaction, config);
+      }
+      throw new Error(`Command ${commandName} does not have a slash execution method`);
+    };
+
+    if (command.requiresApproval) {
+      // Acknowledge before waiting for a human (Discord allows only 3 seconds).
+      await interaction.deferReply({ ephemeral: true });
+      const result = await executeWithApproval(
+        {
+          type: SENSITIVE_OPERATIONS.COMMAND_EXECUTION,
+          user: `${interaction.user.username} (${interaction.user.id})`,
+          context: `Slash command: /${commandName}`,
+          metadata: { command: commandName, channelId: interaction.channelId },
+        },
+        execute,
+        interaction.client
       );
+      if (result.error) throw result.error;
+      if (!result.approved) {
+        await interaction.editReply(
+          '❌ This command requires approval from the bot owner. Request denied.'
+        );
+      }
+    } else {
+      await execute();
     }
   } catch (error) {
     // Enhanced granular error logging for plugin/core slash commands
-    const isPluginCommand = !!command.pluginId;
+    const isPluginCommand = !!command?.pluginId;
     const commandName = interaction.commandName;
     const errorContext = {
       error: {

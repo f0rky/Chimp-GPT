@@ -1,0 +1,67 @@
+{
+  "timestamp": "2026-10-29T22:34:02.695Z",
+  "host": "salt",
+  "node": "v22.23.4",
+  "load": [
+    0.29,
+    0.26,
+    0.26
+  ],
+  "availableMemoryBytes": 14171508736,
+  "cpuCount": 8,
+  "methodology": "10 warmups, 100 measured requests per route/concurrency, 50ms between batches; keep-alive; milliseconds",
+  "benchmarks": [
+    {
+      "route": "/health",
+      "concurrency": 1,
+      "failures": 0,
+      "count": 100,
+      "median": 6.989712000000054,
+      "p95": 11.24386000000004,
+      "max": 13.006429000000026
+    },
+    {
+      "route": "/health",
+      "concurrency": 5,
+      "failures": 0,
+      "count": 100,
+      "median": 14.950517000000218,
+      "p95": 23.414223000000675,
+      "max": 29.25624599999992
+    },
+    {
+      "route": "/api",
+      "concurrency": 1,
+      "failures": 0,
+      "count": 100,
+      "median": 2.557525000000169,
+      "p95": 3.7740169999997306,
+      "max": 4.329669999999169
+    },
+    {
+      "route": "/api",
+      "concurrency": 5,
+      "failures": 0,
+      "count": 100,
+      "median": 4.575364000000263,
+      "p95": 6.07955899999979,
+      "max": 7.290372999999818
+    }
+  ],
+  "taskMetrics": {},
+  "serverHealth": {
+    "status": "healthy",
+    "lastError": null,
+    "memory": {
+      "rss": "151 MB",
+      "heapTotal": "60 MB",
+      "heapUsed": "44 MB",
+      "external": "4 MB"
+    }
+  },
+  "loadAfter": [
+    0.3,
+    0.26,
+    0.26
+  ]
+}

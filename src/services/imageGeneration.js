@@ -35,6 +35,7 @@
  */
 
 const { OpenAI } = require('openai');
+const { CHAT_MODEL, buildChatRequest } = require('./chatModel');
 const { createLogger } = require('../core/logger');
 const {
   ChimpError,
@@ -816,25 +817,27 @@ async function enhanceImagePrompt(basicPrompt) {
 
     logger.info({ basicPrompt }, 'Enhancing image prompt');
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an expert at creating detailed, vivid prompts for GPT Image image generation. ' +
-            'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
-            'and other elements that will result in a high-quality, visually appealing image. ' +
-            'Do not include any text that would violate content policies (no violence, adult content, etc.). ' +
-            'Keep the enhanced prompt concise but descriptive, ideally under 1000 characters.',
-        },
-        {
-          role: 'user',
-          content: `Please enhance this basic image prompt for GPT Image: "${basicPrompt}"`,
-        },
-      ],
-      max_completion_tokens: 300,
-    });
+    const response = await openai.chat.completions.create(
+      buildChatRequest({
+        model: CHAT_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an expert at creating detailed, vivid prompts for GPT Image image generation. ' +
+              'Your task is to enhance basic prompts with more details about style, lighting, composition, ' +
+              'and other elements that will result in a high-quality, visually appealing image. ' +
+              'Do not include any text that would violate content policies (no violence, adult content, etc.). ' +
+              'Keep the enhanced prompt concise but descriptive, ideally under 1000 characters.',
+          },
+          {
+            role: 'user',
+            content: `Please enhance this basic image prompt for GPT Image: "${basicPrompt}"`,
+          },
+        ],
+        max_completion_tokens: 300,
+      })
+    );
 
     const enhancedPrompt = response.choices[0].message.content.trim();
 

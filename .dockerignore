@@ -13,3 +13,7 @@ tests/
 archive/
 *.log
 data/
+
+.deployment-backups/
+.env.*
+!.env.example

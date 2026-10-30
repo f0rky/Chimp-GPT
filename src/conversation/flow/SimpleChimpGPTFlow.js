@@ -10,7 +10,9 @@ const config = require('../../core/configValidator');
 const { createLogger } = require('../../core/logger');
 const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
+const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
+const { withWeatherAttribution } = require('../../services/weatherClient');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
 // hit on first use and subsequent calls skip the require() lookup entirely.
@@ -578,27 +580,29 @@ class SimpleChimpGPTFlow {
           // Generate response with bot personality and current date/time context
           const systemPrompt = buildSystemPrompt(botPersonality);
 
-          const completion = await this.openaiClient.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: systemPrompt,
-              },
-              {
-                role: 'user',
-                content: weatherContext,
-              },
-            ],
-            max_tokens: 500,
-            temperature: 0.7,
-          });
+          const completion = await this.openaiClient.chat.completions.create(
+            buildChatRequest({
+              model: CHAT_MODEL,
+              messages: [
+                {
+                  role: 'system',
+                  content: systemPrompt,
+                },
+                {
+                  role: 'user',
+                  content: weatherContext,
+                },
+              ],
+              max_tokens: 500,
+              temperature: 0.7,
+            })
+          );
 
           const personalizedResponse = completion.choices[0].message.content;
 
           return {
             success: true,
-            response: personalizedResponse,
+            response: withWeatherAttribution(personalizedResponse, weatherData.attribution),
             type: 'weather',
             location: location,
             weatherData: weatherData.weatherData,
@@ -711,21 +715,23 @@ class SimpleChimpGPTFlow {
         // Generate response with bot personality and current date/time context
         const systemPrompt = buildSystemPrompt(botPersonality);
 
-        const completion = await this.openaiClient.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: timeContext,
-            },
-          ],
-          max_tokens: 300,
-          temperature: 0.7,
-        });
+        const completion = await this.openaiClient.chat.completions.create(
+          buildChatRequest({
+            model: CHAT_MODEL,
+            messages: [
+              {
+                role: 'system',
+                content: systemPrompt,
+              },
+              {
+                role: 'user',
+                content: timeContext,
+              },
+            ],
+            max_tokens: 300,
+            temperature: 0.7,
+          })
+        );
 
         const personalizedResponse = completion.choices[0].message.content;
 
@@ -851,14 +857,16 @@ class SimpleChimpGPTFlow {
       // Call OpenAI with tools available so requests the regex fast-path missed
       // (e.g. "hey solvis, draw the moon casting a duck shadow") can still be
       // answered with a real image instead of "I can't create images".
-      const completion = await this.openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: openaiMessages,
-        max_tokens: this.options.maxTokens,
-        temperature: 0.7,
-        tools: CONVERSATION_TOOLS,
-        tool_choice: 'auto',
-      });
+      const completion = await this.openaiClient.chat.completions.create(
+        buildChatRequest({
+          model: CHAT_MODEL,
+          messages: openaiMessages,
+          max_tokens: this.options.maxTokens,
+          temperature: 0.7,
+          tools: CONVERSATION_TOOLS,
+          tool_choice: 'auto',
+        })
+      );
 
       const choice = completion.choices[0];
       const imageToolCall = choice.message?.tool_calls?.find(

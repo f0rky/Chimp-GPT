@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-10-29T21:53:52.256Z",
+  "model": "gpt-4.1-nano",
+  "chat": [
+    {
+      "ms": 715.6571019999999,
+      "error": "model_not_found",
+      "status": 404
+    },
+    {
+      "ms": 755.8949259999999,
+      "error": "model_not_found",
+      "status": 404
+    },
+    {
+      "ms": 332.17099599999983,
+      "error": "model_not_found",
+      "status": 404
+    }
+  ],
+  "quake": [
+    {
+      "cache": "cold",
+      "ms": 274.566155,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.14956099999994876,
+      "servers": 1
+    },
+    {
+      "cache": "cold",
+      "ms": 175.02661799999987,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.1775750000001608,
+      "servers": 1
+    },
+    {
+      "cache": "cold",
+      "ms": 146.81848900000023,
+      "servers": 1
+    },
+    {
+      "cache": "warm",
+      "ms": 0.1685789999996814,
+      "servers": 1
+    }
+  ]
+}

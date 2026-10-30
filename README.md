@@ -6,7 +6,7 @@ Discord bot with OpenAI. Conversations, image generation, weather, web search, a
 
 - AI conversations with reply chain tracking and group chat support
 - Image generation — fast OpenRouter default, GPT Image 2 upscale, remix controls, and all-black-output protection
-- Weather via WeatherAPI through RapidAPI
+- Weather and real five-day forecasts via Open-Meteo, with shared response caching
 - Timezone-aware time lookup
 - Quake Live server stats with Glicko ratings
 - Web search with circuit breaker
@@ -19,7 +19,6 @@ Discord bot with OpenAI. Conversations, image generation, weather, web search, a
 - Node.js 20.18.1+
 - Discord bot token + application
 - OpenAI API key
-- RapidAPI key (weather)
 - Optional: Wolfram Alpha App ID
 
 ## Setup
@@ -43,7 +42,7 @@ npm start
 | `CHANNEL_ID` | ✅ | Channel(s) to respond in (comma-separated) |
 | `OPENAI_API_KEY` | ✅ | OpenAI API key (upscale and fallback image generation) |
 | `OPENROUTER_API_KEY` | ❌ | Fast default image generation through OpenRouter Nano Banana 2 Lite |
-| `X_RAPIDAPI_KEY` | ✅ | RapidAPI key (weather) |
+| `X_RAPIDAPI_KEY` | ❌ | Legacy setting; not used for weather |
 | `BOT_NAME` | ❌ | Bot display name (default: Solvis) |
 | `BOT_PERSONALITY` | ❌ | System prompt personality |
 | `ENABLE_IMAGE_GENERATION` | ❌ | Enable image gen (default: true) |
@@ -51,6 +50,12 @@ npm start
 | `LOG_LEVEL` | ❌ | Pino log level (default: info) |
 
 See `.env.example` for the full list.
+
+## Weather
+
+Weather uses Open-Meteo and its GeoNames-backed geocoding service; no RapidAPI key is needed. The public Open-Meteo endpoint is for non-commercial use. Weather replies include source attribution. Commercial deployments need an appropriately licensed provider or subscription.
+
+All weather commands and conversation/tool paths share a cache: validated current conditions and five-day forecasts for 10 minutes, locations for 24 hours. Concurrent identical requests share one upstream fetch. Failed responses are never used as weather data; a short error cooldown prevents repeated calls during an outage. Caches are bounded, local to each bot process, and reset on restart. See [weather caching and verification](docs/audits/2026-10-30-solvis/WEATHER-CACHE.md).
 
 ## Image generation
 

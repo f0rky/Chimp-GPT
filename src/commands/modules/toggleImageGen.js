@@ -136,7 +136,7 @@ const data = new SlashCommandBuilder()
  */
 async function execute(interaction) {
   try {
-    await interaction.deferReply({ ephemeral: true });
+    if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
 
     const { newState, success } = await toggleImageGeneration();
 

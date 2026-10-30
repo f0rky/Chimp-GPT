@@ -3,6 +3,12 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const commandHandler = require('../../commands/commandHandler');
 const { generateImage } = require('../../services/imageGeneration');
 const { downloadImage } = require('../../utils/imageDownloader');
+const maliciousUserManager = require('../../utils/maliciousUserManager');
+const performanceMonitor = require('../../middleware/performanceMonitor');
+const {
+  checkUserRateLimit,
+  checkImageGenerationRateLimit,
+} = require('../../middleware/rateLimiter');
 
 class InteractionEventHandler {
   constructor(client, config) {
@@ -17,7 +23,26 @@ class InteractionEventHandler {
   }
 
   async handleInteractionCreate(interaction) {
+    let timerId;
     try {
+      const imageButton =
+        interaction.isButton() &&
+        ['image_upscale:', 'image_remix:', 'hd_upgrade:'].some(prefix =>
+          interaction.customId.startsWith(prefix)
+        );
+      if (!imageButton && !interaction.isChatInputCommand()) return;
+
+      const denial = await this.getInteractionDenial(interaction, imageButton);
+      if (denial) {
+        await interaction.reply({ content: denial, ephemeral: true });
+        return;
+      }
+
+      timerId = performanceMonitor.startTimer(
+        imageButton || interaction.commandName === 'image' ? 'image_interaction' : 'slash_command',
+        { command: imageButton ? 'image_button' : interaction.commandName }
+      );
+
       // Handle button interactions
       if (interaction.isButton()) {
         await this.handleButtonInteraction(interaction);
@@ -41,7 +66,31 @@ class InteractionEventHandler {
       } else if (!interaction.replied) {
         await interaction.editReply('An error occurred while processing this command.');
       }
+    } finally {
+      if (timerId) performanceMonitor.stopTimer(timerId);
     }
+  }
+
+  async getInteractionDenial(interaction, imageButton) {
+    if (maliciousUserManager.isUserBlocked(interaction.user.id)) {
+      return 'You are not permitted to use this bot.';
+    }
+    if (
+      !interaction.channel?.isDMBased() &&
+      !this.config.CHANNEL_ID?.includes(interaction.channelId)
+    ) {
+      return 'This bot is not enabled in this channel.';
+    }
+    const limit = await checkUserRateLimit(interaction.user.id, 1, {
+      points: 30,
+      duration: 30,
+    });
+    if (limit.limited) return limit.message;
+    if (imageButton || interaction.commandName === 'image') {
+      const imageLimit = await checkImageGenerationRateLimit(interaction.user.id);
+      if (imageLimit.limited) return imageLimit.message;
+    }
+    return null;
   }
 
   async handleButtonInteraction(interaction) {

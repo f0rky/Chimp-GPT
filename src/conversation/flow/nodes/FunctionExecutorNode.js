@@ -1,5 +1,7 @@
 const BaseConversationNode = require('./BaseNode');
+const { CHAT_MODEL, buildChatRequest } = require('../../../services/chatModel');
 const { buildSystemPrompt } = require('../../../utils/systemPromptBuilder');
+const { withWeatherAttribution } = require('../../../services/weatherClient');
 const { createLogger } = require('../../../core/logger');
 const ImageGenerationFlow = require('../ImageGenerationFlow');
 const { storeUserLocation, normalizeLocation } = require('../../../utils/userLocationManager');
@@ -29,7 +31,7 @@ class FunctionExecutorNode extends BaseConversationNode {
     });
 
     this.config = {
-      model: 'gpt-4.1-nano',
+      model: CHAT_MODEL,
       maxRetries: 2,
       ...options.config,
     };
@@ -266,7 +268,7 @@ class FunctionExecutorNode extends BaseConversationNode {
       requestData.tool_choice = 'auto';
     }
 
-    return await this.openaiClient.chat.completions.create(requestData);
+    return await this.openaiClient.chat.completions.create(buildChatRequest(requestData));
   }
 
   async executeFunctionCall(toolCall, store, message) {
@@ -351,7 +353,14 @@ class FunctionExecutorNode extends BaseConversationNode {
       ];
 
       const naturalCompletion = await this.callOpenAI(responseContext, false);
-      return naturalCompletion.choices[0].message.content;
+      const content = naturalCompletion.choices[0].message.content;
+      if (['lookupWeather', 'lookupExtendedForecast'].includes(toolCall.function.name)) {
+        return withWeatherAttribution(
+          content,
+          functionResult.result?.attribution || functionResult.attribution
+        );
+      }
+      return content;
     } catch (error) {
       logger.error({ error }, 'Error generating natural response:');
       return `I executed the ${toolCall.function.name} function, but encountered an error generating a natural response: ${error.message}`;

@@ -107,7 +107,7 @@ setInterval(() => {
 }, 30000); // Every 30 seconds
 
 // Import test runners
-const { runCorsTests, runRateLimiterTests } = require('../../tests/unit/testRunner');
+const { runCorsTests, runRateLimiterTests } = require('../utils/statusDiagnostics');
 
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');

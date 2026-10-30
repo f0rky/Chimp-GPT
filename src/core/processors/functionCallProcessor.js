@@ -174,7 +174,9 @@ async function handleFunctionCall(
     case 'lookupWeather':
       try {
         // Get the original weather data for status updates
-        const weatherData = await lookupWeather(gptResponse.parameters.location);
+        const weatherResult = await lookupWeather(gptResponse.parameters.location);
+        if (!weatherResult.success) throw weatherResult.error;
+        const weatherData = weatherResult.data;
         trackApiCall('weather');
         if (timings.apiCalls) timings.apiCalls.weather++;
         discordLogger.info(
@@ -216,12 +218,12 @@ async function handleFunctionCall(
         );
 
         // Update the feedback message directly with the response
-        await feedbackMessage.edit(response);
+        await feedbackMessage.edit(response.formattedSummary);
 
         // Add the response to the conversation log
         conversationLog.push({
           role: 'assistant',
-          content: response,
+          content: response.formattedSummary,
         });
 
         // Stop timer and return early since we've already handled the response
@@ -238,10 +240,12 @@ async function handleFunctionCall(
     case 'lookupExtendedForecast':
       try {
         // Get the original weather data for status updates
-        const weatherData = await lookupExtendedForecast(
+        const weatherResult = await lookupExtendedForecast(
           gptResponse.parameters.location,
           gptResponse.parameters.days
         );
+        if (!weatherResult.success) throw weatherResult.error;
+        const weatherData = weatherResult.data;
         trackApiCall('weather');
         discordLogger.info(
           {
@@ -284,12 +288,12 @@ async function handleFunctionCall(
         );
 
         // Update the feedback message directly with the response
-        await feedbackMessage.edit(response);
+        await feedbackMessage.edit(response.formattedSummary);
 
         // Add the response to the conversation log
         conversationLog.push({
           role: 'assistant',
-          content: response,
+          content: response.formattedSummary,
         });
 
         // Stop timer and return early since we've already handled the response

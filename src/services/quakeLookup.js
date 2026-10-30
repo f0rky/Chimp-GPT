@@ -65,6 +65,7 @@ const retryWithBreaker = require('../utils/retryWithBreaker');
 const breakerManager = require('../middleware/breakerManager');
 const apiKeyManager = require('../utils/apiKeyManager');
 const OpenAI = require('openai');
+const { CHAT_MODEL, buildChatRequest } = require('./chatModel');
 // Dedicated undici dispatcher for OpenAI (see ../core/openaiFetch) — avoids the
 // node-fetch "Premature close" bug and the discord.js global-dispatcher hijack.
 const { openaiFetch } = require('../core/openaiFetch');
@@ -929,21 +930,23 @@ async function processServerStatsWithAI(serverResponses, allServerStats) {
       quakeLogger.debug('Using retryWithBreaker for OpenAI API request');
       const aiResponse = await retryWithBreaker(async () => {
         quakeLogger.debug('Making OpenAI API request for server summary');
-        return await openaiClient.chat.completions.create({
-          model: 'gpt-4.1-nano', // Using GPT-4.1-nano for cost efficiency and adequate performance
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types.',
-            },
-            {
-              role: 'user',
-              content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
-            },
-          ],
-          max_completion_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
-        });
+        return await openaiClient.chat.completions.create(
+          buildChatRequest({
+            model: CHAT_MODEL,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are a helpful assistant that summarizes Quake Live server information. Create a very concise summary of the additional servers in 3-4 sentences total. Focus on player counts, maps, and game types.',
+              },
+              {
+                role: 'user',
+                content: `Summarize these additional Quake Live servers in a very brief format: ${JSON.stringify(serverSummaries)}`,
+              },
+            ],
+            max_completion_tokens: 150, // Limiting response length to ensure it fits within Discord's character limits
+          })
+        );
       }, OPENAI_BREAKER_CONFIG);
 
       // Extract the generated summary text from the API response

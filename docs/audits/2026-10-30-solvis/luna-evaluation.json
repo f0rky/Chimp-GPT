@@ -1,0 +1,1771 @@
+{
+  "startedAt": "2026-10-29T23:52:45.875Z",
+  "host": "salt",
+  "repetitions": 3,
+  "methodology": "Sequential alternating model pairs; synthetic prompts; temperature 0.7; SDK retries disabled; 20s timeout; no tools executed. One warmup per model excluded. Narrow automated checks, not a full quality evaluation.",
+  "pricesPerMillionTokensUsd": {
+    "gpt-4o-mini": {
+      "input": 0.15,
+      "cachedInput": 0.075,
+      "output": 0.6
+    },
+    "gpt-6-luna": {
+      "input": 0.1,
+      "cachedInput": 0.01,
+      "cacheWrite": 0.125,
+      "output": 0.5
+    }
+  },
+  "pricingSources": [
+    "https://developers.openai.com/api/docs/models/gpt-4o-mini",
+    "https://developers.openai.com/api/docs/models/gpt-6-luna"
+  ],
+  "warmups": [
+    {
+      "model": "gpt-4o-mini",
+      "ms": 1897.318839,
+      "usage": {
+        "prompt_tokens": 11,
+        "completion_tokens": 2,
+        "total_tokens": 13,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "gpt-6-luna",
+      "ms": 974.505756,
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      }
+    }
+  ],
+  "samples": [
+    {
+      "case": "conversation",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1228.5249000000003,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Hope you and your adorable cat Pixel are having a fantastic day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 102,
+        "completion_tokens": 17,
+        "total_tokens": 119,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000255
+    },
+    {
+      "case": "conversation",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1689.9894990000003,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Hope you and Pixel are having a pawsome day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 17,
+        "total_tokens": 205,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000273
+    },
+    {
+      "case": "time-tool",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1183.8734749999994,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_0HEV9IzfAMM7f9YtLv38n8jr",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 207,
+        "completion_tokens": 18,
+        "total_tokens": 225,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000029700000000000004
+    },
+    {
+      "case": "time-tool",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1390.946488999999,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_sw8vinNaovWfEnf3QDjEIKCk",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 123,
+        "completion_tokens": 15,
+        "total_tokens": 138,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00002745
+    },
+    {
+      "case": "image-tool",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1380.8244090000007,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_BXlAX8P7Ih4mOfmKOYg22PgB",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A night scene showing a full moon in the sky casting a shadow on the ground in the shape of a duck. The moon is bright and surrounded by stars, while the duck-shaped shadow is clearly defined, creating a whimsical and surreal atmosphere.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 74,
+        "completion_tokens": 61,
+        "total_tokens": 135,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000477
+    },
+    {
+      "case": "image-tool",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 2831.722627000001,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_skNlOHlnU9OmrEcLJo99Ps1c",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A whimsical, serene night-sky illustration of a bright full moon casting a clearly recognizable duck-shaped shadow across a softly lit landscape. The moonlight forms the shadow silhouette of a duck with a rounded body, neck, and beak on the ground, playful yet atmospheric, deep indigo sky, gentle silver glow, storybook style.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 158,
+        "completion_tokens": 83,
+        "total_tokens": 241,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000573
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1544.5211040000013,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s clear in Auckland, 18°C with winds around 12 km/h—pretty nice out!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 56,
+        "completion_tokens": 24,
+        "total_tokens": 80,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000176
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 911.1947049999999,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! 🌞 The weather in Auckland is looking pretty sweet right now—it's 18°C with a clear sky and a gentle breeze at 12 km/h. Perfect for a little outdoor adventure! Enjoy!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 57,
+        "completion_tokens": 43,
+        "total_tokens": 100,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00003435
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 724.6171429999995,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! 🌟 Right now, it's 3:45 PM NZDT in Auckland. If you need anything else or want to chat, just let me know!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 34,
+        "total_tokens": 86,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000028199999999999998
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1142.2809959999995,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s 3:45 PM NZDT in Auckland right now! 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 51,
+        "completion_tokens": 19,
+        "total_tokens": 70,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000146
+    },
+    {
+      "case": "quake-summary",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1266.3170089999985,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Arena One has 8 of 16 players on campgrounds, playing CA. Arena Two has 2 of 8 players on bloodrun, playing duel.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 93,
+        "completion_tokens": 35,
+        "total_tokens": 128,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000268
+    },
+    {
+      "case": "quake-summary",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1368.827670999999,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Quake Live servers include \"Arena One,\" which currently hosts 8 players with a maximum capacity of 16, and features the map \"campgrounds\" in a Clan Arena (CA) game type. Another server, \"Arena Two,\" has 2 players, accommodating up to 8, and is set on the \"bloodrun\" map for a duel game type.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 94,
+        "completion_tokens": 75,
+        "total_tokens": 169,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000591
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": false,
+      "ms": 1668.1418110000013,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A whimsical scene of a fox, clad in a cozy, knitted scarf, engrossed in an ancient book under the soft glow of a vintage brass lamp in a grand library. The shelves are lined with leather-bound tomes, their spines catching the warm, amber light. Moonlight filters through a large, arched window, casting gentle shadows across the wooden floor. The fox sits on a plush, velvet armchair, its fur illuminated by the lamp's glow, creating a striking contrast against the deep, rich tones of the library. Dust motes dance in the air, adding to the enchanting atmosphere, while a large globe stands in the background, hinting at adventures yet to be discovered. The composition draws the viewer’s eye to the fox's expressive eyes as it turns a page, inviting them into this magical nocturnal world of stories and imagination.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 53,
+        "completion_tokens": 172,
+        "total_tokens": 225,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00011115
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 2079.0352539999985,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A clever red fox curled in a chair, reading an open book in a quiet library at night. Tall shelves packed with old books frame the scene, while a small pool of warm lamplight falls across the pages and the fox’s face; cool moonlight filters through a nearby window, adding soft blue shadows. Storybook illustration style, rich textures, gentle cinematic lighting, intimate atmosphere, balanced composition with the fox as the clear focal point.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 92,
+        "total_tokens": 144,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000051200000000000004
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 1,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1466.0314270000017,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Acorn restarts every Tuesday at 02:00 UTC. Queued jobs may wait up to 30 seconds during the restart. 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 99,
+        "completion_tokens": 32,
+        "total_tokens": 131,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000259
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 1,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 872.1281720000006,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The fictional Acorn service restarts every Tuesday at 02:00 UTC, and queued jobs can wait up to 30 seconds during a restart!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 30,
+        "total_tokens": 130,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000033
+    },
+    {
+      "case": "time-tool",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1054.0227090000008,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_4PJkWX6VKDKfYd0be9zgJb6W",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 207,
+        "completion_tokens": 18,
+        "total_tokens": 225,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000029700000000000004
+    },
+    {
+      "case": "time-tool",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 699.2492979999988,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_hNDuqRCFe4ikFVBzxjHmiJ3L",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 123,
+        "completion_tokens": 15,
+        "total_tokens": 138,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00002745
+    },
+    {
+      "case": "image-tool",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1107.9330289999998,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_9aBhLCRmqQszgCgT1IrAMSRd",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A full moon in the night sky casting a shadow that is shaped like a duck. The scene is tranquil with a few stars twinkling in the background, and the moonlight illuminating the landscape.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 74,
+        "completion_tokens": 53,
+        "total_tokens": 127,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000429
+    },
+    {
+      "case": "image-tool",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1867.840279,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_JX7rVaRQ8sAAiT9LHgN7XRxA",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A whimsical, dreamy night-sky illustration of a bright full moon casting a clearly recognizable duck-shaped shadow across a quiet landscape. The moonlight forms the shadow silhouette of a duck with a rounded body, neck, and bill, stretching over a calm lake or meadow. Soft blue and silver tones, gentle stars, charming storybook style, visually clear and playful.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 158,
+        "completion_tokens": 88,
+        "total_tokens": 246,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000598
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1032.5535799999998,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s clear in Auckland, 18°C, with winds at 12 km/h. Nice day out!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 56,
+        "completion_tokens": 25,
+        "total_tokens": 81,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000018100000000000003
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1098.1486449999975,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! 🌞 The weather in Auckland is looking pretty sweet right now—it's a cozy 18°C with a clear sky. Plus, there's a gentle breeze at 12 km/h. Perfect day to get outside and enjoy some sunshine! ☀️",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 57,
+        "completion_tokens": 52,
+        "total_tokens": 109,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00003975
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 786.7783860000054,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! 🌟 Just a heads up, it’s currently 3:45 PM NZDT in Auckland. Hope you’re having a great day! If you need anything else, just let me know!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 42,
+        "total_tokens": 94,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000033
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 979.4460770000005,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s 3:45 PM NZDT in Auckland. 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 51,
+        "completion_tokens": 17,
+        "total_tokens": 68,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000013600000000000002
+    },
+    {
+      "case": "quake-summary",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1363.973020000005,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Arena One has 8 of 16 player slots filled and is running CA on campgrounds. Arena Two has 2 of 8 slots filled and is running duel on bloodrun.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 93,
+        "completion_tokens": 40,
+        "total_tokens": 133,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000293
+    },
+    {
+      "case": "quake-summary",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1271.0403880000013,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Quake Live servers feature various player counts and game types. For instance, \"Arena One\" hosts up to 16 players on the \"campgrounds\" map in a Capture the Flag (CA) game mode, currently accommodating 8 players. In contrast, \"Arena Two\" supports a maximum of 8 players on the \"bloodrun\" map, focusing on duel gameplay, with only 2 players currently in attendance.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 94,
+        "completion_tokens": 85,
+        "total_tokens": 179,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000651
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1630.4656879999966,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A cozy library bathed in the warm glow of vintage sconces, casting soft shadows across the rows of books. In the center, a clever fox, with a glossy orange coat and bright, inquisitive eyes, sits comfortably on a plush, oversized armchair. The fox is engrossed in an ancient, leather-bound book, its delicate paws carefully turning the pages. Moonlight filters through a tall window, illuminating dust motes dancing in the air and creating a serene atmosphere. The shelves are filled with towering stacks of books, their spines adorned with gold lettering, while a steaming cup of tea rests on a nearby table, hinting at the fox's late-night reading adventures. The scene captures a whimsical blend of warmth, curiosity, and tranquility, perfect for a storybook illustration.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 53,
+        "completion_tokens": 158,
+        "total_tokens": 211,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00010275
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 2197.3568839999934,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A clever red fox sits reading an open book in a quiet library at night, surrounded by towering shelves of old books. Warm pools of lamplight illuminate the fox’s fur and the pages, while cool moonlight filters through a tall window, casting soft blue shadows. Cozy, storybook illustration with rich textures, cinematic lighting, and a balanced composition focused on the fox, with the library fading into gentle darkness.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 86,
+        "total_tokens": 138,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000048200000000000006
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1159.1484380000038,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Acorn restarts every Tuesday at 02:00 UTC, and queued jobs may wait up to 30 seconds during the restart. 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 99,
+        "completion_tokens": 32,
+        "total_tokens": 131,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000259
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 824.9793550000031,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The fictional Acorn service restarts every Tuesday at 02:00 UTC, and queued jobs can wait up to 30 seconds during a restart!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 30,
+        "total_tokens": 130,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000033
+    },
+    {
+      "case": "conversation",
+      "round": 2,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 763.9991059999957,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Hope you're having a wonderful day with your adorable cat, Pixel!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 102,
+        "completion_tokens": 17,
+        "total_tokens": 119,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000255
+    },
+    {
+      "case": "conversation",
+      "round": 2,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1339.2045540000036,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Hope you and Pixel are having a pawsome day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 17,
+        "total_tokens": 205,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000273
+    },
+    {
+      "case": "image-tool",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1161.341747999999,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_onVuhto4HfznVfduFNy2aEaz",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A night scene featuring a bright full moon in the sky, casting a unique shadow on the ground that resembles a duck. The background includes a starry sky and silhouetted trees, enhancing the magical atmosphere of the scene.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 74,
+        "completion_tokens": 57,
+        "total_tokens": 131,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000045299999999999997
+    },
+    {
+      "case": "image-tool",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 2017.292061,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_xsqLlCBiM1VoT9tHMtEsYbpU",
+            "type": "function",
+            "function": {
+              "name": "generateImage",
+              "arguments": "{\"prompt\":\"A whimsical, serene night-sky illustration of a bright full moon casting a distinct duck-shaped shadow across a calm landscape. The moonlight creates a crisp silhouette of a duck on the ground or mist below, with the moon clearly the source of the shadow. Dreamy stars, soft blue and silver palette, charming storybook style, no text.\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 158,
+        "completion_tokens": 85,
+        "total_tokens": 243,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000058299999999999994
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1349.8392830000012,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s a clear 18°C in Auckland, with winds at 12 km/h. A lovely day out!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 56,
+        "completion_tokens": 26,
+        "total_tokens": 82,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000186
+    },
+    {
+      "case": "weather-rephrasing",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1047.1615689999962,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! 🌞 Looks like it's a lovely day in Auckland with a nice 18°C, clear skies, and a gentle wind blowing at 12 km/h. Perfect weather to enjoy some time outdoors! Enjoy your day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 57,
+        "completion_tokens": 46,
+        "total_tokens": 103,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00003615
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 740.7785300000032,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Just a quick heads up—it's currently 3:45 PM NZDT in Auckland. Hope you're having a great day! 🌟",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 30,
+        "total_tokens": 82,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000258
+    },
+    {
+      "case": "time-rephrasing",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1019.4433700000009,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "It’s 3:45 PM NZDT in Auckland! 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 51,
+        "completion_tokens": 17,
+        "total_tokens": 68,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000013600000000000002
+    },
+    {
+      "case": "quake-summary",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1231.8509639999975,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Arena One has 8 of 16 player slots filled and is playing CA on campgrounds. Arena Two has 2 of 8 slots filled and is playing duel on bloodrun.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 93,
+        "completion_tokens": 40,
+        "total_tokens": 133,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000293
+    },
+    {
+      "case": "quake-summary",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1001.5902280000009,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Quake Live features various servers catering to different player counts and game types. For instance, Arena One supports up to 16 players on the map \"campgrounds\" and hosts Capture the Flag (CA) matches, while Arena Two accommodates 8 players on \"bloodrun\" for Duel matches. Currently, Arena One has 8 players, and Arena Two has 2 players.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 94,
+        "completion_tokens": 76,
+        "total_tokens": 170,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000597
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1445.2463130000033,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A whimsical scene featuring a fox with rich, russet fur, nestled comfortably in an oversized armchair within a cozy library. The room is softly illuminated by warm, golden light emanating from vintage brass sconces, casting gentle shadows on the wooden shelves filled with books. The fox, wearing tiny reading glasses, is engrossed in a book, its expressive eyes reflecting curiosity and wonder. A plush rug lies beneath the chair, adding to the inviting atmosphere. Outside, a moonlit window reveals a starry night sky, enhancing the sense of tranquility and magic. The composition captures the essence of a serene nighttime escape, blending the charm of the fox with the allure of literary adventures.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 53,
+        "completion_tokens": 136,
+        "total_tokens": 189,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00008955
+    },
+    {
+      "case": "image-prompt-enhancement",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 2402.092961000002,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "A clever red fox sits at a wooden table, absorbed in an open book inside a quiet library at night. Tall shelves of old books surround the scene, with moonlight filtering through a nearby window and a warm pool of light from a brass desk lamp illuminating the fox’s face and pages. Whimsical storybook illustration, rich textures, soft cinematic lighting, deep blue shadows, amber highlights, intimate atmosphere, carefully composed medium-wide shot with the fox as the focal point.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 98,
+        "total_tokens": 150,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000542
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1108.9560590000037,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Acorn restarts every Tuesday at 02:00 UTC. Jobs may wait up to 30 seconds during a restart. 👋",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 99,
+        "completion_tokens": 30,
+        "total_tokens": 129,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000249
+    },
+    {
+      "case": "knowledge-synthesis",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 877.3264100000015,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The fictional Acorn service restarts every Tuesday at 02:00 UTC, and queued jobs may wait up to 30 seconds during the restart.",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 30,
+        "total_tokens": 130,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000033
+    },
+    {
+      "case": "conversation",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 857.4256969999988,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! I hope you and your adorable cat, Pixel, are having a fantastic day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 102,
+        "completion_tokens": 20,
+        "total_tokens": 122,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000027299999999999996
+    },
+    {
+      "case": "conversation",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1225.210785000003,
+      "finishReason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Hey there! Hope you and Pixel are having a wonderful day!",
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 16,
+        "total_tokens": 204,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.0000268
+    },
+    {
+      "case": "time-tool",
+      "round": 3,
+      "model": "gpt-6-luna",
+      "returnedModel": "gpt-6-luna",
+      "success": true,
+      "passed": true,
+      "ms": 1749.7501660000053,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_6YkLEN2AK7pTaDfTcFPhJyBZ",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 207,
+        "completion_tokens": 18,
+        "total_tokens": 225,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.000029700000000000004
+    },
+    {
+      "case": "time-tool",
+      "round": 3,
+      "model": "gpt-4o-mini",
+      "returnedModel": "gpt-4o-mini-2024-07-18",
+      "success": true,
+      "passed": true,
+      "ms": 1007.9433649999992,
+      "finishReason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_Ls0miTkvDsvQmvsdHdoQp9qN",
+            "type": "function",
+            "function": {
+              "name": "lookupTime",
+              "arguments": "{\"location\":\"Auckland\"}"
+            }
+          }
+        ],
+        "refusal": null,
+        "annotations": []
+      },
+      "usage": {
+        "prompt_tokens": 123,
+        "completion_tokens": 15,
+        "total_tokens": 138,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "estimatedCostUsd": 0.00002745
+    }
+  ],
+  "summary": {
+    "gpt-4o-mini": {
+      "requests": 24,
+      "apiSuccesses": 24,
+      "contractPasses": 23,
+      "medianMs": 1027.5524669999977,
+      "p95Ms": 1630.4656879999966,
+      "estimatedCostUsd": 0.0010801500000000002,
+      "promptTokens": 1965,
+      "completionTokens": 1309,
+      "reasoningTokens": 0
+    },
+    "gpt-6-luna": {
+      "requests": 24,
+      "apiSuccesses": 24,
+      "contractPasses": 24,
+      "medianMs": 1344.5219185000024,
+      "p95Ms": 2402.092961000002,
+      "estimatedCostUsd": 0.0007577,
+      "promptTokens": 2712,
+      "completionTokens": 973,
+      "reasoningTokens": 0
+    }
+  },
+  "completedAt": "2026-10-29T23:53:50.969Z"
+}
