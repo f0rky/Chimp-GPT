@@ -356,3 +356,13 @@ test('both function processors unwrap weather once and pass prefetched data to f
   }
   assert.equal(h.calls.length, 2);
 });
+
+test('attribution requires the complete source text and is appended only once', () => {
+  const { withWeatherAttribution, ATTRIBUTION } = clientModule;
+  const misleading =
+    'Source: https://example.org/https://open-meteo.com/ and https://example.org/https://www.geonames.org/';
+  const attributed = withWeatherAttribution(misleading, ATTRIBUTION);
+  assert.equal(attributed, `${misleading}\n${ATTRIBUTION}`);
+  assert.equal(withWeatherAttribution(attributed, ATTRIBUTION), attributed);
+  assert.equal(withWeatherAttribution('Weather unavailable.', undefined), 'Weather unavailable.');
+});

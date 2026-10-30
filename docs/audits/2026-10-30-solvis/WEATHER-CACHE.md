@@ -61,8 +61,8 @@ Counts come from the shared HTTP request boundary, not packet capture. A source
 inspection confirms the production weather paths no longer contain RapidAPI
 endpoint calls. This does not claim an audit of unrelated processes on the host.
 
-The isolated PR snapshot passed all nine default test suites and 36 regression
-tests, including 14 weather tests. Weather tests cover expiry, concurrent requests,
+The isolated PR snapshot passed all nine default test suites and 37 regression
+tests, including 15 weather tests. Weather tests cover expiry, concurrent requests,
 cache mutation isolation, malformed responses, cooldowns, rate limits, bounded
 entries, failed result storage, plugin reuse, and both function processors. Full
 lint and formatting checks passed. The broader smoke rerun passed all eight checks
@@ -74,12 +74,13 @@ unchanged. Its non-PNG payload was checked for nonempty bytes, not pixel content
 Reproduce the opt-in live weather smoke test:
 
 ```sh
-node scripts/smokeWeatherCache.js /tmp/weather-cache.json
+node scripts/smokeWeatherCache.js
 # Also issue one paid chat request through the weather conversation flow:
-node scripts/smokeWeatherCache.js /tmp/weather-cache-with-chat.json --include-chat
+node scripts/smokeWeatherCache.js --include-chat
 ```
 
-The public weather checks need no credentials. The chat check uses the configured
+The script prints the report location in a generated temporary directory; command
+line input cannot select a file to overwrite. The public weather checks need no credentials. The chat check uses the configured
 Solvis model and credentials. The script does not send Discord messages.
 
 These results validate the PR source snapshot. Deployment requires restarting

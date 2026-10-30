@@ -2,19 +2,24 @@
 // Opt-in live cache smoke. --include-chat adds one paid Luna request. No Discord messages.
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const root = path.resolve(__dirname, '..');
-const output = process.argv[2];
-const includeChat = process.argv[3] === '--include-chat';
-if (!output || process.argv.length > 4 || (process.argv[3] && !includeChat)) {
-  console.error('Usage: node scripts/smokeWeatherCache.js <output.json> [--include-chat]');
+const includeChat = process.argv[2] === '--include-chat';
+if (process.argv.length > 3 || (process.argv[2] && !includeChat)) {
+  console.error('Usage: node scripts/smokeWeatherCache.js [--include-chat]');
   process.exit(1);
 }
+// Generate a private report directory; CLI input never controls the write path.
+const output = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'chimp-weather-smoke-')),
+  'report.json'
+);
 const envFile = path.join(root, '.env');
 const env = fs.existsSync(envFile) ? require('dotenv').parse(fs.readFileSync(envFile)) : {};
 Object.assign(process.env, env, { LOG_LEVEL: 'fatal', NODE_ENV: 'production' });
 process.chdir(root);
 const load = file => require(path.join(root, file));
-const { weatherService } = load('src/services/weatherClient');
+const { weatherService, ATTRIBUTION } = load('src/services/weatherClient');
 const api = load('src/services/weatherLookup');
 const { getWeatherResponse } = load('src/services/simplified-weather');
 const report = {
@@ -71,20 +76,26 @@ async function check(name, action) {
     async () => {
       const plugin = load('src/plugins/weather-plugin');
       const before = weatherService.getStats();
-      for (let i = 0; i < 5; i++) {
-        const result = await api.lookupWeather(' AUCKLAND,   NEW ZEALAND ');
-        insist(result.success, 'Warm lookup failed');
-        insist(
-          (await api.lookupExtendedForecast('Auckland, New Zealand', 2)).data.forecast.forecastday
-            .length === 2,
-          'Forecast day count mismatch'
-        );
-        const formatted = await getWeatherResponse('Auckland, New Zealand', 'weather?', current);
-        insist(formatted.formattedSummary.includes('Open-Meteo'), 'Attribution missing');
-        await getWeatherResponse('Auckland, New Zealand', 'tomorrow forecast');
-        const data = await plugin.functions.lookupWeather('Auckland, New Zealand');
-        insist(data.source === 'open-meteo', 'Plugin source mismatch');
-      }
+      const warmCallers = [
+        async () => {
+          const result = await api.lookupWeather(' AUCKLAND,   NEW ZEALAND ');
+          insist(result.success, 'Warm lookup failed');
+        },
+        async () => {
+          const result = await api.lookupExtendedForecast('Auckland, New Zealand', 2);
+          insist(result.data.forecast.forecastday.length === 2, 'Forecast day count mismatch');
+        },
+        async () => {
+          const formatted = await getWeatherResponse('Auckland, New Zealand', 'weather?', current);
+          insist(formatted.formattedSummary.includes(ATTRIBUTION), 'Attribution missing');
+        },
+        () => getWeatherResponse('Auckland, New Zealand', 'tomorrow forecast'),
+        async () => {
+          const data = await plugin.functions.lookupWeather('Auckland, New Zealand');
+          insist(data.source === 'open-meteo', 'Plugin source mismatch');
+        },
+      ];
+      await Promise.all(Array.from({ length: 25 }, (_, index) => warmCallers[index % 5]()));
       const after = weatherService.getStats();
       insist(
         after.geocodingRequests === before.geocodingRequests &&
@@ -114,10 +125,7 @@ async function check(name, action) {
           result.success && result.weatherData.source === 'open-meteo',
           'Luna weather flow failed'
         );
-        insist(
-          result.response.includes('https://open-meteo.com/'),
-          'Attribution missing from final response'
-        );
+        insist(result.response.includes(ATTRIBUTION), 'Attribution missing from final response');
         insist(
           weatherService.getStats().forecastRequests === before.forecastRequests,
           'Luna weather flow refetched weather'
@@ -133,6 +141,7 @@ async function check(name, action) {
   report.passed = report.checks.every(result => result.passed);
   report.finalCounts = weatherService.getStats();
   fs.writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
+  console.log(`Report: ${output}`);
   weatherService.close();
   process.exit(report.passed ? 0 : 1);
 })().catch(error => {

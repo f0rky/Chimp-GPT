@@ -55,7 +55,9 @@ function normalizedLocation(location) {
     .normalize('NFKC')
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/\s*,\s*/g, ', ');
+    .split(',')
+    .map(part => part.trim())
+    .join(', ');
   if (query.length < 2) {
     throw weatherError('WEATHER_INVALID_LOCATION', 'Please provide a valid city or location.');
   }
@@ -66,11 +68,7 @@ const inRange = (value, min, max) => Number.isFinite(value) && value >= min && v
 const knownCode = value => Number.isInteger(value) && Object.hasOwn(WEATHER_CODES, value);
 
 function withWeatherAttribution(text, attribution) {
-  if (
-    !attribution ||
-    (text?.includes('https://open-meteo.com/') && text.includes('https://www.geonames.org/'))
-  )
-    return text;
+  if (!attribution || text?.includes(attribution)) return text;
   return `${text}\n${attribution}`;
 }
 const validDate = value =>

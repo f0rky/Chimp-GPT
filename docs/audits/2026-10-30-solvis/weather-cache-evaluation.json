@@ -1,12 +1,12 @@
 {
-  "startedAt": "2026-10-30T00:57:44.671Z",
+  "startedAt": "2026-10-30T05:54:39.533Z",
   "provider": "open-meteo",
   "includeChat": true,
   "checks": [
     {
       "name": "20 concurrent cold lookups share one geocode and one weather request",
       "passed": true,
-      "ms": 2187.366042,
+      "ms": 2597.7425909999997,
       "details": {
         "geocodingRequests": 1,
         "forecastRequests": 1,
@@ -14,14 +14,14 @@
         "inFlightJoins": 38,
         "cooldownRejections": 0,
         "location": "Auckland",
-        "temperatureC": 18,
+        "temperatureC": 16,
         "forecastDays": 5
       }
     },
     {
       "name": "25 warm current/forecast/format/plugin calls make no additional requests",
       "passed": true,
-      "ms": 372.74982999999975,
+      "ms": 384.11062200000015,
       "details": {
         "calls": 25,
         "upstreamRequestIncrease": 0,
@@ -37,15 +37,15 @@
     {
       "name": "Actual Luna weather flow preserves provider attribution and uses the warm cache",
       "passed": true,
-      "ms": 2173.916601,
+      "ms": 2620.756157,
       "details": {
         "model": "gpt-6-luna",
-        "responseCharacters": 172,
+        "responseCharacters": 166,
         "upstreamRequestIncrease": 0
       }
     }
   ],
-  "completedAt": "2026-10-30T00:57:49.406Z",
+  "completedAt": "2026-10-30T05:54:45.137Z",
   "passed": true,
   "finalCounts": {
     "geocodingRequests": 1,
