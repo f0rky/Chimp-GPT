@@ -1,0 +1,149 @@
+{
+  "startedAt": "2026-10-30T00:58:48.729Z",
+  "head": "weather staged snapshot based on bfb5356",
+  "source": "isolated exact PR snapshot with Solvis credentials; live running service endpoints",
+  "deployed": false,
+  "checks": [
+    {
+      "name": "Solvis process and credential match",
+      "passed": true,
+      "ms": 285.903193,
+      "details": {
+        "pid": 169131,
+        "status": "online",
+        "credentialsMatch": true
+      }
+    },
+    {
+      "name": "Running Solvis HTTP health and access controls",
+      "passed": true,
+      "ms": 95.47466400000002,
+      "details": {
+        "/health": 200,
+        "discord": {
+          "status": "ok",
+          "ping": 255,
+          "guilds": 1
+        },
+        "/api": 200,
+        "/performance": 200,
+        "/settings": 403,
+        "/health/detailed": 403,
+        "/function-results": 403
+      }
+    },
+    {
+      "name": "Luna through actual conversation flow",
+      "passed": true,
+      "ms": 1972.725327,
+      "details": {
+        "model": "gpt-6-luna",
+        "responseCharacters": 83
+      }
+    },
+    {
+      "name": "Luna automatic tool selection through FunctionExecutor",
+      "passed": true,
+      "ms": 1069.1769239999999,
+      "details": {
+        "function": "lookupTime",
+        "location": "Auckland"
+      }
+    },
+    {
+      "name": "Real weather and Luna rephrasing",
+      "passed": true,
+      "ms": 3413.8573420000002,
+      "details": {
+        "location": "Auckland",
+        "usedMock": false,
+        "responseCharacters": 164
+      }
+    },
+    {
+      "name": "Time service and Luna rephrasing",
+      "passed": true,
+      "ms": 1339.8346080000001,
+      "details": {
+        "locationsChecked": [
+          "Tokyo",
+          "Auckland"
+        ],
+        "responseCharacters": 52
+      }
+    },
+    {
+      "name": "Quake live lookup from exact PR snapshot",
+      "passed": true,
+      "ms": 1021.0230609999999,
+      "details": {
+        "responseCharacters": 331,
+        "noActiveServers": false
+      }
+    },
+    {
+      "name": "Luna image-prompt enhancement",
+      "passed": true,
+      "ms": 2176.079898,
+      "details": {
+        "characters": 511
+      }
+    }
+  ],
+  "processesBefore": [
+    {
+      "name": "chimpGPT-PurgeryPete",
+      "pid": 2198,
+      "restarts": 0
+    },
+    {
+      "name": "chimpGPT-Solvis",
+      "pid": 169131,
+      "restarts": 1
+    },
+    {
+      "name": "chimpGPT-Bender",
+      "pid": 2219,
+      "restarts": 0
+    }
+  ],
+  "retainedImageEvidence": {
+    "reason": "Image generation code unchanged; earlier paid image smoke retained to avoid another generation. Non-PNG payload: only nonempty decoded bytes verified, no pixel validation.",
+    "runStartedAt": "2026-10-30T00:13:51.949Z",
+    "check": {
+      "name": "Live image generation and binary validation",
+      "passed": true,
+      "ms": 7571.645413,
+      "details": {
+        "model": "google/gemini-3.1-flash-lite-image",
+        "provider": "openrouter",
+        "bytes": 182675,
+        "pngInspection": {
+          "inspectable": false,
+          "uniformBlack": false,
+          "reason": "not a PNG"
+        },
+        "estimatedCost": 0.03360325
+      }
+    }
+  },
+  "processesAfter": [
+    {
+      "name": "chimpGPT-PurgeryPete",
+      "pid": 2198,
+      "restarts": 0
+    },
+    {
+      "name": "chimpGPT-Solvis",
+      "pid": 169131,
+      "restarts": 1
+    },
+    {
+      "name": "chimpGPT-Bender",
+      "pid": 2219,
+      "restarts": 0
+    }
+  ],
+  "completedAt": "2026-10-30T00:59:00.768Z",
+  "passed": true
+}

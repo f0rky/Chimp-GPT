@@ -1,88 +1,16 @@
 /**
  * Weather Plugin for ChimpGPT
  * Provides weather lookup as a Discord slash command and message command.
- * Uses WeatherAPI.com with robust error handling and mock fallback.
+ * Uses the shared Open-Meteo service and validated response cache.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const axios = require('axios');
-const { createLogger } = require('../../core/logger');
-const logger = createLogger('weather-plugin');
-
-// Helper: Get API key from env
-function getApiKey() {
-  return process.env.WEATHER_API_KEY;
-}
-
-// Mock weather data for fallback
-const mockWeatherData = {
-  getWeatherForLocation: location => {
-    const conditions = [
-      'Sunny',
-      'Partly cloudy',
-      'Cloudy',
-      'Overcast',
-      'Rainy',
-      'Stormy',
-      'Snowy',
-      'Foggy',
-      'Clear',
-    ];
-    const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
-    const randomTemp = Math.floor(15 + Math.random() * 15);
-    return {
-      location: {
-        name: location,
-        region: 'Mock Region',
-        country: 'Mock Country',
-        localtime: new Date().toISOString(),
-      },
-      current: {
-        temp_c: randomTemp,
-        condition: {
-          text: randomCondition,
-          icon: '//cdn.weatherapi.com/weather/64x64/day/116.png',
-        },
-        wind_kph: Math.floor(Math.random() * 30),
-        humidity: Math.floor(Math.random() * 100),
-      },
-      forecast: {
-        forecastday: [
-          {
-            date: new Date().toISOString().split('T')[0],
-            day: {
-              maxtemp_c: randomTemp + 2,
-              mintemp_c: randomTemp - 5,
-              condition: {
-                text: randomCondition,
-                icon: '//cdn.weatherapi.com/weather/64x64/day/116.png',
-              },
-            },
-          },
-        ],
-      },
-      _isMock: true,
-    };
-  },
-};
+const { lookupWeather: lookupSharedWeather } = require('../../services/weatherLookup');
 
 async function lookupWeather(location) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('WEATHER_API_KEY not set');
-  try {
-    const url = `https://weatherapi-com.p.rapidapi.com/current.json?q=${encodeURIComponent(location)}`;
-    const response = await axios.get(url, {
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'weatherapi-com.p.rapidapi.com',
-      },
-      timeout: 10000,
-    });
-    return response.data;
-  } catch (err) {
-    logger.warn({ err }, `Weather API failed for ${location}, using mock data`);
-    return mockWeatherData.getWeatherForLocation(location);
-  }
+  const result = await lookupSharedWeather(location);
+  if (!result.success) throw result.error;
+  return result.data;
 }
 
 function formatWeatherResponse(weatherData) {
@@ -92,7 +20,7 @@ function formatWeatherResponse(weatherData) {
   return (
     `Weather for **${loc.name}, ${loc.region}, ${loc.country}**\n` +
     `> ${cur.condition.text}, ${cur.temp_c}°C\n` +
-    `> Wind: ${cur.wind_kph} kph, Humidity: ${cur.humidity}%`
+    `> Wind: ${cur.wind_kph} kph, Humidity: ${cur.humidity}%\n${weatherData.attribution}`
   );
 }
 
@@ -126,13 +54,24 @@ module.exports = {
       execute: async (message, args) => {
         const location = args.join(' ');
         if (!location) return message.reply('Please specify a location.');
-        const data = await lookupWeather(location);
-        return message.reply(formatWeatherResponse(data));
+        try {
+          const data = await lookupWeather(location);
+          return message.reply(formatWeatherResponse(data));
+        } catch {
+          return message.reply('Weather is temporarily unavailable. Please try again later.');
+        }
       },
       interactionExecute: async interaction => {
         const location = interaction.options.getString('location');
-        const data = await lookupWeather(location);
-        return interaction.reply(formatWeatherResponse(data));
+        await interaction.deferReply();
+        try {
+          const data = await lookupWeather(location);
+          return interaction.editReply(formatWeatherResponse(data));
+        } catch {
+          return interaction.editReply(
+            'Weather is temporarily unavailable. Please try again later.'
+          );
+        }
       },
     },
   ],

@@ -12,6 +12,7 @@ const { isModerationError } = require('../../utils/errorHandler');
 const KnowledgeFlow = require('./KnowledgeFlow');
 const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
+const { withWeatherAttribution } = require('../../services/weatherClient');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
 // hit on first use and subsequent calls skip the require() lookup entirely.
@@ -601,7 +602,7 @@ class SimpleChimpGPTFlow {
 
           return {
             success: true,
-            response: personalizedResponse,
+            response: withWeatherAttribution(personalizedResponse, weatherData.attribution),
             type: 'weather',
             location: location,
             weatherData: weatherData.weatherData,

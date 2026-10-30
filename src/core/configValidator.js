@@ -67,7 +67,7 @@ const CONFIG_SCHEMA = {
   },
   X_RAPIDAPI_KEY: {
     required: false,
-    description: 'RapidAPI Key for weather and other external services',
+    description: 'Optional legacy RapidAPI key (weather uses Open-Meteo without a key)',
     default: '',
     validate: value => typeof value === 'string',
   },

@@ -52,8 +52,10 @@ function buildChecks(includeImage) {
       async run() {
         const { getWeatherResponse } = require('../../services/simplified-weather');
         const data = await getWeatherResponse('Auckland, New Zealand', 'weather in Auckland?');
-        if (!data) throw new Error('no weather data');
-        return 'Auckland data returned';
+        if (!data?.weatherData?.current || data.weatherData._isMock) {
+          throw new Error('valid live weather data unavailable');
+        }
+        return 'Auckland data returned from Open-Meteo';
       },
     },
     {
