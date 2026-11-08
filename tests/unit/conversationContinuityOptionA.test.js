@@ -2,30 +2,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
+const simpleFlowStub = require('../helpers/simpleFlowStubs');
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
-  if (request === '../../core/configValidator' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return {
-      ENABLE_KNOWLEDGE_SYSTEM: false,
-      BOT_PERSONALITY: 'test',
-      KNOWLEDGE_MAX_SEARCH_RESULTS: 1,
-      KNOWLEDGE_CONFIDENCE_THRESHOLD: 0.5,
-    };
-  if (request === '../../core/logger' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return { createLogger: () => new Proxy({}, { get: () => () => {} }) };
-  if (request === '../../services/chatModel' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return { CHAT_MODEL: 'fixture', buildChatRequest: x => x };
-  if (
-    request === '../../utils/systemPromptBuilder' &&
-    parent?.filename.includes('SimpleChimpGPTFlow')
-  )
-    return { buildSystemPrompt: x => x };
-  if (request === '../../services/weatherClient' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return { withWeatherAttribution: x => x };
-  if (request === '../../utils/imageDownloader' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return { downloadImage: async () => Buffer.from('image') };
-  if (request === '../../utils/errorHandler' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return { isModerationError: () => false };
+  const stub = simpleFlowStub(request, parent);
+  if (stub !== undefined) return stub;
   if (request === './KnowledgeFlow' && parent?.filename.includes('SimpleChimpGPTFlow'))
     return class {};
   return originalLoad.call(this, request, parent, isMain);
