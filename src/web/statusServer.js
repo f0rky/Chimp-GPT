@@ -112,15 +112,8 @@ const { runCorsTests, runRateLimiterTests } = require('../utils/statusDiagnostic
 // Import rate limiter
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
-const {
-  getConfiguredOwnerToken,
-  constantTimeStringEquals,
-  requireOwnerToken,
-} = require('./ownerTokenAuth');
-
-// Export the middleware for use in route definitions
-module.exports.requireOwnerToken = requireOwnerToken;
-module.exports.constantTimeStringEquals = constantTimeStringEquals;
+// Shared dashboard owner auth (header-only X-Owner-Token, fails closed without a strong OWNER_TOKEN)
+const { requireOwnerToken, validateOwnerTokenConfig } = require('./middleware/ownerAuth');
 
 const stats = {
   startTime: new Date(),
@@ -176,9 +169,11 @@ function initStatusServer(options = {}) {
     // Add body parsing middleware
     app.use(express.json());
 
-    if (!getConfiguredOwnerToken()) {
+    const ownerTokenConfig = validateOwnerTokenConfig(process.env.OWNER_TOKEN);
+    if (!ownerTokenConfig.valid) {
       logger.error(
-        'OWNER_TOKEN is not set. All owner-protected dashboard endpoints will deny every request until it is configured.'
+        { reason: ownerTokenConfig.reason },
+        'Dashboard owner token is not usable. All owner-protected dashboard endpoints will return 503 until a strong OWNER_TOKEN is configured.'
       );
     }
 
@@ -417,6 +412,8 @@ function initStatusServer(options = {}) {
       performanceHistory,
       maliciousUserManager,
       serverState: { healthy: serverHealthy, lastError },
+      // Consumed by healthRoutes (/health/detailed). Other route modules import the same shared
+      // middleware directly and ignore this dependency.
       requireOwnerToken,
       versionInfo: {
         getDetailedVersionInfo,
@@ -699,5 +696,4 @@ module.exports = {
   initStatusServer,
   shutdownGracefully,
   requireOwnerToken,
-  constantTimeStringEquals,
 };

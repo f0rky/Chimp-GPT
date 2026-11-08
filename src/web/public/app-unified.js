@@ -1,56 +1,8 @@
 // Unified Dashboard JavaScript
 // Combines functionality from status page, performance dashboard, and settings
+// Protected endpoints go through OwnerAuth.ownerFetch (owner-auth.js, loaded first)
 
-// ==================== OWNER TOKEN HELPER ====================
-// The owner token is held ONLY in memory for the lifetime of this page.
-// It is never written to localStorage/sessionStorage, never placed in a
-// query string, and never sent in a request body — it is attached solely
-// via the X-Owner-Token request header. A reload or loss of this in-memory
-// value always requires the user to re-enter the token.
-let _ownerToken = null;
-
-/**
- * Prompt the user for the owner token if one is not already held in memory.
- * Returns null if the user cancels the prompt.
- *
- * @returns {string|null}
- */
-function getOwnerToken() {
-  if (_ownerToken) return _ownerToken;
-  const entered = window.prompt('Enter owner token:');
-  if (!entered) return null;
-  _ownerToken = entered;
-  return _ownerToken;
-}
-
-/** Discard the in-memory owner token, forcing re-entry on next use. */
-function clearOwnerToken() {
-  _ownerToken = null;
-}
-
-/**
- * Fetch wrapper for owner-protected endpoints after an explicit owner action.
- * Prompts for the token once and attaches it via the X-Owner-Token header
- * only. On a 403 response the in-memory token is discarded so the next
- * protected call re-prompts rather than silently reusing a bad token.
- *
- * @param {string} url
- * @param {RequestInit} [options]
- * @returns {Promise<Response|null>} null if the user cancelled the prompt
- */
-async function ownerFetch(url, options = {}) {
-  const token = getOwnerToken();
-  if (!token) return null;
-
-  const headers = new Headers(options.headers || {});
-  headers.set('X-Owner-Token', token);
-
-  const response = await fetch(url, { ...options, headers });
-  if (response.status === 403) {
-    clearOwnerToken();
-  }
-  return response;
-}
+/* global OwnerAuth */
 
 // Global state
 const state = {
@@ -80,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   logDebug('Dashboard starting up', 'info');
 
   initializeTheme();
+  initializeOwnerAuth();
   initializeTabs();
   initializeDebugConsole();
   initializeCharts();
@@ -123,6 +76,65 @@ function toggleTheme() {
 function updateThemeIcon() {
   const icon = document.querySelector('#theme-toggle i');
   icon.className = state.theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+}
+
+// Owner Authentication (administration unlock)
+function initializeOwnerAuth() {
+  const toggle = document.getElementById('owner-auth-toggle');
+  if (!toggle) return;
+
+  toggle.addEventListener('click', () => {
+    if (OwnerAuth.isUnlocked()) {
+      OwnerAuth.lock();
+    } else if (!OwnerAuth.unlock()) {
+      return;
+    }
+    // Reload the current tab so protected panels reflect the new lock state
+    loadTabData(state.currentTab);
+  });
+
+  OwnerAuth.onChange(renderOwnerAuthStatus);
+  renderOwnerAuthStatus(OwnerAuth.getStatus());
+}
+
+function renderOwnerAuthStatus(status) {
+  const toggle = document.getElementById('owner-auth-toggle');
+  const label = document.getElementById('owner-auth-status');
+  const unlocked = OwnerAuth.isUnlocked();
+
+  if (toggle) {
+    toggle.innerHTML = unlocked
+      ? '<i class="fas fa-lock-open"></i>'
+      : '<i class="fas fa-lock"></i>';
+    toggle.title = unlocked
+      ? 'Lock administration (forget owner token)'
+      : 'Unlock administration (enter owner token)';
+  }
+  if (label) {
+    label.textContent = status.state === 'unlocked' ? '' : status.message;
+    label.dataset.state = status.state;
+  }
+}
+
+function isOwnerAuthError(error) {
+  return error instanceof OwnerAuth.OwnerAuthError;
+}
+
+// Show an owner auth problem in place of a protected panel's content
+function renderOwnerAuthRequired(containerId, error) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  const message = document.createElement('p');
+  message.className = 'text-center';
+  message.textContent = error.message;
+  container.appendChild(message);
+}
+
+// Report an owner auth problem for a user-initiated admin action
+function notifyOwnerAuthError(error) {
+  logDebug(error.message, 'warn');
+  window.alert(error.message);
 }
 
 // Tab Management
@@ -457,10 +469,9 @@ async function fetchHealthData() {
 
 async function fetchDetailedHealthData() {
   try {
-    const response = await ownerFetch('/health/detailed');
-    if (!response || response.status === 403) {
-      showDetailedHealthOwnerTokenRequired();
-      return;
+    const response = await OwnerAuth.ownerFetch('/health/detailed');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
 
@@ -468,19 +479,25 @@ async function fetchDetailedHealthData() {
     updateLLMProvidersDisplay(data);
     logDebug('LLM providers data updated', 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      showDetailedHealthOwnerTokenRequired(error.message);
+      return;
+    }
     logDebug('Error fetching detailed health data: ' + error.message, 'error');
   }
 }
 
 // Detailed provider diagnostics are owner-only and deliberately opt-in. Public
-// polling must never trigger a credential prompt or a protected request.
+// polling must never trigger a credential prompt or a protected request; while
+// administration is locked this reports the locked state instead of prompting.
 // eslint-disable-next-line no-unused-vars
 async function loadDetailedHealthDiagnostics() {
   await fetchDetailedHealthData();
 }
 
-function showDetailedHealthOwnerTokenRequired() {
-  const message = 'Owner token required for detailed provider health';
+function showDetailedHealthOwnerTokenRequired(
+  message = 'Owner token required for detailed provider health'
+) {
   for (const id of ['primaryLLMProvider', 'imageLLMProvider']) {
     const element = document.getElementById(id);
     if (element) element.textContent = message;
@@ -523,14 +540,9 @@ async function fetchPerformanceDataForStatus() {
 
 async function fetchFunctionResults() {
   try {
-    const response = await ownerFetch('/function-results/summary');
-    if (!response) {
-      showOwnerTokenRequired('function-summary');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch('/function-results/summary');
     if (!response.ok) {
-      showOwnerTokenRequired('function-summary');
-      return;
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
 
@@ -538,6 +550,10 @@ async function fetchFunctionResults() {
     updateFunctionSummary(data);
     logDebug('Function results updated', 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      renderOwnerAuthRequired('function-summary', error);
+      return;
+    }
     logDebug('Error fetching function results: ' + error.message, 'error');
     logDebug(`Error fetching function results: ${error.message}`, 'error');
   }
@@ -545,67 +561,42 @@ async function fetchFunctionResults() {
 
 async function fetchBlockedUsers() {
   try {
-    const response = await ownerFetch('/blocked-users');
-    if (!response) {
-      showOwnerTokenRequired('blocked-users-container');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch('/blocked-users');
     if (!response.ok) {
-      showOwnerTokenRequired('blocked-users-container');
-      return;
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
 
     updateBlockedUsers(data);
     logDebug('Blocked users updated', 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      renderOwnerAuthRequired('blocked-users-container', error);
+      return;
+    }
     logDebug(`Error fetching blocked users: ${error.message}`, 'error');
   }
 }
 
 async function fetchSettings() {
   try {
-    const response = await ownerFetch('/settings');
-    if (!response) {
-      showOwnerTokenRequired('settings-list');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch('/settings');
     if (!response.ok) {
-      showOwnerTokenRequired('settings-list');
-      return;
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
 
     updateSettingsDisplay(data);
     logDebug('Settings loaded', 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      const summary = document.getElementById('settings-summary');
+      if (summary) summary.innerHTML = '';
+      renderOwnerAuthRequired('settings-list', error);
+      return;
+    }
     logDebug(`Error fetching settings: ${error.message}`, 'error');
   }
-}
-
-/**
- * Render a "owner token required" placeholder into a container instead of
- * rendering protected content. Used whenever an owner-protected tab is
- * opened without (or with an invalid) owner token in memory.
- *
- * @param {string} containerId
- */
-function showOwnerTokenRequired(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = '';
-  const message = document.createElement('p');
-  message.className = 'text-center';
-  message.textContent = 'Owner token required. Click to enter it and reload this tab.';
-  const button = document.createElement('button');
-  button.className = 'btn btn-secondary';
-  button.textContent = 'Enter Owner Token';
-  button.addEventListener('click', () => {
-    clearOwnerToken();
-    loadTabData(state.currentTab);
-  });
-  container.appendChild(message);
-  container.appendChild(button);
 }
 
 // Display Updates
@@ -1181,19 +1172,18 @@ function updateClock() {
 async function runTests() {
   logDebug('Running tests...', 'info');
   try {
-    const response = await ownerFetch('/run-tests');
-    if (!response) {
-      logDebug('Run tests cancelled: owner token required', 'warn');
-      return;
+    const response = await OwnerAuth.ownerFetch('/run-tests');
+    const result = await response.json();
+    if (response.ok && result.success) {
+      logDebug('Tests completed successfully', 'info');
+    } else {
+      logDebug(`Tests not run: ${result.error || `HTTP ${response.status}`}`, 'warn');
     }
-    if (!response.ok) {
-      logDebug(`Run tests failed: HTTP ${response.status}`, 'error');
-      return;
-    }
-    const _results = await response.json();
-    logDebug('Tests completed successfully', 'info');
-    logDebug('Test results received from API', 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      notifyOwnerAuthError(error);
+      return;
+    }
     logDebug(`Test execution failed: ${error.message}`, 'error');
   }
 }
@@ -1202,15 +1192,7 @@ async function resetStats() {
   if (!confirm('Are you sure you want to reset all statistics?')) return;
 
   try {
-    const response = await ownerFetch('/reset-stats', { method: 'POST' });
-    if (!response) {
-      logDebug('Reset stats cancelled: owner token required', 'warn');
-      return;
-    }
-    if (!response.ok) {
-      logDebug(`Failed to reset statistics: HTTP ${response.status}`, 'error');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch('/reset-stats', { method: 'POST' });
     const result = await response.json();
 
     if (result.success) {
@@ -1220,24 +1202,22 @@ async function resetStats() {
       logDebug('Failed to reset statistics', 'error');
     }
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      notifyOwnerAuthError(error);
+      return;
+    }
     logDebug(`Error resetting stats: ${error.message}`, 'error');
   }
 }
 
 async function unblockUser(userId) {
   try {
-    const response = await ownerFetch('/unblock-user', {
+    const response = await OwnerAuth.ownerFetch('/unblock-user', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
     });
 
-    if (!response) {
-      logDebug('Unblock cancelled: owner token required', 'warn');
-      return;
-    }
     if (!response.ok) {
       logDebug(`Failed to unblock user: HTTP ${response.status}`, 'error');
       return;
@@ -1252,6 +1232,10 @@ async function unblockUser(userId) {
       logDebug(`Failed to unblock user: ${result.error}`, 'error');
     }
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      notifyOwnerAuthError(error);
+      return;
+    }
     logDebug(`Error unblocking user: ${error.message}`, 'error');
   }
 }
@@ -1322,14 +1306,9 @@ function filterSettings(filter) {
 
 async function loadFunctionDetails(func) {
   try {
-    const response = await ownerFetch(`/function-results?limit=10`);
-    if (!response) {
-      logDebug(`Skipped loading details for ${func}: owner token required`, 'warn');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch(`/function-results?limit=10`);
     if (!response.ok) {
-      logDebug(`Error loading details for ${func}: HTTP ${response.status}`, 'error');
-      return;
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json();
 
@@ -1344,6 +1323,10 @@ async function loadFunctionDetails(func) {
       updateWeatherResults(data.weather);
     }
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      logDebug(error.message, 'warn');
+      return;
+    }
     logDebug(`Error loading function details: ${error.message}`, 'error');
   }
 }
@@ -1446,7 +1429,6 @@ function openImageModal(url, prompt) {
 
 // Global variables for deleted messages
 let currentDeletedMessages = [];
-let currentDeletedUser = null;
 
 // Initialize deleted messages when tab loads
 async function fetchDeletedMessages() {
@@ -1466,8 +1448,9 @@ async function fetchDeletedMessages() {
       endDateInput.value = formatDateForInput(endDate);
     }
 
-    await checkDeletedMessagesAuthentication();
-    await loadDeletedMessages();
+    if (await checkDeletedMessagesAuthentication()) {
+      await loadDeletedMessages();
+    }
   } catch (error) {
     logDebug(`Error initializing deleted messages: ${error.message}`, 'error');
     showDeletedError('Failed to initialize deleted messages: ' + error.message);
@@ -1478,23 +1461,30 @@ function formatDateForInput(date) {
   return date.toISOString().slice(0, 16);
 }
 
+// Returns true when the owner token is accepted for deleted-message access
 async function checkDeletedMessagesAuthentication() {
   try {
-    const response = await ownerFetch('/api/deleted-messages/auth');
-    if (!response) {
-      showDeletedError('Owner token required to view deleted messages');
-      return;
-    }
+    const response = await OwnerAuth.ownerFetch('/api/deleted-messages/auth');
     if (!response.ok) {
-      showDeletedError('Access denied: Owner privileges required');
-      return;
+      showDeletedError(`Authentication check failed: HTTP ${response.status}`);
+      return false;
     }
-    const data = await response.json();
-    currentDeletedUser = data.authenticated === true;
     logDebug('Deleted messages authentication successful', 'info');
+    return true;
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      renderOwnerAuthRequired('deleted-messages-list', error);
+      return false;
+    }
     showDeletedError('Authentication failed: ' + error.message);
     logDebug(`Deleted messages auth error: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+function requireDeletedMessagesUnlocked() {
+  if (!OwnerAuth.isUnlocked()) {
+    throw new OwnerAuth.OwnerAuthError('OWNER_LOCKED', OwnerAuth.getStatus().message);
   }
 }
 
@@ -1505,12 +1495,8 @@ async function loadDeletedMessages() {
   try {
     const filters = getDeletedMessagesFilters();
     const queryString = new URLSearchParams(filters).toString();
-    const response = await ownerFetch(`/api/deleted-messages?${queryString}`);
+    const response = await OwnerAuth.ownerFetch(`/api/deleted-messages?${queryString}`);
 
-    if (!response) {
-      showDeletedError('Owner token required to view deleted messages');
-      return;
-    }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -1522,6 +1508,10 @@ async function loadDeletedMessages() {
 
     logDebug(`Loaded ${currentDeletedMessages.length} deleted messages`, 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      renderOwnerAuthRequired('deleted-messages-list', error);
+      return;
+    }
     showDeletedError('Failed to load messages: ' + error.message);
     logDebug(`Error loading deleted messages: ${error.message}`, 'error');
   } finally {
@@ -1581,7 +1571,7 @@ function displayDeletedMessages(messages) {
         <div class="message-item message-importance-${importance.level}" data-message-id="${message.messageId}">
           <div class="message-header">
             <div class="message-select-container">
-              <input type="checkbox" class="message-select" data-message-id="${message.messageId}" 
+              <input type="checkbox" class="message-select" data-message-id="${message.messageId}"
                      onchange="toggleMessageSelection('${message.messageId}')">
             </div>
             <div class="user-info">
@@ -1605,11 +1595,11 @@ function displayDeletedMessages(messages) {
               <button class="btn btn-warning" onclick="updateDeletedMessageStatus('${message.messageId}', 'ignored')">Ignore</button>
             </div>
           </div>
-          
+
           <div class="message-content">
             ${escapeHtml(message.content || 'No content available')}
           </div>
-          
+
           <div class="message-meta">
             <div><strong>Channel:</strong> ${escapeHtml(message.channelName)}</div>
             <div><strong>Deleted:</strong> ${new Date(message.timestamp).toLocaleString()}</div>
@@ -1936,45 +1926,46 @@ function _filterByChannel(channelId) {
   }
 }
 
+// POST a status update as the server-side owner; throws on auth or HTTP failure
+async function postDeletedMessageStatus(messageId, status, notes) {
+  if (!messageId) {
+    throw new Error('Invalid message ID');
+  }
+
+  const response = await OwnerAuth.ownerFetch('/api/deleted-messages/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messageId,
+      status,
+      notes,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+}
+
 async function updateDeletedMessageStatus(messageId, status) {
   try {
-    // Validate inputs
-    if (!currentDeletedUser) {
-      throw new Error('Not authenticated. Please enter the owner token and try again.');
-    }
-    if (!messageId) {
-      throw new Error('Invalid message ID');
-    }
+    requireDeletedMessagesUnlocked();
 
     // Get notes for status update
     const notes = window.prompt(`Enter notes for ${status} status (optional):`);
     if (notes === null) return; // User cancelled
 
     logDebug(`Updating message ${messageId} to ${status}`, 'info');
-
-    const response = await ownerFetch('/api/deleted-messages/status', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messageId,
-        status,
-        notes,
-      }),
-    });
-
-    if (!response) {
-      throw new Error('Owner token required');
-    }
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+    await postDeletedMessageStatus(messageId, status, notes);
 
     showDeletedSuccess(`Message ${status} successfully`);
     loadDeletedMessages(); // Refresh the list
     logDebug(`Updated message ${messageId} status to ${status}`, 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      notifyOwnerAuthError(error);
+      return;
+    }
     showDeletedError('Failed to update status: ' + error.message);
     logDebug(`Error updating message status: ${error.message}`, 'error');
   }
@@ -1998,12 +1989,12 @@ function reviewDeletedMessage(messageId) {
       <div><strong>Is Owner:</strong> ${message.isOwner ? 'Yes' : 'No'}</div>
       <div><strong>Rapid Deletion:</strong> ${message.isRapidDeletion ? 'Yes' : 'No'}</div>
     </div>
-    
+
     <h4>Full Message Content:</h4>
     <div class="message-content" style="max-height: 200px;">
       ${escapeHtml(message.fullContent || 'No content available')}
     </div>
-    
+
     ${
       message.attachments && message.attachments.length > 0
         ? `
@@ -2020,12 +2011,12 @@ function reviewDeletedMessage(messageId) {
       `
         : ''
     }
-    
+
     <div class="notes-section">
       <label for="deleted-review-notes"><strong>Review Notes:</strong></label>
       <textarea id="deleted-review-notes" placeholder="Add notes about this deletion..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; resize: vertical; min-height: 60px; background: var(--bg-secondary); color: var(--text-primary);">${escapeHtml(message.notes || '')}</textarea>
     </div>
-    
+
     <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
       <button class="btn btn-success" onclick="updateDeletedMessageStatusFromModal('${messageId}', 'approved')">Approve</button>
       <button class="btn btn-danger" onclick="updateDeletedMessageStatusFromModal('${messageId}', 'flagged')">Flag</button>
@@ -2042,40 +2033,20 @@ async function updateDeletedMessageStatusFromModal(messageId, status) {
   const notes = notesTextarea ? notesTextarea.value : '';
 
   try {
-    // Validate inputs
-    if (!currentDeletedUser) {
-      throw new Error('Not authenticated. Please enter the owner token and try again.');
-    }
-    if (!messageId) {
-      throw new Error('Invalid message ID');
-    }
+    requireDeletedMessagesUnlocked();
 
     logDebug(`Updating message ${messageId} to ${status} from modal`, 'info');
-
-    const response = await ownerFetch('/api/deleted-messages/status', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messageId,
-        status,
-        notes,
-      }),
-    });
-
-    if (!response) {
-      throw new Error('Owner token required');
-    }
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+    await postDeletedMessageStatus(messageId, status, notes);
 
     showDeletedSuccess(`Message ${status} successfully`);
     closeDeletedReviewModal();
     loadDeletedMessages(); // Refresh the list
     logDebug(`Updated message ${messageId} status to ${status} from modal`, 'info');
   } catch (error) {
+    if (isOwnerAuthError(error)) {
+      notifyOwnerAuthError(error);
+      return;
+    }
     showDeletedError('Failed to update status: ' + error.message);
     logDebug(`Error updating message status from modal: ${error.message}`, 'error');
   }
@@ -2165,6 +2136,13 @@ async function bulkUpdateStatus(status) {
     return;
   }
 
+  if (!OwnerAuth.isUnlocked()) {
+    notifyOwnerAuthError(
+      new OwnerAuth.OwnerAuthError('OWNER_LOCKED', OwnerAuth.getStatus().message)
+    );
+    return;
+  }
+
   // Get notes for bulk operation
   const notes = window.prompt(`Enter notes for bulk ${status} operation (optional):`);
   if (notes === null) return; // User cancelled
@@ -2178,7 +2156,7 @@ async function bulkUpdateStatus(status) {
 
   for (const messageId of selectedMessages) {
     try {
-      await updateDeletedMessageStatus(messageId, status, notes, false); // Don't reload for each
+      await postDeletedMessageStatus(messageId, status, notes); // Don't reload for each
       completed++;
 
       // Update progress
@@ -2192,6 +2170,12 @@ async function bulkUpdateStatus(status) {
         progressText.textContent = `${completed}/${total} messages processed`;
       }
     } catch (error) {
+      if (isOwnerAuthError(error)) {
+        // Stop instead of repeating a rejected request for every selected message
+        errors.push(error.message);
+        notifyOwnerAuthError(error);
+        break;
+      }
       errors.push(`${messageId}: ${error.message}`);
     }
   }
