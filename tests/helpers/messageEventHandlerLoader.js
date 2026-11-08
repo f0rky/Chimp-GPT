@@ -7,14 +7,14 @@ const Module = require('node:module');
 const simpleFlowStub = require('./simpleFlowStubs');
 
 // Mutable fixture controls for policy checks that must run again for each dispatched message.
-const control = { rateLimited: false, blockedUserIds: new Set() };
+const control = { rateLimitedUserIds: new Set(), blockedUserIds: new Set() };
 
 const messageHandlerStubs = {
   '../logger': { discord: new Proxy({}, { get: () => () => {} }) },
   '../../middleware/performanceMonitor': { startTimer: () => null, stopTimer: () => {} },
   '../../middleware/rateLimiter': {
-    checkUserRateLimit: async () => ({
-      limited: control.rateLimited,
+    checkUserRateLimit: async userId => ({
+      limited: control.rateLimitedUserIds.has(userId),
       remainingPoints: 1,
       secondsBeforeNext: 30,
       message: 'fixture rate limit',

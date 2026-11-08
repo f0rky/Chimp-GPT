@@ -187,10 +187,23 @@ test('bot, DM and ignore-prefix messages are never queued while busy', async () 
   for (const m of [bot, dm, prefixed]) await f.handler.handleMessageCreate(m);
   assert.deepEqual([bot.reactions, dm.reactions, prefixed.reactions], [[], [], []]);
 
+  const ordinary = msg('echo');
+  await f.handler.handleMessageCreate(ordinary);
+  assert.deepEqual(
+    ordinary.reactions,
+    ['⏳'],
+    'an ordinary message is still queued in the same window'
+  );
   settle(f, 'alpha');
+  await until(() => f.dispatched.some(x => x.includes('echo')), 'ordinary queued turn dispatch');
+  settle(f, 'echo');
   await first;
   await until(() => !f.busy.has('c'), 'channel release');
-  assert.equal(f.dispatched.length, 1);
+  assert.equal(f.dispatched.length, 2);
+  assert.equal(
+    f.dispatched.some(x => /bot chatter|direct|\?ignored/.test(x)),
+    false
+  );
 });
 
 test('a queued message from a user blocked after queueing never reaches the provider', async () => {
@@ -198,15 +211,26 @@ test('a queued message from a user blocked after queueing never reaches the prov
   const first = f.handler.handleMessageCreate(msg('alpha', { user: 'u1' }));
   await until(() => f.dispatched.length === 1, 'alpha dispatch');
   await f.handler.handleMessageCreate(msg('bravo-blocked', { user: 'u2' }));
+  await f.handler.handleMessageCreate(msg('delta-allowed', { user: 'u4' }));
   control.blockedUserIds.add('u2');
   try {
     settle(f, 'alpha');
+    await until(
+      () => f.dispatched.some(x => x.includes('delta-allowed')),
+      'allowed turn behind blocked one'
+    );
+    settle(f, 'delta-allowed');
     await first;
     await until(() => !f.busy.has('c'), 'channel release');
   } finally {
     control.blockedUserIds.delete('u2');
   }
-  assert.equal(f.dispatched.length, 1, 'blocked queued turn is re-checked and not dispatched');
+  assert.equal(
+    f.dispatched.some(x => x.includes('bravo-blocked')),
+    false,
+    'blocked queued turn is re-checked and not dispatched'
+  );
+  assert.equal(f.dispatched.length, 2, 'the queue still drains past the blocked turn');
 });
 
 test('a queued message from a rate-limited user never reaches the provider', async () => {
@@ -214,13 +238,24 @@ test('a queued message from a rate-limited user never reaches the provider', asy
   const first = f.handler.handleMessageCreate(msg('alpha', { user: 'u1' }));
   await until(() => f.dispatched.length === 1, 'alpha dispatch');
   await f.handler.handleMessageCreate(msg('charlie-limited', { user: 'u3' }));
-  control.rateLimited = true;
+  await f.handler.handleMessageCreate(msg('delta-allowed', { user: 'u4' }));
+  control.rateLimitedUserIds.add('u3');
   try {
     settle(f, 'alpha');
+    await until(
+      () => f.dispatched.some(x => x.includes('delta-allowed')),
+      'allowed turn behind limited one'
+    );
+    settle(f, 'delta-allowed');
     await first;
     await until(() => !f.busy.has('c'), 'channel release');
   } finally {
-    control.rateLimited = false;
+    control.rateLimitedUserIds.delete('u3');
   }
-  assert.equal(f.dispatched.length, 1, 'rate-limited queued turn is re-checked and not dispatched');
+  assert.equal(
+    f.dispatched.some(x => x.includes('charlie-limited')),
+    false,
+    'rate-limited queued turn is re-checked and not dispatched'
+  );
+  assert.equal(f.dispatched.length, 2, 'the queue still drains past the limited turn');
 });
