@@ -33,7 +33,7 @@ const MAX_CONSUMED_IMAGE_ACTION_CLAIMS = 5000;
 
 function resolveOwnerId(config) {
   const raw = config?.OWNER_ID || process.env.OWNER_ID;
-  const ownerId = typeof raw === 'string' ? raw.replace(/"/g, '').trim() : '';
+  const ownerId = typeof raw === 'string' ? raw.replaceAll('"', '').trim() : '';
   return OWNER_ID_PATTERN.test(ownerId) ? ownerId : null;
 }
 
@@ -216,7 +216,7 @@ class InteractionEventHandler {
         'Failed to decode image action prompt'
       );
     }
-    if (!prompt || !prompt.trim()) {
+    if (!prompt?.trim()) {
       await replyEphemeral(interaction, failureMessage);
       return null;
     }

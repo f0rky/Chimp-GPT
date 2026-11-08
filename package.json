@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node tests/unit/testRunner.js && npm run test:regression",
-    "test:security": "node --test tests/unit/dashboardOwnerAuth.test.js tests/unit/ownerIdentityNormalization.test.js tests/unit/imageActionAuthorization.test.js tests/unit/discoveryRoutesAuth.test.js",
+    "test:security": "node --test tests/unit/dashboardOwnerAuth.test.js tests/unit/ownerIdentityNormalization.test.js tests/unit/imageActionAuthorization.test.js tests/unit/discoveryRoutesAuth.test.js tests/unit/sonarPr31Regression.test.js",
     "test:comprehensive": "node tests/comprehensiveTestRunner.js",
     "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
     "test:integration": "node tests/comprehensiveTestRunner.js --category integration",

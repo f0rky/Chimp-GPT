@@ -177,7 +177,7 @@ function makeHarness({ env = { OWNER_TOKEN }, extraServices = [] } = {}) {
   const ownerAuthLoader = () =>
     loadSource(
       OWNER_AUTH_PATH,
-      { crypto: require('node:crypto'), '../../core/logger': loggerModule },
+      { 'node:crypto': require('node:crypto'), '../../core/logger': loggerModule },
       env
     );
   ownerAuthLoader.lazy = true;

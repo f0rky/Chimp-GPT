@@ -14,11 +14,11 @@ const STATUS_PATTERN = /^[a-z0-9_-]{1,20}$/;
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function displayText(value, fallback) {
@@ -73,7 +73,10 @@ class BotNavigation {
         this.unsubscribeAuth = window.OwnerAuth.onChange(status => {
           if (status.state === 'unlocked') {
             this.locked = false;
-            this.discoverBots();
+            this.discoverBots().catch(error => {
+              console.error('❌ Failed to refresh bot navigation after unlock:', error);
+              this.showError(error?.message);
+            });
           }
         });
       }
@@ -483,7 +486,7 @@ class BotNavigation {
    * Discover active bot instances
    */
   async discoverBots() {
-    if (!window.OwnerAuth || !window.OwnerAuth.isUnlocked()) {
+    if (!window.OwnerAuth?.isUnlocked()) {
       this.showLocked();
       return;
     }
@@ -518,12 +521,12 @@ class BotNavigation {
 
       console.log(`✅ Discovered ${this.botInstances.length} bot instances`);
     } catch (error) {
-      if (error && error.name === 'OwnerAuthError') {
+      if (error?.name === 'OwnerAuthError') {
         this.showLocked();
         return;
       }
       console.error('❌ Failed to discover bots:', error);
-      this.showError(error && error.message);
+      this.showError(error?.message);
     }
   }
 

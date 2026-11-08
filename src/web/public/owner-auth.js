@@ -72,7 +72,7 @@
 
     const response = await window.fetch(url, {
       ...options,
-      headers: { ...(options.headers || {}), 'X-Owner-Token': token },
+      headers: { ...options.headers, 'X-Owner-Token': token },
     });
 
     if (response.status === 401 || response.status === 403) {

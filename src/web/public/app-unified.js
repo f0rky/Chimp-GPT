@@ -1177,7 +1177,8 @@ async function runTests() {
     if (response.ok && result.success) {
       logDebug('Tests completed successfully', 'info');
     } else {
-      logDebug(`Tests not run: ${result.error || `HTTP ${response.status}`}`, 'warn');
+      const reason = result.error || `HTTP ${response.status}`;
+      logDebug(`Tests not run: ${reason}`, 'warn');
     }
   } catch (error) {
     if (isOwnerAuthError(error)) {
@@ -2129,6 +2130,32 @@ function updateMessageSelectionUI(messageId) {
   }
 }
 
+async function updateSelectedMessageStatus(messageId, status, notes, progress) {
+  try {
+    await postDeletedMessageStatus(messageId, status, notes); // Don't reload for each
+    const completed = progress.completed + 1;
+    updateBulkProgress(completed, progress.total);
+    return completed;
+  } catch (error) {
+    if (isOwnerAuthError(error)) {
+      // Stop instead of repeating a rejected request for every selected message
+      progress.errors.push(error.message);
+      notifyOwnerAuthError(error);
+      return null;
+    }
+    progress.errors.push(`${messageId}: ${error.message}`);
+    return progress.completed;
+  }
+}
+
+function updateBulkProgress(completed, total) {
+  const progressBar = document.getElementById('bulk-progress-bar');
+  if (progressBar) progressBar.style.width = `${(completed / total) * 100}%`;
+
+  const progressText = document.getElementById('bulk-progress-text');
+  if (progressText) progressText.textContent = `${completed}/${total} messages processed`;
+}
+
 // Bulk update status for selected messages
 async function bulkUpdateStatus(status) {
   if (selectedMessages.size === 0) {
@@ -2155,29 +2182,13 @@ async function bulkUpdateStatus(status) {
   const errors = [];
 
   for (const messageId of selectedMessages) {
-    try {
-      await postDeletedMessageStatus(messageId, status, notes); // Don't reload for each
-      completed++;
-
-      // Update progress
-      const progressBar = document.getElementById('bulk-progress-bar');
-      if (progressBar) {
-        progressBar.style.width = `${(completed / total) * 100}%`;
-      }
-
-      const progressText = document.getElementById('bulk-progress-text');
-      if (progressText) {
-        progressText.textContent = `${completed}/${total} messages processed`;
-      }
-    } catch (error) {
-      if (isOwnerAuthError(error)) {
-        // Stop instead of repeating a rejected request for every selected message
-        errors.push(error.message);
-        notifyOwnerAuthError(error);
-        break;
-      }
-      errors.push(`${messageId}: ${error.message}`);
-    }
+    const shouldContinue = await updateSelectedMessageStatus(messageId, status, notes, {
+      completed,
+      total,
+      errors,
+    });
+    if (shouldContinue === null) break;
+    completed = shouldContinue;
   }
 
   // Hide progress and show results
