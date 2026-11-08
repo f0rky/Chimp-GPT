@@ -26,7 +26,7 @@ This is not shared multi-person memory: queued messages are answered with the sa
 
 `!clear` and its `!reset` alias clear only **your history in the current channel/thread**, in the active chat flow. They do not clear another person's history or your other channels. The command distinguishes a removed transcript, no existing transcript, and a reset failure.
 
-If a request is already being processed in your scope, reset waits behind it and then clears it. Later admitted requests start after that reset. Any of your own messages still waiting in the channel queue when you run `!clear` are discarded rather than answered after the reset; other people's queued messages are kept. The legacy `--force` argument does not reload files or expand the reset scope.
+If a request is already being processed in your scope, reset waits behind it and then clears it. Later admitted requests start after that reset. Any of your own messages still waiting in the channel queue when you run the text command `!clear` or `!reset` are discarded rather than answered after the reset; other people's queued messages are kept. The `/clear` slash command does not yet discard queued messages, and a queued message dispatched while the Discord client is not ready is dropped without a reply. The legacy `--force` argument does not reload files or expand the reset scope.
 
 The `/clear` interaction adapter uses the same operation and acknowledges before waiting. It becomes visible only after the project's slash-command registration has been refreshed for the intended bot; do not assume that deploying source alone registers it. Use `!clear` for the initial Solvis test unless `/clear` is already available.
 
