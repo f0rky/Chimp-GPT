@@ -69,6 +69,10 @@ function isValidPort(port) {
  */
 function sanitizeEntry(entry) {
   if (!entry || typeof entry !== 'object' || !isValidPort(entry.port)) return null;
+  return sanitizeValidEntry(entry);
+}
+
+function sanitizeValidEntry(entry) {
   const info = entry.serviceInfo && typeof entry.serviceInfo === 'object' ? entry.serviceInfo : {};
   const safe = { port: entry.port };
   for (const [field, type] of Object.entries(ENTRY_TYPES)) {
@@ -82,13 +86,35 @@ function sanitizeEntry(entry) {
   const guilds = entry.discordGuilds ?? info.discordGuilds;
   if (Number.isInteger(guilds) && guilds >= 0) safe.discordGuilds = guilds;
   if (entry.health && typeof entry.health === 'object') {
-    safe.health = {};
-    for (const [field, type] of Object.entries(HEALTH_TYPES)) {
-      const value = typedValue(entry.health[field], type);
-      if (value !== undefined) safe.health[field] = value;
-    }
+    safe.health = sanitizeHealth(entry.health);
   }
   return safe;
+}
+
+function sanitizeHealth(health) {
+  const safe = {};
+  for (const [field, type] of Object.entries(HEALTH_TYPES)) {
+    const value = typedValue(health[field], type);
+    if (value !== undefined) safe[field] = value;
+  }
+  return safe;
+}
+
+function mergeBots(services, legacyBots) {
+  const allBots = [...services.filter(service => service.isBotService), ...legacyBots];
+  return allBots.reduce((unique, bot) => {
+    const existing = unique.find(candidate => candidate.port === bot.port);
+    if (!existing) {
+      unique.push(bot);
+      return unique;
+    }
+    Object.assign(existing, {
+      ...existing,
+      ...bot,
+      botConfidence: Math.max(existing.botConfidence || 0, bot.botConfidence || 0),
+    });
+    return unique;
+  }, []);
 }
 
 function sanitizeEntries(entries) {
@@ -101,7 +127,7 @@ function sanitizeEntries(entries) {
 function parsePortBound(value, fallback) {
   if (value === undefined) return fallback;
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
-  return parseInt(value, 10);
+  return Number.parseInt(value, 10);
 }
 
 /**
@@ -211,20 +237,7 @@ function createRouter(deps = {}) {
         logger.warn({ error: e }, 'Legacy discovery failed');
       }
 
-      const allBots = [...services.filter(s => s.isBotService), ...legacyBots];
-      const uniqueBots = allBots.reduce((unique, bot) => {
-        const existing = unique.find(b => b.port === bot.port);
-        if (!existing) {
-          unique.push(bot);
-        } else {
-          Object.assign(existing, {
-            ...existing,
-            ...bot,
-            botConfidence: Math.max(existing.botConfidence || 0, bot.botConfidence || 0),
-          });
-        }
-        return unique;
-      }, []);
+      const uniqueBots = mergeBots(services, legacyBots);
       const safeServices = sanitizeEntries(services);
       const safeBots = sanitizeEntries(uniqueBots);
 

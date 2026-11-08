@@ -7,7 +7,7 @@
  * - The acting owner is resolved server-side from OWNER_ID; callers cannot choose it.
  */
 
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const { createLogger } = require('../../core/logger');
 
 const logger = createLogger('ownerAuth');
