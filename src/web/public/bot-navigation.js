@@ -8,12 +8,42 @@
  * @author Brett
  */
 
+// Discovery data comes from arbitrary local services: escape everything rendered as HTML
+const MAX_DISPLAY_LENGTH = 100;
+const STATUS_PATTERN = /^[a-z0-9_-]{1,20}$/;
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function displayText(value, fallback) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text ? text.slice(0, MAX_DISPLAY_LENGTH) : fallback;
+}
+
+function safeStatus(value) {
+  return typeof value === 'string' && STATUS_PATTERN.test(value) ? value : 'unknown';
+}
+
+function validPort(value) {
+  const port = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null;
+}
+
 class BotNavigation {
   constructor() {
     this.botInstances = [];
     this.currentBot = null;
     this.refreshInterval = null;
     this.isInitialized = false;
+    // Discovery is owner-only; while locked we show a quiet state and skip periodic refresh
+    this.locked = false;
+    this.unsubscribeAuth = null;
 
     // Configuration
     this.config = {
@@ -37,6 +67,16 @@ class BotNavigation {
     try {
       // Create navigation UI
       this.createNavigationUI();
+
+      // Retry discovery once each time the owner unlocks the dashboard
+      if (window.OwnerAuth) {
+        this.unsubscribeAuth = window.OwnerAuth.onChange(status => {
+          if (status.state === 'unlocked') {
+            this.locked = false;
+            this.discoverBots();
+          }
+        });
+      }
 
       // Discover active bots
       await this.discoverBots();
@@ -113,11 +153,11 @@ class BotNavigation {
                 position: relative;
                 margin-right: 1rem;
             }
-            
+
             .bot-nav-dropdown {
                 position: relative;
             }
-            
+
             .bot-nav-toggle {
                 display: flex;
                 align-items: center;
@@ -132,18 +172,18 @@ class BotNavigation {
                 font-size: 0.875rem;
                 min-width: 120px;
             }
-            
+
             .bot-nav-toggle:hover {
                 background: var(--hover);
                 border-color: var(--accent);
             }
-            
+
             .bot-nav-toggle.active {
                 background: var(--accent);
                 color: white;
                 border-color: var(--accent);
             }
-            
+
             .bot-nav-current {
                 font-weight: 500;
                 white-space: nowrap;
@@ -151,17 +191,17 @@ class BotNavigation {
                 text-overflow: ellipsis;
                 max-width: 80px;
             }
-            
+
             .bot-nav-arrow {
                 font-size: 0.75rem;
                 margin-left: auto;
                 transition: transform 0.2s ease;
             }
-            
+
             .bot-nav-toggle.active .bot-nav-arrow {
                 transform: rotate(180deg);
             }
-            
+
             .bot-nav-menu {
                 position: absolute;
                 top: 100%;
@@ -179,13 +219,13 @@ class BotNavigation {
                 transform: translateY(-10px);
                 transition: all 0.2s ease;
             }
-            
+
             .bot-nav-menu.active {
                 opacity: 1;
                 visibility: visible;
                 transform: translateY(0);
             }
-            
+
             .bot-nav-header {
                 display: flex;
                 align-items: center;
@@ -196,7 +236,7 @@ class BotNavigation {
                 font-size: 0.875rem;
                 color: var(--text);
             }
-            
+
             .bot-nav-refresh {
                 background: none;
                 border: none;
@@ -206,26 +246,26 @@ class BotNavigation {
                 border-radius: 4px;
                 transition: color 0.2s ease;
             }
-            
+
             .bot-nav-refresh:hover {
                 color: var(--accent);
             }
-            
+
             .bot-nav-refresh.spinning {
                 animation: spin 1s linear infinite;
             }
-            
+
             @keyframes spin {
                 from { transform: rotate(0deg); }
                 to { transform: rotate(360deg); }
             }
-            
+
             .bot-nav-list {
                 max-height: 300px;
                 overflow-y: auto;
                 padding: 0.5rem 0;
             }
-            
+
             .bot-nav-loading,
             .bot-nav-error {
                 display: flex;
@@ -236,11 +276,11 @@ class BotNavigation {
                 font-size: 0.875rem;
                 justify-content: center;
             }
-            
+
             .bot-nav-error {
                 color: var(--error);
             }
-            
+
             .bot-nav-item {
                 display: flex;
                 align-items: center;
@@ -252,22 +292,22 @@ class BotNavigation {
                 width: 100%;
                 text-align: left;
             }
-            
+
             .bot-nav-item:hover {
                 background: var(--hover);
             }
-            
+
             .bot-nav-item.current {
                 background: var(--accent-bg);
                 color: var(--accent);
             }
-            
+
             .bot-nav-item.current::after {
                 content: '●';
                 margin-left: auto;
                 font-size: 0.75rem;
             }
-            
+
             .bot-nav-icon {
                 width: 32px;
                 height: 32px;
@@ -279,34 +319,34 @@ class BotNavigation {
                 font-size: 1rem;
                 flex-shrink: 0;
             }
-            
+
             .bot-nav-icon.online {
                 background: var(--success-bg);
                 color: var(--success);
             }
-            
+
             .bot-nav-icon.offline {
                 background: var(--error-bg);
                 color: var(--error);
             }
-            
+
             .bot-nav-icon.unknown {
                 background: var(--warning-bg);
                 color: var(--warning);
             }
-            
+
             .bot-nav-details {
                 flex: 1;
                 min-width: 0;
             }
-            
+
             .bot-nav-name {
                 font-weight: 600;
                 font-size: 0.875rem;
                 color: var(--text);
                 margin-bottom: 0.125rem;
             }
-            
+
             .bot-nav-info {
                 display: flex;
                 align-items: center;
@@ -314,7 +354,7 @@ class BotNavigation {
                 font-size: 0.75rem;
                 color: var(--text-secondary);
             }
-            
+
             .bot-nav-status {
                 display: inline-flex;
                 align-items: center;
@@ -327,28 +367,28 @@ class BotNavigation {
                 font-weight: 600;
                 letter-spacing: 0.025em;
             }
-            
+
             .bot-nav-status.online {
                 background: var(--success-bg);
                 color: var(--success);
             }
-            
+
             .bot-nav-status.offline {
                 background: var(--error-bg);
                 color: var(--error);
             }
-            
+
             .bot-nav-footer {
                 padding: 0.5rem 1rem;
                 border-top: 1px solid var(--border);
                 text-align: center;
             }
-            
+
             .bot-nav-footer small {
                 color: var(--text-secondary);
                 font-size: 0.75rem;
             }
-            
+
             /* Responsive design */
             @media (max-width: 768px) {
                 .bot-nav-menu {
@@ -358,7 +398,7 @@ class BotNavigation {
                     min-width: unset;
                     max-width: unset;
                 }
-                
+
                 .bot-nav-current {
                     max-width: 60px;
                 }
@@ -443,13 +483,22 @@ class BotNavigation {
    * Discover active bot instances
    */
   async discoverBots() {
+    if (!window.OwnerAuth || !window.OwnerAuth.isUnlocked()) {
+      this.showLocked();
+      return;
+    }
+
     try {
       console.log('🔍 Discovering active bots...');
 
       const response = await this.fetchWithTimeout('/api/discover-services', {
         timeout: this.config.discoveryTimeout,
-        ownerProtected: true,
       });
+
+      if ([401, 403, 503].includes(response.status)) {
+        this.showLocked();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Discovery API failed: ${response.status} ${response.statusText}`);
@@ -469,8 +518,12 @@ class BotNavigation {
 
       console.log(`✅ Discovered ${this.botInstances.length} bot instances`);
     } catch (error) {
+      if (error && error.name === 'OwnerAuthError') {
+        this.showLocked();
+        return;
+      }
       console.error('❌ Failed to discover bots:', error);
-      this.showError(error.message);
+      this.showError(error && error.message);
     }
   }
 
@@ -481,33 +534,34 @@ class BotNavigation {
     this.botInstances = [];
 
     if (data.botServices && Array.isArray(data.botServices)) {
-      // Group by bot name to handle multiple ports per bot
-      const botGroups = {};
+      // Group by bot name to handle multiple ports per bot (Map: names are untrusted keys)
+      const botGroups = new Map();
 
       data.botServices.forEach(bot => {
-        const name = bot.serviceInfo?.botName || bot.serviceInfo?.name || 'Unknown Bot';
+        if (!bot || typeof bot !== 'object') return;
+        const port = validPort(bot.port);
+        if (port === null) return;
 
-        if (!botGroups[name]) {
-          botGroups[name] = {
+        const name = displayText(bot.botName, displayText(bot.name, 'Unknown Bot'));
+
+        if (!botGroups.has(name)) {
+          botGroups.set(name, {
             name: name,
             instances: [],
-          };
+          });
         }
 
-        botGroups[name].instances.push(bot);
+        botGroups.get(name).instances.push({ ...bot, port });
       });
 
       // Convert groups to bot instances
-      Object.values(botGroups).forEach(group => {
+      botGroups.forEach(group => {
         // Find the best instance (prioritize online status and higher ports)
         const bestInstance = group.instances.reduce((best, current) => {
           if (!best) return current;
 
           // Prefer online status
-          if (
-            current.serviceInfo?.discordStatus === 'ok' &&
-            best.serviceInfo?.discordStatus !== 'ok'
-          ) {
+          if (current.discordStatus === 'ok' && best.discordStatus !== 'ok') {
             return current;
           }
 
@@ -522,16 +576,11 @@ class BotNavigation {
         this.botInstances.push({
           name: group.name,
           port: bestInstance.port,
-          url: bestInstance.dashboardUrl || `http://localhost:${bestInstance.port}/#performance`,
-          status:
-            bestInstance.serviceInfo?.discordStatus ||
-            bestInstance.serviceInfo?.status ||
-            'unknown',
-          uptime: bestInstance.serviceInfo?.formattedUptime || 'Unknown',
-          version: bestInstance.serviceInfo?.version || 'Unknown',
-          messageCount: bestInstance.serviceInfo?.stats?.messageCount || 0,
-          guilds: bestInstance.serviceInfo?.discordGuilds || 0,
-          memory: bestInstance.serviceInfo?.memoryUsage?.rss || 'Unknown',
+          url: `http://localhost:${bestInstance.port}/#performance`,
+          status: safeStatus(bestInstance.discordStatus || bestInstance.status),
+          uptime: displayText(bestInstance.formattedUptime, 'Unknown'),
+          version: displayText(bestInstance.version, 'Unknown'),
+          guilds: Number.isInteger(bestInstance.discordGuilds) ? bestInstance.discordGuilds : 0,
           isCurrent: this.isCurrentBot(bestInstance.port),
           instances: group.instances,
         });
@@ -550,7 +599,7 @@ class BotNavigation {
    */
   isCurrentBot(port) {
     const currentPort = window.location.port || '3001';
-    return port.toString() === currentPort;
+    return String(port) === currentPort;
   }
 
   /**
@@ -583,18 +632,17 @@ class BotNavigation {
         .map(
           bot => `
                 <button class="bot-nav-item ${bot.isCurrent ? 'current' : ''}"
-                        onclick="_botNavigation.navigateToBot('${bot.url}')"
-                        title="Switch to ${bot.name}">
-                    <div class="bot-nav-icon ${bot.status}">
+                        onclick="_botNavigation.navigateToBot('${escapeHtml(bot.url)}')"
+                        title="Switch to ${escapeHtml(bot.name)} (v${escapeHtml(bot.version)})">
+                    <div class="bot-nav-icon ${escapeHtml(bot.status)}">
                         <i class="fas fa-robot"></i>
                     </div>
                     <div class="bot-nav-details">
-                        <div class="bot-nav-name">${bot.name}</div>
+                        <div class="bot-nav-name">${escapeHtml(bot.name)}</div>
                         <div class="bot-nav-info">
-                            <span class="bot-nav-status ${bot.status}">${bot.status}</span>
-                            <span>Port ${bot.port}</span>
-                            <span>${bot.uptime}</span>
-                            <span>${bot.messageCount} msgs</span>
+                            <span class="bot-nav-status ${escapeHtml(bot.status)}">${escapeHtml(bot.status)}</span>
+                            <span>Port ${escapeHtml(bot.port)}</span>
+                            <span>${escapeHtml(bot.uptime)}</span>
                         </div>
                     </div>
                 </button>
@@ -654,6 +702,7 @@ class BotNavigation {
     }
 
     this.refreshInterval = setInterval(async () => {
+      if (this.locked) return;
       try {
         await this.discoverBots();
       } catch (error) {
@@ -676,6 +725,36 @@ class BotNavigation {
   }
 
   /**
+   * Show a quiet locked state; discovery resumes when the owner unlocks
+   */
+  showLocked() {
+    this.locked = true;
+    this.botInstances = [];
+    this.currentBot = null;
+
+    const currentSpan = document.querySelector('.bot-nav-current');
+    if (currentSpan) {
+      currentSpan.textContent = 'Bots';
+      currentSpan.title = 'Bot discovery is locked';
+    }
+
+    const listContainer = document.getElementById('bot-nav-list');
+    if (listContainer) {
+      listContainer.innerHTML = `
+                <div class="bot-nav-loading">
+                    <i class="fas fa-lock"></i>
+                    <span>Bot discovery locked. Unlock administration to view bots.</span>
+                </div>
+            `;
+    }
+
+    const statusElement = document.getElementById('bot-nav-status');
+    if (statusElement) {
+      statusElement.textContent = 'Discovery locked';
+    }
+  }
+
+  /**
    * Show error message in the navigation
    */
   showError(message) {
@@ -684,27 +763,23 @@ class BotNavigation {
       listContainer.innerHTML = `
                 <div class="bot-nav-error">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>${message}</span>
+                    <span>${escapeHtml(displayText(message, 'Bot discovery failed'))}</span>
                 </div>
             `;
     }
   }
 
   /**
-   * Fetch with timeout support
+   * Owner-authenticated fetch with timeout support (X-Owner-Token is added by OwnerAuth)
    */
   async fetchWithTimeout(url, options = {}) {
-    const { timeout = 5000, ownerProtected = false, ...fetchOptions } = options;
+    const { timeout = 5000, ...fetchOptions } = options;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const fetchFn = ownerProtected ? window.ownerFetch : fetch;
-      if (ownerProtected && typeof fetchFn !== 'function') {
-        throw new Error('Owner authentication is unavailable');
-      }
-      const response = await fetchFn(url, {
+      const response = await window.OwnerAuth.ownerFetch(url, {
         ...fetchOptions,
         signal: controller.signal,
       });
@@ -724,6 +799,11 @@ class BotNavigation {
    */
   destroy() {
     this.stopPeriodicRefresh();
+
+    if (this.unsubscribeAuth) {
+      this.unsubscribeAuth();
+      this.unsubscribeAuth = null;
+    }
 
     const navContainer = document.querySelector('.bot-navigation');
     if (navContainer) {

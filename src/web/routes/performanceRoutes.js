@@ -1,10 +1,13 @@
 /**
  * Performance Routes
- * GET /performance, /performance/history/*, POST /reset-stats, /repair-stats, /repair-function-results
+ * GET /performance, /performance/history/* (public)
+ * POST /reset-stats, /repair-stats, /repair-function-results (owner token)
+ * GET /function-results, /function-results/summary (owner token)
  */
 
 const { Router } = require('express');
 const { createLogger } = require('../../core/logger');
+const { requireOwnerToken } = require('../middleware/ownerAuth');
 
 const logger = createLogger('performanceRoutes');
 
@@ -39,17 +42,12 @@ function toPublicMetrics(metrics) {
 }
 
 /**
+ * Authorization is always the shared ownerAuth middleware; an injected requireOwnerToken
+ * dependency is intentionally ignored.
  * @param {{ stats: Object, statsStorage: Object, functionResults: Object, performanceHistory: Object, serverState: Object }} deps
  */
 function createRouter(deps) {
-  const {
-    stats,
-    statsStorage,
-    functionResults,
-    performanceHistory,
-    serverState,
-    requireOwnerToken,
-  } = deps;
+  const { stats, statsStorage, functionResults, performanceHistory, serverState } = deps;
   const router = Router();
 
   // GET /performance

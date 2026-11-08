@@ -59,6 +59,14 @@
             <span class="mode-text" title="Conversation Mode">Loading...</span>
           </div>
           <!-- Quick Actions -->
+          <span id="owner-auth-status" class="owner-auth-status" aria-live="polite"></span>
+          <button
+            id="owner-auth-toggle"
+            class="btn-icon"
+            title="Unlock administration (enter owner token)"
+          >
+            <i class="fas fa-lock"></i>
+          </button>
           <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
             <i class="fas fa-moon"></i>
           </button>
@@ -584,6 +592,7 @@
       </div>
     </div>
 
+    <script src="owner-auth.js"></script>
     <script src="app-unified.js"></script>
     <script src="bot-navigation.js"></script>
   </body>

@@ -171,6 +171,19 @@ async function processOpenAIMessage(content, conversationLog) {
 - Run tests before submitting a pull request: `npm test`
 - Ensure all tests pass before submitting
 
+#### Security Regression Suite
+
+`npm run test:security` runs four hermetic `node:test` suites (`dashboardOwnerAuth`, `ownerIdentityNormalization`, `imageActionAuthorization`, `discoveryRoutesAuth`) against the real source files. They use fixture data and stub external providers: no external network, no `.env`, and no real credentials. Discovery-route tests briefly bind an ephemeral loopback port and close it afterward. It is safe to run offline, and CI runs it after `npm test`.
+
+The suites check this behaviour:
+
+- **Dashboard access**: read-only status pages stay public. Admin actions (stats reset/repair, blocked users, settings, test runs, function results, deleted messages, bot/service discovery) need the `X-Owner-Token` header. Query strings and request bodies are never accepted as credentials.
+- **`OWNER_TOKEN`**: must be at least 32 random characters. Short or placeholder-like values are rejected, and protected routes return 503 until a valid token is configured. Generate a token locally with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Never commit a real token or paste one into tests, issues or PRs.
+- **Owner identity**: the acting owner is resolved on the server from `OWNER_ID`. Callers cannot choose it.
+- **Legacy image action buttons** (upscale, remix, etc.) are owner-only, because each one makes a billable provider request.
+
+Integration tests that use real providers, Discord or network access, and any deployment, are outside this suite. They need separate approval and must not run with production credentials as part of normal contribution checks.
+
 ## PocketFlow Development
 
 ChimpGPT v2.0+ features the PocketFlow architecture for advanced conversation management.

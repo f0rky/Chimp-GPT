@@ -39,14 +39,20 @@ jobs:
           # Ensure image generation tests don't call the real API
           echo 'ENABLE_IMAGE_GENERATION=false' >> .env
 
+      # --ignore-scripts skips dependency/lifecycle install scripts (e.g. husky
+      # prepare), which can modify the lockfile and dependencies during install
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
 
       - name: Run tests
         run: npm test
+
+      # Hermetic security regressions (no network, no real env or credentials)
+      - name: Run security regression tests
+        run: npm run test:security
 
       - name: Check formatting
         run: npm run format:check

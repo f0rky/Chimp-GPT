@@ -1,13 +1,19 @@
+/**
+ * Compatibility shim for the former standalone owner-token helper.
+ *
+ * The single production authorization boundary is ./middleware/ownerAuth (header-only
+ * X-Owner-Token, strong-token requirement, 503/401/403 fail-closed semantics). This module
+ * re-exports that middleware so no weaker parallel implementation remains.
+ */
+
 const crypto = require('crypto');
-const { createLogger } = require('../core/logger');
+const { requireOwnerToken, validateOwnerTokenConfig } = require('./middleware/ownerAuth');
 
-const logger = createLogger('ownerTokenAuth');
-
-// There is intentionally no default token. Owner-only routes deny all
-// requests until a token is explicitly configured.
+// There is intentionally no default token. Returns the configured token only when it passes
+// the shared strength checks, otherwise null.
 function getConfiguredOwnerToken() {
-  const value = process.env.OWNER_TOKEN;
-  return typeof value === 'string' && value.length > 0 ? value : null;
+  const config = validateOwnerTokenConfig(process.env.OWNER_TOKEN);
+  return config.valid ? config.token : null;
 }
 
 function constantTimeStringEquals(a, b) {
@@ -21,19 +27,6 @@ function constantTimeStringEquals(a, b) {
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
-}
-
-function requireOwnerToken(req, res, next) {
-  const configuredToken = getConfiguredOwnerToken();
-  if (!configuredToken) {
-    logger.error('OWNER_TOKEN is not configured; denying owner-protected request (fail closed)');
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  if (!constantTimeStringEquals(req.headers['x-owner-token'], configuredToken)) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  return next();
 }
 
 module.exports = { getConfiguredOwnerToken, constantTimeStringEquals, requireOwnerToken };

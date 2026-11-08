@@ -82,7 +82,9 @@ async function testSecurityHardeningDashboard() {
   const runtimeDataBefore = snapshotRuntimeData();
   const express = require('express');
   // requireOwnerToken (and the constant-time comparator) come from the
-  // production module under test.
+  // production module under test. ownerTokenAuth re-exports the shared
+  // middleware/ownerAuth boundary: 503 when OWNER_TOKEN is missing/weak,
+  // 401 when the X-Owner-Token header is absent, 403 when it is wrong.
   const { requireOwnerToken, constantTimeStringEquals } = require('../../src/web/ownerTokenAuth');
 
   const originalOwnerToken = process.env.OWNER_TOKEN;
@@ -99,7 +101,14 @@ async function testSecurityHardeningDashboard() {
       const res = await fetch(`${url}/protected`, {
         headers: { 'X-Owner-Token': 'anything-at-all' },
       });
-      assert.equal(res.status, 403);
+      assert.equal(res.status, 503);
+
+      // A configured but weak (short) token also fails closed.
+      process.env.OWNER_TOKEN = 'short-owner-token';
+      const weak = await fetch(`${url}/protected`, {
+        headers: { 'X-Owner-Token': 'short-owner-token' },
+      });
+      assert.equal(weak.status, 503);
     } finally {
       await close();
     }
@@ -114,14 +123,14 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 2. requireOwnerToken denies wrong token, allows correct token, via header only ----
   try {
-    process.env.OWNER_TOKEN = 'correct-owner-token-value';
+    process.env.OWNER_TOKEN = 'correct-owner-token-value-4f9a2c7e1b';
     const app = express();
     app.use(express.json());
     app.get('/protected', requireOwnerToken, (req, res) => res.json({ ok: true }));
     const { url, close } = await startServer(app);
     try {
       const noHeader = await fetch(`${url}/protected`);
-      assert.equal(noHeader.status, 403);
+      assert.equal(noHeader.status, 401);
 
       const wrongHeader = await fetch(`${url}/protected`, {
         headers: { 'X-Owner-Token': 'wrong-token' },
@@ -129,17 +138,17 @@ async function testSecurityHardeningDashboard() {
       assert.equal(wrongHeader.status, 403);
 
       // Query string and body must NOT be accepted as a token source.
-      const viaQuery = await fetch(`${url}/protected?token=correct-owner-token-value`);
-      assert.equal(viaQuery.status, 403);
+      const viaQuery = await fetch(`${url}/protected?token=correct-owner-token-value-4f9a2c7e1b`);
+      assert.equal(viaQuery.status, 401);
 
       const viaBody = await fetch(`${url}/protected`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
-      assert.equal(viaBody.status, 403);
+      assert.equal(viaBody.status, 401);
 
       const correctHeader = await fetch(`${url}/protected`, {
-        headers: { 'X-Owner-Token': 'correct-owner-token-value' },
+        headers: { 'X-Owner-Token': 'correct-owner-token-value-4f9a2c7e1b' },
       });
       assert.equal(correctHeader.status, 200);
       const body = await correctHeader.json();
@@ -179,7 +188,7 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 4. adminRoutes: protected GET routes deny/allow correctly, settings omit secrets ----
   try {
-    process.env.OWNER_TOKEN = 'admin-routes-owner-token';
+    process.env.OWNER_TOKEN = 'admin-routes-owner-token-8d3e6f1a2c';
     process.env.OPENROUTER_API_KEY = 'secret-openrouter-key';
     process.env.X_RAPIDAPI_KEY = 'secret-rapidapi-key';
 
@@ -213,17 +222,17 @@ async function testSecurityHardeningDashboard() {
     try {
       // GET /blocked-users requires the token
       const blockedNoAuth = await fetch(`${url}/blocked-users`);
-      assert.equal(blockedNoAuth.status, 403);
+      assert.equal(blockedNoAuth.status, 401);
       const blockedAuth = await fetch(`${url}/blocked-users`, {
-        headers: { 'X-Owner-Token': 'admin-routes-owner-token' },
+        headers: { 'X-Owner-Token': 'admin-routes-owner-token-8d3e6f1a2c' },
       });
       assert.equal(blockedAuth.status, 200);
 
       // GET /settings requires the token and omits secret-bearing keys
       const settingsNoAuth = await fetch(`${url}/settings`);
-      assert.equal(settingsNoAuth.status, 403);
+      assert.equal(settingsNoAuth.status, 401);
       const settingsAuth = await fetch(`${url}/settings`, {
-        headers: { 'X-Owner-Token': 'admin-routes-owner-token' },
+        headers: { 'X-Owner-Token': 'admin-routes-owner-token-8d3e6f1a2c' },
       });
       assert.equal(settingsAuth.status, 200);
       const settingsBody = await settingsAuth.json();
@@ -233,11 +242,11 @@ async function testSecurityHardeningDashboard() {
       const openRouterSetting = settingsBody.settings.find(s => s.key === 'OPENROUTER_API_KEY');
       assert.equal(openRouterSetting, undefined, 'OPENROUTER_API_KEY must be omitted entirely');
 
-      // GET /run-tests requires the token (it may still fail internally
-      // because utils/diagnostics doesn't exist, but auth must be enforced
-      // before that failure is reached).
+      // GET /run-tests requires the token (no diagnostics runner exists in
+      // this build, so an authorized call reports 501, but auth must be
+      // enforced before that is reached).
       const runTestsNoAuth = await fetch(`${url}/run-tests`);
-      assert.equal(runTestsNoAuth.status, 403);
+      assert.equal(runTestsNoAuth.status, 401);
 
       // POST /unblock-user requires the token
       const unblockNoAuth = await fetch(`${url}/unblock-user`, {
@@ -245,12 +254,12 @@ async function testSecurityHardeningDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: '111111111111111111' }),
       });
-      assert.equal(unblockNoAuth.status, 403);
+      assert.equal(unblockNoAuth.status, 401);
       const unblockAuth = await fetch(`${url}/unblock-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Owner-Token': 'admin-routes-owner-token',
+          'X-Owner-Token': 'admin-routes-owner-token-8d3e6f1a2c',
         },
         body: JSON.stringify({ userId: '111111111111111111' }),
       });
@@ -275,7 +284,7 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 5. healthRoutes: detailed diagnostics require the owner token; basic health remains public ----
   try {
-    process.env.OWNER_TOKEN = 'health-routes-owner-token';
+    process.env.OWNER_TOKEN = 'health-routes-owner-token-5b7c9e2d4f';
     let loadStatsCalls = 0;
     const healthRoutes = require('../../src/web/routes/healthRoutes');
     const app = express();
@@ -327,7 +336,7 @@ async function testSecurityHardeningDashboard() {
     const { url, close } = await startServer(app);
     try {
       const detailedNoAuth = await fetch(`${url}/health/detailed`);
-      assert.equal(detailedNoAuth.status, 403);
+      assert.equal(detailedNoAuth.status, 401);
       const detailedWrongAuth = await fetch(`${url}/health/detailed`, {
         headers: { 'X-Owner-Token': 'wrong-token' },
       });
@@ -427,7 +436,7 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 7. performanceRoutes: public metrics are aggregate-only; detailed timing metadata is owner-only ----
   try {
-    process.env.OWNER_TOKEN = 'performance-routes-owner-token';
+    process.env.OWNER_TOKEN = 'performance-routes-owner-token-3a6d';
 
     const stats = { apiCalls: {}, errors: {}, rateLimits: { hit: 0, users: new Set() } };
     const fakeStatsStorage = {
@@ -541,9 +550,9 @@ async function testSecurityHardeningDashboard() {
       }
 
       const detailedDenied = await fetch(`${url}/performance/detailed`);
-      assert.equal(detailedDenied.status, 403);
+      assert.equal(detailedDenied.status, 401);
       const detailedAllowed = await fetch(`${url}/performance/detailed`, {
-        headers: { 'X-Owner-Token': 'performance-routes-owner-token' },
+        headers: { 'X-Owner-Token': 'performance-routes-owner-token-3a6d' },
       });
       assert.equal(detailedAllowed.status, 200);
       const ownerPerformance = await detailedAllowed.json();
@@ -565,7 +574,7 @@ async function testSecurityHardeningDashboard() {
 
       for (const { method, path: routePath } of protectedRequests) {
         const denied = await fetch(`${url}${routePath}`, { method });
-        assert.equal(denied.status, 403, `${method} ${routePath} should deny without token`);
+        assert.equal(denied.status, 401, `${method} ${routePath} should deny without token`);
       }
 
       // Exercise authorized non-mutating reads only. Do not authorize a repair
@@ -573,7 +582,7 @@ async function testSecurityHardeningDashboard() {
       // would turn this unit test into a data-mutating integration test.
       for (const routePath of ['/function-results', '/function-results/summary']) {
         const allowed = await fetch(`${url}${routePath}`, {
-          headers: { 'X-Owner-Token': 'performance-routes-owner-token' },
+          headers: { 'X-Owner-Token': 'performance-routes-owner-token-3a6d' },
         });
         assert.equal(allowed.status, 200, `GET ${routePath} should allow with token`);
       }
@@ -601,7 +610,7 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 7. discoveryRoutes: PM2/Docker enumeration and port scans are owner-only ----
   try {
-    process.env.OWNER_TOKEN = 'discovery-routes-owner-token';
+    process.env.OWNER_TOKEN = 'discovery-routes-owner-token-9e1f4b';
     const discoveryCalls = {
       pm2: 0,
       docker: 0,
@@ -641,10 +650,10 @@ async function testSecurityHardeningDashboard() {
     try {
       for (const routePath of [
         '/api/discover-bots',
-        '/api/discover-services?startPort=1&endPort=2',
+        '/api/discover-services?startPort=3000&endPort=3001',
       ]) {
         const denied = await fetch(`${url}${routePath}`);
-        assert.equal(denied.status, 403, `${routePath} must deny unauthenticated discovery`);
+        assert.equal(denied.status, 401, `${routePath} must deny unauthenticated discovery`);
       }
       assert.deepEqual(
         discoveryCalls,
@@ -653,12 +662,22 @@ async function testSecurityHardeningDashboard() {
       );
 
       const botsAllowed = await fetch(`${url}/api/discover-bots`, {
-        headers: { 'X-Owner-Token': 'discovery-routes-owner-token' },
+        headers: { 'X-Owner-Token': 'discovery-routes-owner-token-9e1f4b' },
       });
       assert.equal(botsAllowed.status, 200);
-      const servicesAllowed = await fetch(`${url}/api/discover-services?startPort=1&endPort=2`, {
-        headers: { 'X-Owner-Token': 'discovery-routes-owner-token' },
+      // Scans are confined to the local 3000-3020 window; out-of-window ranges are rejected.
+      const outOfWindow = await fetch(`${url}/api/discover-services?startPort=1&endPort=2`, {
+        headers: { 'X-Owner-Token': 'discovery-routes-owner-token-9e1f4b' },
       });
+      assert.equal(outOfWindow.status, 400);
+      assert.equal(discoveryCalls.services, 0, 'out-of-window range must not scan');
+
+      const servicesAllowed = await fetch(
+        `${url}/api/discover-services?startPort=3000&endPort=3001`,
+        {
+          headers: { 'X-Owner-Token': 'discovery-routes-owner-token-9e1f4b' },
+        }
+      );
       assert.equal(servicesAllowed.status, 200);
       assert.equal(discoveryCalls.pm2, 2);
       assert.equal(discoveryCalls.docker, 2);
@@ -681,7 +700,7 @@ async function testSecurityHardeningDashboard() {
 
   // ---- 8. deletedMessagesRoutes: no x-user-id/OWNER_ID fallback authorization ----
   try {
-    process.env.OWNER_TOKEN = 'deleted-messages-owner-token';
+    process.env.OWNER_TOKEN = 'deleted-messages-owner-token-2c8a5d';
     process.env.OWNER_ID = '999999999999999999';
 
     const fakeMaliciousUserManager = {
@@ -711,20 +730,20 @@ async function testSecurityHardeningDashboard() {
       const authViaUserIdOnly = await fetch(`${url}/api/deleted-messages/auth`, {
         headers: { 'x-user-id': process.env.OWNER_ID },
       });
-      assert.equal(authViaUserIdOnly.status, 403);
+      assert.equal(authViaUserIdOnly.status, 401);
 
       const authViaToken = await fetch(`${url}/api/deleted-messages/auth`, {
-        headers: { 'X-Owner-Token': 'deleted-messages-owner-token' },
+        headers: { 'X-Owner-Token': 'deleted-messages-owner-token-2c8a5d' },
       });
       assert.equal(authViaToken.status, 200);
 
       const listViaUserIdOnly = await fetch(`${url}/api/deleted-messages`, {
         headers: { 'x-user-id': process.env.OWNER_ID },
       });
-      assert.equal(listViaUserIdOnly.status, 403);
+      assert.equal(listViaUserIdOnly.status, 401);
 
       const listViaToken = await fetch(`${url}/api/deleted-messages`, {
-        headers: { 'X-Owner-Token': 'deleted-messages-owner-token' },
+        headers: { 'X-Owner-Token': 'deleted-messages-owner-token-2c8a5d' },
       });
       assert.equal(listViaToken.status, 200);
 
@@ -733,13 +752,13 @@ async function testSecurityHardeningDashboard() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': process.env.OWNER_ID },
         body: JSON.stringify({ messageId: 'm1', status: 'approved' }),
       });
-      assert.equal(statusNoAuth.status, 403);
+      assert.equal(statusNoAuth.status, 401);
 
       const statusWithToken = await fetch(`${url}/api/deleted-messages/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Owner-Token': 'deleted-messages-owner-token',
+          'X-Owner-Token': 'deleted-messages-owner-token-2c8a5d',
         },
         body: JSON.stringify({ messageId: 'm1', status: 'approved' }),
       });
@@ -788,12 +807,19 @@ async function testSecurityHardeningDashboard() {
   // ---- 10. Frontend static checks ----
   try {
     const appJs = fs.readFileSync(path.join(REPO_ROOT, 'src/web/public/app-unified.js'), 'utf8');
+    const ownerAuthJs = fs.readFileSync(
+      path.join(REPO_ROOT, 'src/web/public/owner-auth.js'),
+      'utf8'
+    );
 
-    // Single in-memory, prompt-based token helper attaches only the header.
-    assert.match(appJs, /function getOwnerToken\s*\(/);
-    assert.match(appJs, /function ownerFetch\s*\(/);
-    assert.match(appJs, /headers\.set\(\s*['"]X-Owner-Token['"]/);
-    assert.match(appJs, /window\.prompt\(\s*['"]Enter owner token:['"]/);
+    // Single shared token helper (owner-auth.js) attaches only the header and
+    // solicits the token only from the explicit unlock control.
+    assert.match(ownerAuthJs, /function ownerFetch\s*\(/);
+    assert.match(ownerAuthJs, /['"]X-Owner-Token['"]:\s*token/);
+    assert.match(appJs, /OwnerAuth\.ownerFetch\(/);
+    assert.equal(/function (getOwnerToken|ownerFetch)\s*\(/.test(appJs), false);
+    assert.equal(/prompt\(\s*['"`]Enter (the dashboard )?owner token/i.test(appJs), false);
+    assert.equal((appJs.match(/OwnerAuth\.unlock\(/g) || []).length, 1);
 
     // Public health polling must never reach the protected diagnostics fetch;
     // diagnostics are loaded only from the explicit owner action in index.html.
@@ -813,11 +839,11 @@ async function testSecurityHardeningDashboard() {
       path.join(REPO_ROOT, 'src/web/public/bot-navigation.js'),
       'utf8'
     );
-    assert.match(botNavigationJs, /ownerProtected:\s*true/);
-    assert.match(botNavigationJs, /window\.ownerFetch/);
+    assert.match(botNavigationJs, /window\.OwnerAuth\.ownerFetch\(/);
     assert.ok(
-      indexHtml.indexOf('app-unified.js') < indexHtml.indexOf('bot-navigation.js'),
-      'owner fetch helper must load before bot navigation'
+      indexHtml.indexOf('owner-auth.js') < indexHtml.indexOf('app-unified.js') &&
+        indexHtml.indexOf('app-unified.js') < indexHtml.indexOf('bot-navigation.js'),
+      'owner fetch helper must load before the dashboard and bot navigation'
     );
 
     // Token must never be persisted or sent via query/body.

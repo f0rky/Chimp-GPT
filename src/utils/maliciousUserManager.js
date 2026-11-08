@@ -237,7 +237,10 @@ async function saveDeletedMessages() {
  * @returns {boolean} True if user is owner
  */
 function isOwner(userId) {
-  return userId === process.env.OWNER_ID;
+  // Trim both sides and never match when OWNER_ID is unset/blank (avoids undefined === undefined)
+  const ownerId = process.env.OWNER_ID == null ? '' : String(process.env.OWNER_ID).trim();
+  if (!ownerId || userId == null) return false;
+  return String(userId).trim() === ownerId;
 }
 
 /**

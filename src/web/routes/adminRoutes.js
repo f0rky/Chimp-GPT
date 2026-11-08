@@ -1,18 +1,21 @@
 /**
  * Admin Routes
- * GET /blocked-users, POST /unblock-user, GET /settings, GET /run-tests
+ * GET /blocked-users, POST /unblock-user, GET /settings, GET /run-tests (all owner token)
  */
 
 const { Router } = require('express');
 const { createLogger } = require('../../core/logger');
+const { requireOwnerToken } = require('../middleware/ownerAuth');
 
 const logger = createLogger('adminRoutes');
 
 /**
- * @param {{ maliciousUserManager: Object, requireOwnerToken: Function }} deps
+ * Authorization is always the shared ownerAuth middleware; an injected requireOwnerToken
+ * dependency is intentionally ignored.
+ * @param {{ maliciousUserManager: Object }} deps
  */
 function createRouter(deps) {
-  const { maliciousUserManager, requireOwnerToken } = deps;
+  const { maliciousUserManager } = deps;
   const router = Router();
   let maliciousUserManagerInitialized = false;
 
@@ -43,7 +46,7 @@ function createRouter(deps) {
 
   // POST /unblock-user
   router.post('/unblock-user', requireOwnerToken, async (req, res) => {
-    const { userId } = req.body;
+    const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ success: false, error: 'userId is required' });
 
     try {
@@ -75,12 +78,15 @@ function createRouter(deps) {
         'WOLFRAM_APP_ID',
         'TELNYX_API_KEY',
         'OWNER_ID',
+        'OWNER_TOKEN',
       ]);
+      // Any secret-shaped key name (e.g. OPENROUTER_API_KEY, *_TOKEN, *_SECRET) is also skipped
+      const SENSITIVE_KEY_PATTERN = /(^|_)(API_KEY|TOKEN|SECRET|PASSWORD|APP_ID)$/i;
 
       const settings = [];
 
       for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
-        if (SENSITIVE_KEYS.has(key)) continue;
+        if (SENSITIVE_KEYS.has(key) || SENSITIVE_KEY_PATTERN.test(key)) continue;
         const value = config[key];
         const isSet = value !== undefined && value !== '' && value !== schema.default;
         const displayValue = SENSITIVE_KEYS.has(key)
@@ -121,16 +127,14 @@ function createRouter(deps) {
     }
   });
 
-  // GET /run-tests
-  router.get('/run-tests', requireOwnerToken, async (req, res) => {
-    try {
-      const { runDiagnostics } = require('../../utils/diagnostics');
-      const results = await runDiagnostics();
-      res.json({ success: true, results, timestamp: new Date().toISOString() });
-    } catch (error) {
-      logger.error({ error }, 'Error running tests');
-      res.status(500).json({ success: false, error: error.message });
-    }
+  // GET /run-tests — no diagnostics runner exists in this build; report that honestly
+  router.get('/run-tests', requireOwnerToken, (req, res) => {
+    res.status(501).json({
+      success: false,
+      code: 'DIAGNOSTICS_UNAVAILABLE',
+      error: 'Dashboard diagnostics are not available in this build',
+      timestamp: new Date().toISOString(),
+    });
   });
 
   return router;
