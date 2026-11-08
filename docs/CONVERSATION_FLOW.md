@@ -1,5 +1,8 @@
 # Conversation Flow and Function Handling
 
+> **Historical / superseded.** This page includes legacy architecture, persistence and reply-context descriptions; it is not a statement of current or approved chat behavior. See [Conversation behavior](CONVERSATION_BEHAVIOR.md) for the approved draft contract, pending reconciliation with final candidate code and tests. References below to blended/channel-wide conversations, disk loading/saving, reply-chain resolution, or legacy error pipelines must not be treated as active features.
+
+
 This document describes the complete conversation flow and function handling architecture of Chimp-GPT, featuring the modern PocketFlow system alongside legacy conversation management.
 
 ## Architecture Overview

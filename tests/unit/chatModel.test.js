@@ -110,12 +110,17 @@ test('function executor uses the shared model and retains explicit model overrid
 });
 
 test('active conversations use the same model as status reporting', async () => {
-  const conversations = new Map();
-  const response = await SimpleChimpGPTFlow.prototype.handleConversation.call(
-    { options: { maxConversationLength: 4, maxTokens: 20 }, openaiClient: new FakeOpenAI() },
-    { get: key => (key === 'conversations' ? conversations : 'Helpful bot') },
-    { message: { author: { id: 'user' }, content: 'Hello' } }
-  );
+  const flow = new SimpleChimpGPTFlow(new FakeOpenAI(), null, {
+    maxConversationLength: 4,
+    maxTokens: 20,
+    enableKnowledge: false,
+  });
+  const response = await flow.processMessage({
+    author: { id: 'user' },
+    channelId: 'channel',
+    guildId: 'guild',
+    content: 'Hello',
+  });
   assert.equal(response.success, true);
   assert.equal(response.response, 'OK');
   assert.equal(requests[0].model, openaiConfig.getOpenAIModel());
@@ -123,11 +128,11 @@ test('active conversations use the same model as status reporting', async () => 
 });
 
 test('weather and time rephrasing retain their separate output budgets', async () => {
-  const flow = {
-    openaiClient: new FakeOpenAI(),
+  const flow = new SimpleChimpGPTFlow(new FakeOpenAI(), null, {
+    enableKnowledge: false,
     weatherService: { getWeatherResponse: async () => ({ formattedSummary: 'Auckland: 18 C' }) },
     timeLookup: async () => 'Auckland: 3:45 PM NZDT',
-  };
+  });
   const store = { get: () => 'Helpful bot' };
   const weather = await SimpleChimpGPTFlow.prototype.handleWeatherRequest.call(flow, store, {
     message: { content: 'weather in Auckland' },

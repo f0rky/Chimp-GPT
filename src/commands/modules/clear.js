@@ -1,150 +1,56 @@
 const { createLogger } = require('../../core/logger');
+const { SlashCommandBuilder } = require('discord.js');
 const logger = createLogger('commands:clear');
-const {
-  clearConversation,
-  getConversationStorageStatus,
-  loadConversationsFromStorage,
-} = require('../../conversation/conversationManagerSelector');
-const fs = require('fs').promises;
-const path = require('path');
-const { formatBytes } = require('../../utils/formatters');
+const ACTIVE_FLOW = Symbol.for('chimp-gpt.activeConversationFlow');
 
-/**
- * Clear command - Clears the conversation history for the current channel
- * @param {import('discord.js').Message} message - The Discord message object
- * @param {string[]} args - Command arguments (unused)
- * @param {Object} config - Bot configuration
- * @returns {Promise<void>}
- */
+function getScope(source) {
+  return {
+    userId: source.author?.id || source.user?.id,
+    channelId: source.channel?.id || source.channelId,
+    guildId: source.guildId || source.guild?.id || null,
+  };
+}
+
+async function clearFor(source, respond) {
+  const scope = getScope(source);
+  const flow = source.client?.[ACTIVE_FLOW];
+  if (!flow || typeof flow.clearConversation !== 'function') {
+    await respond('❌ No active conversation flow is available; history was not cleared.');
+    return;
+  }
+  if (!scope.userId) {
+    await respond('❌ Could not identify your account; history was not cleared.');
+    return;
+  }
+  try {
+    const cleared = await flow.clearConversation(scope);
+    await respond(
+      cleared
+        ? '✅ Your conversation history was cleared.'
+        : 'ℹ️ No conversation history was found to clear.'
+    );
+  } catch (error) {
+    logger.error({ error, ...scope }, 'Failed to clear active conversation');
+    await respond('❌ Failed to clear conversation history. Please try again.');
+  }
+}
+
 module.exports = {
   name: 'clear',
-  description: 'Clear the conversation history for this channel',
+  description: 'Clear your conversation history in this channel',
   aliases: ['reset'],
   usage: '!clear',
   dmAllowed: true,
   adminOnly: false,
   ownerOnly: false,
-  async execute(message, args, _config) {
-    const userId = message.author.id;
-    const channelId = message.channelId;
-    const username = message.author.username;
-
-    logger.info('Clear command executed', {
-      userId,
-      username,
-      channelId,
-      botReady: message.client.isReady(),
-    });
-
-    try {
-      try {
-        // Get conversation storage status before clearing
-        const storageStatus = getConversationStorageStatus();
-
-        // Get in-memory conversation status from storage status
-        const activeCount = storageStatus.individual?.active || 0;
-        const inMemoryStatus = {
-          hasConversation: activeCount > 0,
-          totalConversations: activeCount,
-          userId,
-          userIdType: typeof userId,
-        };
-
-        // Try to clear the conversation
-        clearConversation(userId);
-        const wasCleared = true; // clearConversation runs successfully if no exception
-
-        // Get storage file info if it exists
-        let fileStats = null;
-        try {
-          const filePath = path.join(__dirname, '../../data/conversations.json');
-          const stats = await fs.stat(filePath);
-          fileStats = {
-            exists: true,
-            size: formatBytes(stats.size),
-            modified: stats.mtime.toISOString(),
-            path: filePath,
-          };
-
-          // Try to read the file to check if the user's conversation exists
-          const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-          fileStats.userInFile = userId in (data.conversations || {});
-          fileStats.totalUsers = data.conversations ? Object.keys(data.conversations).length : 0;
-        } catch (fileError) {
-          fileStats = {
-            exists: false,
-            error: fileError.message,
-          };
-        }
-
-        // Create a detailed status message
-        const statusMessage = [
-          '### Conversation Status',
-          '**In-Memory:**',
-          `- Has conversation: ${inMemoryStatus.hasConversation ? '✅' : '❌'}`,
-          `- Total active conversations: ${inMemoryStatus.totalConversations}`,
-          `- User ID type: ${inMemoryStatus.userIdType}`,
-          '',
-          '**Storage File:**',
-          `- Exists: ${fileStats.exists ? '✅' : '❌'}${fileStats.error ? ` (${fileStats.error})` : ''}`,
-          fileStats.exists ? `- Size: ${fileStats.size}` : '',
-          fileStats.exists ? `- Modified: ${new Date(fileStats.modified).toLocaleString()}` : '',
-          fileStats.exists ? `- User in file: ${fileStats.userInFile ? '✅' : '❌'}` : '',
-          fileStats.exists ? `- Total users in file: ${fileStats.totalUsers}` : '',
-          '',
-          `**Action:** ${wasCleared ? '✅ Cleared conversation' : 'ℹ️ No conversation found to clear'}`,
-          '',
-          'Use `!clear --force` to force reload conversations from disk.',
-        ]
-          .filter(Boolean)
-          .join('\n');
-
-        logger.info('Clear command executed', {
-          userId,
-          username,
-          wasCleared,
-          inMemoryStatus,
-          fileStats,
-          storageStatus,
-        });
-
-        await message.reply(statusMessage);
-
-        // If user used --force flag, reload conversations from disk
-        if (args.includes('--force')) {
-          try {
-            await loadConversationsFromStorage();
-            await message.reply('🔄 Successfully reloaded conversations from disk.');
-          } catch (reloadError) {
-            logger.error({ error: reloadError }, 'Failed to reload conversations');
-            await message.reply('❌ Failed to reload conversations from disk.');
-          }
-        }
-      } catch (error) {
-        logger.error(
-          {
-            error: error.message,
-            stack: error.stack,
-            userId,
-            username,
-            channelId,
-          },
-          'Failed to clear conversation'
-        );
-        await message.reply('❌ Failed to clear conversation history. Please try again.');
-      }
-    } catch (error) {
-      logger.error(
-        {
-          error: error.message,
-          stack: error.stack,
-          userId,
-          username,
-          channelId,
-        },
-        'Failed to clear conversation'
-      );
-      await message.reply('❌ Failed to clear conversation history. Please try again.');
-    }
+  slashCommand: new SlashCommandBuilder()
+    .setName('clear')
+    .setDescription('Clear your conversation history in this channel'),
+  async execute(message) {
+    await clearFor(message, content => message.reply(content));
+  },
+  async interactionExecute(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    await clearFor(interaction, content => interaction.editReply({ content }));
   },
 };

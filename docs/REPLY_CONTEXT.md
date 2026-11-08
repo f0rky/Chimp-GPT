@@ -1,5 +1,8 @@
 # Reply Context Enhancement
 
+> **Historical / superseded.** This page describes an earlier reply-context proposal and does not establish active reply-chain fetching or insertion. The approved Option A contract does not include reply-chain support. See [Conversation behavior](CONVERSATION_BEHAVIOR.md), a draft pending reconciliation with final candidate code and tests. Do not rely on the configuration names or implementation claims below as current behavior.
+
+
 ## Overview
 
 This document describes the reply context enhancement feature implemented in ChimpGPT, which allows the bot to utilize message replies to provide context for ongoing conversations.

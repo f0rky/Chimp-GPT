@@ -37,6 +37,8 @@ class MessageEventHandler {
 
     // Initialize PocketFlow for conversation processing with PFPManager
     this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
+    // Keep reset bound to the active flow instance for this Discord client only.
+    this.client[Symbol.for('chimp-gpt.activeConversationFlow')] = this.pocketFlow;
 
     // Pre-compiled image-request detection patterns (hoisted from handleMessageCreate hot path
     // so the RegExp objects are created once per handler instance, not on every message).
@@ -89,6 +91,10 @@ class MessageEventHandler {
   }
 
   async handleMessageCreate(message) {
+    // Resets must remain available while a channel's conversation request is in flight.
+    const prefixCommand = commandHandler.parseCommand?.(message.content);
+    const isResetCommand = prefixCommand && ['clear', 'reset'].includes(prefixCommand.commandName);
+
     // Check if client is ready before processing
     if (!this.client.isReady()) {
       return;
@@ -101,7 +107,7 @@ class MessageEventHandler {
     }
 
     // Skip if there's already an operation in progress for this channel
-    if (this.inProgressOperations.has(message.channelId)) {
+    if (!isResetCommand && this.inProgressOperations.has(message.channelId)) {
       discordLogger.debug(
         {
           channelId: message.channelId,
@@ -116,6 +122,7 @@ class MessageEventHandler {
 
     // Initialize timer variable
     let messageTimerId = null;
+    let ownsChannelOperation = false;
 
     // Add a debug object to track timing of each step
     const timings = {
@@ -392,6 +399,7 @@ class MessageEventHandler {
 
       // Mark channel as having an operation in progress
       this.inProgressOperations.add(message.channelId);
+      ownsChannelOperation = true;
 
       // Track conversation for status updates
       addTiming('before_status_update');
@@ -820,8 +828,8 @@ class MessageEventHandler {
         });
       }
     } finally {
-      // Always clear the in-progress flag when done
-      this.inProgressOperations.delete(message.channelId);
+      // A reset/early return must not release another request's busy marker.
+      if (ownsChannelOperation) this.inProgressOperations.delete(message.channelId);
 
       // Always stop the timer if it was started and hasn't been stopped yet
       if (messageTimerId) {
