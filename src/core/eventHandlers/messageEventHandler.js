@@ -20,6 +20,8 @@ const {
   saveConversationsToStorage,
 } = require('../../conversation/conversationManagerSelector');
 
+const MAX_QUEUED_TURNS_PER_CHANNEL = 3;
+
 class MessageEventHandler {
   constructor(client, config, dependencies) {
     this.client = client;
@@ -34,6 +36,8 @@ class MessageEventHandler {
 
     // Initialize message relationships map for legacy compatibility
     this.messageRelationships = new Map();
+    // Ordinary messages that arrive while a channel's turn is in flight, in arrival order.
+    this.channelQueues = new Map();
 
     // Initialize PocketFlow for conversation processing with PFPManager
     this.pocketFlow = new SimpleChimpGPTFlow(this.openai, this.pfpManager);
@@ -90,39 +94,41 @@ class MessageEventHandler {
     this.client.on('messageUpdate', this.handleMessageUpdate.bind(this));
   }
 
-  async handleMessageCreate(message) {
+  async handleMessageCreate(message, options = {}) {
     // Resets must remain available while a channel's conversation request is in flight.
     const prefixCommand = commandHandler.parseCommand?.(message.content);
     const isResetCommand = prefixCommand && ['clear', 'reset'].includes(prefixCommand.commandName);
+    // A turn dispatched from the queue inherits the channel marker from the turn before it.
+    let channelOwnership = options.ownership ?? null;
 
     // Check if client is ready before processing
     if (!this.client.isReady()) {
+      this.releaseChannelOwnership(channelOwnership);
       return;
     }
 
     // Additional check for token to prevent REST errors
     if (!this.client.token || !this.client.rest) {
       discordLogger.debug('Client token or REST not ready, skipping message');
+      this.releaseChannelOwnership(channelOwnership);
       return;
     }
 
-    // Skip if there's already an operation in progress for this channel
-    if (!isResetCommand && this.inProgressOperations.has(message.channelId)) {
-      discordLogger.debug(
-        {
-          channelId: message.channelId,
-          messageId: message.id,
-          messagePreview: message.content.substring(0, 50),
-          userId: message.author.id,
-        },
-        'Skipping message - operation already in progress for this channel'
-      );
+    // A reset only discards this person's queued turns; those turns were sent before the reset.
+    if (isResetCommand) this.discardQueuedTurns(message.channelId, message.author?.id);
+
+    const channelBusy = this.inProgressOperations.has(message.channelId);
+    if (!channelOwnership && channelBusy && !isResetCommand) {
+      // Keep ordinary messages in a bounded FIFO instead of silently dropping them.
+      await this.enqueueBusyChannelMessage(message);
       return;
+    }
+    if (!channelOwnership && !channelBusy) {
+      channelOwnership = this.claimChannelOperation(message.channelId);
     }
 
     // Initialize timer variable
     let messageTimerId = null;
-    let ownsChannelOperation = false;
 
     // Add a debug object to track timing of each step
     const timings = {
@@ -396,10 +402,6 @@ class MessageEventHandler {
       // Await the feedback message if we haven't already
       const feedbackMessage = await feedbackPromise;
       addTiming('feedback_message_confirmed');
-
-      // Mark channel as having an operation in progress
-      this.inProgressOperations.add(message.channelId);
-      ownsChannelOperation = true;
 
       // Track conversation for status updates
       addTiming('before_status_update');
@@ -829,7 +831,7 @@ class MessageEventHandler {
       }
     } finally {
       // A reset/early return must not release another request's busy marker.
-      if (ownsChannelOperation) this.inProgressOperations.delete(message.channelId);
+      this.releaseChannelOwnership(channelOwnership);
 
       // Always stop the timer if it was started and hasn't been stopped yet
       if (messageTimerId) {
@@ -850,6 +852,90 @@ class MessageEventHandler {
           totalDuration: finalTiming,
         });
       }
+    }
+  }
+
+  claimChannelOperation(channelId) {
+    this.inProgressOperations.add(channelId);
+    return { channelId, released: false };
+  }
+
+  /**
+   * Releases a channel marker once. If turns are queued, the marker passes directly to the
+   * oldest one, so messages that arrive later cannot overtake the queue.
+   */
+  releaseChannelOwnership(ownership) {
+    if (!ownership || ownership.released) return;
+    ownership.released = true;
+    const { channelId } = ownership;
+    const queue = this.channelQueues.get(channelId);
+    const next = queue?.shift();
+    if (queue && queue.length === 0) this.channelQueues.delete(channelId);
+    if (!next) {
+      this.inProgressOperations.delete(channelId);
+      return;
+    }
+    const inherited = { channelId, released: false };
+    this.handleMessageCreate(next.message, { ownership: inherited }).catch(error => {
+      discordLogger.error({ error: error?.message, channelId }, 'Queued channel turn failed');
+      this.releaseChannelOwnership(inherited);
+    });
+  }
+
+  isBusyQueueEligible(message) {
+    return (
+      !message.author?.bot &&
+      !message.channel?.isDMBased?.() &&
+      this.allowedChannelIDs.includes(message.channelId) &&
+      !String(message.content ?? '').startsWith(this.config.IGNORE_MESSAGE_PREFIX)
+    );
+  }
+
+  async enqueueBusyChannelMessage(message) {
+    const { channelId } = message;
+    if (!this.isBusyQueueEligible(message)) {
+      discordLogger.debug({ channelId }, 'Skipping message - not eligible for the busy queue');
+      return;
+    }
+    const queue = this.channelQueues.get(channelId) ?? [];
+    if (queue.length >= MAX_QUEUED_TURNS_PER_CHANNEL) {
+      discordLogger.info(
+        { channelId, userId: message.author?.id, queued: queue.length },
+        'Busy-channel queue is full; message not queued'
+      );
+      await this.safeMessageAction(
+        () =>
+          message.reply(
+            `⏳ ${MAX_QUEUED_TURNS_PER_CHANNEL} messages are already waiting in this channel. ` +
+              'Yours was not queued; please send it again once the current replies finish.'
+          ),
+        'queue overflow reply'
+      );
+      return;
+    }
+    queue.push({ message, userId: message.author?.id });
+    this.channelQueues.set(channelId, queue);
+    await this.safeMessageAction(() => message.react('⏳'), 'queued reaction');
+  }
+
+  discardQueuedTurns(channelId, userId) {
+    const queue = this.channelQueues.get(channelId);
+    if (!queue || !userId) return;
+    const kept = queue.filter(entry => entry.userId !== userId);
+    if (kept.length === queue.length) return;
+    if (kept.length) this.channelQueues.set(channelId, kept);
+    else this.channelQueues.delete(channelId);
+    discordLogger.info(
+      { channelId, userId, removed: queue.length - kept.length },
+      'Discarded queued channel turns after reset'
+    );
+  }
+
+  async safeMessageAction(action, label) {
+    try {
+      await action();
+    } catch (error) {
+      discordLogger.warn({ error: error?.message }, `Failed to send ${label}`);
     }
   }
 
