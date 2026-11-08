@@ -18,13 +18,15 @@ Only completed successful user/assistant pairs are saved. Failed requests do not
 
 Specialist responses are retained as bounded text excerpts, not full external payload objects. Images retain only a short prompt-based outcome summary: generated image buffers, attachment metadata, and image result URLs are not replayed as context. Saved history must never automatically repeat or retry a billable operation. It does not imply pixel-level understanding of a previous image.
 
-Processing and reset operations are ordered per personal scope inside the flow. The existing Discord handler can still skip ordinary messages while its channel is busy; this minimal repair does not introduce a channel-wide message queue. Wait for Solvis to finish before sending the next test message.
+Processing and reset operations are ordered per personal scope inside the flow. While a channel has a turn in flight, an ordinary message is **queued in arrival order** instead of being dropped. The queue is per channel, holds at most **3 waiting messages**, and is never shared with a DM. A queued message gets a ⏳ reaction; when the queue is full the sender gets a reply saying the message was not queued. Each queued message is dispatched once, in order, and re-runs the malicious-user, rate-limit and owner checks at dispatch time. A failed turn releases the channel and the queue continues. Bot, DM and ignore-prefix messages are not queued. The queue is in memory only and is not persisted across restarts.
+
+This is not shared multi-person memory: queued messages are answered with the same per-person scope as before. Queueing does not fetch reply chains or retain transcripts beyond the existing bounded history.
 
 ## Reset
 
 `!clear` and its `!reset` alias clear only **your history in the current channel/thread**, in the active chat flow. They do not clear another person's history or your other channels. The command distinguishes a removed transcript, no existing transcript, and a reset failure.
 
-If a request is already being processed in your scope, reset waits behind it and then clears it. Later admitted requests start after that reset. The legacy `--force` argument does not reload files or expand the reset scope.
+If a request is already being processed in your scope, reset waits behind it and then clears it. Later admitted requests start after that reset. Any of your own messages still waiting in the channel queue when you run `!clear` are discarded rather than answered after the reset; other people's queued messages are kept. The legacy `--force` argument does not reload files or expand the reset scope.
 
 The `/clear` interaction adapter uses the same operation and acknowledges before waiting. It becomes visible only after the project's slash-command registration has been refreshed for the intended bot; do not assume that deploying source alone registers it. Use `!clear` for the initial Solvis test unless `/clear` is already available.
 

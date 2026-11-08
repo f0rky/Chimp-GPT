@@ -1,80 +1,8 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const Module = require('node:module');
-const simpleFlowStub = require('../helpers/simpleFlowStubs');
-const originalLoad = Module._load;
-const savedEnv = { ...process.env };
-process.env.NODE_ENV = 'test';
-Module._load = function (request, parent, isMain) {
-  const stub = simpleFlowStub(request, parent);
-  if (stub !== undefined) return stub;
-  if (request === './KnowledgeFlow' && parent?.filename.includes('SimpleChimpGPTFlow'))
-    return class KnowledgeFlow {
-      processKnowledgeRequest(message) {
-        this.recorded = message.content;
-        return Promise.resolve({ success: true, response: 'Knowledge answer' });
-      }
-    };
-  if (request === '../../core/logger' && parent?.filename.includes('commands/modules/clear'))
-    return { createLogger: () => new Proxy({}, { get: () => () => {} }) };
-  if (request === 'discord.js')
-    return {
-      SlashCommandBuilder: class {
-        setName() {
-          return this;
-        }
-        setDescription() {
-          return this;
-        }
-      },
-      EmbedBuilder: class {},
-      ActionRowBuilder: class {},
-      ButtonBuilder: class {},
-      ButtonStyle: {},
-    };
-  if (parent?.filename.includes('messageEventHandler')) {
-    const stubs = {
-      '../logger': { discord: new Proxy({}, { get: () => () => {} }) },
-      '../../middleware/performanceMonitor': { startTimer: () => null, stopTimer: () => {} },
-      '../../middleware/rateLimiter': { checkUserRateLimit: async () => ({ limited: false }) },
-      '../../utils/maliciousUserManager': {
-        DETECTION_CONFIG: { ENHANCED_MESSAGE_MANAGEMENT: false },
-        isUserBlocked: () => false,
-      },
-      '../../utils/enhancedMessageManager': {
-        enhancedMessageManager: { cleanupOldRelationships() {} },
-      },
-      '../../utils/contextExtractionService': { contextExtractionService: {} },
-      '../healthCheck': {
-        trackMessage() {},
-        trackRateLimit() {},
-        isStatsCommand: () => false,
-        handleStatsCommand() {},
-      },
-      '../../utils/versionSelfQuery': { processVersionQuery: () => null },
-      '../../commands/commandHandler': {
-        parseCommand: text => (text === '!clear' ? { commandName: 'clear' } : null),
-        handleCommand: async message => {
-          if (message.content === '!clear')
-            await require('../../commands/modules/clear').execute(message);
-          return true;
-        },
-      },
-      '../../plugins/pluginManager': {},
-      '../../conversation/conversationManagerSelector': {
-        updateMessageById() {},
-        saveConversationsToStorage() {},
-      },
-    };
-    if (stubs[request]) return stubs[request];
-  }
-  return originalLoad.call(this, request, parent, isMain);
-};
-const SimpleChimpGPTFlow = require('../../src/conversation/flow/SimpleChimpGPTFlow');
-const MessageEventHandler = require('../../src/core/eventHandlers/messageEventHandler');
-Module._load = originalLoad;
-process.env = savedEnv;
+const { loadHandlerModules } = require('../helpers/messageEventHandlerLoader');
+const { SimpleChimpGPTFlow, MessageEventHandler } = loadHandlerModules();
 const message = (content, id = content) => ({
   id,
   content,
