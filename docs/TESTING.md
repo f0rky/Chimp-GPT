@@ -1,4 +1,22 @@
-# Testing Strategy and Guidelines
+## Current command map (package.json)
+
+- `npm test`: `tests/unit/testRunner.js` followed by `npm run test:regression`.
+- `npm run test:regression`: `tests/regressionRunner.js`.
+- `npm run test:comprehensive`: `tests/comprehensiveTestRunner.js`.
+- `npm run lint`: ESLint.
+- `npm run format:check`: Prettier check.
+
+Test files existing in the tree are not necessarily discovered by each runner. Inspect the configured file list/glob before treating a result as coverage. Do not run provider-facing tests without checking whether they make live calls; prefer offline fixtures/stubs for chat contract checks.
+
+Conversation behavior is specified as a draft implementation contract in [CONVERSATION_BEHAVIOR.md](CONVERSATION_BEHAVIOR.md); parent integration review must verify coverage against the final active route, scope, bounded specialist summaries, reset, restart loss, and ignored natural-language DMs.
+
+---
+
+## Historical test-strategy notes
+
+The earlier test strategy below contains aspirational coverage, suite descriptions, and thresholds that are not guaranteed by the current default runners. Treat it as historical guidance, not evidence that a suite runs or that a behavior is covered.
+
+
 
 This document outlines the comprehensive testing strategy for the Chimp-GPT Discord Bot, including test organization, execution instructions, and coverage requirements.
 

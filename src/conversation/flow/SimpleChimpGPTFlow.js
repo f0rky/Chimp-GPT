@@ -73,6 +73,7 @@ class SimpleChimpGPTFlow {
   constructor(openaiClient, pfpManager, options = {}) {
     this.openaiClient = openaiClient;
     this.pfpManager = pfpManager;
+    this.scopeQueues = new Map();
     this.options = {
       maxConversationLength: 10,
       maxTokens: 2000,
@@ -473,7 +474,20 @@ class SimpleChimpGPTFlow {
       logger.info(`Processing knowledge request: ${message.content.substring(0, 50)}...`);
 
       // Use the multi-agent KnowledgeFlow to process the request
-      const knowledgeResult = await this.knowledgeFlow.processKnowledgeRequest(message);
+      // Inherit the original Message so non-enumerable client state and channel
+      // getters remain valid; override only content without mutating Discord's object.
+      const knowledgeMessage = Object.create(message, {
+        content: {
+          value: this.getConversationMessages(message)
+            .map(x => `${x.role}: ${x.content}`)
+            .concat(`user: ${message.content}`)
+            .join('\n'),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        },
+      });
+      const knowledgeResult = await this.knowledgeFlow.processKnowledgeRequest(knowledgeMessage);
 
       logger.debug(`[KNOWLEDGE_RESULT_DEBUG] KnowledgeFlow returned:`, {
         success: knowledgeResult.success,
@@ -574,7 +588,10 @@ class SimpleChimpGPTFlow {
       if (weatherData && weatherData.formattedSummary) {
         // Create a conversation context with the weather data for the bot to respond with personality
         const botPersonality = store.get('botPersonality');
-        const weatherContext = `The user asked: "${message.content}"\n\nWeather data: ${weatherData.formattedSummary}\n\nRespond naturally with your personality while providing this weather information.`;
+        const priorContext = this.getConversationMessages(message)
+          .map(x => `${x.role}: ${x.content}`)
+          .join('\n');
+        const weatherContext = `${priorContext}\nuser: "${message.content}"\n\nWeather data: ${weatherData.formattedSummary}\n\nRespond naturally with your personality while providing this weather information.`;
 
         try {
           // Generate response with bot personality and current date/time context
@@ -709,7 +726,10 @@ class SimpleChimpGPTFlow {
 
       // Format response with bot personality
       const botPersonality = store.get('botPersonality');
-      const timeContext = `The user asked: "${message.content}"\n\nTime information: ${timeData}\n\nRespond naturally with your personality while providing this time information.`;
+      const priorContext = this.getConversationMessages(message)
+        .map(x => `${x.role}: ${x.content}`)
+        .join('\n');
+      const timeContext = `${priorContext}\nuser: "${message.content}"\n\nTime information: ${timeData}\n\nRespond naturally with your personality while providing this time information.`;
 
       try {
         // Generate response with bot personality and current date/time context
@@ -822,21 +842,11 @@ class SimpleChimpGPTFlow {
         return { success: false, error: 'No user ID provided' };
       }
 
-      // Get or create conversation history
-      const conversations = store.get('conversations');
-      const conversation = conversations.get(userId) || { messages: [] };
-
-      // Add user message to conversation
-      conversation.messages.push({
-        role: 'user',
-        content: message.content,
-        timestamp: Date.now(),
-      });
-
-      // Keep conversation length manageable
-      if (conversation.messages.length > this.options.maxConversationLength) {
-        conversation.messages = conversation.messages.slice(-this.options.maxConversationLength);
-      }
+      const history = this.getConversationMessages(message);
+      const openHistory = [
+        ...history,
+        { role: 'user', content: message.content, timestamp: Date.now() },
+      ];
 
       // Build OpenAI conversation with personality and current date/time context
       const botPersonality = store.get('botPersonality');
@@ -847,7 +857,7 @@ class SimpleChimpGPTFlow {
           role: 'system',
           content: systemPrompt,
         },
-        ...conversation.messages,
+        ...openHistory,
       ];
 
       logger.debug(
@@ -890,11 +900,6 @@ class SimpleChimpGPTFlow {
           ).substring(0, 50)}...`
         );
 
-        // Drop the user turn we optimistically appended above. handleImageGeneration
-        // records its own outcome, and leaving an unanswered user message here would
-        // desync the transcript on the next turn.
-        conversation.messages.pop();
-
         return await this.handleImageGeneration(store, data, toolPrompt);
       }
 
@@ -904,23 +909,13 @@ class SimpleChimpGPTFlow {
         choice.message?.content ||
         "I wasn't able to put together a response for that. Could you rephrase?";
 
-      // Add bot response to conversation history
-      conversation.messages.push({
-        role: 'assistant',
-        content: response,
-        timestamp: Date.now(),
-      });
-
-      // Save updated conversation
-      conversations.set(userId, conversation);
-
       logger.info(`Generated response for user ${userId}: ${response.substring(0, 50)}...`);
 
       return {
         success: true,
         response: response,
         type: 'conversation',
-        conversationLength: conversation.messages.length,
+        conversationLength: history.length + 2,
       };
     } catch (error) {
       logger.error(
@@ -963,46 +958,74 @@ class SimpleChimpGPTFlow {
   }
 
   async processMessage(discordMessage) {
-    const startTime = Date.now();
-
-    try {
-      logger.info(`Starting SimpleChimpGPTFlow processing for message ${discordMessage.id}`, {
-        userId: discordMessage.author?.id,
-        content: discordMessage.content.substring(0, 50) + '...',
-        messageId: discordMessage.id,
-        architecture: 'simplified_single_node',
-      });
-
+    const key = this.getScopeKey(discordMessage);
+    if (!key) return { success: false, error: 'Missing conversation scope identifiers' };
+    return this.enqueueScope(key, async () => {
       const result = await this.flow.run({ message: discordMessage });
-
-      const duration = Date.now() - startTime;
-
-      logger.info(`Flow completed for message ${discordMessage.id}:`, {
-        success: result.success,
-        hasResponse: !!result.response,
-        type: result.type,
-        duration: duration + 'ms',
-        responsePreview: result.response
-          ? result.response.substring(0, 100) + '...'
-          : 'no response',
-      });
-
+      if (result?.success) {
+        const conversations = this.store.get('conversations');
+        const previous = conversations.get(key)?.messages || [];
+        const assistant =
+          result.type === 'image'
+            ? `Generated image: ${(result.originalPrompt || discordMessage.content || '')
+                .replace(/https?:\/\/\S+|data:\S+/gi, '[image reference omitted]')
+                .slice(0, 160)}`
+            : result.response;
+        if (typeof assistant === 'string' && assistant)
+          conversations.set(key, {
+            messages: this.trimCompleteTurns([
+              ...previous,
+              {
+                role: 'user',
+                content: (discordMessage.content || '').slice(0, 4000),
+                timestamp: Date.now(),
+              },
+              { role: 'assistant', content: assistant.slice(0, 4000), timestamp: Date.now() },
+            ]),
+          });
+      }
       return result;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.error('Error in SimpleChimpGPTFlow:', {
-        error: error.message,
-        stack: error.stack,
-        messageId: discordMessage.id,
-        duration: duration + 'ms',
-      });
+    });
+  }
 
-      return {
-        success: false,
-        error: error.message,
-        response: 'I encountered an error while processing your message.',
-      };
-    }
+  enqueueScope(key, operation) {
+    const previous = this.scopeQueues.get(key) || Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    this.scopeQueues.set(key, current);
+    return current.finally(() => {
+      if (this.scopeQueues.get(key) === current) this.scopeQueues.delete(key);
+    });
+  }
+
+  trimCompleteTurns(messages) {
+    const max = Math.max(2, Math.floor(Number(this.options.maxConversationLength) / 2) * 2);
+    const complete = [];
+    for (let i = 0; i + 1 < messages.length; i += 2)
+      if (messages[i].role === 'user' && messages[i + 1].role === 'assistant')
+        complete.push(messages[i], messages[i + 1]);
+    return complete.slice(-max);
+  }
+
+  getScopeKey(message) {
+    const guildId = message?.guildId || message?.guild?.id;
+    const channelId = message?.channel?.id || message?.channelId;
+    const userId = message?.author?.id;
+    if (!channelId || !userId) return null;
+    return JSON.stringify([guildId || 'dm', channelId, userId]);
+  }
+
+  getConversationMessages(message) {
+    const key = this.getScopeKey(message);
+    const records = key ? this.store.get('conversations').get(key)?.messages || [] : [];
+    return records.map(record => ({ ...record }));
+  }
+
+  async clearConversation(scope = {}) {
+    const { userId, channelId, guildId, threadId } = scope || {};
+    const channel = threadId || channelId;
+    if (!userId || !channel) return false;
+    const key = JSON.stringify([guildId || 'dm', channel, userId]);
+    return this.enqueueScope(key, async () => this.store.get('conversations').delete(key));
   }
 
   // Get conversation stats for monitoring
