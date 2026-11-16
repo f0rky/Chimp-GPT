@@ -223,6 +223,19 @@ class FunctionExecutorNode extends BaseConversationNode {
         const toolCall = completion.choices[0].message.tool_calls[0];
         const functionResult = await this.executeFunctionCall(toolCall, store, message);
 
+        if (toolCall.function.name === 'quakeLookup') {
+          const quakeResult = functionResult.result || functionResult;
+          return {
+            success: functionResult.success && quakeResult.success,
+            type: 'quake',
+            functionName: toolCall.function.name,
+            functionResult,
+            quakeRequest: JSON.parse(toolCall.function.arguments),
+            response: quakeResult.formatted,
+            executionTime: Date.now() - startTime,
+          };
+        }
+
         const naturalResponse = await this.generateNaturalResponse(
           context,
           toolCall,

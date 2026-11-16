@@ -37,7 +37,7 @@ function validateServerInput(input) {
   const maliciousPatterns = [
     /[<>]/g, // HTML tags
     /javascript:/i, // JavaScript protocol
-    /(\s|;|&|`|\|)/g, // Command injection characters
+    /(;|&|`|\|)/g, // Command injection characters
     /%[0-9A-F]{2}/g, // URL encoding
     /\\x[0-9A-F]{2}/g, // Hex encoding
   ];

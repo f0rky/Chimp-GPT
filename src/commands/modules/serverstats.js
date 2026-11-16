@@ -10,16 +10,45 @@
  * @version 1.0.0
  */
 
-const lookupQuakeServer = require('../../services/quakeLookup');
 const { createLogger } = require('../../core/logger');
 const { trackApiCall } = require('../../core/healthCheck');
+const { validateServerInput, validateEloMode } = require('../../utils/inputValidator');
+const { limitQuakeContent } = require('../../utils/quakeContentLimit');
 const {
-  validateServerInput,
-  validateEloMode,
-  sanitizeDiscordMessage,
-} = require('../../utils/inputValidator');
+  scheduleMessageDeletion,
+  scheduleQuakeResultLifecycle,
+} = require('../../utils/temporaryMessage');
 const logger = createLogger('commands:serverstats');
 const { SlashCommandBuilder } = require('discord.js');
+
+function lookupQuakeServer(...args) {
+  return require('../../services/quakeLookup')(...args);
+}
+
+function scheduleQuakeLifecycle(resultMessage, serverFilter, eloMode, options) {
+  if (options.scheduleDeletion) return options.scheduleDeletion(resultMessage);
+
+  return (options.scheduleLifecycle || scheduleQuakeResultLifecycle)(
+    resultMessage,
+    async message => {
+      (options.trackApiCall || trackApiCall)('quake');
+      const refreshedStats = await (options.lookup || lookupQuakeServer)(serverFilter, eloMode, {
+        forceRefresh: true,
+      });
+      await message.edit(limitQuakeContent(refreshedStats));
+    }
+  );
+}
+
+function parseTextArguments(args) {
+  if (args.length === 0) return { serverFilter: null, eloMode: null };
+  const possibleElo = args.length > 1 ? validateEloMode(args.at(-1)) : { isValid: false };
+  const serverParts = possibleElo.isValid ? args.slice(0, -1) : args;
+  return {
+    serverFilter: serverParts.join(' ') || null,
+    eloMode: possibleElo.isValid ? possibleElo.value : null,
+  };
+}
 
 module.exports = {
   name: 'serverstats',
@@ -54,7 +83,7 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async execute(message, args) {
+  async execute(message, args, options = {}) {
     logger.info(
       {
         userId: message.author.id,
@@ -64,45 +93,42 @@ module.exports = {
       'Server stats command used'
     );
 
+    let resultMessage;
     try {
-      // Send initial feedback
-      const feedbackMessage = await message.reply('🎯 Checking server stats...');
+      resultMessage = await message.reply('🔍 Checking server stats...');
 
       // Validate server argument
-      const serverArg = args.length > 0 ? args[0] : null;
+      const parsed = parseTextArguments(args);
+      const serverArg = parsed.serverFilter;
       const validatedServer = validateServerInput(serverArg);
 
       if (serverArg && !validatedServer.isValid) {
-        await feedbackMessage.edit(
-          '⚠️ Invalid server name or IP address provided. Please try again with a valid input.'
-        );
+        await resultMessage.edit('⚠️ Invalid server name or IP address provided.');
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
         return;
       }
 
       // Validate ELO mode argument
-      let eloMode = null;
-      if (args.length > 1) {
-        const validatedEloMode = validateEloMode(args[1]);
-        if (!validatedEloMode.isValid) {
-          await feedbackMessage.edit(
-            '⚠️ Invalid ELO mode. Please use 0 (off), 1 (categories), or 2 (values).'
-          );
-          return;
-        }
-        eloMode = validatedEloMode.value;
-      }
+      const eloMode = parsed.eloMode;
 
-      // Track API call in health check system
-      trackApiCall('quake');
-
-      // Get server stats with optional server filter and ELO mode
-      const serverStats = await lookupQuakeServer(validatedServer.value, eloMode);
-
-      // Send the sanitized server stats to the channel
-      await feedbackMessage.edit(sanitizeDiscordMessage(serverStats));
+      (options.trackApiCall || trackApiCall)('quake');
+      const serverStats = await (options.lookup || lookupQuakeServer)(
+        validatedServer.value,
+        eloMode
+      );
+      await resultMessage.edit(limitQuakeContent(serverStats));
+      scheduleQuakeLifecycle(resultMessage, validatedServer.value, eloMode, options);
     } catch (error) {
       logger.error({ error }, 'Error executing server stats command');
-      await message.reply('An error occurred while retrieving server statistics.');
+      if (resultMessage) {
+        await resultMessage.edit('An error occurred while retrieving server statistics.');
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
+      } else {
+        const errorMessage = await message.reply(
+          'An error occurred while retrieving server statistics.'
+        );
+        (options.scheduleDeletion || scheduleMessageDeletion)(errorMessage);
+      }
     }
   },
 
@@ -113,8 +139,8 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async executeSlash(interaction) {
-    return this.interactionExecute(interaction);
+  async executeSlash(interaction, options) {
+    return this.interactionExecute(interaction, options);
   },
 
   /**
@@ -124,7 +150,7 @@ module.exports = {
    * @param {Object} config - Bot configuration
    * @returns {Promise<void>}
    */
-  async interactionExecute(interaction) {
+  async interactionExecute(interaction, options = {}) {
     logger.info(
       {
         userId: interaction.user.id,
@@ -138,7 +164,6 @@ module.exports = {
     );
 
     try {
-      // Defer reply to show the bot is processing
       await interaction.deferReply();
 
       // Get and validate options from the interaction
@@ -146,9 +171,10 @@ module.exports = {
       const validatedServer = validateServerInput(serverArg);
 
       if (serverArg && !validatedServer.isValid) {
-        await interaction.editReply(
+        const resultMessage = await interaction.editReply(
           '⚠️ Invalid server name or IP address provided. Please try again with a valid input.'
         );
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
         return;
       }
 
@@ -157,31 +183,38 @@ module.exports = {
       const validatedEloMode = validateEloMode(eloModeArg);
 
       if (eloModeArg !== null && !validatedEloMode.isValid) {
-        await interaction.editReply(
+        const resultMessage = await interaction.editReply(
           '⚠️ Invalid ELO mode. Please use 0 (off), 1 (categories), or 2 (values).'
         );
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
         return;
       }
 
-      // Track API call in health check system
-      trackApiCall('quake');
-
-      // Get server stats with optional server filter and ELO mode
-      const serverStats = await lookupQuakeServer(validatedServer.value, validatedEloMode.value);
-
-      // Send the sanitized server stats as a reply
-      await interaction.editReply(sanitizeDiscordMessage(serverStats));
+      (options.trackApiCall || trackApiCall)('quake');
+      const serverStats = await (options.lookup || lookupQuakeServer)(
+        validatedServer.value,
+        validatedEloMode.value
+      );
+      const resultMessage = await interaction.editReply(limitQuakeContent(serverStats));
+      scheduleQuakeLifecycle(resultMessage, validatedServer.value, validatedEloMode.value, options);
     } catch (error) {
       logger.error({ error }, 'Error executing server stats slash command');
 
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: 'An error occurred while retrieving server statistics.',
-          ephemeral: true,
         });
+        const resultMessage =
+          typeof interaction.fetchReply === 'function' ? await interaction.fetchReply() : null;
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
       } else {
-        await interaction.editReply('An error occurred while retrieving server statistics.');
+        const resultMessage = await interaction.editReply(
+          'An error occurred while retrieving server statistics.'
+        );
+        (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
       }
     }
   },
 };
+
+module.exports.parseTextArguments = parseTextArguments;

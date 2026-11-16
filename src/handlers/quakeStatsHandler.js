@@ -1,5 +1,13 @@
 const { logger, discord: discordLogger } = require('../core/logger');
-const lookupQuakeServer = require('../services/quakeLookup');
+const { limitQuakeContent } = require('../utils/quakeContentLimit');
+const {
+  scheduleMessageDeletion,
+  scheduleQuakeResultLifecycle,
+} = require('../utils/temporaryMessage');
+
+function lookupQuakeServer(...args) {
+  return require('../services/quakeLookup')(...args);
+}
 
 /**
  * Handles requests for Quake server statistics
@@ -12,16 +20,17 @@ const lookupQuakeServer = require('../services/quakeLookup');
  * @param {Object} statusManager - Status manager instance for tracking
  * @returns {Promise<boolean>} True if successful, false if an error occurred
  */
-async function handleQuakeStats(feedbackMessage, loadingEmoji, statusManager) {
+async function handleQuakeStats(feedbackMessage, loadingEmoji, statusManager, options = {}) {
   try {
     await feedbackMessage.edit(`${loadingEmoji} Checking server stats...`);
 
     // Get server stats - lookupQuakeServer now returns a formatted string
-    const serverStats = await lookupQuakeServer();
+    const serverStats = await (options.lookup || lookupQuakeServer)(
+      options.serverFilter ?? null,
+      options.eloMode ?? null
+    );
 
-    // The AI processing in quakeLookup.js should ensure we're under the Discord character limit
-    // but we'll still truncate if needed as a safety measure
-    const finalMessage = serverStats.slice(0, 1997) + (serverStats.length > 1997 ? '...' : '');
+    const finalMessage = limitQuakeContent(serverStats);
 
     // Log Discord message content if debug logging enabled
     if (process.env.ENABLE_DISCORD_MESSAGE_LOGGING === 'true') {
@@ -36,7 +45,21 @@ async function handleQuakeStats(feedbackMessage, loadingEmoji, statusManager) {
       );
     }
 
-    await feedbackMessage.edit(finalMessage);
+    const editedMessage = await feedbackMessage.edit(finalMessage);
+    const resultMessage =
+      editedMessage && typeof editedMessage.delete === 'function' ? editedMessage : feedbackMessage;
+    if (options.scheduleDeletion) {
+      options.scheduleDeletion(resultMessage);
+    } else {
+      (options.scheduleLifecycle || scheduleQuakeResultLifecycle)(resultMessage, async message => {
+        const refreshedStats = await (options.lookup || lookupQuakeServer)(
+          options.serverFilter ?? null,
+          options.eloMode ?? null,
+          { forceRefresh: true }
+        );
+        await message.edit(limitQuakeContent(refreshedStats));
+      });
+    }
 
     // Count active servers for status update
     // Extract server count from response (improved parsing)
@@ -73,9 +96,12 @@ async function handleQuakeStats(feedbackMessage, loadingEmoji, statusManager) {
     return true;
   } catch (error) {
     discordLogger.error({ error }, 'Error in handleQuakeStats');
-    await feedbackMessage.edit(
+    const editedMessage = await feedbackMessage.edit(
       '# 🎯 Quake Live Server Status\n\n> ⚠️ An error occurred while retrieving server information.'
     );
+    const resultMessage =
+      editedMessage && typeof editedMessage.delete === 'function' ? editedMessage : feedbackMessage;
+    (options.scheduleDeletion || scheduleMessageDeletion)(resultMessage);
     return false;
   }
 }
