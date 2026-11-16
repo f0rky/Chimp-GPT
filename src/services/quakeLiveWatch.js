@@ -321,7 +321,10 @@ const manager = createWatchManager();
 // The existing application signal handlers own process exit and transport teardown.
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'beforeExit'])
   process.prependOnceListener(signal, () => {
-    manager.shutdown();
+    // Invalidation starts synchronously; application signal handlers own process exit.
+    manager.shutdown().catch(() => {
+      console.error('Quake watch shutdown did not complete.');
+    });
   });
 module.exports = {
   ...manager,

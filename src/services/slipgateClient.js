@@ -1,5 +1,6 @@
 'use strict';
 const axios = require('axios');
+const { randomUUID } = require('node:crypto');
 const BASE = 'https://slipgate.gg/api/v1';
 const validAddress = value =>
   typeof value === 'string' &&
@@ -149,7 +150,9 @@ function createSlipgateClient({
       !body ||
       typeof body !== 'object' ||
       Array.isArray(body) ||
-      Object.keys(body).sort().join(',') !== 'game_type,rating_set,steam_ids' ||
+      Object.keys(body)
+        .sort((a, b) => a.localeCompare(b))
+        .join(',') !== 'game_type,rating_set,steam_ids' ||
       body.game_type !== 'ca' ||
       !['A', 'B'].includes(body.rating_set) ||
       !Array.isArray(body.steam_ids) ||
@@ -159,7 +162,7 @@ function createSlipgateClient({
     )
       throw new TypeError('Invalid Slipgate ratings body');
     return {
-      steam_ids: [...new Set(body.steam_ids)].sort(),
+      steam_ids: [...new Set(body.steam_ids)].sort((a, b) => a.localeCompare(b)),
       game_type: body.game_type,
       rating_set: body.rating_set,
     };
@@ -450,7 +453,7 @@ function createSlipgateClient({
         guid: null,
         phase: null,
         map: snapshot.map,
-        token: `session-${now()}-${Math.random()}`,
+        token: `session-${now()}-${randomUUID()}`,
       };
     if (
       !snapshot.stale &&
@@ -478,7 +481,7 @@ function createSlipgateClient({
         guid: null,
         phase: null,
         map: snapshot.map,
-        token: `session-${now()}-${Math.random()}`,
+        token: `session-${now()}-${randomUUID()}`,
       };
     }
     if (!snapshot.stale && phase !== 'unknown' && !snapshot.quality?.a2sOnly) {
