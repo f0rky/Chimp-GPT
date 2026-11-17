@@ -13,6 +13,7 @@ const KnowledgeFlow = require('./KnowledgeFlow');
 const { CHAT_MODEL, buildChatRequest } = require('../../services/chatModel');
 const { buildSystemPrompt } = require('../../utils/systemPromptBuilder');
 const { withWeatherAttribution } = require('../../services/weatherClient');
+const { limitQuakeContent } = require('../../utils/quakeContentLimit');
 
 // Hoist service requires out of hot-path functions so Node's module cache is
 // hit on first use and subsequent calls skip the require() lookup entirely.
@@ -806,13 +807,9 @@ class SimpleChimpGPTFlow {
     }
   }
 
-  async handleQuakeStats(_store, data) {
+  async handleQuakeStats(_store, _data) {
     try {
-      const { message: _message } = data;
-
       logger.info('Processing quake stats request');
-
-      // Use the underlying quake lookup service directly
       const lookupQuakeServer = this.quakeLookup || getQuakeLookup();
 
       // Get default server stats (no specific server specified)
@@ -820,7 +817,7 @@ class SimpleChimpGPTFlow {
 
       return {
         success: true,
-        response: serverData || 'No server stats available at the moment.',
+        response: limitQuakeContent(serverData || 'No server stats available at the moment.'),
         type: 'quake',
       };
     } catch (error) {
@@ -829,6 +826,7 @@ class SimpleChimpGPTFlow {
         success: false,
         error: error.message,
         response: "I'm having trouble fetching server stats right now. Please try again.",
+        type: 'quake',
       };
     }
   }

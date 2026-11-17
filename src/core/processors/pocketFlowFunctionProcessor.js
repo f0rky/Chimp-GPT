@@ -220,11 +220,14 @@ class PocketFlowFunctionProcessor {
    * Handle quake server stats lookup
    * Note: This needs to be adapted since the original expects Discord message objects
    */
-  async handleQuakeLookup(_args, _message) {
+  async handleQuakeLookup(args, message) {
+    let resultContent = null;
     // Create a minimal mock feedback message for the legacy handler
     const mockFeedback = {
+      channel: message?.channel,
       edit: async content => {
         logger.debug('Quake stats result:', content);
+        resultContent = content;
         return { content };
       },
     };
@@ -237,10 +240,13 @@ class PocketFlowFunctionProcessor {
     };
 
     try {
-      await handleQuakeStats(mockFeedback, '🔍', mockStatusManager);
+      const updated = await handleQuakeStats(mockFeedback, '🔍', mockStatusManager, {
+        serverFilter: args?.server || null,
+        eloMode: args?.eloMode ?? null,
+      });
       return {
-        success: true,
-        formatted: 'Quake server statistics retrieved successfully',
+        success: updated,
+        formatted: resultContent || '⚠️ Quake server statistics were not updated.',
       };
     } catch (error) {
       throw new Error(`Quake stats lookup failed: ${error.message}`);

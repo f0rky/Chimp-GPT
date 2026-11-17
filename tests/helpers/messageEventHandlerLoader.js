@@ -50,7 +50,7 @@ const messageHandlerStubs = {
   },
 };
 
-function loadHandlerModules() {
+function loadHandlerModules({ commandHandler } = {}) {
   const originalLoad = Module._load;
   const savedEnv = { ...process.env };
   process.env.NODE_ENV = 'test';
@@ -81,6 +81,12 @@ function loadHandlerModules() {
         ButtonBuilder: class {},
         ButtonStyle: {},
       };
+    if (
+      parent?.filename.includes('messageEventHandler') &&
+      request === '../../commands/commandHandler' &&
+      commandHandler
+    )
+      return commandHandler;
     if (parent?.filename.includes('messageEventHandler') && messageHandlerStubs[request])
       return messageHandlerStubs[request];
     return originalLoad.call(this, request, parent, isMain);

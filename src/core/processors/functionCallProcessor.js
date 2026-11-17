@@ -323,7 +323,10 @@ async function handleFunctionCall(
       break;
     case 'quakeLookup':
       try {
-        await handleQuakeStats(feedbackMessage, loadingEmoji, statusManager);
+        await handleQuakeStats(feedbackMessage, loadingEmoji, statusManager, {
+          serverFilter: gptResponse.parameters?.server || null,
+          eloMode: gptResponse.parameters?.eloMode ?? null,
+        });
         trackApiCall('quake');
         if (timings.apiCalls) timings.apiCalls.quake++;
         return;

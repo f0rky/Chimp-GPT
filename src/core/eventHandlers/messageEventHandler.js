@@ -15,10 +15,16 @@ const { processVersionQuery } = require('../../utils/versionSelfQuery');
 const commandHandler = require('../../commands/commandHandler');
 const pluginManager = require('../../plugins/pluginManager');
 const SimpleChimpGPTFlow = require('../../conversation/flow/SimpleChimpGPTFlow');
+const { scheduleQuakeResultLifecycle } = require('../../utils/temporaryMessage');
+const { limitQuakeContent } = require('../../utils/quakeContentLimit');
 const {
   updateMessageById,
   saveConversationsToStorage,
 } = require('../../conversation/conversationManagerSelector');
+
+function lookupQuakeServer(...args) {
+  return require('../../services/quakeLookup')(...args);
+}
 
 const MAX_QUEUED_TURNS_PER_CHANNEL = 3;
 
@@ -697,67 +703,91 @@ class MessageEventHandler {
             }
             addTiming('after_image_attachment_message');
           } else {
-            // Non-image response - standard text edit
-            try {
-              discordLogger.info('Attempting to edit message with standard response:', {
-                messageId: feedbackMessage.id,
-                channelId: feedbackMessage.channelId,
-                contentLength: flowResult.response.length,
-                responseType: flowResult.type || 'unknown',
+            // Quake results are a reply to the requesting message and self-expire.
+            if (flowResult.type === 'quake') {
+              try {
+                await feedbackMessage.delete();
+              } catch (deleteError) {
+                if (deleteError.code !== 10008) {
+                  discordLogger.warn({ deleteError }, 'Unable to remove Quake thinking message');
+                }
+              }
+              const resultMessage = await message.reply(flowResult.response);
+              const quakeRequest = flowResult.quakeRequest || {};
+              scheduleQuakeResultLifecycle(resultMessage, async currentMessage => {
+                const refreshedStats = await lookupQuakeServer(
+                  quakeRequest.serverFilter ?? quakeRequest.server ?? null,
+                  quakeRequest.eloMode ?? null,
+                  { forceRefresh: true }
+                );
+                await currentMessage.edit(limitQuakeContent(refreshedStats));
               });
+            } else {
+              // Non-image response - standard text edit
+              try {
+                discordLogger.info('Attempting to edit message with standard response:', {
+                  messageId: feedbackMessage.id,
+                  channelId: feedbackMessage.channelId,
+                  contentLength: flowResult.response.length,
+                  responseType: flowResult.type || 'unknown',
+                });
 
-              await feedbackMessage.edit(flowResult.response);
+                await feedbackMessage.edit(flowResult.response);
 
-              discordLogger.info('Successfully edited message with standard response:', {
-                messageId: feedbackMessage.id,
-                operation: 'edit_with_text_response',
-                responseType: flowResult.type || 'unknown',
-              });
-            } catch (editError) {
-              discordLogger.error('Failed to edit message with standard response:', {
-                messageId: feedbackMessage.id,
-                channelId: feedbackMessage.channelId,
-                editError: String(editError.message),
-                editErrorCode: editError.code || 'unknown',
-                messageExists: !!feedbackMessage,
-                hasEditFunction: typeof feedbackMessage.edit === 'function',
-                contentLength: flowResult.response.length,
-              });
-              throw editError; // Re-throw to trigger higher-level error handling
+                discordLogger.info('Successfully edited message with standard response:', {
+                  messageId: feedbackMessage.id,
+                  operation: 'edit_with_text_response',
+                  responseType: flowResult.type || 'unknown',
+                });
+              } catch (editError) {
+                discordLogger.error('Failed to edit message with standard response:', {
+                  messageId: feedbackMessage.id,
+                  channelId: feedbackMessage.channelId,
+                  editError: String(editError.message),
+                  editErrorCode: editError.code || 'unknown',
+                  messageExists: !!feedbackMessage,
+                  hasEditFunction: typeof feedbackMessage.edit === 'function',
+                  contentLength: flowResult.response.length,
+                });
+                throw editError; // Re-throw to trigger higher-level error handling
+              }
             }
             addTiming('after_edit_message');
           }
 
-          // Store enhanced message relationship for deletion tracking
-          try {
-            const context = contextExtractionService.extractContext(message.content, {
-              type: flowResult.type,
-              conversationLength: flowResult.conversationLength || 0,
-              functionType: flowResult.functionType,
-              imageContext: flowResult.imageContext,
-              conversationTheme: flowResult.conversationTheme,
-            });
+          // Quake responses are independent, request-scoped replies that self-delete.
+          // Do not retain a relationship for the removed thinking message.
+          if (flowResult.type !== 'quake') {
+            try {
+              const context = contextExtractionService.extractContext(message.content, {
+                type: flowResult.type,
+                conversationLength: flowResult.conversationLength || 0,
+                functionType: flowResult.functionType,
+                imageContext: flowResult.imageContext,
+                conversationTheme: flowResult.conversationTheme,
+              });
 
-            enhancedMessageManager.storeRelationship(
-              message.id,
-              feedbackMessage,
-              {
-                id: message.author.id,
-                username: message.author.username,
-                displayName: message.author.displayName,
-              },
-              context
-            );
+              enhancedMessageManager.storeRelationship(
+                message.id,
+                feedbackMessage,
+                {
+                  id: message.author.id,
+                  username: message.author.username,
+                  displayName: message.author.displayName,
+                },
+                context
+              );
 
-            addTiming('after_relationship_storage');
-          } catch (relationshipError) {
-            discordLogger.warn(
-              {
-                error: relationshipError,
-                messageId: message.id,
-              },
-              'Failed to store enhanced message relationship'
-            );
+              addTiming('after_relationship_storage');
+            } catch (relationshipError) {
+              discordLogger.warn(
+                {
+                  error: relationshipError,
+                  messageId: message.id,
+                },
+                'Failed to store enhanced message relationship'
+              );
+            }
           }
         }
       } else {
