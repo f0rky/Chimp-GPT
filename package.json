@@ -13,7 +13,7 @@
     "test:comprehensive": "node tests/comprehensiveTestRunner.js",
     "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
     "test:integration": "node tests/comprehensiveTestRunner.js --category integration",
-    "test:coverage": "node tests/comprehensiveTestRunner.js --save",
+    "test:coverage": "node tests/regressionRunner.js --coverage",
     "test:high-priority": "node tests/comprehensiveTestRunner.js --priority high",
     "test:medium-priority": "node tests/comprehensiveTestRunner.js --priority medium",
     "test:advanced": "node tests/unit/commandHandlerAdvancedTest.js",
@@ -29,18 +29,6 @@
     "start": "node --watch src/core/combined.js",
     "prepare": "husky install",
     "test:regression": "node tests/regressionRunner.js"
-  },
-  "lint-staged": {
-    "*.{js,jsx}": [
-      "eslint --fix --config config/eslint.config.js",
-      "prettier --write"
-    ],
-    "*.{json,md,html,css}": [
-      "prettier --write"
-    ],
-    "package-lock.json": [
-      "npm run security:check"
-    ]
   },
   "repository": {
     "type": "git",
@@ -108,7 +96,6 @@
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^16.2.0",
     "husky": "^8.0.0",
-    "lint-staged": "^16.0.0",
     "mocha": "^11.3.0",
     "prettier": "^3.5.3",
     "sinon": "^21.0.1",

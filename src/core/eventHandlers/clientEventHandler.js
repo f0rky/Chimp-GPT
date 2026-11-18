@@ -11,7 +11,7 @@ const { initReactionDelete } = require('../../utils/reactionDeleteManager');
 const PFPManager = require('../../utils/pfpManager');
 const commandHandler = require('../../commands/commandHandler');
 const { shouldDeploy, recordSuccessfulDeployment } = require('../../utils/deploymentManager');
-const { sendChannelGreeting } = require('../../utils/greetingManager');
+const { sendChannelGreeting, startDailyGreetingScheduler } = require('../../utils/greetingManager');
 const { stats: healthCheckStats } = require('../healthCheck');
 const statsStorage = require('../statsStorage');
 
@@ -232,6 +232,7 @@ class ClientEventHandler {
     // Send startup greetings to configured channels
     try {
       await sendChannelGreeting(this.client, this.config.CHANNEL_ID);
+      startDailyGreetingScheduler(this.client);
       // The healthCheck system will use the greetingManager to get system information
       discordLogger.info('Channel greetings sent successfully');
     } catch (error) {

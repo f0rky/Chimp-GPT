@@ -92,7 +92,9 @@ class CoverageTracker {
       totalFiles: this.totalFiles,
       coveredFiles: this.coveredFiles.size,
       uncoveredFiles: this.totalFiles - this.coveredFiles.size,
-      coveragePercentage: coveragePercentage.toFixed(1),
+      measurement: 'declared-file-inventory',
+      measured: false,
+      declaredFilePercentage: coveragePercentage.toFixed(1),
       coveredFilesList: Array.from(this.coveredFiles),
       summary: `${this.coveredFiles.size}/${this.totalFiles} files (${coveragePercentage.toFixed(1)}%)`,
     };
@@ -368,15 +370,11 @@ function displayResults(results) {
 
   // Coverage report
   if (coverage) {
-    logger.info('\n📊 Test Coverage:');
-    logger.info(`   Files: ${coverage.summary}`);
-    logger.info(`   Coverage: ${coverage.coveragePercentage}%`);
-
-    if (parseFloat(coverage.coveragePercentage) < 70) {
-      logger.warn('   ⚠️ Coverage below 70% target');
-    } else {
-      logger.info('   ✅ Coverage meets 70% target');
-    }
+    logger.info('\n📊 Declared test-file inventory (not measured execution coverage):');
+    logger.info(`   Declared files: ${coverage.summary}`);
+    logger.info(
+      '   Run npm run test:coverage for measured Node-test line/branch/function coverage.'
+    );
   }
 
   // Failed tests

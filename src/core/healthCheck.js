@@ -167,15 +167,15 @@ function initHealthCheck(client) {
  * Schedule periodic health reports to be sent to the bot owner.
  *
  * Sets up two intervals:
- * 1. A regular interval (every 12 hours) to send health reports
+ * 1. A daily interval that updates the owner's private monitoring message
  * 2. A one-time delayed report sent shortly after startup
  *
  * @param {import('discord.js').Client} client - Discord.js client
  * @returns {void}
  */
 function scheduleHealthReports(client) {
-  // Send a health report every 12 hours
-  const REPORT_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+  // Update the private monitoring message once per day.
+  const REPORT_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
   setInterval(async () => {
     try {
@@ -189,14 +189,23 @@ function scheduleHealthReports(client) {
         return;
       }
 
+      const startupCoordinator = require('../utils/startupMessageCoordinator');
       const owner = await client.users.fetch(config.OWNER_ID);
-      if (owner) {
-        const report = generateHealthReport();
-        await owner.send(report);
-        logger.info('Sent scheduled health report to owner');
+      const ready = await startupCoordinator.ensureDailyMonitoringMessage(owner);
+      if (!ready) {
+        logger.warn(
+          'Scheduled health report skipped because no daily monitoring message is available'
+        );
+        return;
+      }
+
+      const report = generateHealthReport();
+      const updated = await startupCoordinator.updateHealthReport(report);
+      if (!updated) {
+        logger.warn('Scheduled health report skipped because no monitoring message is available');
       }
     } catch (error) {
-      logger.error({ error }, 'Failed to send health report to owner');
+      logger.error({ error }, 'Failed to update scheduled server monitoring message');
     }
   }, REPORT_INTERVAL);
 
@@ -369,12 +378,8 @@ function scheduleHealthReports(client) {
 
             // Update the startup message with all embeds
             await startupCoordinator.updateStartupMessage();
+            await startupCoordinator.updateHealthReport(report);
             logger.info('Updated startup message with comprehensive report');
-
-            // Reset the coordinator after some time to free memory
-            setTimeout(() => {
-              startupCoordinator.reset();
-            }, 10000);
           } catch (updateError) {
             logger.error({ error: updateError }, 'Failed to update startup message with details');
           }
