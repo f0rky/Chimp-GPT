@@ -3,6 +3,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+if (process.argv.includes('--coverage')) {
+  console.log(
+    'Measured V8 coverage: loaded files in node:test suites only; Mocha and unexecuted files are not included.'
+  );
+}
 const unitDir = path.join(__dirname, 'unit');
 const files = fs.readdirSync(unitDir).filter(name => name.endsWith('.test.js'));
 const nodeTests = files.filter(name =>
@@ -13,7 +18,15 @@ const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'chimp-regression-'));
 const preload = path.join(__dirname, 'helpers/offlineEnvironment.js');
 try {
   for (const [runner, tests] of [
-    [['--test', '--test-concurrency=1', '--test-timeout=30000'], nodeTests],
+    [
+      [
+        ...(process.argv.includes('--coverage') ? ['--experimental-test-coverage'] : []),
+        '--test',
+        '--test-concurrency=1',
+        '--test-timeout=30000',
+      ],
+      nodeTests,
+    ],
     [[require.resolve('mocha/bin/mocha.js'), '--timeout', '15000'], mochaTests],
   ]) {
     if (!tests.length) continue;

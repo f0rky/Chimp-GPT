@@ -13,7 +13,7 @@
     "test:comprehensive": "node tests/comprehensiveTestRunner.js",
     "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
     "test:integration": "node tests/comprehensiveTestRunner.js --category integration",
-    "test:coverage": "node tests/comprehensiveTestRunner.js --save",
+    "test:coverage": "node tests/regressionRunner.js --coverage",
     "test:high-priority": "node tests/comprehensiveTestRunner.js --priority high",
     "test:medium-priority": "node tests/comprehensiveTestRunner.js --priority medium",
     "test:advanced": "node tests/unit/commandHandlerAdvancedTest.js",

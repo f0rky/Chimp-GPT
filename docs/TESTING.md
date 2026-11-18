@@ -180,11 +180,11 @@ node tests/integration/weatherApiIntegrationTest.js
 
 ```json
 {
-  "test": "node tests/unit/testRunner.js",
+  "test": "node tests/unit/testRunner.js && npm run test:regression",
   "test:comprehensive": "node tests/comprehensiveTestRunner.js",
   "test:unit": "node tests/comprehensiveTestRunner.js --category unit",
   "test:integration": "node tests/comprehensiveTestRunner.js --category integration",
-  "test:coverage": "node tests/comprehensiveTestRunner.js --save",
+  "test:coverage": "node tests/regressionRunner.js --coverage",
   "test:high-priority": "node tests/comprehensiveTestRunner.js --priority high"
 }
 ```
@@ -192,18 +192,25 @@ node tests/integration/weatherApiIntegrationTest.js
 ## Test Coverage Requirements
 
 ### Coverage Goals
-- **Overall Coverage**: >70% of source files
-- **Critical Components**: >90% coverage
+- Establish measured line, branch, and function baselines before selecting thresholds.
+- No numerical execution-coverage gate is currently enforced.
 - **High Priority Tests**: 100% pass rate required
 - **Integration Tests**: All critical paths covered
 
 ### Coverage Reporting
-The comprehensive test runner provides:
-- File coverage statistics
-- Priority-based coverage breakdown
-- Category-based coverage analysis
-- Performance insights
-- Failed test summaries
+`npm run test:coverage` runs the discovered regression suites and enables Node's
+built-in V8 line, branch, and function coverage for the `node:test` portion.
+The report is printed to stdout; redirect it to retain an artifact. Mocha suites
+still run, but their execution is not included in the coverage percentage.
+Node reports loaded files, not every unexecuted source file. Its totals include
+loaded test files and helpers, not only production source. VM-loaded source may
+be represented differently from normal module imports. These
+figures are a scoped baseline, not a whole-application coverage claim.
+
+The comprehensive runner's manually declared file list remains available as an
+inventory only, with `measurement: declared-file-inventory` and `measured: false`.
+It is not line/branch coverage and must not be used to assert a coverage target.
+Its priority/category statistics describe test results, not measured coverage.
 
 ### Coverage Exclusions
 - Third-party dependencies
@@ -385,7 +392,7 @@ node tests/comprehensiveTestRunner.js --verbose
 
 ### Common Commands
 ```bash
-# Full test suite with coverage
+# Regression suites; measured coverage for the Node-test portion only
 npm run test:coverage
 
 # High priority tests only
@@ -402,8 +409,8 @@ npm test
 ```
 
 ### Coverage Goals
-- Overall: >70%
-- Critical: >90%
+- Measured execution baseline: use npm run test:coverage; no threshold set yet.
+- Declared-file inventory is not execution coverage.
 - High Priority: 100% pass rate
 
 ### Test Categories
