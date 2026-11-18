@@ -30,18 +30,6 @@
     "prepare": "husky install",
     "test:regression": "node tests/regressionRunner.js"
   },
-  "lint-staged": {
-    "*.{js,jsx}": [
-      "eslint --fix --config config/eslint.config.js",
-      "prettier --write"
-    ],
-    "*.{json,md,html,css}": [
-      "prettier --write"
-    ],
-    "package-lock.json": [
-      "npm run security:check"
-    ]
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/f0rky/Chimp-GPT.git"
@@ -108,7 +96,6 @@
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^16.2.0",
     "husky": "^8.0.0",
-    "lint-staged": "^16.0.0",
     "mocha": "^11.3.0",
     "prettier": "^3.5.3",
     "sinon": "^21.0.1",

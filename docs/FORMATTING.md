@@ -30,21 +30,27 @@ The project uses Prettier with the following configuration:
 - Omit parentheses around single arrow function parameters
 - Use LF line endings
 
-## Automatic Formatting
+## Pre-commit Checks
 
-The project is set up with the following tools to automate code formatting:
-
-1. **Husky**: Manages Git hooks to run checks before commits
-2. **lint-staged**: Runs linters and formatters on staged files
-3. **ESLint with Prettier integration**: Ensures code quality and consistent formatting
+The project uses Husky to run ESLint and Prettier checks before commits.
+`lint-staged` is deliberately not used, removing its vulnerable `picomatch`
+dependency path without disabling quality checks.
 
 ### Pre-commit Hooks
 
-When you commit changes, the pre-commit hook will automatically:
+When you commit changes, the pre-commit hook runs:
 
-1. Run Prettier on all staged files
-2. Run ESLint with auto-fix on staged files
-3. Prevent the commit if there are any errors that can't be automatically fixed
+1. `npm run lint`
+2. `npm run format:check`, only if lint succeeds
+
+Either failure rejects the commit. These are non-mutating, whole-repository
+checks over the working tree, subject to the existing ESLint/Prettier ignores;
+they do not auto-fix, format, stage, or stash files. Unstaged changes can therefore
+cause a failure too. Whole-repository checks may take longer than staged-file checks.
+
+To fix formatting, run `npm run format` explicitly, review the resulting diff,
+and stage the intended changes before retrying the commit. Dependency auditing
+remains available through `npm run security:audit` and the CI security workflow.
 
 ## Manual Commands
 
