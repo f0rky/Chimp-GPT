@@ -50,6 +50,58 @@ test('concurrent greeting creation sends exactly one channel message', async () 
   assert.equal(sends, 1);
 });
 
+test('channel reconciliation stays sequential, persists each send and continues past failures', async () => {
+  let state = JSON.stringify({ channels: {} });
+  const events = [];
+  fs.existsSync = () => true;
+  fs.readFileSync = () => state;
+  fs.writeFileSync = (_path, value) => {
+    state = value;
+    events.push('save');
+  };
+  fs.mkdirSync = () => undefined;
+  let activeSends = 0;
+  let maxActiveSends = 0;
+  const client = {
+    user: { id: 'solvis' },
+    isReady: () => true,
+    channels: {
+      fetch: async id => {
+        events.push(`fetch:${id}`);
+        if (id === 'unavailable') throw new Error('fixture channel unavailable');
+        if (id === 'voice') return { isTextBased: () => false };
+        const channel = {
+          name: id,
+          isTextBased: () => true,
+          permissionsFor: () => ({ has: () => false }),
+          send: async () => {
+            activeSends++;
+            maxActiveSends = Math.max(maxActiveSends, activeSends);
+            events.push(`send:${id}`);
+            await new Promise(resolve => setImmediate(resolve));
+            activeSends--;
+            return { id: `message-${id}`, channel };
+          },
+        };
+        return channel;
+      },
+    },
+  };
+  await sendChannelGreeting(client, ['first', 'unavailable', 'voice', 'last']);
+  assert.equal(maxActiveSends, 1);
+  assert.deepEqual(events, [
+    'fetch:first',
+    'send:first',
+    'save',
+    'fetch:unavailable',
+    'fetch:voice',
+    'fetch:last',
+    'send:last',
+    'save',
+  ]);
+  assert.deepEqual(Object.keys(JSON.parse(state).channels), ['first', 'last']);
+});
+
 test('reuses the current Auckland-day greeting instead of sending another', async () => {
   const today = getAnnouncementDate();
   let savedState = JSON.stringify({
@@ -99,6 +151,10 @@ test('reuses the current Auckland-day greeting instead of sending another', asyn
 
   assert.equal(edits.length, 1);
   assert.equal(collectors.length, 1);
+  const ownerId = require('../../src/core/configValidator').OWNER_ID;
+  assert.equal(collectors[0].filter({ emoji: { name: '🗑️' } }, { id: ownerId }), true);
+  assert.equal(collectors[0].filter({ emoji: { name: '📌' } }, { id: ownerId }), true);
+  assert.equal(collectors[0].filter({ emoji: { name: '🗑️' } }, { id: 'non-owner' }), false);
   assert.equal(
     collectors[0].filter({ emoji: { name: '🧹' } }, { id: '000000000000000001' }),
     false

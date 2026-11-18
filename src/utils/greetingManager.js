@@ -9,8 +9,8 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const os = require('os');
 const { execSync } = require('child_process');
 const { createLogger } = require('../core/logger');
@@ -198,50 +198,55 @@ async function reconcileChannelGreetings(client, channelIds) {
     state.channels ||= {};
 
     // Send to each allowed channel
-    let successCount = 0;
-    let createdCount = 0;
-    for (const channelID of allowedChannelIDs) {
-      try {
-        const channel = await client.channels.fetch(channelID);
-        if (channel && channel.isTextBased()) {
-          const previous = state.channels[channelID];
-          let msg = null;
-
-          if (
-            previous?.date === announcementDate &&
-            previous.messageId &&
-            channel.messages?.fetch
-          ) {
-            msg = await channel.messages.fetch(previous.messageId).catch(() => null);
-            if (msg) {
-              await msg.edit({ embeds: [greeting] });
-              await attachGreetingReactions(client, msg);
-              logger.info(`Daily greeting updated in channel ${channel.name} (${channelID})`);
-            }
-          }
-
-          if (!msg) {
-            msg = await channel.send({ embeds: [greeting] });
-            createdCount++;
-            logger.info(`Daily greeting created in channel ${channel.name} (${channelID})`);
-            await attachGreetingReactions(client, msg);
-          }
-
-          state.channels[channelID] = { date: announcementDate, messageId: msg.id };
-          saveDailyGreetingState(state);
-          successCount++;
-        }
-      } catch (error) {
-        logger.error({ error, channelID }, 'Failed to create or update daily greeting');
-      }
-    }
+    const context = { greeting, announcementDate, state, successCount: 0, createdCount: 0 };
+    // Chain channels deliberately: persist each result before starting the next.
+    // Parallel sends would race shared state and change Discord request ordering.
+    await allowedChannelIDs.reduce(
+      (pending, channelID) =>
+        pending.then(() => reconcileChannelGreeting(client, channelID, context)),
+      Promise.resolve()
+    );
 
     logger.info(
-      { announcementDate, successCount, createdCount, channelCount: allowedChannelIDs.length },
+      {
+        announcementDate,
+        successCount: context.successCount,
+        createdCount: context.createdCount,
+        channelCount: allowedChannelIDs.length,
+      },
       'Daily greetings reconciled'
     );
   } catch (error) {
     logger.error({ error }, 'Failed to send channel greeting');
+  }
+}
+
+async function reconcileChannelGreeting(client, channelID, context) {
+  const { greeting, announcementDate, state } = context;
+  try {
+    const channel = await client.channels.fetch(channelID);
+    if (!channel?.isTextBased()) return;
+
+    const previous = state.channels[channelID];
+    let msg = null;
+    if (previous?.date === announcementDate && previous.messageId && channel.messages?.fetch) {
+      msg = await channel.messages.fetch(previous.messageId).catch(() => null);
+    }
+
+    if (msg) {
+      await msg.edit({ embeds: [greeting] });
+      logger.info(`Daily greeting updated in channel ${channel.name} (${channelID})`);
+    } else {
+      msg = await channel.send({ embeds: [greeting] });
+      context.createdCount++;
+      logger.info(`Daily greeting created in channel ${channel.name} (${channelID})`);
+    }
+    await attachGreetingReactions(client, msg);
+    state.channels[channelID] = { date: announcementDate, messageId: msg.id };
+    saveDailyGreetingState(state);
+    context.successCount++;
+  } catch (error) {
+    logger.error({ error, channelID }, 'Failed to create or update daily greeting');
   }
 }
 
@@ -348,7 +353,7 @@ async function attachGreetingReactions(client, msg) {
     return;
   }
 
-  const REACTIONS = ['🗑️', '📌'];
+  const REACTIONS = new Set(['🗑️', '📌']);
 
   try {
     for (const emoji of REACTIONS) {
@@ -362,7 +367,7 @@ async function attachGreetingReactions(client, msg) {
 
   // Listen for owner reactions (60 min window — long enough to catch a late response)
   const filter = (reaction, user) =>
-    REACTIONS.includes(reaction.emoji.name) && user.id === config.OWNER_ID;
+    REACTIONS.has(reaction.emoji.name) && user.id === config.OWNER_ID;
 
   const collector = msg.createReactionCollector({ filter, time: 60 * 60 * 1000 });
   greetingReactionCollectors.set(msg.id, collector);
