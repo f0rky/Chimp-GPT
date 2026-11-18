@@ -9,6 +9,8 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
 const { createLogger } = require('../core/logger');
@@ -20,6 +22,37 @@ const { getHealthStatus } = require('../core/healthCheck');
 
 // Create a logger for this module
 const logger = createLogger('greeting');
+const DAILY_GREETING_STATE_FILE = path.join(__dirname, '../../data/daily-greeting-state.json');
+const greetingReactionCollectors = new Map();
+
+function getAnnouncementDate(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Pacific/Auckland',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+function loadDailyGreetingState(fileSystem = fs, stateFile = DAILY_GREETING_STATE_FILE) {
+  try {
+    if (fileSystem.existsSync(stateFile)) {
+      return JSON.parse(fileSystem.readFileSync(stateFile, 'utf8'));
+    }
+  } catch (error) {
+    logger.warn({ error }, 'Could not load daily greeting state');
+  }
+  return { channels: {} };
+}
+
+function saveDailyGreetingState(state, fileSystem = fs, stateFile = DAILY_GREETING_STATE_FILE) {
+  try {
+    fileSystem.mkdirSync(path.dirname(stateFile), { recursive: true });
+    fileSystem.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  } catch (error) {
+    logger.warn({ error }, 'Could not save daily greeting state');
+  }
+}
 
 /**
  * Generate a startup report with detailed system and bot information
@@ -127,10 +160,21 @@ function generateChannelGreeting() {
 /**
  * Send a greeting message to all allowed channels
  *
- * @param {import('discord.js').Client} client - Discord.js client
+ * @param {import('discord.js').Client} client - Discord client
+ * @param {string[]} [channelIds] - Explicit channel IDs (defaults to configured channels)
  * @returns {Promise<void>}
  */
-async function sendChannelGreeting(client) {
+let greetingReconciliation = Promise.resolve();
+
+function sendChannelGreeting(client, channelIds) {
+  const current = greetingReconciliation
+    .catch(() => undefined)
+    .then(() => reconcileChannelGreetings(client, channelIds));
+  greetingReconciliation = current;
+  return current;
+}
+
+async function reconcileChannelGreetings(client, channelIds) {
   try {
     // Check if client is ready before sending
     if (!client.isReady()) {
@@ -139,38 +183,88 @@ async function sendChannelGreeting(client) {
     }
 
     // Get the allowed channel IDs from config
-    const allowedChannelIDs = config.CHANNEL_ID || [];
+    const allowedChannelIDs = channelIds || config.CHANNEL_ID || [];
 
     if (allowedChannelIDs.length === 0) {
       logger.warn('No allowed channels configured, skipping channel greeting');
       return;
     }
 
-    // Generate the greeting
+    // Generate the greeting and reuse the same per-channel announcement for the
+    // current Auckland day. A restart refreshes that message instead of posting.
     const greeting = generateChannelGreeting();
+    const announcementDate = getAnnouncementDate();
+    const state = loadDailyGreetingState();
+    state.channels ||= {};
 
     // Send to each allowed channel
     let successCount = 0;
+    let createdCount = 0;
     for (const channelID of allowedChannelIDs) {
       try {
         const channel = await client.channels.fetch(channelID);
         if (channel && channel.isTextBased()) {
-          const msg = await channel.send({ embeds: [greeting] });
-          successCount++;
-          logger.info(`Greeting sent to channel ${channel.name} (${channelID})`);
+          const previous = state.channels[channelID];
+          let msg = null;
 
-          // Add reaction controls for the owner
-          await attachGreetingReactions(client, msg);
+          if (
+            previous?.date === announcementDate &&
+            previous.messageId &&
+            channel.messages?.fetch
+          ) {
+            msg = await channel.messages.fetch(previous.messageId).catch(() => null);
+            if (msg) {
+              await msg.edit({ embeds: [greeting] });
+              await attachGreetingReactions(client, msg);
+              logger.info(`Daily greeting updated in channel ${channel.name} (${channelID})`);
+            }
+          }
+
+          if (!msg) {
+            msg = await channel.send({ embeds: [greeting] });
+            createdCount++;
+            logger.info(`Daily greeting created in channel ${channel.name} (${channelID})`);
+            await attachGreetingReactions(client, msg);
+          }
+
+          state.channels[channelID] = { date: announcementDate, messageId: msg.id };
+          saveDailyGreetingState(state);
+          successCount++;
         }
       } catch (error) {
-        logger.error({ error, channelID }, 'Failed to send greeting to channel');
+        logger.error({ error, channelID }, 'Failed to create or update daily greeting');
       }
     }
 
-    logger.info(`Greeting sent to ${successCount}/${allowedChannelIDs.length} channels`);
+    logger.info(
+      { announcementDate, successCount, createdCount, channelCount: allowedChannelIDs.length },
+      'Daily greetings reconciled'
+    );
   } catch (error) {
     logger.error({ error }, 'Failed to send channel greeting');
   }
+}
+
+const dailyGreetingTimers = new WeakMap();
+
+/**
+ * Reconcile daily channel greetings regularly so a long-running bot creates a
+ * new announcement on the next Auckland day without requiring a restart.
+ */
+function startDailyGreetingScheduler(client) {
+  if (dailyGreetingTimers.has(client)) return;
+
+  const interval = setInterval(
+    () => {
+      sendChannelGreeting(client).catch(error =>
+        logger.error({ error }, 'Scheduled daily greeting reconciliation failed')
+      );
+    },
+    5 * 60 * 1000
+  );
+  interval.unref();
+  dailyGreetingTimers.set(client, interval);
+  logger.info('Daily greeting scheduler initialized');
 }
 
 /**
@@ -238,13 +332,14 @@ function formatTime(seconds) {
  *
  * 🗑️ → delete this message
  * 📌 → hold/archive (clear other reactions, leave message)
- * 🧹 → delete this message + next 5 in channel
+ * Broad channel sweeping is intentionally unavailable: bot replies and FINAL cards are retained.
  *
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').Message} msg
  */
 async function attachGreetingReactions(client, msg) {
   const { PermissionFlagsBits } = require('discord.js');
+  if (greetingReactionCollectors.has(msg.id)) return;
 
   // Check we have Manage Messages before proceeding
   const perms = msg.channel.permissionsFor(client.user);
@@ -253,7 +348,7 @@ async function attachGreetingReactions(client, msg) {
     return;
   }
 
-  const REACTIONS = ['🗑️', '📌', '🧹'];
+  const REACTIONS = ['🗑️', '📌'];
 
   try {
     for (const emoji of REACTIONS) {
@@ -270,6 +365,7 @@ async function attachGreetingReactions(client, msg) {
     REACTIONS.includes(reaction.emoji.name) && user.id === config.OWNER_ID;
 
   const collector = msg.createReactionCollector({ filter, time: 60 * 60 * 1000 });
+  greetingReactionCollectors.set(msg.id, collector);
 
   collector.on('collect', async (reaction, user) => {
     const emoji = reaction.emoji.name;
@@ -285,19 +381,6 @@ async function attachGreetingReactions(client, msg) {
         await msg.reactions.removeAll();
         logger.info('Greeting message held/archived by owner reaction');
         collector.stop('held');
-      } else if (emoji === '🧹') {
-        // Delete this message + next 5
-        try {
-          const channel = msg.channel;
-          const messages = await channel.messages.fetch({ after: msg.id, limit: 5 });
-          const toDelete = [msg, ...messages.values()];
-          // bulkDelete requires messages < 14 days old
-          await channel.bulkDelete(toDelete, true);
-          logger.info({ count: toDelete.length }, 'Bulk deleted greeting + next messages');
-        } catch (bulkErr) {
-          logger.warn({ error: bulkErr }, 'Bulk delete failed, deleting greeting only');
-          await msg.delete().catch(() => undefined);
-        }
       }
     } catch (actionErr) {
       logger.warn({ error: actionErr, emoji }, 'Reaction action failed');
@@ -305,6 +388,7 @@ async function attachGreetingReactions(client, msg) {
   });
 
   collector.on('end', (_, reason) => {
+    greetingReactionCollectors.delete(msg.id);
     if (reason !== 'held' && !msg.deleted) {
       // Clean up our reaction buttons when collector expires
       msg.reactions.removeAll().catch(() => undefined);
@@ -314,8 +398,13 @@ async function attachGreetingReactions(client, msg) {
 
 module.exports = {
   sendChannelGreeting,
+  startDailyGreetingScheduler,
   sendOwnerStartupReport,
   generateStartupReport,
   generateChannelGreeting,
   attachGreetingReactions,
+
+  getAnnouncementDate,
+  loadDailyGreetingState,
+  saveDailyGreetingState,
 };

@@ -1,11 +1,10 @@
 /**
  * Startup Message Coordinator for ChimpGPT
  *
- * Coordinates startup messages to the bot owner:
- * - Persists the startup message ID across restarts so it can be edited in place
- * - Shows last shutdown reason in the startup embed
- * - Cleans up old bot startup messages in owner DM on startup
- * - Supports dying gasp: edits the message with shutdown reason before process exits
+ * Coordinates private daily server-monitoring messages:
+ * - Sends the bot owner one monitoring message per Auckland calendar day
+ * - Reuses and edits that message across restarts and scheduled updates
+ * - Shows last shutdown reason in the monitoring embed
  *
  * @module startupMessageCoordinator
  */
@@ -23,6 +22,54 @@ const contributingComponents = new Set();
 let messageSent = false;
 const embeds = [];
 let sessionStartTime = new Date();
+let currentRestartCount = 0;
+let sessionInitialized = false;
+
+function nextRestartCount(state = {}) {
+  const previousCount = Number(state.restartCount);
+  return Number.isSafeInteger(previousCount) && previousCount >= 0 ? previousCount + 1 : 1;
+}
+
+function initializeSession(state = {}, now = new Date()) {
+  if (!sessionInitialized) {
+    sessionStartTime = now;
+    currentRestartCount = nextRestartCount(state);
+    sessionInitialized = true;
+  }
+  return { sessionStartTime, restartCount: currentRestartCount };
+}
+
+function lifecycleFields({ includeLastChecked = false } = {}) {
+  const fields = [
+    {
+      name: 'Started at',
+      value: sessionStartTime.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+      inline: true,
+    },
+    {
+      name: 'Restart number',
+      value: String(currentRestartCount || 1),
+      inline: true,
+    },
+  ];
+  if (includeLastChecked) {
+    fields.push({
+      name: 'Last checked',
+      value: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+      inline: true,
+    });
+  }
+  return fields;
+}
+
+function getMonitoringDate(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Pacific/Auckland',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
@@ -100,49 +147,6 @@ async function dyingGasp(reason, error) {
   }
 }
 
-// ─── Old message cleanup ──────────────────────────────────────────────────────
-
-/**
- * Delete old bot startup/status messages from the owner DM channel.
- * Skips the current startup message if we just edited it.
- *
- * @param {import('discord.js').User} owner
- * @param {string} [skipMessageId] - ID of the message to keep
- */
-async function cleanupOldOwnerMessages(owner, skipMessageId) {
-  try {
-    const dmChannel = owner.dmChannel || (await owner.createDM());
-    const messages = await dmChannel.messages.fetch({ limit: 50 });
-
-    const toDelete = messages.filter(
-      m =>
-        m.author.bot &&
-        m.author.id === dmChannel.client.user.id &&
-        m.id !== skipMessageId &&
-        m.embeds.length > 0 &&
-        (m.embeds[0]?.title?.includes('ChimpGPT') ||
-          m.embeds[0]?.title?.includes('Solvis') ||
-          m.embeds[0]?.title?.includes('Starting') ||
-          m.embeds[0]?.title?.includes('Online') ||
-          m.embeds[0]?.title?.includes('Offline') ||
-          m.embeds[0]?.title?.includes('Plugin Status') ||
-          m.embeds[0]?.title?.includes('Status Report'))
-    );
-
-    let deleted = 0;
-    for (const [, msg] of toDelete) {
-      try {
-        await msg.delete();
-        deleted++;
-      } catch (_) {}
-    }
-
-    if (deleted > 0) logger.info({ deleted }, 'Cleaned up old owner startup messages');
-  } catch (e) {
-    logger.warn({ error: e.message }, 'Could not clean up old owner messages');
-  }
-}
-
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 function registerComponent(componentName) {
@@ -161,80 +165,89 @@ function addEmbed(componentName, embed) {
 }
 
 /**
- * Send (or edit) the startup message to the bot owner.
- * Cleans up old messages first, then tries to edit the last known message.
+ * Create or reuse the bot owner's monitoring message for the current Auckland
+ * day. This is private by design; server channels never receive health reports.
  *
  * @param {import('discord.js').User} owner
  * @returns {Promise<boolean>}
  */
-async function sendStartupMessage(owner) {
-  if (messageSent) {
-    logger.warn('Attempted to send startup message more than once');
-    return false;
+let monitoringCreation = null;
+
+function ensureDailyMonitoringMessage(owner) {
+  if (!monitoringCreation) {
+    monitoringCreation = createDailyMonitoringMessage(owner).finally(() => {
+      monitoringCreation = null;
+    });
   }
+  return monitoringCreation;
+}
+
+async function createDailyMonitoringMessage(owner) {
   if (!owner) {
-    logger.error('Cannot send startup message: owner is undefined');
+    logger.error('Cannot create daily monitoring message: owner is undefined');
     return false;
   }
 
-  sessionStartTime = new Date();
   const state = loadState();
+  initializeSession(state);
+  const monitoringDate = getMonitoringDate();
   const lastShutdown = state.lastShutdownReason
     ? `**Last session:** ${state.lastShutdownReason}${state.lastShutdownError ? ` — \`${state.lastShutdownError}\`` : ''} *(uptime: ${state.lastSessionUptime || '?'})*`
     : null;
-
   const startingEmbed = {
     title: '🟡 Solvis Starting Up...',
     description: ['Initializing systems...', lastShutdown].filter(Boolean).join('\n'),
     color: 0xffaa00,
+    fields: lifecycleFields(),
     timestamp: new Date(),
   };
 
   try {
-    // Try to clean up old messages and edit the last one
-    let edited = false;
-
-    if (state.messageId && state.channelId) {
-      try {
-        const dmChannel = owner.dmChannel || (await owner.createDM());
-        const oldMsg = await dmChannel.messages.fetch(state.messageId).catch(() => null);
-        if (oldMsg) {
-          await oldMsg.edit({ embeds: [startingEmbed] });
-          startupMessageRef = oldMsg;
-          edited = true;
-          logger.info('Edited existing startup message in place');
-        }
-      } catch (e) {
-        logger.info('Could not find old startup message, will post fresh');
+    const dmChannel = owner.dmChannel || (await owner.createDM());
+    if (state.monitoringDate === monitoringDate && state.messageId) {
+      const existing = await dmChannel.messages.fetch(state.messageId).catch(() => null);
+      if (existing) {
+        await existing.edit({ embeds: [startingEmbed] });
+        startupMessageRef = existing;
+        saveState({
+          monitoringDate,
+          sessionStartTime: sessionStartTime.toISOString(),
+          restartCount: currentRestartCount,
+          lastShutdownReason: null,
+          lastShutdownTime: null,
+          lastShutdownError: null,
+          lastSessionUptime: null,
+        });
+        messageSent = true;
+        logger.info({ monitoringDate }, 'Reused daily server monitoring message in owner DM');
+        return true;
       }
     }
 
-    // Clean up other old bot messages (but not the one we just edited)
-    await cleanupOldOwnerMessages(owner, startupMessageRef?.id);
-
-    // Post fresh if we couldn't edit
-    if (!edited) {
-      startupMessageRef = await owner.send({ embeds: [startingEmbed] });
-      logger.info('Posted fresh startup message to owner');
-    }
-
-    // Persist the reference
+    startupMessageRef = await owner.send({ embeds: [startingEmbed] });
     saveState({
       messageId: startupMessageRef.id,
       channelId: startupMessageRef.channel.id,
+      monitoringDate,
       sessionStartTime: sessionStartTime.toISOString(),
+      restartCount: currentRestartCount,
       lastShutdownReason: null,
       lastShutdownTime: null,
       lastShutdownError: null,
       lastSessionUptime: null,
     });
-
     messageSent = true;
+    logger.info({ monitoringDate }, 'Posted new daily server monitoring message to owner DM');
     return true;
   } catch (error) {
-    logger.error({ error }, 'Failed to send startup message to owner');
+    logger.error({ error }, 'Failed to create or reuse daily server monitoring message');
     return false;
   }
+}
+
+async function sendStartupMessage(owner) {
+  if (messageSent) return true;
+  return ensureDailyMonitoringMessage(owner);
 }
 
 async function updateStartupMessage() {
@@ -247,13 +260,7 @@ async function updateStartupMessage() {
       title: '🟢 Solvis Online',
       color: 0x00cc66,
       timestamp: new Date(),
-      fields: [
-        {
-          name: 'Started',
-          value: sessionStartTime.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
-          inline: true,
-        },
-      ],
+      fields: lifecycleFields(),
     };
 
     // Merge in any component embeds as fields
@@ -270,12 +277,53 @@ async function updateStartupMessage() {
   }
 }
 
+/**
+ * Replace the health portion of this process's monitoring message. Scheduled
+ * reports call this instead of posting a new Discord message.
+ *
+ * @param {string} report
+ * @returns {Promise<boolean>}
+ */
+async function updateHealthReport(report) {
+  if (!startupMessageRef) {
+    logger.error('Cannot update health report: no monitoring message reference');
+    return false;
+  }
+
+  try {
+    const safeReport = String(report || 'No health data available.').slice(0, 4096);
+    await startupMessageRef.edit({
+      embeds: [
+        {
+          title: '🟢 Solvis Online',
+          color: 0x00cc66,
+          timestamp: new Date(),
+          fields: lifecycleFields({ includeLastChecked: true }),
+        },
+        {
+          title: '📊 Server Monitoring',
+          description: safeReport,
+          color: 0x00cc66,
+          timestamp: new Date(),
+        },
+      ],
+    });
+    logger.info('Updated server monitoring message in place');
+    return true;
+  } catch (error) {
+    logger.error({ error }, 'Failed to update server monitoring message');
+    return false;
+  }
+}
+
 function reset() {
   startupMessageRef = null;
   contributingComponents.clear();
   messageSent = false;
   embeds.length = 0;
   sessionStartTime = new Date();
+  currentRestartCount = 0;
+  sessionInitialized = false;
   logger.info('Startup message coordinator reset');
 }
 
@@ -283,9 +331,13 @@ module.exports = {
   registerComponent,
   addEmbed,
   sendStartupMessage,
+  ensureDailyMonitoringMessage,
   updateStartupMessage,
+  updateHealthReport,
   dyingGasp,
   reset,
+  getMonitoringDate,
+  _test: { nextRestartCount, initializeSession, lifecycleFields },
   get messageRef() {
     return startupMessageRef;
   },
