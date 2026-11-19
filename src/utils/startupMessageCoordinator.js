@@ -25,6 +25,10 @@ let sessionStartTime = new Date();
 let currentRestartCount = 0;
 let sessionInitialized = false;
 
+function getBotName() {
+  return process.env.BOT_NAME?.trim() || 'ChimpGPT';
+}
+
 function nextRestartCount(state = {}) {
   const previousCount = Number(state.restartCount);
   return Number.isSafeInteger(previousCount) && previousCount >= 0 ? previousCount + 1 : 1;
@@ -126,7 +130,7 @@ async function dyingGasp(reason, error) {
     await startupMessageRef.edit({
       embeds: [
         {
-          title: '🔴 Solvis Offline',
+          title: `🔴 ${getBotName()} Offline`,
           description: `Session ended: **${reason}**${error ? `\n\`${error.message}\`` : ''}`,
           fields: [
             { name: 'Session Uptime', value: uptimeStr, inline: true },
@@ -195,7 +199,7 @@ async function createDailyMonitoringMessage(owner) {
     ? `**Last session:** ${state.lastShutdownReason}${state.lastShutdownError ? ` — \`${state.lastShutdownError}\`` : ''} *(uptime: ${state.lastSessionUptime || '?'})*`
     : null;
   const startingEmbed = {
-    title: '🟡 Solvis Starting Up...',
+    title: `🟡 ${getBotName()} Starting Up...`,
     description: ['Initializing systems...', lastShutdown].filter(Boolean).join('\n'),
     color: 0xffaa00,
     fields: lifecycleFields(),
@@ -257,7 +261,7 @@ async function updateStartupMessage() {
   }
   try {
     const finalEmbed = {
-      title: '🟢 Solvis Online',
+      title: `🟢 ${getBotName()} Online`,
       color: 0x00cc66,
       timestamp: new Date(),
       fields: lifecycleFields(),
@@ -295,7 +299,7 @@ async function updateHealthReport(report) {
     await startupMessageRef.edit({
       embeds: [
         {
-          title: '🟢 Solvis Online',
+          title: `🟢 ${getBotName()} Online`,
           color: 0x00cc66,
           timestamp: new Date(),
           fields: lifecycleFields({ includeLastChecked: true }),

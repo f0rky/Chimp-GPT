@@ -9,6 +9,12 @@ const originalFs = {
   mkdirSync: fs.mkdirSync,
 };
 const coordinator = require('../../src/utils/startupMessageCoordinator');
+const originalBotName = process.env.BOT_NAME;
+
+test.after(() => {
+  if (originalBotName === undefined) delete process.env.BOT_NAME;
+  else process.env.BOT_NAME = originalBotName;
+});
 
 let state = {
   monitoringDate: '2000-01-01',
@@ -92,3 +98,46 @@ test('uses one private owner-DM monitoring message per Auckland day', async () =
   assert.equal(sent.length, 1, 'a same-day restart reuses the owner-DM message');
   assert.equal(edits.length, 2, 'the existing daily message is edited on restart');
 });
+
+for (const [configured, expected] of [
+  ['PurgeryPete', 'PurgeryPete'],
+  ['Solvis', 'Solvis'],
+  ['  PurgeryPete  ', 'PurgeryPete'],
+  [undefined, 'ChimpGPT'],
+  ['  ', 'ChimpGPT'],
+]) {
+  test(`monitoring lifecycle uses bot identity ${JSON.stringify(configured)}`, async () => {
+    if (configured === undefined) delete process.env.BOT_NAME;
+    else process.env.BOT_NAME = configured;
+    coordinator.reset();
+    state = {};
+    const sent = [];
+    const edits = [];
+    const message = {
+      id: 'identity-message',
+      channel: { id: 'owner-dm' },
+      edit: async payload => edits.push(payload),
+    };
+    const owner = {
+      dmChannel: { messages: { fetch: async () => message } },
+      send: async payload => {
+        sent.push(payload);
+        return message;
+      },
+    };
+
+    assert.equal(await coordinator.sendStartupMessage(owner), true);
+    assert.equal(sent[0].embeds[0].title, `🟡 ${expected} Starting Up...`);
+    assert.equal(await coordinator.updateStartupMessage(), true);
+    assert.equal(edits.at(-1).embeds[0].title, `🟢 ${expected} Online`);
+    assert.equal(await coordinator.updateHealthReport('fixture health'), true);
+    assert.equal(edits.at(-1).embeds[0].title, `🟢 ${expected} Online`);
+    await coordinator.dyingGasp('fixture shutdown');
+    assert.equal(edits.at(-1).embeds[0].title, `🔴 ${expected} Offline`);
+
+    coordinator.reset();
+    assert.equal(await coordinator.sendStartupMessage(owner), true);
+    assert.equal(sent.length, 1, 'same-day restarts must reuse the identity-correct card');
+    assert.equal(edits.at(-1).embeds[0].title, `🟡 ${expected} Starting Up...`);
+  });
+}
