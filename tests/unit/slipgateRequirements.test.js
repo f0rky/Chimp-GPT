@@ -166,5 +166,5 @@ test('scoreboard Discord snapshot includes all product fields with separated pri
   assert.match(embedText(card), /Bravo\s+2\s+2\/0/);
   assert.match(embedText(card), /Spectators \(1\)[\s\S]*Anonymous/);
   assert.equal(card.fields.length, 4);
-  assert.equal(card.footer.text, 'Slipgate · source time unavailable · checked 00:00 UTC');
+  assert.equal(card.footer.text, 'Slipgate · source time unavailable');
 });

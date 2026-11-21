@@ -156,7 +156,8 @@ test('confirmed result has distinct final title, winner, scoreline, duration, en
   assert.match(c.description, /Blue wins/);
   assert.match(c.description, /Red \*\*4\*\*.*\*\*10\*\* Blue/);
   assert.match(visible, /Duration.*10:42/);
-  assert.match(visible, /Ended.*05:09.*UTC/);
+  assert.match(visible, /Ended: 16 Nov 2026, 4:09 pm Sydney/);
+  assert.match(visible, /16 Nov 2026, 6:09 pm NZ/);
   assert.match(visible, /Highest reported score.*Blue archived.*95/);
   assert.match(visible, /Unrated match/);
   assert.match(visible, /ELO/);
@@ -201,7 +202,7 @@ test('aborted results declare no winner; completed tied and unavailable scores r
 test('final confirmation footer uses the archive check time, not an earlier live-fetch time', () => {
   const f = fixture(),
     c = card(f.final());
-  assert.match(c.footer.text, /confirmed 05:10 UTC/);
+  assert.match(c.footer.text, /confirmed 16 Nov 2026, 4:10 pm Sydney/);
   assert.doesNotMatch(c.footer.text, /fetched 05:08/);
 });
 test('missing ELO is explained once without invented values or duplicate player queries', () => {

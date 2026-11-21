@@ -6,6 +6,7 @@
 
 const { createLogger } = require('../../core/logger');
 const logger = createLogger('cmd-image-stats');
+const { formatLocalTimes } = require('../../utils/localTime');
 // const { MessageEmbed } = require('discord.js'); // Unused import
 
 // Command definition
@@ -89,7 +90,7 @@ module.exports = {
         const recentList = stats.recentEntries
           .slice(0, 5) // Limit to 5 most recent
           .map((entry, i) => {
-            const date = new Date(entry.timestamp).toLocaleString();
+            const date = formatLocalTimes(entry.timestamp);
             return `**${i + 1}.** ${date} - ${entry.size} - $${entry.cost.toFixed(4)} - ${entry.username}`;
           })
           .join('\n');
@@ -186,7 +187,7 @@ module.exports = {
         const recentList = stats.recentEntries
           .slice(0, 5) // Limit to 5 most recent
           .map((entry, i) => {
-            const date = new Date(entry.timestamp).toLocaleString();
+            const date = formatLocalTimes(entry.timestamp);
             return `**${i + 1}.** ${date} - ${entry.size} - $${entry.cost.toFixed(4)} - ${entry.username}`;
           })
           .join('\n');

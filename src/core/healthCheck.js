@@ -68,6 +68,7 @@ const { createLogger } = require('./logger');
 const logger = createLogger('health');
 // const os = require('os'); // Unused import
 const { version } = require('../../package.json');
+const { formatLocalTimes } = require('../utils/localTime');
 // const { getLastDeploymentTimestamp } = require('../utils/deploymentManager'); // Unused import
 
 // Track response times for latency calculation
@@ -646,7 +647,7 @@ async function handleStatsCommand(message) {
           color: 0x00ff00, // Green color for success
           timestamp: new Date(),
           footer: {
-            text: `ChimpGPT v${botVersion} | Updated at ${new Date().toLocaleTimeString()}`,
+            text: `ChimpGPT v${botVersion} | Updated at ${formatLocalTimes(new Date())}`,
           },
         });
 

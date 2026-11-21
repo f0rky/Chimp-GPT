@@ -12,6 +12,7 @@
 
 const { createLogger } = require('../core/logger');
 const logger = createLogger('versionQuery');
+const { formatLocalTimes } = require('./localTime');
 const {
   // getBotVersion, // Unused import
   getDetailedVersionInfo,
@@ -106,7 +107,7 @@ function generateVersionResponse(options = {}) {
 
       // Add timestamp
       const startTime = new Date(new Date().getTime() - versionInfo.uptime * 1000);
-      response += `Started at ${startTime.toISOString().replace('T', ' ').substring(0, 19)}. `;
+      response += `Started at ${formatLocalTimes(startTime)}. `;
     }
   }
 
