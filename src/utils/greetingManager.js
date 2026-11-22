@@ -9,6 +9,7 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
+const { formatLocalTimes } = require('./localTime');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('os');
@@ -112,11 +113,11 @@ function generateStartupReport() {
         name: '💾 Conversation Storage',
         value:
           `**Total Conversations:** ${conversationStatus.totalConversations || 0}\n` +
-          `**Last Save:** ${conversationStatus.lastSave ? new Date(conversationStatus.lastSave).toLocaleString() : 'Never'}\n` +
+          `**Last Save:** ${conversationStatus.lastSave ? formatLocalTimes(conversationStatus.lastSave) : 'Never'}\n` +
           `**Storage Size:** ${formatBytes(conversationStatus.storageSize || 0)}`,
       }
     )
-    .setFooter({ text: `Generated at ${new Date().toISOString()}` });
+    .setFooter({ text: `Generated at ${formatLocalTimes(new Date())}` });
 
   return embed;
 }

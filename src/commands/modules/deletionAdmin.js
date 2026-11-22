@@ -9,6 +9,7 @@
  */
 
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { formatLocalTimes } = require('../../utils/localTime');
 const { createLogger } = require('../../core/logger');
 const { deletionTestingInterface } = require('../../utils/deletionTestingInterface');
 // const maliciousUserManager = require('../../utils/maliciousUserManager'); // Imported but not used in this module
@@ -149,7 +150,7 @@ function formatCommandResult(result, command) {
                   `**Content:** ${msg.content}...\n` +
                   `**Rapid:** ${msg.isRapidDeletion ? '⚡ Yes' : '❌ No'} | ` +
                   `**Count:** ${msg.deletionCount} | ` +
-                  `**Time:** ${new Date(msg.timestamp).toLocaleString()}`,
+                  `**Time:** ${formatLocalTimes(msg.timestamp)}`,
                 inline: false,
               }))
             )

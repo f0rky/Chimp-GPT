@@ -340,7 +340,10 @@ test('footer differentiates delayed source from failed or rate-limited refresh w
   ]) {
     const c = card(match({ stale: true, staleReason: reason }));
     assert.match(c.footer.text, expected);
-    assert.match(c.footer.text, /source 2026-11-14 00:00 UTC · fetched 00:00 UTC/);
+    assert.match(
+      c.footer.text,
+      /source 14 Nov 2026, 11:00 am Sydney · 14 Nov 2026, 1:00 pm NZ · fetched 14 Nov 2026, 11:00 am Sydney · 14 Nov 2026, 1:00 pm NZ/
+    );
   }
   for (const fetchedAt of [NaN, Infinity, 1e99])
     assert.doesNotThrow(() => card(match({ fetchedAt, sourceUpdatedAt: 'invalid' })));

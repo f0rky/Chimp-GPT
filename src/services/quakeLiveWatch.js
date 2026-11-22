@@ -53,6 +53,8 @@ function createWatchManager({
       maintenance: null,
       generation: Symbol(),
       hash: null,
+      lastChangedAt: null,
+      lastCheckedAt: null,
       failures: 0,
       message: null,
       experimental: Boolean(p.experimental),
@@ -182,17 +184,31 @@ function createWatchManager({
           w.intervalMs = delay;
           const cooldownMs = client.pollingPolicy().cooldownMs || 0;
           if (cooldownMs > 0) {
-            // This includes a 429 swallowed by optional ratings or stale GET fallback.
-            if (!w.message || w.hash !== meaningfulHash(s))
+            // Preserve prior success evidence; cooldown snapshots are not successful checks.
+            if (!w.message)
               await write({
-                embeds: [renderSlipgateCard(s)],
+                embeds: [
+                  renderSlipgateCard({
+                    ...s,
+                    localCheckedAt: w.lastCheckedAt,
+                    localChangedAt: w.lastChangedAt,
+                  }),
+                ],
                 allowedMentions: { parse: [] },
               });
             await pause(cooldownMs);
             return;
           }
           const hash = meaningfulHash(s);
-          if (w.hash === hash && !w.paused && !moveCard && w.message) {
+          const fresh = !s.stale && !s.quality?.a2sOnly;
+          const changedAt = fresh && w.hash !== hash ? now() : w.lastChangedAt;
+          const checkedAt = fresh ? now() : w.lastCheckedAt;
+          const displaySnapshot = {
+            ...s,
+            localCheckedAt: checkedAt,
+            localChangedAt: changedAt,
+          };
+          if (w.hash === hash && !w.paused && !moveCard && w.message && !fresh) {
             if (s.stale) throw new Error('Stale Slipgate snapshot');
             w.failures = 0;
             maintenanceSnapshot = s;
@@ -200,14 +216,19 @@ function createWatchManager({
           }
           const payload = {
             content: `Auto-refresh active · ${Math.ceil(delay / 1000)}s minimum.`,
-            embeds: [renderSlipgateCard(s)],
+            embeds: [renderSlipgateCard(displaySnapshot)],
             allowedMentions: { parse: [] },
           };
           await write(payload);
           if (!active(generation)) return;
-          w.hash = hash;
+          if (fresh) {
+            w.hash = hash;
+            w.lastChangedAt = changedAt;
+            w.lastCheckedAt = checkedAt;
+          }
           w.paused = false;
-          if (s.stale) throw new Error('Stale Slipgate snapshot');
+          if (!fresh)
+            throw new Error(s.stale ? 'Stale Slipgate snapshot' : 'Unreliable A2S-only snapshot');
           w.failures = 0;
           maintenanceSnapshot = s;
         } catch (caught) {

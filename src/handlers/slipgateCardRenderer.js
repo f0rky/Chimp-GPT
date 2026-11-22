@@ -1,5 +1,6 @@
 'use strict';
 const { EmbedBuilder } = require('discord.js');
+const { formatLocalTimes } = require('../utils/localTime');
 const {
   number,
   matchState,
@@ -87,29 +88,29 @@ function finalSummary(s, players) {
     winner,
     scoreKnown ? `🔴 Red **${numeric(red)}** — **${numeric(blue)}** Blue 🔵` : null,
     duration ? `⏱ Duration: **${duration}**` : null,
-    Number.isFinite(end) ? `🕒 Ended: **${new Date(end).toISOString().slice(11, 16)} UTC**` : null,
+    Number.isFinite(end) ? `🕒 Ended: ${formatLocalTimes(end)}` : null,
     s.finalRated === true ? 'Rated match' : s.finalRated === false ? 'Unrated match' : null,
     !s.finalAborted && tied.length
       ? `⭐ Highest reported score: **${clean(tied[0].name, 24)}**${tied.length > 1 ? ` (+${tied.length - 1} tied)` : ''} · **${numeric(best)}**`
       : null,
   ].filter(Boolean);
 }
-function footer(s, now) {
+function footer(s) {
   const updated = typeof s.sourceUpdatedAt === 'string' ? Date.parse(s.sourceUpdatedAt) : NaN;
   const confirmed = s.finalConfirmed === true && matchState(s) === 'FINAL';
   const reportedFetch = number(confirmed ? s.finalCheckedAt : s.fetchedAt);
-  const fetched = reportedFetch ?? number(now);
+  const fetched = reportedFetch;
   const time = Number.isFinite(updated)
-    ? `source ${new Date(updated).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+    ? `source ${formatLocalTimes(updated)}`
     : 'source time unavailable';
   const checked =
     fetched !== null && Math.abs(fetched) <= 8640000000000000
-      ? ` · ${confirmed ? 'confirmed' : reportedFetch === null ? 'checked' : 'fetched'} ${new Date(fetched).toISOString().slice(11, 16)} UTC`
+      ? ` · ${confirmed ? 'confirmed' : reportedFetch === null ? 'checked' : 'fetched'} ${formatLocalTimes(fetched)}`
       : '';
   const warning = freshnessWarning(s);
   return `${warning ? `${warning} · ` : ''}Slipgate · ${time}${checked}`;
 }
-function renderSlipgateCard(s, now = Date.now()) {
+function renderSlipgateCard(s, _now = Date.now()) {
   const phase = matchState(s);
   const final = phase === 'FINAL';
   const confirmed = final && s.finalConfirmed === true;
@@ -151,6 +152,16 @@ function renderSlipgateCard(s, now = Date.now()) {
       ? `Last observed time: ${clock}`
       : null
     : [activeRound ? `Round ${s.round}` : null, clock].filter(Boolean).join(' · ');
+  const localFreshness = [
+    Number.isFinite(s.localCheckedAt)
+      ? `Last checked: <t:${Math.floor(s.localCheckedAt / 1000)}:R>`
+      : null,
+    Number.isFinite(s.localChangedAt)
+      ? `Last changed: <t:${Math.floor(s.localChangedAt / 1000)}:R>`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const prediction = s.prediction;
   const predictionAllowed =
     !s.stale &&
@@ -306,9 +317,9 @@ function renderSlipgateCard(s, now = Date.now()) {
     .setTitle(`${final ? '🏁 FINAL MATCH RESULTS · ' : ''}${clean(s.name || s.address, 120)}`)
     .setURL(`https://slipgate.gg/servers/${encodeURIComponent(s.address || '')}`)
     .setDescription(
-      `${intro}${legend}${rosterFields.length ? '' : '\n\nNo player roster reported.'}`
+      `${intro}${legend}${localFreshness ? `\n${localFreshness}` : ''}${rosterFields.length ? '' : '\n\nNo player roster reported.'}`
     )
     .addFields(rosterFields)
-    .setFooter({ text: footer(s, now) });
+    .setFooter({ text: footer(s) });
 }
 module.exports = { renderSlipgateCard, TEAM, clean };

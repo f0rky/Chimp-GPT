@@ -11,6 +11,7 @@
 
 const { SlashCommandBuilder } = require('discord.js');
 const { EmbedBuilder } = require('discord.js');
+const { formatLocalTimes } = require('../../utils/localTime');
 const { getDetailedVersionInfo } = require('../../core/getBotVersion');
 const { generateVersionResponse } = require('../../utils/versionSelfQuery');
 const { trackApiCall } = require('../../core/healthCheck');
@@ -110,7 +111,7 @@ const versionCommand = {
             { name: 'Uptime', value: uptimeFormatted, inline: true },
             {
               name: 'Started At',
-              value: startTime.toISOString().replace('T', ' ').substring(0, 19),
+              value: formatLocalTimes(startTime),
               inline: false,
             }
           );
