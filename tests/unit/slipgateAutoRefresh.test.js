@@ -611,7 +611,7 @@ test('an uncertain initial Discord POST is never replayed; stop during rate-paus
   assert.equal(clock.queue.length, 0);
 });
 
-test('optional ratings 429 visibly pauses a real enriched watch and recovers on the same card', async () => {
+test('optional ratings 429 after base publication visibly pauses and later recovers on the same card', async t => {
   const clock = timers(),
     sent = [],
     edits = [];
@@ -636,6 +636,7 @@ test('optional ratings 429 visibly pauses a real enriched watch and recovers on 
     },
   });
   const manager = createWatchManager({ ...clock, tracker: { observe: async s => s } });
+  t.after(() => manager.stopAll());
   manager.start('rating-pause', {
     client,
     filter: raw.addr,
@@ -651,6 +652,8 @@ test('optional ratings 429 visibly pauses a real enriched watch and recovers on 
     },
   });
   await clock.tick();
+  assert.equal(sent.length, 1, 'base scoreboard precedes optional ratings');
+  await manager._watches.get('rating-pause').maintenance;
   assert.equal(posts, 1);
   assert.equal(sent.length, 1);
   assert.equal(clock.queue[0].ms, 900000);
@@ -658,8 +661,10 @@ test('optional ratings 429 visibly pauses a real enriched watch and recovers on 
   time += 900000;
   limited = false;
   await clock.tick();
+  await manager._watches.get('rating-pause').maintenance;
   assert.equal(sent.length, 1);
   assert.equal(posts, 2);
+  await clock.tick();
   assert.match(embedText(edits.at(-1).embeds[0].toJSON()), /2600\*/);
   assert.match(edits.at(-1).content, /Auto-refresh active/);
   await manager.stopAll();
@@ -697,7 +702,7 @@ test('compact ELO omits absent totals, unresolved ladders, warmup and private va
     assert.doesNotMatch(renderSlipgateCard({ ...base, ...override }).toJSON().description, /ELO/);
 });
 
-test('real implicit command, client, ratings and tracker feed successive edits to one card without analysis', async () => {
+test('real implicit command publishes before ratings then feeds cached ELO and successive edits without analysis', async t => {
   const { createRoundTracker } = require('../../src/services/quakeRoundTracker');
   const clock = timers(),
     sent = [],
@@ -724,6 +729,7 @@ test('real implicit command, client, ratings and tracker feed successive edits t
     ...clock,
     tracker: createRoundTracker({ now: () => time }),
   });
+  t.after(() => manager.stopAll());
   const command = createCommand({
     client,
     manager,
@@ -755,13 +761,16 @@ test('real implicit command, client, ratings and tracker feed successive edits t
   await command.execute(message, [raw.addr]);
   assert.equal(posts, 0);
   await clock.tick();
-  assert.match(embedText(sent[0].embeds[0].toJSON()), /CA B[\s\S]*2600\*/);
+  assert.equal(sent.length, 1);
+  assert.doesNotMatch(embedText(sent[0].embeds[0].toJSON()), /2600/);
+  await manager._watches.values().next().value.maintenance;
   raw.live.score_red = 2;
   time += 60000;
   await clock.tick();
   assert.equal(sent.length, 1);
   assert.equal(posts, 1);
   assert.equal(models, 0);
+  assert.match(embedText(edits.at(-1).embeds[0].toJSON()), /CA B[\s\S]*2600\*/);
   assert.match(embedText(edits.at(-1).embeds[0].toJSON()), /Red \(1\) · 2/);
   await command.execute(message, ['stop']);
   assert.match(edits.at(-1).content, /Auto-refresh stopped/);

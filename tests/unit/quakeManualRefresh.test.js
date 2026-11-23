@@ -10,12 +10,14 @@ function fixture() {
   const messages = [];
   let current = snapshot();
   let reactionFailure = null;
+  let reactions = 0;
   const channel = {
     send: async payload => {
       const m = {
         id: String(messages.length + 1),
         payload,
         react: () => {
+          reactions++;
           if (reactionFailure === 'throw') throw Error('missing Add Reactions');
           if (reactionFailure === 'reject') return Promise.reject(Error('missing Add Reactions'));
         },
@@ -52,6 +54,7 @@ function fixture() {
     messages,
     channel,
     client,
+    reactions: () => reactions,
     set: s => {
       current = s;
     },
@@ -83,7 +86,7 @@ test('manual refresh shares watch path, binds current card, coalesces overlap, a
   assert.equal(f.queue.length, 1);
 });
 
-test('reaction-add permission failures degrade to the button and do not stop the watch', async () => {
+test('button-only watch never invokes reaction decoration even if that permission is absent', async () => {
   for (const mode of ['throw', 'reject']) {
     const f = fixture();
     f.failReaction(mode);
@@ -91,6 +94,7 @@ test('reaction-add permission failures degrade to the button and do not stop the
     assert.ok(f.manager.status('bot:guild:channel'));
     assert.equal(f.messages[0].payload.components[0].components[0].label, 'Refresh');
     assert.equal(f.queue.length, 1);
+    assert.equal(f.reactions(), 0);
     await f.manager.stopAll();
   }
 });

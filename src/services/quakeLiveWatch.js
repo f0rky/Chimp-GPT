@@ -48,6 +48,7 @@ function createWatchManager({
     const w = {
       key,
       channel,
+      client,
       address: null,
       lastPublishedSnapshot: null,
       rivalryReport: null,
@@ -142,6 +143,35 @@ function createWatchManager({
       w.maintenance = Promise.resolve()
         .then(async () => {
           if (w.stopped || watches.get(key) !== w) return;
+          // Missing ratings share the provider queue, but never hold up the base card.
+          // Enrichment seeds only the client's match-scoped cache; a later normal poll
+          // renders it, so this old snapshot cannot overwrite newer scores or timestamps.
+          if (
+            client.enrichRatings &&
+            !observedSnapshot.stale &&
+            !observedSnapshot.quality?.a2sOnly
+          ) {
+            try {
+              await client.enrichRatings(structuredClone(observedSnapshot));
+            } catch (_) {
+              /* Optional ELO coverage must not affect the current watch. */
+            }
+          }
+          if (w.stopped || watches.get(key) !== w) return;
+          const ratingsCooldown = client.pollingPolicy().cooldownMs || 0;
+          if (ratingsCooldown > 0) {
+            w.paused = true;
+            w.lastPollOutcome = 'backoff';
+            const delay = Math.max(w.intervalMs, ratingsCooldown);
+            w.intervalMs = delay;
+            clearTimer(w.timer);
+            w.timer = schedule(w.tick, delay);
+            await w.cards.publish({
+              content: `Auto-refresh paused: Slipgate rate limit/backoff. Next refresh no sooner than ${Math.ceil(delay / 1000)}s.`,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
           await w.cards.reconcile({ allowOptionalContext: !manual });
           if (w.stopped || watches.get(key) !== w || (client.pollingPolicy().cooldownMs || 0) > 0)
             return;
@@ -237,16 +267,8 @@ function createWatchManager({
             );
           }
           await w.cards.publish(payload, moveCard);
-          const current = w.cards.message;
-          if (current?.id && !w.cards.retainedFinal && current.id !== w.reactionMessageId) {
-            w.reactionMessageId = current.id;
-            // Reaction is a convenience; missing Add Reactions permission must not break polling.
-            try {
-              Promise.resolve(current.react?.('🔄')).catch(() => undefined);
-            } catch (_) {
-              // Synchronous permission/cache failures also degrade to button-only controls.
-            }
-          }
+          // Button-only controls. Remove only our obsolete reaction on a reused owned card.
+          w.removeOwnReaction(w.cards.message);
         } finally {
           w.message = w.cards.message;
           // An uncertain reposition POST must never turn the stop-status edit into another POST.
@@ -267,8 +289,12 @@ function createWatchManager({
       const work = (async () => {
         try {
           const s = w.address
-            ? await client.getServer(w.address, { forceRefresh: true, includePrediction: true })
-            : await client.selectServer(filter, { includePrediction: true });
+            ? await client.getServer(w.address, {
+                forceRefresh: true,
+                includePrediction: true,
+                deferRatings: true,
+              })
+            : await client.selectServer(filter, { includePrediction: true, deferRatings: true });
           if (!active(generation)) return;
           if (!s) throw new Error('No matching server');
           w.address = s.address;
@@ -456,7 +482,7 @@ function createWatchManager({
     w.timer = schedule(tick, 0);
     return { ok: true, existing: false };
   }
-  async function refresh(key, messageId) {
+  function enqueueRefresh(key, messageId) {
     const w = watches.get(key);
     if (
       !w ||
@@ -466,31 +492,54 @@ function createWatchManager({
       String(w.message.id) !== String(messageId)
     )
       return { ok: false, reason: 'This refresh control is no longer active.' };
-    if (w.inflight) return { ok: true, coalesced: true, promise: w.inflight };
-    if (w.refreshPromise) return { ok: true, coalesced: true, promise: w.refreshPromise };
+    if (w.inflight || w.refreshPromise)
+      return {
+        ok: true,
+        coalesced: true,
+        reason: 'A refresh is already queued or running; the scoreboard will update when ready.',
+        promise: w.refreshPromise || w.inflight,
+      };
+    if ((w.client?.pollingPolicy?.().cooldownMs || 0) > 0)
+      return {
+        ok: false,
+        backoff: true,
+        reason: 'Provider backoff is active; the watch will retry when allowed.',
+      };
     if (now() < w.refreshAt)
       return { ok: false, reason: 'Refresh is cooling down; scheduled polling remains active.' };
     w.refreshAt = now() + 5000;
     clearTimer(w.timer);
     w.timer = null;
-    const promise = w.tick({ manual: true });
-    w.refreshPromise = promise;
-    try {
-      await promise;
-      if (w.stopped || watches.get(key) !== w)
-        return { ok: false, reason: 'This watch stopped before refresh completed.' };
-      if (w.lastPollOutcome === 'backoff')
-        return {
-          ok: true,
-          backoff: true,
-          reason: 'Provider backoff is active; scheduled refresh remains paused.',
-        };
-      if (w.lastPollOutcome !== 'success')
-        return { ok: false, reason: 'Refresh failed; the scheduled watch will retry.' };
-      return { ok: true, coalesced: false };
-    } finally {
+    const promise = w.tick({ manual: true }).finally(() => {
       if (w.refreshPromise === promise) w.refreshPromise = null;
-    }
+    });
+    w.refreshPromise = promise;
+    // The interaction owns admission only; the existing watch owns completion and its timer.
+    promise.catch(() => undefined);
+    return {
+      ok: true,
+      queued: true,
+      coalesced: false,
+      reason: 'Refresh queued; the scoreboard will update when ready.',
+      promise,
+    };
+  }
+  async function refresh(key, messageId) {
+    const w = watches.get(key);
+    const result = enqueueRefresh(key, messageId);
+    if (!result.ok || result.coalesced) return result;
+    await result.promise;
+    if (w.stopped || watches.get(key) !== w)
+      return { ok: false, reason: 'This watch stopped before refresh completed.' };
+    if (w.lastPollOutcome === 'backoff')
+      return {
+        ok: true,
+        backoff: true,
+        reason: 'Provider backoff is active; scheduled refresh remains paused.',
+      };
+    if (w.lastPollOutcome !== 'success')
+      return { ok: false, reason: 'Refresh failed; the scheduled watch will retry.' };
+    return { ok: true, coalesced: false };
   }
   async function stop(key) {
     const w = watches.get(key);
@@ -564,7 +613,17 @@ function createWatchManager({
         }
       : null;
   }
-  return { start, refresh, snapshot, stop, stopAll, shutdown, status, _watches: watches };
+  return {
+    start,
+    enqueueRefresh,
+    refresh,
+    snapshot,
+    stop,
+    stopAll,
+    shutdown,
+    status,
+    _watches: watches,
+  };
 }
 const manager = createWatchManager();
 // Invalidate generations and timers immediately when the application's shutdown begins.

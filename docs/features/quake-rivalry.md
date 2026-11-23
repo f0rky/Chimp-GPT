@@ -9,8 +9,8 @@ Automatic rivalry enrichment is opt-in with `SLIPGATE_RIVALRY_ENABLED=true`. Lea
 ## User-facing behavior
 
 - The current mutable watch card moves below newer ordinary channel messages on its next successful refresh, even when the scoreboard is unchanged. This includes ordinary status messages from the bot itself. Retained final scoreboards are not moved or deleted.
-- The active card has a labelled **🔄 Refresh** button and a 🔄 reaction. Human reaction additions and removals use the same refresh path as the button. Old cards and stopped/finalized watches cannot start another refresh.
-- Concurrent refreshes coalesce with existing polling. A click does not bypass provider backoff, start a second recurring timer, or regenerate AI commentary.
+- The active card has one labelled **🔄 Refresh** button, without a separate reaction control. Old cards and stopped/finalized watches cannot start another refresh. The button acknowledges immediately and confirms queue admission privately rather than keeping a “thinking” reply open until the lookup finishes.
+- Concurrent refreshes coalesce with existing polling. A click does not bypass provider backoff, start a second recurring timer, or regenerate AI commentary. Live server lookups take priority over pending optional history/rivalry requests inside the same rate-limited queue, with bounded fairness for background work. Already-dispatched work and the next permitted admission time cannot be bypassed. The base scoreboard uses available cached/prediction ELO; missing ratings are collected only after base publication for a later ordinary poll.
 - `!gaunt` and `!gaunts` are aliases. With no player arguments they summarize the current watched roster. One public roster player selects a player report; two opposing public roster players select a comparison. A unique current-roster name can resolve to its public SteamID, but provider records are joined only by exact IDs.
 - `!gaunt prematch` and `!gaunt summary` select presentation modes. They do not turn warmup statistics into a confirmed result.
 - Automatic pre-match context is scoped to a lineup. Confirmed final context belongs to the exact archived match, not the next warmup roster. Missing or delayed enrichment must not block publication of the ordinary scoreboard.
@@ -53,7 +53,7 @@ flowchart TD
   G -->|no| X[Discard obsolete result]
   E -->|unavailable or throttled| W
   D --> W
-  W -->|button or reaction| M[Validate exact current card and coalesce]
+  W -->|Refresh button| M[Validate exact current card and coalesce]
   M -->|admitted| F
   M -->|backoff or obsolete| R
   W -->|stop| S[Invalidate generation and remove active controls]
@@ -74,7 +74,7 @@ After a separately approved rollout, exercise these without deliberately trigger
 
 - Start one watch and confirm its card shows its active cadence and relative last-check time.
 - Add an ordinary channel message; after the next successful update, confirm the new current card is below it and the old owned mutable card is retired.
-- Click Refresh and add/remove 🔄; verify one current card, one watch, and truthful cooldown behavior. Reactions may degrade to button-only if the bot lacks Add Reactions permission.
+- Click Refresh; verify prompt private queue confirmation without a persistent thinking reply, one current card, one watch, and truthful cooldown behavior. There must be no bot-added standalone 🔄 reaction. A genuine admission wait remains possible under the shared provider budget; compare queue-wait and HTTP-duration diagnostics rather than assuming the API was slow.
 - Try `!gaunt` and `!gaunts`, then one public player and a valid opposing pair. Verify aliases, sample coverage and lifetime-versus-match labels.
 - Confirm a private/ambiguous player, an obsolete card and a stopped watch cannot trigger provider work.
 - Observe a natural lineup change and a confirmed final only when available. An offline fixture pass is not an observed live match transition or a Discord-client visual check.

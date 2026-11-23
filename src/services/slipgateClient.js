@@ -68,6 +68,7 @@ function createSlipgateClient({
   env = process.env,
   sleep = ms => new Promise(resolve => setTimeout(resolve, Math.min(ms, 60000))),
   apiKey = env.SLIPGATE_API_KEY,
+  onRequestTiming = null,
 } = {}) {
   const policy = budgetPolicy(env, apiKey);
   const spacing = Math.ceil(policy.windowMs / policy.capacity);
@@ -76,9 +77,12 @@ function createSlipgateClient({
     ratingCache = new Map(),
     matchLifecycles = new Map();
   let ratingsBlockedUntil = 0;
-  let gate = Promise.resolve(),
-    lastStart = -Infinity,
+  let lastStart = -Infinity,
     blockedUntil = 0;
+  const pending = [];
+  const pendingByKey = new Map();
+  let pumping = false,
+    consecutiveLive = 0;
   const starts = [];
   // Outer local safety ceiling for this process; never overrides a stricter provider window.
   const safetyStarts = [];
@@ -152,25 +156,92 @@ function createSlipgateClient({
         throw new TypeError('Invalid pagination');
     return { path: suffix, params: sorted, key: `${suffix}:${JSON.stringify(sorted)}` };
   }
-  async function admit() {
-    if (now() < blockedUntil) throw cooldown();
-    let delay;
-    do {
+  async function pump() {
+    if (pumping) return;
+    pumping = true;
+    const delayForSlot = () => {
       const t = now();
       while (starts.length && starts[0] <= t - policy.windowMs) starts.shift();
       while (safetyStarts.length && safetyStarts[0] <= t - 60000) safetyStarts.shift();
-      delay = Math.max(
+      return Math.max(
         0,
         lastStart + spacing - t,
         starts.length >= policy.capacity ? starts[0] + policy.windowMs - t : 0,
-        safetyStarts.length >= 60 ? safetyStarts[0] + 60000 - t : 0
+        safetyStarts.length >= 60 ? safetyStarts[0] + 60000 - t : 0,
+        blockedUntil - t
       );
-      if (delay > 0) await sleep(delay);
-      if (now() < blockedUntil) throw cooldown();
-    } while (delay > 0);
-    lastStart = now();
-    starts.push(lastStart);
-    safetyStarts.push(lastStart);
+    };
+    try {
+      while (pending.length) {
+        // Fail pending work on a provider cooldown. Do not silently sleep and
+        // replay a backlog after Retry-After; the watch owns its next retry.
+        if (now() < blockedUntil) {
+          for (const job of pending.splice(0)) {
+            pendingByKey.delete(job.key);
+            job.reject(cooldown());
+          }
+          break;
+        }
+
+        const delay = delayForSlot();
+        if (delay > 0) {
+          await sleep(Math.min(delay, 60000));
+          continue;
+        }
+        const backgrounds = pending.filter(job => job.priority !== 'live');
+        const live = pending.filter(job => job.priority === 'live');
+        const chosen =
+          backgrounds.length && (!live.length || consecutiveLive >= 3)
+            ? backgrounds[0]
+            : live[0] || backgrounds[0];
+        pending.splice(pending.indexOf(chosen), 1);
+        if (chosen.key) pendingByKey.delete(chosen.key);
+        if (now() < blockedUntil) {
+          chosen.reject(cooldown());
+          continue;
+        }
+        lastStart = now();
+        starts.push(lastStart);
+        safetyStarts.push(lastStart);
+        consecutiveLive = chosen.priority === 'live' ? consecutiveLive + 1 : 0;
+        chosen.resolve(lastStart);
+        // Yield so dispatch/fast failures can publish cooldown before another
+        // admission. Do not await HTTP completion: a slow optional lookup must
+        // not block a live request after its next quota slot becomes eligible.
+        await new Promise(resolve => setImmediate(resolve));
+      }
+    } catch (error) {
+      for (const job of pending.splice(0)) {
+        pendingByKey.delete(job.key);
+        job.reject(error);
+      }
+    } finally {
+      pumping = false;
+      if (pending.length) pump();
+    }
+  }
+  function enqueue(priority, key) {
+    const existing = pendingByKey.get(key);
+    if (existing) {
+      if (priority === 'live') existing.priority = 'live';
+      return existing;
+    }
+    let resolve, reject;
+    const promise = new Promise((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    const job = {
+      key,
+      priority: priority === 'live' ? 'live' : 'background',
+      resolve,
+      reject,
+      promise,
+    };
+    pending.push(job);
+    pendingByKey.set(key, job);
+    pump();
+    return job;
   }
   function bulk(body) {
     if (
@@ -246,15 +317,17 @@ function createSlipgateClient({
     }
     const saved = cache.get(c.key);
     if (!options.noCache && saved && now() < saved.until) return saved.response;
-    if (inflight.has(c.key)) return inflight.get(c.key);
+    if (inflight.has(c.key)) {
+      const queued = pendingByKey.get(c.key);
+      if (queued && options.priority === 'live') queued.priority = 'live';
+      return inflight.get(c.key);
+    }
     if (now() < blockedUntil) throw cooldown();
     if (inflight.size >= 64) throw new Error('Slipgate local request queue full');
-    const admission = gate.then(admit);
-    gate = admission.catch(() => {
-      /* Keep later admissions usable after failures. */
-    });
+    const queuedAt = now();
+    const job = enqueue(options.priority, c.key);
     const promise = (async () => {
-      await admission;
+      const admittedAt = await job.promise;
       if (now() < blockedUntil) throw cooldown();
       if (c.body && now() < ratingsBlockedUntil)
         throw new Error('Slipgate ratings authentication cooldown');
@@ -267,10 +340,21 @@ function createSlipgateClient({
           maxBodyLength: 1048576,
           headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
         };
+        const startedAt = now();
         const response = c.body
           ? await httpPost(`${BASE}${c.path}`, c.body, config)
           : await httpGet(`${BASE}${c.path}`, config);
         const data = c.body ? validateRatings(response.data, c.body) : stripPrivate(response.data);
+        try {
+          (options.onRequestTiming || onRequestTiming)?.({
+            kind: c.body ? 'ratings' : 'get',
+            queueMs: Math.max(0, admittedAt - queuedAt),
+            httpMs: Math.max(0, now() - startedAt),
+            status: response.status ?? 200,
+          });
+        } catch (_) {
+          /* diagnostics are best effort */
+        }
         const ttl = c.body
           ? 900000
           : c.path === '/servers'
@@ -467,7 +551,7 @@ function createSlipgateClient({
       },
     };
   }
-  async function enrichRatings(snapshot) {
+  async function enrichRatings(snapshot, { cacheOnly = false } = {}) {
     const mode = snapshot.gameType,
       set = snapshot.ratingSet;
     const scope = `${snapshot.address}:${mode}:${set}`;
@@ -573,7 +657,7 @@ function createSlipgateClient({
     const missing = ids.filter(
       id => !ratingCache.has(cacheKey(id)) || now() >= ratingCache.get(cacheKey(id)).until
     );
-    if (missing.length && now() >= ratingsBlockedUntil) {
+    if (!cacheOnly && missing.length && now() >= ratingsBlockedUntil) {
       try {
         const response = await request('/ratings/bulk', {
           method: 'POST',
@@ -614,7 +698,15 @@ function createSlipgateClient({
     });
     return result;
   }
-  async function getServer(addr, { forceRefresh = false, includePrediction = false } = {}) {
+  async function getServer(
+    addr,
+    {
+      forceRefresh = false,
+      includePrediction = false,
+      deferRatings = false,
+      priority = 'live',
+    } = {}
+  ) {
     if (!validAddress(addr)) throw new TypeError('Invalid server address');
     const path = `/servers/${encodeURIComponent(addr)}`;
     const params = {
@@ -622,10 +714,13 @@ function createSlipgateClient({
       ...(includePrediction ? { include_prediction: true } : {}),
     };
     try {
-      const response = await request(path, { params, noCache: forceRefresh });
+      const response = await request(path, { params, noCache: forceRefresh, priority });
       if (!response.data?.ok || response.data.addr !== addr)
         throw new Error('Slipgate server response mismatch');
-      return await enrichRatings(normalize(response.data, response, includePrediction));
+      const snapshot = normalize(response.data, response, includePrediction);
+      return deferRatings
+        ? await enrichRatings(snapshot, { cacheOnly: true })
+        : await enrichRatings(snapshot);
     } catch (error) {
       const old = cache.get(canonical(path, params).key)?.response;
       if (old?.data?.ok && old.data.addr === addr && now() - old.slipgateFetchedAt <= 600000)
@@ -641,7 +736,8 @@ function createSlipgateClient({
         ...(page ? { offset: page * limit } : {}),
         ...(active ? { active: 'true' } : {}),
       };
-      const d = (await request('/servers', { params, noCache: forceRefresh })).data;
+      const d = (await request('/servers', { params, noCache: forceRefresh, priority: 'live' }))
+        .data;
       if (!d?.ok || !Array.isArray(d.servers)) throw new Error('Invalid Slipgate catalogue');
       servers.push(...d.servers.slice(0, limit));
       if (d.servers.length < limit) break;
@@ -703,7 +799,10 @@ function createSlipgateClient({
     getMatch,
   };
 }
-const defaultClient = createSlipgateClient();
+const defaultClient = createSlipgateClient({
+  onRequestTiming: sample =>
+    require('../core/logger').discord.info(sample, 'Slipgate request timing'),
+});
 module.exports = {
   createSlipgateClient,
   defaultClient,

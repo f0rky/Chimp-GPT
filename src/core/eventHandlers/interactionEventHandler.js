@@ -1,5 +1,5 @@
 const { discord: discordLogger } = require('../logger');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const commandHandler = require('../../commands/commandHandler');
 const { generateImage } = require('../../services/imageGeneration');
 const { downloadImage } = require('../../utils/imageDownloader');
@@ -81,12 +81,6 @@ class InteractionEventHandler {
 
   setupEventHandlers() {
     this.client.on('interactionCreate', this.handleInteractionCreate.bind(this));
-    this.client.on('messageReactionAdd', (reaction, user) =>
-      this.handleWatchReaction(reaction, user)
-    );
-    this.client.on('messageReactionRemove', (reaction, user) =>
-      this.handleWatchReaction(reaction, user)
-    );
   }
 
   async handleInteractionCreate(interaction) {
@@ -167,32 +161,15 @@ class InteractionEventHandler {
       await replyEphemeral(interaction, 'This refresh control is no longer available.');
       return;
     }
-    await interaction.deferReply({ ephemeral: true });
-    const result = await this.watches.refresh(key, interaction.message?.id);
-    await interaction.editReply(
-      result.ok ? result.reason || '🔄 Refresh request completed.' : result.reason
-    );
-  }
-
-  async handleWatchReaction(reaction, user) {
+    // Acknowledge the component, not a deferred reply that displays a long-lived thinking state.
+    await interaction.deferUpdate();
+    const result = this.watches.enqueueRefresh(key, interaction.message?.id);
     try {
-      if (!user || user.bot || user.id === this.client.user?.id || reaction.emoji?.name !== '🔄')
-        return;
-      if (reaction.partial) await reaction.fetch();
-      const message = reaction.message;
-      if (message?.partial) await message.fetch();
-      const channel = message?.channel;
-      if (
-        !message?.id ||
-        !channel?.guildId ||
-        !(this.config.CHANNEL_ID || []).includes(channel.id) ||
-        this.blocked.isUserBlocked(user.id)
-      )
-        return;
-      const key = `${this.client.user?.id || 'bot'}:${channel.guildId}:${channel.id}`;
-      await this.watches.refresh(key, message.id);
-    } catch (error) {
-      discordLogger.debug({ error }, 'Ignored invalid or unavailable Quake refresh reaction');
+      await interaction.followUp({ content: result.reason, flags: MessageFlags.Ephemeral });
+    } catch (_) {
+      // After deferUpdate, editReply targets the original scoreboard. Never replace
+      // that card with an acknowledgement error or replay the accepted lookup.
+      discordLogger.warn('Quake refresh acknowledgement follow-up unavailable');
     }
   }
 
