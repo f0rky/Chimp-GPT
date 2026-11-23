@@ -105,6 +105,7 @@ function loadHandler({ env = {}, config = { OWNER_ID } } = {}) {
     '../../services/imageGeneration': { generateImage },
     '../../utils/imageDownloader': { downloadImage: async () => Buffer.from('img') },
     '../../utils/maliciousUserManager': { isUserBlocked: () => false },
+    '../../services/quakeLiveWatch': { refresh: async () => ({ ok: false }) },
     '../../middleware/performanceMonitor': { startTimer: () => 'fixture-timer', stopTimer: noop },
     '../../middleware/rateLimiter': {
       checkUserRateLimit: async () => ({ limited: false }),

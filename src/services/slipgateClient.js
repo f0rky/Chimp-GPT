@@ -80,22 +80,30 @@ function createSlipgateClient({
     lastStart = -Infinity,
     blockedUntil = 0;
   const starts = [];
+  // Outer local safety ceiling for this process; never overrides a stricter provider window.
+  const safetyStarts = [];
   const cooldown = () =>
     Object.assign(
       new Error(`Slipgate cooldown active for ${Math.ceil((blockedUntil - now()) / 1000)}s`),
       { status: 429, retryAfterMs: Math.max(0, blockedUntil - now()) }
     );
   function canonical(path, params = {}) {
+    const analytics =
+      typeof path === 'string'
+        ? /^\/players\/(7656119\d{10})\/(head-to-head\/(7656119\d{10})|peers|weapons)(\?[^#]*)?$/.exec(
+            path
+          )
+        : null;
     if (
       typeof path !== 'string' ||
-      !/^\/(servers|matches)(\/[^/?#]+)?(\?[^#]*)?$/.test(path) ||
+      (!analytics && !/^\/(servers|matches)(\/[^/?#]+)?(\?[^#]*)?$/.test(path)) ||
       path.includes('..')
     )
       throw new TypeError('Invalid Slipgate API path');
     const url = new URL(BASE + path);
     const suffix = url.pathname.slice('/api/v1'.length);
     const parts = suffix.split('/');
-    if (parts[2]) {
+    if (parts[2] && !analytics) {
       let decoded;
       try {
         decoded = decodeURIComponent(parts[2]);
@@ -109,15 +117,31 @@ function createSlipgateClient({
     const sorted = Object.fromEntries(
       [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b))
     );
-    if (
-      Object.keys(sorted).some(
-        k =>
-          !['limit', 'offset', 'active', 'include_rules', 'include_prediction', 'server'].includes(
-            k
-          )
-      )
-    )
+    const allowed = analytics
+      ? analytics[2].startsWith('head-to-head/')
+        ? []
+        : analytics[2] === 'peers'
+          ? ['game_type', 'last', 'limit']
+          : ['game_type', 'rating_set', 'last']
+      : ['limit', 'offset', 'active', 'include_rules', 'include_prediction', 'server'];
+    if (Object.keys(sorted).some(k => !allowed.includes(k)))
       throw new TypeError('Invalid Slipgate query');
+    if (analytics) {
+      if (sorted.game_type !== undefined && !/^[a-z][a-z0-9_]{0,15}$/.test(sorted.game_type))
+        throw new TypeError('Invalid Slipgate game type');
+      if (sorted.rating_set !== undefined && !['A', 'B'].includes(sorted.rating_set))
+        throw new TypeError('Invalid Slipgate rating set');
+      if (
+        sorted.last !== undefined &&
+        (!/^\d{1,3}$/.test(sorted.last) || Number(sorted.last) < 1 || Number(sorted.last) > 200)
+      )
+        throw new TypeError('Invalid Slipgate match window');
+      if (
+        sorted.limit !== undefined &&
+        (!/^\d{1,3}$/.test(sorted.limit) || Number(sorted.limit) < 1 || Number(sorted.limit) > 50)
+      )
+        throw new TypeError('Invalid Slipgate peer limit');
+    }
     if (sorted.server && !validAddress(sorted.server))
       throw new TypeError('Invalid server address');
     for (const key of ['offset', 'limit'])
@@ -134,16 +158,19 @@ function createSlipgateClient({
     do {
       const t = now();
       while (starts.length && starts[0] <= t - policy.windowMs) starts.shift();
+      while (safetyStarts.length && safetyStarts[0] <= t - 60000) safetyStarts.shift();
       delay = Math.max(
         0,
         lastStart + spacing - t,
-        starts.length >= policy.capacity ? starts[0] + policy.windowMs - t : 0
+        starts.length >= policy.capacity ? starts[0] + policy.windowMs - t : 0,
+        safetyStarts.length >= 60 ? safetyStarts[0] + 60000 - t : 0
       );
       if (delay > 0) await sleep(delay);
       if (now() < blockedUntil) throw cooldown();
     } while (delay > 0);
     lastStart = now();
     starts.push(lastStart);
+    safetyStarts.push(lastStart);
   }
   function bulk(body) {
     if (

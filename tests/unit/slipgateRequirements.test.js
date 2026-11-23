@@ -61,6 +61,31 @@ test('concurrent distinct endpoints share pacing and the aggregate window cap', 
     assert.ok(starts.filter(t => t > start - 1000 && t <= start).length <= 2);
 });
 
+test('dispatch safety cap holds at 60 actual HTTP starts per rolling minute', async () => {
+  let time = 0;
+  const starts = [];
+  const client = createSlipgateClient({
+    env: {
+      SLIPGATE_CONFIRMED_REQUESTS_PER_WINDOW: '1000',
+      SLIPGATE_CONFIRMED_WINDOW_SECONDS: '60',
+      SLIPGATE_WATCH_BUDGET_FRACTION: '0.25',
+    },
+    now: () => time,
+    sleep: async ms => {
+      time += ms;
+    },
+    httpGet: async url => {
+      starts.push(time);
+      return { data: { ok: true, addr: url.split('/').pop() } };
+    },
+  });
+  for (let i = 0; i < 61; i++) await client.request(`/matches/id-${i}`);
+  assert.equal(starts.length, 61);
+  assert.ok(starts[60] - starts[0] >= 60000);
+  for (const start of starts)
+    assert.ok(starts.filter(t => t > start - 60000 && t <= start).length <= 60);
+});
+
 test('archive list uses the published matches server query', async () => {
   const urls = [];
   const client = createSlipgateClient({

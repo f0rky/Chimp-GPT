@@ -5,6 +5,7 @@ const { generateImage } = require('../../services/imageGeneration');
 const { downloadImage } = require('../../utils/imageDownloader');
 const maliciousUserManager = require('../../utils/maliciousUserManager');
 const performanceMonitor = require('../../middleware/performanceMonitor');
+const quakeWatches = require('../../services/quakeLiveWatch');
 const {
   checkUserRateLimit,
   checkImageGenerationRateLimit,
@@ -69,28 +70,38 @@ async function replyEphemeral(interaction, content) {
 }
 
 class InteractionEventHandler {
-  constructor(client, config) {
+  constructor(client, config, { watches = quakeWatches, blocked = maliciousUserManager } = {}) {
     this.client = client;
     this.config = config;
+    this.watches = watches;
+    this.blocked = blocked;
 
     this.setupEventHandlers();
   }
 
   setupEventHandlers() {
     this.client.on('interactionCreate', this.handleInteractionCreate.bind(this));
+    this.client.on('messageReactionAdd', (reaction, user) =>
+      this.handleWatchReaction(reaction, user)
+    );
+    this.client.on('messageReactionRemove', (reaction, user) =>
+      this.handleWatchReaction(reaction, user)
+    );
   }
 
   async handleInteractionCreate(interaction) {
     let timerId;
     try {
+      const refreshButton =
+        interaction.isButton() && interaction.customId.startsWith('quake_refresh:');
       const imageButton =
         interaction.isButton() &&
         ['image_upscale:', 'image_remix:', 'hd_upgrade:'].some(prefix =>
           interaction.customId.startsWith(prefix)
         );
-      if (!imageButton && !interaction.isChatInputCommand()) return;
+      if (!imageButton && !refreshButton && !interaction.isChatInputCommand()) return;
 
-      const denial = await this.getInteractionDenial(interaction, imageButton);
+      const denial = await this.getInteractionDenial(interaction, imageButton, refreshButton);
       if (denial) {
         await interaction.reply({ content: denial, ephemeral: true });
         return;
@@ -100,6 +111,12 @@ class InteractionEventHandler {
         imageButton || interaction.commandName === 'image' ? 'image_interaction' : 'slash_command',
         { command: imageButton ? 'image_button' : interaction.commandName }
       );
+
+      // Refresh controls are intentionally outside image billing/rate-limit paths.
+      if (refreshButton) {
+        await this.handleWatchRefresh(interaction);
+        return;
+      }
 
       // Handle button interactions
       if (interaction.isButton()) {
@@ -129,8 +146,58 @@ class InteractionEventHandler {
     }
   }
 
-  async getInteractionDenial(interaction, imageButton) {
-    if (maliciousUserManager.isUserBlocked(interaction.user.id)) {
+  async handleWatchRefresh(interaction) {
+    const match = /^quake_refresh:([^:]+)$/.exec(interaction.customId || '');
+    let key;
+    try {
+      key = decodeURIComponent(match?.[1] || '');
+    } catch (_) {
+      key = '';
+    }
+    const channel = interaction.channel;
+    const expected = `${this.client.user?.id || 'bot'}:${interaction.guildId}:${interaction.channelId}`;
+    if (
+      !key ||
+      key !== expected ||
+      !interaction.guildId ||
+      !channel ||
+      !(this.config.CHANNEL_ID || []).includes(interaction.channelId) ||
+      this.blocked.isUserBlocked(interaction.user?.id)
+    ) {
+      await replyEphemeral(interaction, 'This refresh control is no longer available.');
+      return;
+    }
+    await interaction.deferReply({ ephemeral: true });
+    const result = await this.watches.refresh(key, interaction.message?.id);
+    await interaction.editReply(
+      result.ok ? result.reason || '🔄 Refresh request completed.' : result.reason
+    );
+  }
+
+  async handleWatchReaction(reaction, user) {
+    try {
+      if (!user || user.bot || user.id === this.client.user?.id || reaction.emoji?.name !== '🔄')
+        return;
+      if (reaction.partial) await reaction.fetch();
+      const message = reaction.message;
+      if (message?.partial) await message.fetch();
+      const channel = message?.channel;
+      if (
+        !message?.id ||
+        !channel?.guildId ||
+        !(this.config.CHANNEL_ID || []).includes(channel.id) ||
+        this.blocked.isUserBlocked(user.id)
+      )
+        return;
+      const key = `${this.client.user?.id || 'bot'}:${channel.guildId}:${channel.id}`;
+      await this.watches.refresh(key, message.id);
+    } catch (error) {
+      discordLogger.debug({ error }, 'Ignored invalid or unavailable Quake refresh reaction');
+    }
+  }
+
+  async getInteractionDenial(interaction, imageButton, refreshButton = false) {
+    if (this.blocked.isUserBlocked(interaction.user.id)) {
       return 'You are not permitted to use this bot.';
     }
     if (
@@ -139,6 +206,7 @@ class InteractionEventHandler {
     ) {
       return 'This bot is not enabled in this channel.';
     }
+    if (refreshButton) return null;
     const limit = await checkUserRateLimit(interaction.user.id, 1, {
       points: 30,
       duration: 30,
