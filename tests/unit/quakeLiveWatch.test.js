@@ -144,64 +144,99 @@ test('fresh unchanged snapshots refresh checked time while last-changed remains 
   await manager.stopAll();
 });
 
-test('stale, A2S-only, provider failure and cooldown preserve successful timestamp evidence', async () => {
+test('four empty A2S-only polls stay active with checked times, one timer and no archive work', async t => {
+  const f = fixture();
+  let now = 1_800_000_000_000;
+  const manager = createWatchManager({ ...f.clock, now: () => now });
+  t.after(() => manager.stopAll());
+  f.setSnapshot({
+    ...snapshot(),
+    state: 'warmup',
+    players: [],
+    matchGuid: null,
+    quality: { a2sOnly: true },
+  });
+  assert.equal(manager.start('basic', f).ok, true);
+  for (let i = 0; i < 4; i++) {
+    await f.clock.tick();
+    assert.ok(manager.status('basic'), 'limited data must not stop monitoring');
+    assert.equal(f.clock.queue.length, 1);
+    assert.equal(f.clock.queue[0].ms, 300000);
+    const card = (f.edits.at(-1) || f.sent[0]).embeds[0].toJSON();
+    assert.match(card.description, new RegExp(`Last checked: <t:${Math.floor(now / 1000)}:R>`));
+    assert.match(card.description, /Limited A2S data/);
+    assert.match(card.footer.text, /source time unavailable/);
+    now += 300000;
+  }
+  assert.equal(f.lookups(), 4);
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.edits.length, 3);
+  assert.equal(f.archive(), 0);
+  await manager.stopAll();
+  assert.equal(f.clock.queue.length, 0);
+});
+
+test('rich to A2S to rich recovery retains rich match ownership and resets transport failures', async t => {
   const f = fixture();
   let now = 1_800_000_000_000;
   let cooldownMs = 0;
   f.client.pollingPolicy = () => ({ enabled: true, minIntervalMs: 500, cooldownMs });
-  const manager = createWatchManager({
-    ...f.clock,
-    tracker: createRoundTracker({ now: () => 0 }),
-    now: () => now,
+  const manager = createWatchManager({ ...f.clock, now: () => now });
+  t.after(() => manager.stopAll());
+  const originalGet = f.client.getServer;
+  const tick = async () => {
+    now += 60000;
+    await f.clock.tick();
+  };
+  const latest = () => (f.edits.findLast(p => p.embeds?.length) || f.sent[0]).embeds[0].toJSON();
+  const checked = timestamp =>
+    assert.match(latest().description, new RegExp(`Last checked: <t:${timestamp}:R>`));
+  manager.start('recovery', f);
+  await f.clock.tick();
+  f.client.getServer = async () => {
+    throw Error('provider unavailable');
+  };
+  await tick();
+  checked(1800000000);
+  f.client.getServer = originalGet;
+  f.setSnapshot({
+    ...snapshot(),
+    state: 'warmup',
+    matchGuid: 'untrusted-other-guid',
+    map: 'other-map',
+    players: [],
+    quality: { a2sOnly: true },
   });
-  const description = payload => payload.embeds[0].toJSON().description;
-  let lastCard = null;
-  const preserved = () => {
-    const update = f.edits.findLast(payload => payload.embeds?.length);
-    if (update) lastCard = update;
-    assert.ok(lastCard, 'a timestamp-bearing card was published');
-    assert.match(description(lastCard), /Last checked: <t:1800000000:R>/);
-    assert.match(description(lastCard), /Last changed: <t:1800000000:R>/);
+  await tick();
+  checked(1800000120);
+  assert.match(latest().description, /Last changed: <t:1800000000:R>/);
+  assert.equal(f.sent.length, 1, 'A2S metadata must not create a new match card');
+  f.client.getServer = async () => {
+    throw Error('provider unavailable');
   };
-  manager.start('evidence', f);
-  await f.clock.tick();
-  now += 60_000;
-  f.setSnapshot({ ...snapshot(), stale: true, staleReason: 'cached fallback' });
-  await f.clock.tick();
-  preserved();
-  assert.match(f.edits.at(-1).embeds[0].toJSON().footer.text, /Stale snapshot/);
-  now += 60_000;
-  f.setSnapshot({ ...snapshot(), quality: { a2sOnly: true } });
-  await f.clock.tick();
-  preserved();
-  f.setSnapshot({ ...snapshot() });
-  now += 60_000;
-  await f.clock.tick();
-  lastCard = f.edits.at(-1);
-  assert.match(description(lastCard), /Last checked: <t:1800000180:R>/);
-  assert.match(description(lastCard), /Last changed: <t:1800000000:R>/);
-  now += 60_000;
-  f.client.selectServer = async () => {
-    throw Error('provider offline');
-  };
-  await f.clock.tick();
-  assert.match(description(lastCard), /Last checked: <t:1800000180:R>/);
-  assert.match(description(lastCard), /Last changed: <t:1800000000:R>/);
-  f.client.selectServer = async () => snapshot();
-  now += 60_000;
-  cooldownMs = 90_000;
-  await f.clock.tick();
-  assert.match(
-    description(f.edits.findLast(payload => payload.embeds?.length)),
-    /Last checked: <t:1800000240:R>/
-  );
-  now += 120_000;
+  await tick();
+  await tick();
+  assert.ok(manager.status('recovery'), 'A2S success reset the previous transport failure');
+  checked(1800000120);
+  f.client.getServer = originalGet;
+  f.setSnapshot({ ...snapshot(), scoreRed: 1 });
+  await tick();
+  checked(1800000300);
+  assert.match(latest().description, /Last changed: <t:1800000300:R>/);
+  assert.equal(f.sent.length, 1);
+  f.setSnapshot({ ...snapshot(), scoreRed: 1, stale: true, staleReason: 'cached fallback' });
+  await tick();
+  checked(1800000300);
+  assert.match(latest().footer.text, /Stale snapshot/);
+  f.setSnapshot({ ...snapshot(), scoreRed: 1 });
+  cooldownMs = 90000;
+  await tick();
+  checked(1800000300);
+  assert.match(f.edits.at(-1).content, /paused/);
+  assert.equal(f.clock.queue[0].ms, 90000);
   cooldownMs = 0;
-  await f.clock.tick();
-  assert.match(description(f.edits.at(-1)), /Last checked: <t:1800000420:R>/);
-  assert.match(description(f.edits.at(-1)), /Last changed: <t:1800000000:R>/);
-  await manager.stopAll();
-  assert.equal(f.clock.queue.length, 0);
+  await tick();
+  checked(1800000480);
 });
 
 test('stop during lookup prevents late sends and no timers survive; overlapping callback skipped', async () => {

@@ -201,19 +201,15 @@ function createWatchManager({
           }
           const hash = meaningfulHash(s);
           const fresh = !s.stale && !s.quality?.a2sOnly;
+          // A2S is a successful basic check, not authoritative live-match evidence.
+          const successfulCheck = !s.stale;
           const changedAt = fresh && w.hash !== hash ? now() : w.lastChangedAt;
-          const checkedAt = fresh ? now() : w.lastCheckedAt;
+          const checkedAt = successfulCheck ? now() : w.lastCheckedAt;
           const displaySnapshot = {
             ...s,
             localCheckedAt: checkedAt,
             localChangedAt: changedAt,
           };
-          if (w.hash === hash && !w.paused && !moveCard && w.message && !fresh) {
-            if (s.stale) throw new Error('Stale Slipgate snapshot');
-            w.failures = 0;
-            maintenanceSnapshot = s;
-            return;
-          }
           const payload = {
             content: `Auto-refresh active · ${Math.ceil(delay / 1000)}s minimum.`,
             embeds: [renderSlipgateCard(displaySnapshot)],
@@ -224,13 +220,12 @@ function createWatchManager({
           if (fresh) {
             w.hash = hash;
             w.lastChangedAt = changedAt;
-            w.lastCheckedAt = checkedAt;
           }
+          if (successfulCheck) w.lastCheckedAt = checkedAt;
           w.paused = false;
-          if (!fresh)
-            throw new Error(s.stale ? 'Stale Slipgate snapshot' : 'Unreliable A2S-only snapshot');
+          if (s.stale) throw new Error('Stale Slipgate snapshot');
           w.failures = 0;
-          maintenanceSnapshot = s;
+          maintenanceSnapshot = fresh ? s : null;
         } catch (caught) {
           let error = caught;
           if (!active(generation)) return;
