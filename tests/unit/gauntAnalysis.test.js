@@ -199,6 +199,14 @@ test('H2H facts identify the actual winner or draw and reject malformed, duplica
     }).rivalries,
     []
   );
+  assert.deepEqual(
+    buildEvidence({
+      snapshot,
+      headToHeads: [row(a, b, 3, 8), row(b, a, 8, 3), null, {}],
+    }).rivalries,
+    [],
+    'unordered pair keys reject reversed duplicate evidence without changing directed results'
+  );
 });
 
 test('lifetime ties are represented as multiple leaders, never an arbitrary unique winner', () => {

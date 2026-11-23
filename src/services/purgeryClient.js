@@ -55,7 +55,7 @@ function createPurgeryClient({ httpGet = axios.get, now = Date.now } = {}) {
   async function getPlayers(input) {
     if (!Array.isArray(input) || input.length > 50 || input.some(id => !validSteamId(id)))
       throw new TypeError('Expected at most 50 valid Steam IDs');
-    const ids = [...new Set(input)].sort();
+    const ids = [...new Set(input)].sort((a, b) => a.localeCompare(b, 'en'));
     if (!ids.length) return { players: [], missing: [] };
     const key = ids.join(',');
     const hit = cache.get(key);

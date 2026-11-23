@@ -61,14 +61,15 @@ test('coalesces concurrent duplicate requests', async () => {
     release;
   const wait = new Promise(r => (release = r));
   const c = createPurgeryClient({
-    httpGet: async () => {
+    httpGet: async (_url, options) => {
       calls++;
+      assert.equal(options.params.steam_ids, '76561198000000001,76561198000000002');
       await wait;
       return { status: 200, data: { players: [] } };
     },
   });
-  const a = c.getPlayers(['76561198000000001']),
-    b = c.getPlayers(['76561198000000001']);
+  const a = c.getPlayers(['76561198000000002', '76561198000000001', '76561198000000002']),
+    b = c.getPlayers(['76561198000000001', '76561198000000002']);
   await new Promise(r => setImmediate(r));
   assert.equal(calls, 1);
   release();

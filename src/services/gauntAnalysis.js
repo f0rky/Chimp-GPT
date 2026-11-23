@@ -80,13 +80,17 @@ function buildEvidence({
   const rawHeads = Array.isArray(headToHeads) ? headToHeads : [];
   const pairCounts = new Map();
   for (const item of rawHeads) {
-    const key = [item?.steam_id_a, item?.steam_id_b].sort().join(':');
+    const key = [item?.steam_id_a, item?.steam_id_b]
+      .sort((a, b) => String(a).localeCompare(String(b), 'en'))
+      .join(':');
     if (item?.steam_id_a && item?.steam_id_b) pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
   }
   for (const item of rawHeads) {
     const a = item?.steam_id_a,
       b = item?.steam_id_b,
-      pairKey = [a, b].sort().join(':');
+      pairKey = [a, b]
+        .sort((left, right) => String(left).localeCompare(String(right), 'en'))
+        .join(':');
     if (
       !ids.has(a) ||
       !ids.has(b) ||
