@@ -217,7 +217,10 @@ function createSlipgateClient({
       }
     } finally {
       pumping = false;
-      if (pending.length) pump();
+      if (pending.length)
+        pump().catch(() => {
+          // Admission failures are delivered to the individual queued promises.
+        });
     }
   }
   function enqueue(priority, key) {
@@ -240,7 +243,9 @@ function createSlipgateClient({
     };
     pending.push(job);
     pendingByKey.set(key, job);
-    pump();
+    pump().catch(() => {
+      // Admission failures are delivered to the individual queued promises.
+    });
     return job;
   }
   function bulk(body) {
