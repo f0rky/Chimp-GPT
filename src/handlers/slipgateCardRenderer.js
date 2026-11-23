@@ -211,9 +211,7 @@ function renderSlipgateCard(s, _now = Date.now()) {
       : phase === 'UNKNOWN'
         ? 'Match state unavailable.'
         : null,
-    s.quality?.a2sOnly && phase !== 'WARMUP' && phase !== 'UNKNOWN'
-      ? 'Scoreboard detail unavailable.'
-      : null,
+    s.quality?.a2sOnly ? 'Limited A2S data · detailed scoreboard data unavailable.' : null,
     context,
     progress,
     hasRatings

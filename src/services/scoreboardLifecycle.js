@@ -102,17 +102,31 @@ function createScoreboardLifecycle({
   active,
   now = Date.now,
   deferReconciliation = false,
+  rivalryContext = null,
+  contextSignal,
 }) {
   let message = null,
     retainedFinal = false,
     last = null,
     phase = null;
   const pending = [];
-  const payload = (s, content) => ({
-    content,
-    embeds: [renderSlipgateCard(s)],
-    allowedMentions: { parse: [] },
-  });
+  const payload = (s, content, report = null, commentary = null, kind = 'live') => {
+    const body = {
+      content,
+      embeds: [renderSlipgateCard(s)],
+      components: [],
+      allowedMentions: { parse: [] },
+    };
+    if (report) {
+      try {
+        const { appendGauntContext } = require('../handlers/gauntCardRenderer');
+        body.embeds[0] = appendGauntContext(body.embeds[0], { ...report, commentary }, { kind });
+      } catch (_) {
+        /* Optional context must never interrupt the scoreboard. */
+      }
+    }
+    return body;
+  };
   async function edit(target, body) {
     if (!active()) return;
     await perform(() => target.edit(body));
@@ -170,7 +184,7 @@ function createScoreboardLifecycle({
       pending.push({ message, old, snapshot: unconfirmed, attempts: 0, next: 0 });
     }
   }
-  async function reconcile() {
+  async function reconcile({ allowOptionalContext = true } = {}) {
     if (!active()) return;
     // One pending archive per scheduled tick; no independent retry timer or unbounded fanout.
     const job = pending.find(j => now() >= j.next);
@@ -178,8 +192,10 @@ function createScoreboardLifecycle({
     job.attempts++;
     job.next = now() + 120000;
     let final = null;
+    let rawArchive = null;
     try {
-      final = archiveFinal(await client.getMatch(job.old.matchGuid), job.old, now());
+      rawArchive = await client.getMatch(job.old.matchGuid);
+      final = archiveFinal(rawArchive, job.old, now());
     } catch (_) {
       /* Delayed 404 and other optional archive failures remain explicitly unconfirmed. */
     }
@@ -199,6 +215,36 @@ function createScoreboardLifecycle({
         // A deleted/inaccessible historical result must not stop the current live watch.
       }
       pending.splice(pending.indexOf(job), 1);
+      if (final && allowOptionalContext && rivalryContext && active()) {
+        try {
+          const evidenceSnapshot = { ...job.old, state: 'final', finalConfirmed: true };
+          const report = await rivalryContext.collect(evidenceSnapshot, {
+            archive: rawArchive,
+            signal: contextSignal,
+            isActive: active,
+          });
+          if (!active() || contextSignal?.aborted) return;
+          const commentary = report
+            ? await rivalryContext.summarize(final, report, {
+                signal: contextSignal,
+                isActive: active,
+              })
+            : null;
+          if (active() && report)
+            await edit(
+              job.message,
+              payload(
+                final,
+                'FINAL · Slipgate archived result confirmed.',
+                report,
+                commentary,
+                'final'
+              )
+            );
+        } catch (_) {
+          /* Optional final context cannot delay or undo the confirmed result. */
+        }
+      }
     }
   }
   async function prepare(s) {
@@ -231,7 +277,18 @@ function createScoreboardLifecycle({
       const found = await channel.messages.fetch({ after: message.id, limit: 100, cache: false });
       if (!active()) return false;
       const rows = typeof found.values === 'function' ? [...found.values()] : [];
-      return rows.some(m => m?.author?.bot === false && m.author.system !== true && !m.webhookId);
+      return rows.some(m => {
+        if (!m || m.author?.system === true) return false;
+        // Ignore this bot's own scoreboard cards (live or retained FINAL), but any
+        // ordinary message from another bot is channel activity like human chat.
+        const botId = channel.client?.user?.id;
+        const ownCard =
+          Boolean(botId && m.author?.id === botId) &&
+          (m.embeds || []).some(
+            e => typeof e.footer?.text === 'string' && /^Slipgate\s*[·|]/.test(e.footer.text)
+          );
+        return !ownCard;
+      });
     } catch (_) {
       return false;
     } // No delete/repost on uncertain channel-history reads.
